@@ -64,6 +64,15 @@
         "editor.tabSize": 4,
     },
 
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab_tasks",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab_assets",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab_rl",
+        "${workspaceFolder}/external/IsaacLab/scripts"
+    ],
+
     "[powershell]": {
         "debug.saveBeforeStart": "nonUntitledEditorsInActiveGroup",
         "editor.semanticHighlighting.enabled": false,

@@ -416,3 +416,12 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+.tmp/
+
+.venv/
+venv/
+**/out/*
+.copilot-tracking/*
+external/
+
+.DS_Store

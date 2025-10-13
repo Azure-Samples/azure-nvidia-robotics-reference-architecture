@@ -34,15 +34,30 @@ The architecture integrates Azure services and NVIDIA robotics frameworks (Isaac
 
 - Modular Terraform configurations referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components
 
-## Prerequisites
+## Local Development Setup
 
-- To be added...
+### Prerequisites
 
-## Quick Start
+- [pyenv](https://github.com/pyenv/pyenv)
+- Python 3.11 (required by Isaac Sim 5.X)
+
+### Quick Start
 
 ```bash
-# To be added...
+./setup-dev.sh
 ```
+
+The setup script installs Python 3.11 via pyenv, creates a virtual environment at `.venv/`, and installs training dependencies.
+
+### VS Code Configuration
+
+The workspace is configured with `python.analysis.extraPaths` pointing to `src/`, enabling imports like:
+
+```python
+from training.utils import AzureMLContext, bootstrap_azure_ml
+```
+
+Select the `.venv/bin/python` interpreter in VS Code for IntelliSense support
 
 ## License
 
