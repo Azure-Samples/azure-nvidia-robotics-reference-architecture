@@ -18,6 +18,8 @@ workflow:
         TASK: "{{ task }}"
         NUM_ENVS: "{{ num_envs }}"
         MAX_ITERATIONS: "{{ max_iterations }}"
+        ACCEPT_EULA: "Y"
+        PRIVACY_CONSENT: "Y"
         ENCODED_ARCHIVE: "{{ encoded_archive }}"
         PAYLOAD_ROOT: "{{ payload_root }}"
         AZURE_CLIENT_ID: "{{ azure_client_id }}"
@@ -54,14 +56,14 @@ workflow:
             export PYTHONPATH="${TRAINING_ROOT}:${PYTHONPATH:-}"
 
             bash "${TRAINING_ROOT}/scripts/train.sh" \
-              --task "${TASK:-Isaaclab-Aeon-ReachAndPush-v0}" \
+              --task "${TASK}" \
               --num_envs "${NUM_ENVS:-2048}" \
               --headless \
               ${MAX_ITERATIONS:+--max_iterations "${MAX_ITERATIONS}"}
 
 default-values:
-  image: nvcr.io/nvidia/isaac-sim:latest
-  task: Isaaclab-Aeon-ReachAndPush-v0
+  image: nvcr.io/nvidia/isaac-lab:2.2.0
+  task: Isaac-Velocity-Rough-Anymal-C-v0
   num_envs: "2048"
   max_iterations: ""
   encoded_archive: ""

@@ -49,10 +49,10 @@ WORKFLOW_TEMPLATE=${WORKFLOW_TEMPLATE:-"$REPO_ROOT/deploy/004-workflow/osmo/temp
 TMP_DIR=${TMP_DIR:-"$REPO_ROOT/deploy/004-workflow/osmo/.tmp"}
 ARCHIVE_PATH=${ARCHIVE_PATH:-"$TMP_DIR/osmo-training.zip"}
 B64_PATH=${B64_PATH:-"$TMP_DIR/osmo-training.b64"}
-TASK_VALUE=${TASK:-Isaaclab-Aeon-ReachAndPush-v0}
+TASK_VALUE=${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}
 NUM_ENVS_VALUE=${NUM_ENVS:-2048}
 MAX_ITERATIONS_VALUE=${MAX_ITERATIONS:-}
-IMAGE_VALUE=${IMAGE:-nvcr.io/nvidia/isaac-sim:latest}
+IMAGE_VALUE=${IMAGE:-nvcr.io/nvidia/isaac-lab:2.2.0}
 PAYLOAD_ROOT_VALUE=${PAYLOAD_ROOT:-/workspace/isaac_payload}
 RUN_AZURE_SMOKE_TEST_VALUE=${RUN_AZURE_SMOKE_TEST:-0}
 
