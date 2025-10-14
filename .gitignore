@@ -422,6 +422,5 @@ FodyWeavers.xsd
 venv/
 **/out/*
 .copilot-tracking/*
-external/
 
 .DS_Store
