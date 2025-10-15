@@ -112,17 +112,48 @@ def _build_metric_callback(mlflow_module):
         if step % _METRIC_INTERVAL != 0:
             return
         metrics = {}
+
         for key in ("episode_reward_mean", "success_rate", "episode_length_mean"):
             value = info.get(key)
             if value is not None:
                 metrics[key] = float(value)
+
+        for key in ("timesteps_total", "iterations_total", "fps"):
+            value = info.get(key)
+            if value is not None:
+                metrics[key] = float(value)
+
+        for key in ("policy_loss", "value_loss", "entropy", "learning_rate"):
+            value = info.get(key)
+            if value is not None:
+                metrics[key] = float(value)
+
+        for stat_key in ("episode_reward", "episode_length"):
+            for suffix in ("_min", "_max", "_std"):
+                key = f"{stat_key}{suffix}"
+                value = info.get(key)
+                if value is not None:
+                    metrics[key] = float(value)
+
+        try:
+            import torch
+            if torch.cuda.is_available():
+                device = torch.cuda.current_device()
+                metrics["gpu_memory_allocated"] = float(torch.cuda.memory_allocated(device)) / (1024**3)
+                try:
+                    metrics["gpu_utilization"] = float(torch.cuda.utilization(device))
+                except (AttributeError, RuntimeError):
+                    pass
+        except ImportError:
+            pass
+
         if metrics:
             mlflow_module.log_metrics(metrics, step=step)
 
     return _callback
 
 
-def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> None:
+def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> Optional[str]:
     params_dir = log_dir / "params"
     for rel_path in ("env.yaml", "agent.yaml", "env.pkl", "agent.pkl"):
         candidate = params_dir / rel_path
@@ -130,9 +161,68 @@ def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> 
             mlflow_module.log_artifact(str(candidate), artifact_path="skrl-run")
     if resume_path:
         mlflow_module.log_artifact(resume_path, artifact_path="skrl-run/checkpoints")
+    checkpoint_dir = log_dir / "checkpoints"
+    active_run = mlflow_module.active_run()
+    latest_uri: Optional[str] = None
+    if checkpoint_dir.exists() and checkpoint_dir.is_dir():
+        mlflow_module.log_artifacts(str(checkpoint_dir), artifact_path="skrl-run/checkpoints")
+        latest_file: Optional[Path] = None
+        for candidate in checkpoint_dir.rglob("*"):
+            if candidate.is_file():
+                if latest_file is None or candidate.stat().st_mtime > latest_file.stat().st_mtime:
+                    latest_file = candidate
+        if active_run and latest_file:
+            run_id = active_run.info.run_id
+            relative_path = latest_file.relative_to(checkpoint_dir)
+            directory_uri = f"runs:/{run_id}/skrl-run/checkpoints"
+            latest_uri = f"{directory_uri}/{relative_path.as_posix()}"
+            mlflow_module.set_tag("checkpoint_directory", directory_uri)
+            mlflow_module.set_tag("checkpoint_latest", latest_uri)
+            token = f"::checkpoint_uri::{latest_uri}"
+            mlflow_module.set_tag("checkpoint_log_token", token)
+            _LOGGER.info("Latest SKRL checkpoint stored at %s", latest_uri)
+            print(token)
     videos_dir = log_dir / "videos"
     if videos_dir.exists():
         mlflow_module.log_artifacts(str(videos_dir), artifact_path="videos")
+    return latest_uri
+
+
+def _register_checkpoint_model(
+    *,
+    context: Optional[AzureMLContext],
+    model_name: str,
+    checkpoint_uri: str,
+    checkpoint_mode: Optional[str],
+    task: Optional[str],
+) -> None:
+    if context is None:
+        _LOGGER.warning("Azure ML context unavailable; skipping checkpoint registration for %s", model_name)
+        return
+    try:
+        from azure.ai.ml.entities import Model
+    except ImportError as exc:  # pragma: no cover - dependency guard
+        _LOGGER.error("Azure ML SDK missing; cannot register checkpoint %s: %s", model_name, exc)
+        return
+
+    tags = {
+        "checkpoint_mode": checkpoint_mode or "from-scratch",
+    }
+    if task:
+        tags["task"] = task
+
+    try:
+        model = Model(
+            name=model_name,
+            path=checkpoint_uri,
+            type="custom_model",
+            description="IsaacLab SKRL checkpoint artifact",
+            tags=tags,
+        )
+        context.client.models.create_or_update(model)
+        _LOGGER.info("Registered SKRL checkpoint %s as Azure ML model %s", checkpoint_uri, model_name)
+    except Exception as exc:  # pragma: no cover - AzureML errors are environment-dependent
+        _LOGGER.error("Failed to register checkpoint %s as Azure ML model %s: %s", checkpoint_uri, model_name, exc)
 
 
 def _resolve_env_count(env_cfg) -> Optional[int]:
@@ -161,6 +251,8 @@ def _namespace_to_tokens(args: argparse.Namespace) -> Sequence[str]:
         tokens.extend(["--max_iterations", str(args.max_iterations)])
     if getattr(args, "headless", False):
         tokens.append("--headless")
+    if getattr(args, "checkpoint", None):
+        tokens.extend(["--checkpoint", str(args.checkpoint)])
     return tokens
 
 
@@ -187,6 +279,7 @@ def run_training(
     simulation_app = app_launcher.app
 
     try:
+        import isaaclab_tasks  # noqa: F401
         from isaaclab_tasks.utils.hydra import hydra_task_config
         import gymnasium as gym_module
         import skrl as skrl_module
@@ -289,6 +382,11 @@ def run_training(
                 mlflow_module.set_tag("entrypoint", "training/scripts/train.py")
                 if context:
                     mlflow_module.set_tag("azureml_workspace", context.workspace_name)
+                checkpoint_mode = getattr(args, "checkpoint_mode", None)
+                if checkpoint_mode:
+                    mlflow_module.set_tag("checkpoint_mode", checkpoint_mode)
+                if getattr(args, "checkpoint_uri", None):
+                    mlflow_module.set_tag("checkpoint_source_uri", args.checkpoint_uri)
                 if hasattr(runner, "register_callback"):
                     runner.register_callback("on_episode_end", _build_metric_callback(mlflow_module))
 
@@ -301,7 +399,16 @@ def run_training(
                 env.close()
                 if mlflow_module and run_started:
                     mlflow_module.set_tag("training_outcome", outcome)
-                    _log_artifacts(mlflow_module, log_dir, resume_path)
+                    latest_checkpoint_uri = _log_artifacts(mlflow_module, log_dir, resume_path)
+                    register_name = getattr(args, "register_checkpoint", None)
+                    if register_name and latest_checkpoint_uri:
+                        _register_checkpoint_model(
+                            context=context,
+                            model_name=register_name,
+                            checkpoint_uri=latest_checkpoint_uri,
+                            checkpoint_mode=getattr(args, "checkpoint_mode", None),
+                            task=args_cli.task,
+                        )
                     mlflow_module.end_run()
 
         _launch()

@@ -32,6 +32,10 @@ workflow:
         MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES: "{{ mlflow_token_refresh_retries }}"
         MLFLOW_HTTP_REQUEST_TIMEOUT: "{{ mlflow_http_request_timeout }}"
         RUN_AZURE_SMOKE_TEST: "{{ run_azure_smoke_test }}"
+        PYTHON: "{{ python }}"
+        CHECKPOINT_URI: "{{ checkpoint_uri }}"
+        CHECKPOINT_MODE: "{{ checkpoint_mode }}"
+        REGISTER_CHECKPOINT: "{{ register_checkpoint }}"
       files:
         - path: /tmp/entry.sh
           contents: |
@@ -55,11 +59,23 @@ workflow:
 
             export PYTHONPATH="${TRAINING_ROOT}:${PYTHONPATH:-}"
 
-            bash "${TRAINING_ROOT}/scripts/train.sh" \
-              --task "${TASK}" \
-              --num_envs "${NUM_ENVS:-2048}" \
-              --headless \
-              ${MAX_ITERATIONS:+--max_iterations "${MAX_ITERATIONS}"}
+            MODE="train"
+            if [[ "${RUN_AZURE_SMOKE_TEST:-0}" == "1" ]]; then
+              MODE="smoke-test"
+            fi
+
+            train_args=(
+              --mode "${MODE}"
+              --task "${TASK:-}"
+              --num_envs "${NUM_ENVS:-}"
+              --max_iterations "${MAX_ITERATIONS:-}"
+              --checkpoint-uri "${CHECKPOINT_URI:-}"
+              --checkpoint-mode "${CHECKPOINT_MODE:-from-scratch}"
+              --register-checkpoint "${REGISTER_CHECKPOINT:-}"
+              --headless
+            )
+
+            bash "${TRAINING_ROOT}/scripts/train.sh" "${train_args[@]}"
 
 default-values:
   image: nvcr.io/nvidia/isaac-lab:2.2.0
@@ -77,4 +93,8 @@ default-values:
   azure_federated_token_file: /var/run/secrets/azure/tokens/azure-identity-token
   mlflow_token_refresh_retries: "3"
   mlflow_http_request_timeout: "60"
+  python: "/workspace/isaaclab/isaaclab.sh -p"
   run_azure_smoke_test: "0"
+  checkpoint_uri: ""
+  checkpoint_mode: "from-scratch"
+  register_checkpoint: ""

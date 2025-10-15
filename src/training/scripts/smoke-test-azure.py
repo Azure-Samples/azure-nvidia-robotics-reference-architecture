@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
-from training.scripts import train as train_entrypoint
+from training.scripts import launch as launch_entrypoint
 
 _LOGGER = logging.getLogger("isaaclab.azure-smoke")
 _DEFAULT_EXPERIMENT = "isaaclab-smoke-test"
@@ -170,7 +170,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
     args = _parse_args(argv)
 
-    train_entrypoint._ensure_dependencies()
+    launch_entrypoint._ensure_dependencies()
 
     try:
         user_tags = _parse_tags(args.tag)

@@ -14,11 +14,15 @@ Options:
   -m, --max-iterations N  Maximum iteration override (blank to unset).
   -i, --image IMAGE       Container image override for the workflow.
   -p, --payload-root DIR  Runtime extraction root override.
+  -c, --checkpoint-uri URI  MLflow checkpoint artifact URI to resume or warm-start from.
+  -M, --checkpoint-mode MODE  Checkpoint mode (from-scratch, warm-start, resume, fresh).
+  -r, --register-checkpoint NAME  Azure ML model name to register the final checkpoint under.
   -s, --run-smoke-test    Enable the Azure connectivity smoke test before training.
   -h, --help              Show this help message and exit.
 
 Environment overrides:
   TASK, NUM_ENVS, MAX_ITERATIONS, IMAGE, PAYLOAD_ROOT, RUN_AZURE_SMOKE_TEST
+  CHECKPOINT_URI, CHECKPOINT_MODE, REGISTER_CHECKPOINT
 
 Additional arguments after -- are forwarded to osmo workflow submit.
 EOF
@@ -55,6 +59,31 @@ MAX_ITERATIONS_VALUE=${MAX_ITERATIONS:-}
 IMAGE_VALUE=${IMAGE:-nvcr.io/nvidia/isaac-lab:2.2.0}
 PAYLOAD_ROOT_VALUE=${PAYLOAD_ROOT:-/workspace/isaac_payload}
 RUN_AZURE_SMOKE_TEST_VALUE=${RUN_AZURE_SMOKE_TEST:-0}
+CHECKPOINT_URI_VALUE=${CHECKPOINT_URI:-}
+CHECKPOINT_MODE_VALUE=${CHECKPOINT_MODE:-from-scratch}
+REGISTER_CHECKPOINT_VALUE=${REGISTER_CHECKPOINT:-}
+
+normalize_checkpoint_mode() {
+  local mode="$1"
+  if [[ -z "$mode" ]]; then
+    echo "from-scratch"
+    return
+  fi
+  local lowered
+  lowered=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
+  case "$lowered" in
+    from-scratch|warm-start|resume)
+      echo "$lowered"
+      ;;
+    fresh)
+      echo "from-scratch"
+      ;;
+    *)
+      echo "Unsupported checkpoint mode: $mode" >&2
+      exit 1
+      ;;
+  esac
+}
 
 forward_args=()
 while [[ $# -gt 0 ]]; do
@@ -83,6 +112,18 @@ while [[ $# -gt 0 ]]; do
       PAYLOAD_ROOT_VALUE="$2"
       shift 2
       ;;
+    -c|--checkpoint-uri)
+      CHECKPOINT_URI_VALUE="$2"
+      shift 2
+      ;;
+    -M|--checkpoint-mode)
+      CHECKPOINT_MODE_VALUE="$2"
+      shift 2
+      ;;
+    -r|--register-checkpoint)
+      REGISTER_CHECKPOINT_VALUE="$2"
+      shift 2
+      ;;
     -s|--run-smoke-test)
       RUN_AZURE_SMOKE_TEST_VALUE="1"
       shift
@@ -102,6 +143,8 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+CHECKPOINT_MODE_VALUE=$(normalize_checkpoint_mode "$CHECKPOINT_MODE_VALUE")
 
 if [[ ! -f "$WORKFLOW_TEMPLATE" ]]; then
   echo "Workflow template not found: $WORKFLOW_TEMPLATE" >&2
@@ -150,6 +193,9 @@ submit_args=(
   "num_envs=$NUM_ENVS_VALUE"
   "payload_root=$PAYLOAD_ROOT_VALUE"
   "run_azure_smoke_test=$RUN_AZURE_SMOKE_TEST_VALUE"
+  "checkpoint_uri=$CHECKPOINT_URI_VALUE"
+  "checkpoint_mode=$CHECKPOINT_MODE_VALUE"
+  "register_checkpoint=$REGISTER_CHECKPOINT_VALUE"
 )
 
 if [[ -n "$MAX_ITERATIONS_VALUE" ]]; then
