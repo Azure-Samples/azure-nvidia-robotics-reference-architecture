@@ -136,7 +136,7 @@ def _start_run(
     mlflow_module = _load_mlflow()
 
     tags = {
-        "entrypoint": "training/scripts/smoke-test-azure.py",
+        "entrypoint": "training/scripts/smoke_test_azure.py",
         "smoke_test": "azure-connectivity",
         "workspace_name": context.workspace_name,
     }
