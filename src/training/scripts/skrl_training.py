@@ -16,7 +16,34 @@ from training.scripts.skrl_mlflow_agent import MLflowAgentWrapper
 from training.utils import AzureMLContext
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
-_METRIC_INTERVAL = 10
+
+
+def _parse_mlflow_log_interval(interval_arg: str, rollouts: int) -> int:
+    """Parse mlflow_log_interval argument into integer interval.
+
+    Args:
+        interval_arg: CLI argument value (preset name or integer string)
+        rollouts: Number of rollouts per iteration from agent config
+
+    Returns:
+        Integer interval for metric logging
+    """
+    interval_arg = interval_arg.strip().lower()
+    if interval_arg == "step":
+        return 1
+    if interval_arg == "balanced":
+        return 10
+    if interval_arg == "rollout":
+        return rollouts if rollouts > 0 else 10
+    try:
+        interval = int(interval_arg)
+        if interval < 1:
+            _LOGGER.warning("MLflow log interval must be >= 1, using default (10)")
+            return 10
+        return interval
+    except ValueError:
+        _LOGGER.warning("Invalid mlflow_log_interval '%s', using default (10)", interval_arg)
+        return 10
 
 
 def _build_parser(app_launcher_cls) -> argparse.ArgumentParser:
@@ -46,6 +73,12 @@ def _build_parser(app_launcher_cls) -> argparse.ArgumentParser:
     parser.add_argument("--video", action="store_true", help="Record rollout videos")
     parser.add_argument("--video_length", type=int, default=200, help="Video duration in steps")
     parser.add_argument("--video_interval", type=int, default=2000, help="Video capture interval")
+    parser.add_argument(
+        "--mlflow_log_interval",
+        type=str,
+        default="balanced",
+        help="MLflow metric logging interval: 'step' (every step), 'balanced' (every 10 steps), 'rollout' (per rollout), or integer",
+    )
     app_launcher_cls.add_app_launcher_args(parser)
     return parser
 
@@ -400,11 +433,17 @@ def run_training(
 
             if mlflow_module:
                 try:
-                    _LOGGER.info("Wrapping agent with MLflowAgentWrapper for metric logging")
+                    rollouts = agent_dict.get("agent", {}).get("rollouts", 1)
+                    log_interval = _parse_mlflow_log_interval(args_cli.mlflow_log_interval, rollouts)
+                    _LOGGER.info(
+                        "Wrapping agent with MLflowAgentWrapper for metric logging (interval=%d, preset=%s)",
+                        log_interval,
+                        args_cli.mlflow_log_interval,
+                    )
                     runner.agent = MLflowAgentWrapper(
                         agent=runner.agent,
                         mlflow_module=mlflow_module,
-                        log_interval=_METRIC_INTERVAL,
+                        log_interval=log_interval,
                     )
                 except AttributeError as exc:
                     raise RuntimeError("Runner must have agent attribute when MLflow logging is enabled") from exc
@@ -416,6 +455,8 @@ def run_training(
                 mlflow_module.start_run(run_name=log_dir.name)
                 run_started = True
                 env_count = _resolve_env_count(env_cfg)
+                rollouts = agent_dict.get("agent", {}).get("rollouts", 1)
+                log_interval = _parse_mlflow_log_interval(args_cli.mlflow_log_interval, rollouts)
                 mlflow_module.log_params(
                     {
                         "algorithm": args_cli.algorithm,
@@ -424,6 +465,8 @@ def run_training(
                         "distributed": args_cli.distributed,
                         "resume_checkpoint": bool(resume_path),
                         "seed": random_seed,
+                        "mlflow_log_interval": log_interval,
+                        "mlflow_log_interval_preset": args_cli.mlflow_log_interval,
                     }
                 )
                 if resume_path:
