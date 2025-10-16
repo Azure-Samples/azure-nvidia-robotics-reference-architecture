@@ -29,6 +29,13 @@ This wrapper extracts the following metric categories from SKRL agents:
 All entries in agent.tracking_data dict are extracted, supporting custom metrics
 from different SKRL algorithms (PPO, SAC, TD3, DDPG, A2C, etc.).
 
+Metric Logging
+--------------
+Metrics are logged to MLflow after each agent._update() call, which is when SKRL
+agents populate their tracking_data dict. This occurs after collecting rollouts
+(e.g., every 16 environment steps for default PPO config), ensuring metrics
+reflect actual training updates rather than environment interactions.
+
 Metric Filtering
 ----------------
 Use the metric_filter parameter to control which metrics are logged:
@@ -46,15 +53,19 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MLflowAgentWrapper:
-    """Wrapper around SKRL agents to intercept post_interaction and log metrics to MLflow.
+    """Wrapper around SKRL agents to intercept _update and log metrics to MLflow.
 
     This wrapper uses delegation to transparently proxy all agent operations while
-    intercepting post_interaction() calls to extract and log training metrics to MLflow.
+    intercepting _update() calls to extract and log training metrics to MLflow.
+    The _update() method is the correct hook point because SKRL agents only populate
+    their tracking_data dict during _update() calls (after collecting rollouts), not
+    during post_interaction() which happens after every environment step.
 
     Args:
         agent: The SKRL agent instance to wrap
         mlflow_module: The mlflow module for logging metrics
-        log_interval: Number of steps between metric logging (default: 10)
+        log_interval: Deprecated parameter, kept for backward compatibility but not used.
+            Metrics are now logged on every _update() call when tracking_data is populated.
         metric_filter: Optional set of metric names to log. If None, all metrics are logged.
             Use this to reduce MLflow API load by only logging specific metrics of interest.
     """
@@ -68,9 +79,7 @@ class MLflowAgentWrapper:
     ) -> None:
         self._agent = agent
         self._mlflow = mlflow_module
-        self._log_interval = log_interval
         self._metric_filter = metric_filter
-        self._step_count = 0
 
         if not hasattr(agent, "tracking_data"):
             raise AttributeError(
@@ -87,30 +96,30 @@ class MLflowAgentWrapper:
         """Delegate all attribute access to the wrapped agent except for explicitly overridden methods."""
         return getattr(self._agent, name)
 
-    def post_interaction(self, *args, **kwargs) -> Any:
-        """Override post_interaction to extract and log metrics to MLflow.
+    def _update(self, timestep: int, timesteps: int) -> Any:
+        """Override _update to extract and log metrics to MLflow after each training update.
 
-        Calls the original agent's post_interaction method, then extracts metrics
-        from the agent's internal state and logs them to MLflow at the configured interval.
+        Calls the original agent's _update method first (which populates tracking_data),
+        then extracts metrics and logs them to MLflow. This is the correct hook point
+        because SKRL agents only populate tracking_data during _update() calls, not
+        during post_interaction() which happens after every environment step.
 
         Args:
-            *args: Positional arguments passed to the wrapped agent's post_interaction
-            **kwargs: Keyword arguments passed to the wrapped agent's post_interaction
+            timestep: Current timestep in the training process
+            timesteps: Total number of timesteps for training
 
         Returns:
-            The return value from the wrapped agent's post_interaction method
+            The return value from the wrapped agent's _update method
         """
-        result = self._agent.post_interaction(*args, **kwargs)
+        result = self._agent._update(timestep, timesteps)
 
-        self._step_count += 1
-
-        if self._step_count % self._log_interval == 0:
-            try:
-                metrics = self._extract_metrics()
-                if metrics and self._mlflow:
-                    self._mlflow.log_metrics(metrics, step=self._step_count)
-            except Exception as exc:
-                _LOGGER.warning("Failed to extract or log metrics at step %d: %s", self._step_count, exc)
+        try:
+            metrics = self._extract_metrics()
+            if metrics and self._mlflow:
+                self._mlflow.log_metrics(metrics, step=timestep)
+                _LOGGER.debug("Logged %d metrics to MLflow at timestep %d", len(metrics), timestep)
+        except Exception as exc:
+            _LOGGER.warning("Failed to extract or log metrics at timestep %d: %s", timestep, exc)
 
         return result
 

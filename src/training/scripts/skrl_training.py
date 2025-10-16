@@ -436,15 +436,14 @@ def run_training(
                     rollouts = agent_dict.get("agent", {}).get("rollouts", 1)
                     log_interval = _parse_mlflow_log_interval(args_cli.mlflow_log_interval, rollouts)
                     _LOGGER.info(
-                        "Wrapping agent with MLflowAgentWrapper for metric logging (interval=%d, preset=%s)",
-                        log_interval,
-                        args_cli.mlflow_log_interval,
+                        "Wrapping agent with MLflowAgentWrapper for metric logging after each _update() call"
                     )
-                    runner.agent = MLflowAgentWrapper(
+                    wrapped_agent = MLflowAgentWrapper(
                         agent=runner.agent,
                         mlflow_module=mlflow_module,
                         log_interval=log_interval,
                     )
+                    runner._agent = wrapped_agent
                 except AttributeError as exc:
                     raise RuntimeError("Runner must have agent attribute when MLflow logging is enabled") from exc
 
