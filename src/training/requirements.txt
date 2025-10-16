@@ -3,3 +3,4 @@ azure-ai-ml
 azureml-mlflow
 mlflow
 packaging
+skrl>=1.4.3

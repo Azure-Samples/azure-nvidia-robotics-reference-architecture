@@ -12,15 +12,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Sequence
 
-try:
-    from packaging.version import parse as parse_version
-except ImportError:
-    parse_version = None
-
 from training.utils import AzureMLContext
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
-_SKRL_MIN_VERSION = "1.4.3"
 _METRIC_INTERVAL = 10
 
 
@@ -64,17 +58,6 @@ def _agent_entry(args_cli: argparse.Namespace) -> str:
     if algorithm in {"ippo", "mappo", "amp"}:
         return f"skrl_{algorithm}_cfg_entry_point"
     return "skrl_cfg_entry_point"
-
-
-def _ensure_skrl_version(skrl_module) -> None:
-    if parse_version is None:
-        _LOGGER.warning("packaging module unavailable; skipping skrl version enforcement")
-        return
-
-    if parse_version(skrl_module.__version__) < parse_version(_SKRL_MIN_VERSION):
-        raise SystemExit(
-            f"skrl {skrl_module.__version__} detected; version >= {_SKRL_MIN_VERSION} is required"
-        )
 
 
 def _prepare_log_paths(agent_cfg: Dict, args_cli: argparse.Namespace) -> Path:
@@ -305,8 +288,6 @@ def run_training(
         from isaaclab_tasks.utils.hydra import hydra_task_config
         import gymnasium as gym_module
         import skrl as skrl_module
-        _ensure_skrl_version(skrl_module)
-        _LOGGER.info("Detected skrl version: %s", getattr(skrl_module, "__version__", "unknown"))
 
         from isaaclab.envs import (
             DirectMARLEnv,
@@ -334,8 +315,13 @@ def run_training(
             import mlflow as mlflow_module
         agent_entry = _agent_entry(args_cli)
 
+        if args_cli.seed == -1:
+            args_cli.seed = random.randint(0, 10000)
+
         @hydra_task_config(args_cli.task, agent_entry)
         def _launch(env_cfg, agent_cfg):
+            _LOGGER.info("_launch() function entered with env_cfg type: %s, agent_cfg type: %s",
+                        type(env_cfg).__name__, type(agent_cfg).__name__)
             random_seed = args_cli.seed if args_cli.seed is not None else random.randint(1, 1_000_000)
             random.seed(random_seed)
             os.environ.setdefault("PYTHONHASHSEED", str(random_seed))
@@ -348,25 +334,48 @@ def run_training(
             elif isinstance(env_cfg, DirectMARLEnvCfg):
                 env_cfg.num_envs = args_cli.num_envs or env_cfg.num_envs
 
+            if args_cli.distributed:
+                env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
+
+            env_cfg.seed = random_seed
+
+            if isinstance(agent_cfg, dict):
+                agent_dict = agent_cfg
+            else:
+                agent_dict = agent_cfg.to_dict()
+
+            if args_cli.max_iterations:
+                rollouts = agent_dict.get("agent", {}).get("rollouts", 1)
+                agent_dict["trainer"]["timesteps"] = args_cli.max_iterations * rollouts
+                _LOGGER.info("Setting trainer timesteps: %d iterations × %d rollouts = %d timesteps",
+                           args_cli.max_iterations, rollouts, agent_dict["trainer"]["timesteps"])
+
+            agent_dict["trainer"]["close_environment_at_exit"] = False
+            agent_dict["seed"] = random_seed
+
+            if args_cli.ml_framework.startswith("jax"):
+                skrl_module.config.jax.backend = "jax" if args_cli.ml_framework == "jax" else "numpy"
+
             env_dict = env_cfg.to_dict()
-            agent_dict = agent_cfg.to_dict()
 
             print_dict(env_dict)
             print_dict(agent_dict)
 
-            log_dir = _prepare_log_paths(agent_cfg, args_cli)
+            log_dir = _prepare_log_paths(agent_dict, args_cli)
             params_dir = log_dir / "params"
             params_dir.mkdir(parents=True, exist_ok=True)
             dump_yaml(str(params_dir / "env.yaml"), env_cfg)
-            dump_yaml(str(params_dir / "agent.yaml"), agent_cfg)
+            dump_yaml(str(params_dir / "agent.yaml"), agent_dict)
             if dump_pickle:
                 dump_pickle(str(params_dir / "env.pkl"), env_cfg)
-                dump_pickle(str(params_dir / "agent.pkl"), agent_cfg)
+                dump_pickle(str(params_dir / "agent.pkl"), agent_dict)
 
             resume_path = _resolve_checkpoint(retrieve_file_path, args_cli.checkpoint)
             if isinstance(env_cfg, ManagerBasedRLEnvCfg) and args_cli.export_io_descriptors:
                 env_cfg.export_io_descriptors = True
                 env_cfg.io_descriptors_output_dir = str(log_dir)
+
+            env_cfg.log_dir = str(log_dir)
 
             env_count = _resolve_env_count(env_cfg)
             trainer_cfg = agent_dict.get("agent", {}).get("trainer", {})
@@ -375,16 +384,31 @@ def run_training(
                 "ml_framework": args_cli.ml_framework,
                 "num_envs": env_count,
                 "max_iterations": args_cli.max_iterations,
+                "trainer_timesteps": trainer_cfg.get("timesteps"),
+                "rollouts": agent_dict.get("agent", {}).get("rollouts"),
                 "distributed": args_cli.distributed,
-                "trainer": trainer_cfg,
+                "seed": random_seed,
+                "device": env_cfg.sim.device if hasattr(env_cfg, "sim") else None,
             }
             _LOGGER.info("SKRL training configuration: %s", config_snapshot)
 
+            all_envs = list(gym_module.envs.registry.keys())
+            isaac_envs = [e for e in all_envs if e.startswith("Isaac-")]
+            _LOGGER.info("Registered Isaac environments (%d total): %s", len(isaac_envs), isaac_envs[:10])
+
+            if args_cli.task not in all_envs:
+                _LOGGER.error("Task '%s' is not registered in gym. Available Isaac tasks: %s",
+                            args_cli.task, isaac_envs)
+                raise ValueError(f"Task {args_cli.task} not found in gym registry")
+
+            _LOGGER.info("Creating environment for task: %s", args_cli.task)
             env = gym_module.make(
                 args_cli.task,
                 cfg=env_cfg,
                 render_mode="rgb_array" if args_cli.video else None,
             )
+            _LOGGER.info("Environment created successfully: %s (type: %s)",
+                        args_cli.task, type(env.unwrapped).__name__)
 
             if isinstance(env.unwrapped, DirectMARLEnv) and args_cli.algorithm.lower() == "ppo":
                 env = multi_agent_to_single_agent(env)
@@ -392,8 +416,23 @@ def run_training(
             env = _maybe_wrap_video(gym_module, env, args_cli, log_dir)
             env = SkrlVecEnvWrapper(env, ml_framework=args_cli.ml_framework)
 
-            runner = Runner(env, agent_cfg)
+            _LOGGER.info("Creating SKRL Runner with agent config keys: %s", list(agent_dict.keys()))
+            _LOGGER.info("Agent trainer config: %s", agent_dict.get("trainer", {}))
+            _LOGGER.info("Agent agent config keys: %s", list(agent_dict.get("agent", {}).keys()))
+
+            runner = Runner(env, agent_dict)
+
+            _LOGGER.info("Runner created successfully (type: %s)", type(runner).__name__)
+            if hasattr(runner, "agent"):
+                agent_info = {
+                    "agent_type": type(runner.agent).__name__,
+                    "has_memory": hasattr(runner.agent, "memory"),
+                    "has_training_started": getattr(runner.agent, "training_started", None),
+                }
+                _LOGGER.info("Runner agent info: %s", agent_info)
+
             if resume_path and hasattr(runner, "agent"):
+                _LOGGER.info("Loading checkpoint from: %s", resume_path)
                 runner.agent.load(resume_path)
 
             outcome = "success"
@@ -435,11 +474,16 @@ def run_training(
                 "log_dir": str(log_dir),
                 "resume_checkpoint": bool(resume_path),
                 "resume_path": resume_path,
+                "trainer_timesteps": agent_dict.get("trainer", {}).get("timesteps"),
+                "max_iterations": args_cli.max_iterations,
+                "rollouts": agent_dict.get("agent", {}).get("rollouts"),
             }
             _LOGGER.info("SKRL runner starting: %s", run_descriptor)
 
             try:
+                _LOGGER.info("Calling runner.run() - training should begin now...")
                 runner.run()
+                _LOGGER.info("runner.run() completed")
             except Exception:
                 outcome = "failed"
                 failure_payload = dict(run_descriptor)
@@ -470,8 +514,20 @@ def run_training(
                         )
                     mlflow_module.end_run()
 
-        _launch()
-    except ImportError as exc:  # pragma: no cover - dependency diagnostics
+        try:
+            _LOGGER.info("About to call _launch() decorated function")
+            _launch()
+            _LOGGER.info("_launch() returned successfully")
+        except Exception:
+            _LOGGER.exception("Exception during _launch() execution")
+            raise
+    except ImportError as exc:
+        _LOGGER.error("ImportError caught in run_training: %s", exc)
         raise SystemExit("Required IsaacLab dependencies are missing for SKRL training") from exc
+    except Exception:
+        _LOGGER.exception("Unexpected exception in run_training")
+        raise
     finally:
+        _LOGGER.info("Closing simulation_app")
         simulation_app.close()
+        _LOGGER.info("simulation_app closed")
