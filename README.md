@@ -32,14 +32,21 @@ The architecture integrates Azure services and NVIDIA robotics frameworks (Isaac
 
 ### Infrastructure as Code
 
-- Modular Terraform configurations referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components
+* Modular Terraform configurations referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components
+
+### MLflow Integration
+
+* Automatic metric logging from SKRL agents to Azure ML
+* Comprehensive tracking of episode statistics, losses, optimization metrics, and timing data
+* Configurable logging intervals and metric filtering
+* See [MLflow Integration Guide](docs/mlflow-integration.md) for details
 
 ## Local Development Setup
 
 ### Prerequisites
 
-- [pyenv](https://github.com/pyenv/pyenv)
-- Python 3.11 (required by Isaac Sim 5.X)
+* [pyenv](https://github.com/pyenv/pyenv)
+* Python 3.11 (required by Isaac Sim 5.X)
 
 ### Quick Start
 
@@ -67,13 +74,13 @@ This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for
 
 For issues and questions:
 
-- Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
+* Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
 
 ## Acknowledgments
 
 This reference architecture builds upon:
 
-- [microsoft/edge-ai](https://github.com/microsoft/edge-ai) - Edge AI infrastructure components
-- [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) - RL task framework
-- [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) - Physics simulation
-- [NVIDIA OSMO](https://developer.nvidia.com/osmo) - Workflow orchestration
+* [microsoft/edge-ai](https://github.com/microsoft/edge-ai) - Edge AI infrastructure components
+* [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) - RL task framework
+* [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) - Physics simulation
+* [NVIDIA OSMO](https://developer.nvidia.com/osmo) - Workflow orchestration
