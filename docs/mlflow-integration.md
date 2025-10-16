@@ -1,14 +1,14 @@
 # MLflow Integration for SKRL Training
 
-This document explains how to use the `MLflowAgentWrapper` to automatically log training metrics from SKRL agents to MLflow during Isaac Lab training runs.
+This document explains how MLflow metric logging is integrated with SKRL agent training during Isaac Lab training runs.
 
 ## Overview
 
-The `MLflowAgentWrapper` transparently wraps SKRL agents to intercept their `post_interaction()` calls and extract training metrics for logging to MLflow. This provides comprehensive experiment tracking without modifying the underlying training code.
+The training pipeline uses monkey-patching to wrap the agent's `_update` method, intercepting training updates to extract and log metrics to MLflow. This approach provides comprehensive experiment tracking without modifying the underlying SKRL agent implementation or training code.
 
 ## Available Metrics
 
-The wrapper automatically extracts metrics from SKRL agents across several categories:
+The MLflow integration automatically extracts metrics from SKRL agents across several categories:
 
 ### Episode Statistics
 
@@ -44,7 +44,7 @@ The wrapper automatically extracts metrics from SKRL agents across several categ
 
 ### Multi-Element Metrics
 
-For metrics with multiple values (tensors or arrays), the wrapper extracts statistical aggregates:
+For metrics with multiple values (tensors or arrays), the integration extracts statistical aggregates:
 
 * `metric_name/mean` - Mean value
 * `metric_name/std` - Standard deviation
@@ -55,37 +55,34 @@ For metrics with multiple values (tensors or arrays), the wrapper extracts stati
 
 All entries in `agent.tracking_data` are automatically extracted, supporting algorithm-specific metrics from PPO, SAC, TD3, DDPG, A2C, and other SKRL implementations.
 
-## Configuration Options
+## Implementation Details
 
-### Basic Configuration
+The integration uses the `create_mlflow_logging_wrapper` function from `skrl_mlflow_agent` module to create a closure that wraps the agent's `_update` method. The wrapper is applied after the SKRL Runner is instantiated but before training begins.
 
-```python
-from skrl_mlflow_agent import MLflowAgentWrapper
+### Configuration Parameters
 
-wrapped_agent = MLflowAgentWrapper(
-    agent=skrl_agent,
-    mlflow_module=mlflow,
-    log_interval=10,
-)
-```
-
-### Parameters
-
-* `agent` - The SKRL agent instance to wrap (required)
+* `agent` - The SKRL agent instance to extract metrics from (required)
 * `mlflow_module` - The mlflow module for logging metrics (required)
-* `log_interval` - Number of steps between metric logging (default: 10)
-  * Lower values provide more frequent updates but increase MLflow API load
-  * Higher values reduce overhead but provide coarser-grained tracking
-  * Recommended: 10-100 for most training runs
 * `metric_filter` - Optional set of metric names to log (default: None)
   * When None, all available metrics are logged
   * Use a set of strings to only log specific metrics
   * Useful for reducing MLflow API load in production environments
 
+### Logging Interval
+
+The MLflow logging interval is controlled via the `--mlflow_log_interval` CLI argument:
+
+* `step` - Log metrics after every training step (most frequent)
+* `balanced` - Log metrics every 10 steps (default, recommended)
+* `rollout` - Log metrics once per rollout cycle
+* Integer value - Custom interval in steps
+
 ### Metric Filtering Examples
 
+To customize which metrics are logged, modify the `create_mlflow_logging_wrapper` call in `skrl_training.py`:
+
 ```python
-from skrl_mlflow_agent import MLflowAgentWrapper
+from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
 
 basic_metrics = {
     "episode_reward_mean",
@@ -94,12 +91,12 @@ basic_metrics = {
     "value_loss",
 }
 
-wrapped_agent = MLflowAgentWrapper(
-    agent=skrl_agent,
+wrapper_func = create_mlflow_logging_wrapper(
+    agent=runner.agent,
     mlflow_module=mlflow,
-    log_interval=50,
     metric_filter=basic_metrics,
 )
+runner.agent._update = wrapper_func
 ```
 
 ```python
@@ -111,61 +108,62 @@ optimization_metrics = {
     "value_loss",
 }
 
-wrapped_agent = MLflowAgentWrapper(
-    agent=skrl_agent,
+wrapper_func = create_mlflow_logging_wrapper(
+    agent=runner.agent,
     mlflow_module=mlflow,
-    log_interval=10,
     metric_filter=optimization_metrics,
 )
+runner.agent._update = wrapper_func
 ```
 
 ## Usage Examples
 
 ### Integration with SKRL Training
 
+The monkey-patching approach is applied after creating the SKRL Runner:
+
 ```python
 import mlflow
-from skrl.agents.ppo import PPO
-from skrl_mlflow_agent import MLflowAgentWrapper
+from skrl.utils.runner.torch import Runner
+from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
 
 mlflow.set_tracking_uri("azureml://...")
 mlflow.set_experiment("isaaclab-training")
 
 with mlflow.start_run():
-    agent = PPO(...)
-    
-    wrapped_agent = MLflowAgentWrapper(
-        agent=agent,
+    runner = Runner(env, agent_cfg)
+
+    wrapper_func = create_mlflow_logging_wrapper(
+        agent=runner.agent,
         mlflow_module=mlflow,
-        log_interval=10,
+        metric_filter=None,
     )
-    
-    wrapped_agent.train()
+
+    runner.agent._update = wrapper_func
+    runner.run()
 ```
 
 ### Configuring Logging Intervals
 
-```python
-fast_logging = MLflowAgentWrapper(
-    agent=agent,
-    mlflow_module=mlflow,
-    log_interval=1,
-)
+Use CLI arguments to control logging frequency:
 
-balanced_logging = MLflowAgentWrapper(
-    agent=agent,
-    mlflow_module=mlflow,
-    log_interval=10,
-)
+```bash
+# Log after every training step
+python src/training/scripts/skrl_training.py --mlflow_log_interval step
 
-minimal_logging = MLflowAgentWrapper(
-    agent=agent,
-    mlflow_module=mlflow,
-    log_interval=100,
-)
+# Log every 10 steps (default)
+python src/training/scripts/skrl_training.py --mlflow_log_interval balanced
+
+# Log once per rollout
+python src/training/scripts/skrl_training.py --mlflow_log_interval rollout
+
+# Log every 100 steps
+python src/training/scripts/skrl_training.py --mlflow_log_interval 100
 ```
 
 ### Filtering Metrics for Production
+
+Modify the wrapper creation in `skrl_training.py`:
 
 ```python
 production_metrics = {
@@ -174,26 +172,26 @@ production_metrics = {
     "success_rate",
 }
 
-wrapped_agent = MLflowAgentWrapper(
-    agent=agent,
+wrapper_func = create_mlflow_logging_wrapper(
+    agent=runner.agent,
     mlflow_module=mlflow,
-    log_interval=100,
     metric_filter=production_metrics,
 )
+runner.agent._update = wrapper_func
 ```
 
 ## Integration with Isaac Lab
 
-The wrapper is automatically used in `skrl_training.py` when training with Isaac Lab tasks:
+The MLflow integration is automatically applied in `skrl_training.py` when training with Isaac Lab tasks:
 
-```python
+```bash
 python src/training/scripts/skrl_training.py \
     --task Isaac-Cartpole-v0 \
     --num_envs 512 \
     --headless
 ```
 
-The training script handles MLflow setup and agent wrapping automatically. To customize the logging interval or metric filter, modify the wrapper instantiation in `skrl_training.py`.
+The training script handles MLflow setup and monkey-patching automatically. To customize the logging interval, use the `--mlflow_log_interval` argument. To customize metric filtering, modify the `create_mlflow_logging_wrapper` call in `skrl_training.py`.
 
 ## Troubleshooting
 
@@ -208,13 +206,14 @@ The training script handles MLflow setup and agent wrapping automatically. To cu
    * Check Azure authentication is valid
    * Confirm MLflow experiment exists
 
-2. Wrapper not initialized correctly
-   * Ensure `MLflowAgentWrapper` is wrapping the agent before `train()` is called
-   * Verify `mlflow_module` parameter is the actual mlflow module, not None
+2. Monkey-patching not applied correctly
+   * Ensure `create_mlflow_logging_wrapper` is called after Runner instantiation
+   * Verify `runner.agent._update` is replaced with the wrapper function before `runner.run()`
+   * Confirm `mlflow_module` parameter is the actual mlflow module, not None
 
-3. Log interval too high
-   * If training runs are short, reduce `log_interval` to ensure at least one logging event occurs
-   * Example: For 1000-step training, use `log_interval <= 1000`
+3. Training completed before metrics logged
+   * If training runs are very short, metrics may not be captured
+   * Training updates occur after rollouts complete, not after every environment step
 
 ### Missing Specific Metrics
 
@@ -246,8 +245,12 @@ The training script handles MLflow setup and agent wrapping automatically. To cu
    * Verify SKRL version is compatible
 
 2. Agent not fully initialized
-   * Wrap the agent after full initialization
+   * Apply monkey-patch after Runner instantiation
    * Ensure the agent has been configured with all required parameters
+
+3. Monkey-patching timing issue
+   * Verify `runner.agent` exists before calling `create_mlflow_logging_wrapper`
+   * Check that `runner.agent._update` method exists before replacement
 
 ### High MLflow API Load
 
@@ -255,8 +258,8 @@ The training script handles MLflow setup and agent wrapping automatically. To cu
 
 **Solutions:**
 
-1. Increase `log_interval`
-   * Change from `log_interval=10` to `log_interval=100` or higher
+1. Increase logging interval
+   * Use `--mlflow_log_interval 100` or higher to reduce API calls
    * Balance between metric granularity and performance
 
 2. Use `metric_filter`
@@ -264,7 +267,7 @@ The training script handles MLflow setup and agent wrapping automatically. To cu
    * Remove high-cardinality or nested metrics
 
 3. Batch metric logging
-   * The wrapper already batches metrics per step
+   * The integration already batches metrics per training update
    * Ensure MLflow is using asynchronous logging if available
 
 ### Metric Extraction Warnings
@@ -278,7 +281,7 @@ The training script handles MLflow setup and agent wrapping automatically. To cu
    * Usually harmless if only occasional warnings appear
 
 2. Incompatible metric types
-   * The wrapper attempts to convert all metrics to float
+   * The integration attempts to convert all metrics to float
    * Some complex objects cannot be converted and are skipped
 
 **Solutions:**
@@ -288,17 +291,18 @@ The training script handles MLflow setup and agent wrapping automatically. To cu
    * Determine if the failed metric is critical
 
 2. Add custom extraction logic
-   * Modify `_extract_from_value()` for specific metric types
-   * Contribute improvements back to the wrapper
+   * Modify `_extract_from_value()` in `skrl_mlflow_agent.py` for specific metric types
+   * Contribute improvements back to the integration module
 
 ### Empty Metrics Dictionary
 
-**Symptom:** Wrapper runs but extracts zero metrics.
+**Symptom:** Integration runs but extracts zero metrics.
 
 **Possible Causes:**
 
 1. Agent `tracking_data` is empty
    * Agent may not have started tracking yet
+   * Training updates occur after rollouts, not after every environment step
    * Check agent initialization and training state
 
 2. All metrics filtered out

@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Sequence
 
-from training.scripts.skrl_mlflow_agent import MLflowAgentWrapper
+from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
 from training.utils import AzureMLContext
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
@@ -433,17 +433,17 @@ def run_training(
 
             if mlflow_module:
                 try:
-                    rollouts = agent_dict.get("agent", {}).get("rollouts", 1)
-                    log_interval = _parse_mlflow_log_interval(args_cli.mlflow_log_interval, rollouts)
-                    _LOGGER.info(
-                        "Wrapping agent with MLflowAgentWrapper for metric logging after each _update() call"
-                    )
-                    wrapped_agent = MLflowAgentWrapper(
+                    _LOGGER.info("Monkey-patching agent._update for MLflow metric logging")
+
+                    wrapper_func = create_mlflow_logging_wrapper(
                         agent=runner.agent,
                         mlflow_module=mlflow_module,
-                        log_interval=log_interval,
+                        metric_filter=None,
                     )
-                    runner._agent = wrapped_agent
+
+                    runner.agent._update = wrapper_func
+                    _LOGGER.info("Successfully monkey-patched agent._update for MLflow logging")
+
                 except AttributeError as exc:
                     raise RuntimeError("Runner must have agent attribute when MLflow logging is enabled") from exc
 
