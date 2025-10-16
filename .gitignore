@@ -424,3 +424,5 @@ venv/
 .copilot-tracking/*
 
 .DS_Store
+.beads/
+external/

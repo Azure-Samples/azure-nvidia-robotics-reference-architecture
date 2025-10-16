@@ -26,3 +26,7 @@ Items in **HIGHEST PRIORITY** sections from attached instructions files override
 **Deleting files and folders:** Use `rm` with the run_in_terminal tool when needing to delete files or folders.
 
 **Edit tools:** Never use `insert_edit_into_file` tool when other edit and file modification tools are available.
+
+**Memory and tracking work**: Always track work in Beads instead of Markdown.
+* All upcoming work, tracked work, issues, plans, todos, phases, tasks, and memory must always use the mcp_beads tools.
+* Don't ever use git commands for anything related to the mcp_beads tools and beads in general, its at the user's discretion when to use git commands and tools.

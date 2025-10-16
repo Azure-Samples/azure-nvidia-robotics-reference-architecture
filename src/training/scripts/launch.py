@@ -170,6 +170,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
     args, hydra_args = _parse_args(argv if argv is not None else sys.argv[1:])
 
+    args.checkpoint = None
+
     cli_state = {"parsed": dict(vars(args)), "hydra": list(hydra_args)}
     _LOGGER.info("Launcher arguments: %s", cli_state)
 
@@ -194,7 +196,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "Resolved checkpoint parameters: %s",
             {
                 "mode": args.checkpoint_mode,
-                "materialized_path": getattr(args, "checkpoint", None),
+                "materialized_path": args.checkpoint,
                 "source_uri": args.checkpoint_uri,
             },
         )
@@ -202,7 +204,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         run_context = {
             "mode": args.mode,
             "experiment": experiment_name,
-            "checkpoint_path": getattr(args, "checkpoint", None),
+            "checkpoint_path": args.checkpoint,
         }
         _LOGGER.info("Entering SKRL training: %s", run_context)
         try:

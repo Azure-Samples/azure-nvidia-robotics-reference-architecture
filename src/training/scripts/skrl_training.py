@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Sequence
 
+from training.scripts.skrl_mlflow_agent import MLflowAgentWrapper
 from training.utils import AzureMLContext
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
@@ -91,50 +92,7 @@ def _maybe_wrap_video(gym_module, env, args_cli: argparse.Namespace, log_dir: Pa
     return gym_module.wrappers.RecordVideo(env, **video_kwargs)
 
 
-def _build_metric_callback(mlflow_module):
-    def _callback(step: int, info: Dict[str, float]) -> None:
-        if step % _METRIC_INTERVAL != 0:
-            return
-        metrics = {}
 
-        for key in ("episode_reward_mean", "success_rate", "episode_length_mean"):
-            value = info.get(key)
-            if value is not None:
-                metrics[key] = float(value)
-
-        for key in ("timesteps_total", "iterations_total", "fps"):
-            value = info.get(key)
-            if value is not None:
-                metrics[key] = float(value)
-
-        for key in ("policy_loss", "value_loss", "entropy", "learning_rate"):
-            value = info.get(key)
-            if value is not None:
-                metrics[key] = float(value)
-
-        for stat_key in ("episode_reward", "episode_length"):
-            for suffix in ("_min", "_max", "_std"):
-                key = f"{stat_key}{suffix}"
-                value = info.get(key)
-                if value is not None:
-                    metrics[key] = float(value)
-
-        try:
-            import torch
-            if torch.cuda.is_available():
-                device = torch.cuda.current_device()
-                metrics["gpu_memory_allocated"] = float(torch.cuda.memory_allocated(device)) / (1024**3)
-                try:
-                    metrics["gpu_utilization"] = float(torch.cuda.utilization(device))
-                except (AttributeError, RuntimeError):
-                    pass
-        except ImportError:
-            pass
-
-        if metrics:
-            mlflow_module.log_metrics(metrics, step=step)
-
-    return _callback
 
 
 def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> Optional[str]:
@@ -388,7 +346,7 @@ def run_training(
                 "rollouts": agent_dict.get("agent", {}).get("rollouts"),
                 "distributed": args_cli.distributed,
                 "seed": random_seed,
-                "device": env_cfg.sim.device if hasattr(env_cfg, "sim") else None,
+                "device": env_cfg.sim.device,
             }
             _LOGGER.info("SKRL training configuration: %s", config_snapshot)
 
@@ -423,17 +381,33 @@ def run_training(
             runner = Runner(env, agent_dict)
 
             _LOGGER.info("Runner created successfully (type: %s)", type(runner).__name__)
-            if hasattr(runner, "agent"):
+            try:
                 agent_info = {
                     "agent_type": type(runner.agent).__name__,
                     "has_memory": hasattr(runner.agent, "memory"),
                     "has_training_started": getattr(runner.agent, "training_started", None),
                 }
                 _LOGGER.info("Runner agent info: %s", agent_info)
+            except AttributeError as exc:
+                raise RuntimeError("Runner must have agent attribute after initialization") from exc
 
-            if resume_path and hasattr(runner, "agent"):
-                _LOGGER.info("Loading checkpoint from: %s", resume_path)
-                runner.agent.load(resume_path)
+            if resume_path:
+                try:
+                    _LOGGER.info("Loading checkpoint from: %s", resume_path)
+                    runner.agent.load(resume_path)
+                except AttributeError as exc:
+                    raise RuntimeError("Runner must have agent attribute when loading checkpoint") from exc
+
+            if mlflow_module:
+                try:
+                    _LOGGER.info("Wrapping agent with MLflowAgentWrapper for metric logging")
+                    runner.agent = MLflowAgentWrapper(
+                        agent=runner.agent,
+                        mlflow_module=mlflow_module,
+                        log_interval=_METRIC_INTERVAL,
+                    )
+                except AttributeError as exc:
+                    raise RuntimeError("Runner must have agent attribute when MLflow logging is enabled") from exc
 
             outcome = "success"
             run_started = False
@@ -459,13 +433,9 @@ def run_training(
                 mlflow_module.set_tag("entrypoint", "training/scripts/train.py")
                 if context:
                     mlflow_module.set_tag("azureml_workspace", context.workspace_name)
-                checkpoint_mode = getattr(args, "checkpoint_mode", None)
-                if checkpoint_mode:
-                    mlflow_module.set_tag("checkpoint_mode", checkpoint_mode)
-                if getattr(args, "checkpoint_uri", None):
+                mlflow_module.set_tag("checkpoint_mode", args.checkpoint_mode)
+                if args.checkpoint_uri:
                     mlflow_module.set_tag("checkpoint_source_uri", args.checkpoint_uri)
-                if hasattr(runner, "register_callback"):
-                    runner.register_callback("on_episode_end", _build_metric_callback(mlflow_module))
 
             runner_start = time.perf_counter()
             run_descriptor = {
@@ -503,13 +473,12 @@ def run_training(
                 if mlflow_module and run_started:
                     mlflow_module.set_tag("training_outcome", outcome)
                     latest_checkpoint_uri = _log_artifacts(mlflow_module, log_dir, resume_path)
-                    register_name = getattr(args, "register_checkpoint", None)
-                    if register_name and latest_checkpoint_uri:
+                    if args.register_checkpoint and latest_checkpoint_uri:
                         _register_checkpoint_model(
                             context=context,
-                            model_name=register_name,
+                            model_name=args.register_checkpoint,
                             checkpoint_uri=latest_checkpoint_uri,
-                            checkpoint_mode=getattr(args, "checkpoint_mode", None),
+                            checkpoint_mode=args.checkpoint_mode,
                             task=args_cli.task,
                         )
                     mlflow_module.end_run()
