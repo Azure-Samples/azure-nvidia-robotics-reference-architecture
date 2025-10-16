@@ -17,12 +17,13 @@ Options:
   -c, --checkpoint-uri URI  MLflow checkpoint artifact URI to resume or warm-start from.
   -M, --checkpoint-mode MODE  Checkpoint mode (from-scratch, warm-start, resume, fresh).
   -r, --register-checkpoint NAME  Azure ML model name to register the final checkpoint under.
+      --sleep-after-unpack VALUE  Provide a non-empty value to sleep post-unpack (ex. 7200 to sleep 2 hours).
   -s, --run-smoke-test    Enable the Azure connectivity smoke test before training.
   -h, --help              Show this help message and exit.
 
 Environment overrides:
   TASK, NUM_ENVS, MAX_ITERATIONS, IMAGE, PAYLOAD_ROOT, RUN_AZURE_SMOKE_TEST
-  CHECKPOINT_URI, CHECKPOINT_MODE, REGISTER_CHECKPOINT
+  CHECKPOINT_URI, CHECKPOINT_MODE, REGISTER_CHECKPOINT, SLEEP_AFTER_UNPACK
 
 Additional arguments after -- are forwarded to osmo workflow submit.
 EOF
@@ -62,6 +63,7 @@ RUN_AZURE_SMOKE_TEST_VALUE=${RUN_AZURE_SMOKE_TEST:-0}
 CHECKPOINT_URI_VALUE=${CHECKPOINT_URI:-}
 CHECKPOINT_MODE_VALUE=${CHECKPOINT_MODE:-from-scratch}
 REGISTER_CHECKPOINT_VALUE=${REGISTER_CHECKPOINT:-}
+SLEEP_AFTER_UNPACK_VALUE=${SLEEP_AFTER_UNPACK:-}
 
 normalize_checkpoint_mode() {
   local mode="$1"
@@ -127,6 +129,10 @@ while [[ $# -gt 0 ]]; do
     -s|--run-smoke-test)
       RUN_AZURE_SMOKE_TEST_VALUE="1"
       shift
+      ;;
+    --sleep-after-unpack)
+      SLEEP_AFTER_UNPACK_VALUE="$2"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -196,6 +202,7 @@ submit_args=(
   "checkpoint_uri=$CHECKPOINT_URI_VALUE"
   "checkpoint_mode=$CHECKPOINT_MODE_VALUE"
   "register_checkpoint=$REGISTER_CHECKPOINT_VALUE"
+  "sleep_after_unpack=$SLEEP_AFTER_UNPACK_VALUE"
 )
 
 if [[ -n "$MAX_ITERATIONS_VALUE" ]]; then

@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Sequence
@@ -256,6 +257,16 @@ def _namespace_to_tokens(args: argparse.Namespace) -> Sequence[str]:
     return tokens
 
 
+def _namespace_payload(namespace: argparse.Namespace) -> Dict[str, object]:
+    payload: Dict[str, object] = {}
+    for key, value in vars(namespace).items():
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            payload[key] = value
+        else:
+            payload[key] = str(value)
+    return payload
+
+
 def run_training(
     *,
     args: argparse.Namespace,
@@ -274,9 +285,20 @@ def run_training(
     if getattr(args_cli, "video", False):
         setattr(args_cli, "enable_cameras", True)
 
+    parse_report = {
+        "parsed": _namespace_payload(args_cli),
+        "hydra_overrides": list(leftover),
+        "launcher_hydra_args": list(hydra_args),
+    }
+    _LOGGER.info("SKRL runner arguments: %s", parse_report)
+
     sys.argv = [sys.argv[0]] + leftover
     app_launcher = AppLauncher(args_cli)
     simulation_app = app_launcher.app
+
+    kit_log_dir = getattr(getattr(simulation_app, "config", None), "log_dir", None)
+    if kit_log_dir:
+        _LOGGER.info("Kit logs located at %s", kit_log_dir)
 
     try:
         import isaaclab_tasks  # noqa: F401
@@ -284,6 +306,7 @@ def run_training(
         import gymnasium as gym_module
         import skrl as skrl_module
         _ensure_skrl_version(skrl_module)
+        _LOGGER.info("Detected skrl version: %s", getattr(skrl_module, "__version__", "unknown"))
 
         from isaaclab.envs import (
             DirectMARLEnv,
@@ -325,8 +348,11 @@ def run_training(
             elif isinstance(env_cfg, DirectMARLEnvCfg):
                 env_cfg.num_envs = args_cli.num_envs or env_cfg.num_envs
 
-            print_dict(env_cfg.to_dict())
-            print_dict(agent_cfg.to_dict())
+            env_dict = env_cfg.to_dict()
+            agent_dict = agent_cfg.to_dict()
+
+            print_dict(env_dict)
+            print_dict(agent_dict)
 
             log_dir = _prepare_log_paths(agent_cfg, args_cli)
             params_dir = log_dir / "params"
@@ -341,6 +367,18 @@ def run_training(
             if isinstance(env_cfg, ManagerBasedRLEnvCfg) and args_cli.export_io_descriptors:
                 env_cfg.export_io_descriptors = True
                 env_cfg.io_descriptors_output_dir = str(log_dir)
+
+            env_count = _resolve_env_count(env_cfg)
+            trainer_cfg = agent_dict.get("agent", {}).get("trainer", {})
+            config_snapshot = {
+                "algorithm": args_cli.algorithm,
+                "ml_framework": args_cli.ml_framework,
+                "num_envs": env_count,
+                "max_iterations": args_cli.max_iterations,
+                "distributed": args_cli.distributed,
+                "trainer": trainer_cfg,
+            }
+            _LOGGER.info("SKRL training configuration: %s", config_snapshot)
 
             env = gym_module.make(
                 args_cli.task,
@@ -390,11 +428,32 @@ def run_training(
                 if hasattr(runner, "register_callback"):
                     runner.register_callback("on_episode_end", _build_metric_callback(mlflow_module))
 
+            runner_start = time.perf_counter()
+            run_descriptor = {
+                "algorithm": args_cli.algorithm,
+                "ml_framework": args_cli.ml_framework,
+                "log_dir": str(log_dir),
+                "resume_checkpoint": bool(resume_path),
+                "resume_path": resume_path,
+            }
+            _LOGGER.info("SKRL runner starting: %s", run_descriptor)
+
             try:
                 runner.run()
             except Exception:
                 outcome = "failed"
+                failure_payload = dict(run_descriptor)
+                failure_payload["elapsed_seconds"] = round(time.perf_counter() - runner_start, 2)
+                _LOGGER.exception("SKRL runner failed: %s", failure_payload)
                 raise
+            else:
+                success_payload = dict(run_descriptor)
+                success_payload["elapsed_seconds"] = round(time.perf_counter() - runner_start, 2)
+                if mlflow_module and run_started:
+                    active_run = mlflow_module.active_run()
+                    if active_run:
+                        success_payload["mlflow_run_id"] = active_run.info.run_id
+                _LOGGER.info("SKRL runner completed: %s", success_payload)
             finally:
                 env.close()
                 if mlflow_module and run_started:

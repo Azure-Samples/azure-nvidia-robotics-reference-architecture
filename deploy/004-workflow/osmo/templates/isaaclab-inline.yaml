@@ -22,6 +22,7 @@ workflow:
         PRIVACY_CONSENT: "Y"
         ENCODED_ARCHIVE: "{{ encoded_archive }}"
         PAYLOAD_ROOT: "{{ payload_root }}"
+        SLEEP_AFTER_UNPACK: "{{ sleep_after_unpack }}"
         AZURE_CLIENT_ID: "{{ azure_client_id }}"
         AZURE_TENANT_ID: "{{ azure_tenant_id }}"
         AZURE_SUBSCRIPTION_ID: "{{ azure_subscription_id }}"
@@ -39,6 +40,7 @@ workflow:
       files:
         - path: /tmp/entry.sh
           contents: |
+            {% raw %}
             #!/bin/bash
             set -euo pipefail
 
@@ -54,8 +56,37 @@ workflow:
             mkdir -p "${PAYLOAD_ROOT}"
             trap 'rm -f "${ARCHIVE_PATH}"' EXIT
 
+            stream_kit_logs() {
+              local kit_root="${KIT_LOG_ROOT:-/isaac-sim/kit/logs/Kit/Isaac-Sim/5.0}"
+              echo "Collecting Kit logs from ${kit_root}"
+              if [[ ! -d "${kit_root}" ]]; then
+                echo "Kit log directory not found: ${kit_root}" >&2
+                return 0
+              fi
+
+              local found=0
+              while IFS= read -r log_path; do
+                found=1
+                echo "===== Omniverse Kit log: ${log_path} ====="
+                if ! tail -n +1 "${log_path}"; then
+                  echo "Warning: unable to read ${log_path}" >&2
+                fi
+              done < <(find "${kit_root}" -type f -name '*.log' -print 2>/dev/null | sort)
+
+              if (( found == 0 )); then
+                echo "No Kit log files discovered under ${kit_root}" >&2
+              fi
+            }
+
             printf '%s' "${ENCODED_ARCHIVE}" | base64 -d > "${ARCHIVE_PATH}"
             unzip -oq "${ARCHIVE_PATH}" -d "${PAYLOAD_ROOT}"
+
+            if [[ -n "${SLEEP_AFTER_UNPACK:-}" ]]; then
+              echo "SLEEP_AFTER_UNPACK set; sleeping for ${SLEEP_AFTER_UNPACK} after payload unpack"
+              sleep "${SLEEP_AFTER_UNPACK}"
+              echo "Finished post-unpack sleep; exiting"
+              exit 0
+            fi
 
             export PYTHONPATH="${TRAINING_ROOT}:${PYTHONPATH:-}"
 
@@ -75,7 +106,21 @@ workflow:
               --headless
             )
 
+            set +e
             bash "${TRAINING_ROOT}/scripts/train.sh" "${train_args[@]}"
+            train_status=$?
+            set -e
+
+            stream_kit_logs || true
+
+            if (( train_status != 0 )); then
+              echo "Training exited with status ${train_status}" >&2
+            else
+              echo "Training completed successfully"
+            fi
+
+            exit "${train_status}"
+            {% endraw %}
 
 default-values:
   image: nvcr.io/nvidia/isaac-lab:2.2.0
@@ -84,6 +129,7 @@ default-values:
   max_iterations: ""
   encoded_archive: ""
   payload_root: /workspace/isaac_payload
+  sleep_after_unpack: ""
   azure_client_id: ""
   azure_tenant_id: ""
   azure_subscription_id: ""

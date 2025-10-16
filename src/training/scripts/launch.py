@@ -123,16 +123,18 @@ def _materialized_checkpoint(artifact_uri: str | None) -> Iterator[str | None]:
         shutil.rmtree(download_root, ignore_errors=True)
 
 
-def _bootstrap(args: argparse.Namespace) -> AzureMLContext | None:
+def _bootstrap(args: argparse.Namespace) -> tuple[AzureMLContext | None, str | None]:
     if args.disable_mlflow:
         _LOGGER.warning("MLflow integration disabled via --disable-mlflow")
-        return None
+        return None, None
 
     os.environ.setdefault("MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES", "3")
     os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "60")
 
     experiment_name = args.experiment_name or (f"isaaclab-{args.task}" if args.task else "isaaclab-training")
-    return bootstrap_azure_ml(experiment_name=experiment_name)
+    context = bootstrap_azure_ml(experiment_name=experiment_name)
+    _LOGGER.info("MLflow context ready: %s", {"experiment": experiment_name, "tracking_uri": context.tracking_uri})
+    return context, experiment_name
 
 
 def _run_training(
@@ -168,6 +170,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
     args, hydra_args = _parse_args(argv if argv is not None else sys.argv[1:])
 
+    cli_state = {"parsed": dict(vars(args)), "hydra": list(hydra_args)}
+    _LOGGER.info("Launcher arguments: %s", cli_state)
+
     _ensure_dependencies()
 
     if args.mode == "smoke-test":
@@ -178,15 +183,35 @@ def main(argv: Sequence[str] | None = None) -> None:
     _validate_mlflow_flags(args)
 
     try:
-        context = _bootstrap(args)
+        context, experiment_name = _bootstrap(args)
     except AzureConfigError as exc:
         raise SystemExit(str(exc)) from exc
 
     with _materialized_checkpoint(args.checkpoint_uri) as checkpoint_path:
         if checkpoint_path:
             args.checkpoint = checkpoint_path
-        _LOGGER.info("Resolved checkpoint mode: %s", args.checkpoint_mode)
-        _run_training(args=args, hydra_args=hydra_args, context=context)
+        _LOGGER.info(
+            "Resolved checkpoint parameters: %s",
+            {
+                "mode": args.checkpoint_mode,
+                "materialized_path": getattr(args, "checkpoint", None),
+                "source_uri": args.checkpoint_uri,
+            },
+        )
+
+        run_context = {
+            "mode": args.mode,
+            "experiment": experiment_name,
+            "checkpoint_path": getattr(args, "checkpoint", None),
+        }
+        _LOGGER.info("Entering SKRL training: %s", run_context)
+        try:
+            _run_training(args=args, hydra_args=hydra_args, context=context)
+        except Exception:
+            _LOGGER.exception("SKRL training failed: %s", run_context)
+            raise
+        else:
+            _LOGGER.info("Completed SKRL training: %s", run_context)
 
 
 if __name__ == "__main__":
