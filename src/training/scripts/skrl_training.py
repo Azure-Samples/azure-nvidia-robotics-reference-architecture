@@ -124,10 +124,6 @@ def _maybe_wrap_video(gym_module, env, args_cli: argparse.Namespace, log_dir: Pa
     _LOGGER.info("Recording training videos to %s", video_dir)
     return gym_module.wrappers.RecordVideo(env, **video_kwargs)
 
-
-
-
-
 def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> Optional[str]:
     params_dir = log_dir / "params"
     for rel_path in ("env.yaml", "agent.yaml", "env.pkl", "agent.pkl"):

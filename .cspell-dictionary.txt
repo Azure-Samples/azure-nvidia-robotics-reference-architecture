@@ -6,4 +6,5 @@ MAPPO
 nvcr
 PYTHONHASHSEED
 PYTHONPATH
+rollouts
 skrl
