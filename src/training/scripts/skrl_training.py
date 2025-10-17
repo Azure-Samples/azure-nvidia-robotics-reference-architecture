@@ -1,4 +1,13 @@
-"""SKRL training loop instrumented with Azure MLflow."""
+"""SKRL training orchestration with IsaacLab environments and Azure MLflow integration.
+
+This module provides the main training loop for reinforcement learning agents using
+the SKRL library with IsaacLab simulation environments. It handles:
+- Environment and agent configuration via Hydra
+- Checkpoint loading and model registration
+- MLflow metric logging and artifact tracking
+- Video recording of training rollouts
+- Integration with Azure ML workspaces
+"""
 
 from __future__ import annotations
 
@@ -47,6 +56,7 @@ def _parse_mlflow_log_interval(interval_arg: str, rollouts: int) -> int:
 
 
 def _build_parser(app_launcher_cls) -> argparse.ArgumentParser:
+    """Build argument parser for SKRL training with IsaacLab launcher args."""
     parser = argparse.ArgumentParser(description="Train IsaacLab SKRL policies")
     parser.add_argument("--task", type=str, default=None, help="IsaacLab task identifier")
     parser.add_argument("--agent", type=str, default=None, help="Override agent configuration entry point")
@@ -84,6 +94,7 @@ def _build_parser(app_launcher_cls) -> argparse.ArgumentParser:
 
 
 def _agent_entry(args_cli: argparse.Namespace) -> str:
+    """Resolve agent configuration entry point for selected algorithm."""
     if args_cli.agent:
         return args_cli.agent
     algorithm = (args_cli.algorithm or "").lower()
@@ -95,6 +106,15 @@ def _agent_entry(args_cli: argparse.Namespace) -> str:
 
 
 def _prepare_log_paths(agent_cfg: Dict, args_cli: argparse.Namespace) -> Path:
+    """Configure experiment metadata and create log directory for the run.
+
+    Args:
+        agent_cfg: Agent configuration dictionary to populate with experiment details.
+        args_cli: Parsed CLI arguments that drive naming and algorithm metadata.
+
+    Returns:
+        Absolute path to the run-specific log directory.
+    """
     experiment_cfg = agent_cfg.setdefault("agent", {}).setdefault("experiment", {})
     root_path = Path(experiment_cfg.get("directory") or Path("logs") / "skrl").resolve()
     timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
@@ -111,6 +131,17 @@ def _prepare_log_paths(agent_cfg: Dict, args_cli: argparse.Namespace) -> Path:
 
 
 def _maybe_wrap_video(gym_module, env, args_cli: argparse.Namespace, log_dir: Path):
+    """Wrap environment with video capture when video recording is enabled.
+
+    Args:
+        gym_module: Gymnasium module providing wrappers.
+        env: Environment instance to optionally wrap.
+        args_cli: Parsed CLI arguments containing video options.
+        log_dir: Base directory for run artifacts.
+
+    Returns:
+        Environment wrapped with video recorder when requested; otherwise original env.
+    """
     if not args_cli.video:
         return env
     video_dir = log_dir / "videos" / "train"
@@ -125,6 +156,16 @@ def _maybe_wrap_video(gym_module, env, args_cli: argparse.Namespace, log_dir: Pa
     return gym_module.wrappers.RecordVideo(env, **video_kwargs)
 
 def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> Optional[str]:
+    """Log training artifacts to MLflow and derive latest checkpoint URI.
+
+    Args:
+        mlflow_module: MLflow module used for logging operations.
+        log_dir: Log directory containing artifacts to upload.
+        resume_path: Path to the resumed checkpoint, if any.
+
+    Returns:
+        URI to the most recent checkpoint artifact, or None when unavailable.
+    """
     params_dir = log_dir / "params"
     for rel_path in ("env.yaml", "agent.yaml", "env.pkl", "agent.pkl"):
         candidate = params_dir / rel_path
@@ -167,6 +208,15 @@ def _register_checkpoint_model(
     checkpoint_mode: Optional[str],
     task: Optional[str],
 ) -> None:
+    """Register a checkpoint artifact as an Azure ML model when context is available.
+
+    Args:
+        context: Azure ML context responsible for model registration.
+        model_name: Target Azure ML model name.
+        checkpoint_uri: MLflow URI for the checkpoint artifact.
+        checkpoint_mode: Checkpoint mode metadata tag.
+        task: IsaacLab task identifier for tagging.
+    """
     if context is None:
         _LOGGER.warning("Azure ML context unavailable; skipping checkpoint registration for %s", model_name)
         return
@@ -197,6 +247,7 @@ def _register_checkpoint_model(
 
 
 def _resolve_env_count(env_cfg) -> Optional[int]:
+    """Extract environment count from configuration object regardless of env type."""
     scene = getattr(env_cfg, "scene", None)
     if scene and hasattr(scene, "env") and hasattr(scene.env, "num_envs"):
         return scene.env.num_envs
@@ -204,6 +255,18 @@ def _resolve_env_count(env_cfg) -> Optional[int]:
 
 
 def _resolve_checkpoint(retrieve_file_path, checkpoint: Optional[str]) -> Optional[str]:
+    """Resolve checkpoint location via IsaacLab asset resolver.
+
+    Args:
+        retrieve_file_path: Callable resolving checkpoint identifiers to absolute paths.
+        checkpoint: User-specified checkpoint identifier or path.
+
+    Returns:
+        Resolved checkpoint path, or None when checkpoint not provided.
+
+    Raises:
+        SystemExit: If the checkpoint cannot be located.
+    """
     if not checkpoint:
         return None
     try:
@@ -213,6 +276,14 @@ def _resolve_checkpoint(retrieve_file_path, checkpoint: Optional[str]) -> Option
 
 
 def _namespace_to_tokens(args: argparse.Namespace) -> Sequence[str]:
+    """Convert namespace values into CLI tokens suitable for parser invocation.
+
+    Args:
+        args: Launch arguments namespace from external caller.
+
+    Returns:
+        Sequence of tokens representing namespace values.
+    """
     tokens = []
     if getattr(args, "task", None):
         tokens.extend(["--task", str(args.task)])
@@ -228,6 +299,7 @@ def _namespace_to_tokens(args: argparse.Namespace) -> Sequence[str]:
 
 
 def _namespace_payload(namespace: argparse.Namespace) -> Dict[str, object]:
+    """Render argparse namespace into JSON-serializable payload."""
     payload: Dict[str, object] = {}
     for key, value in vars(namespace).items():
         if isinstance(value, (str, int, float, bool)) or value is None:
@@ -243,6 +315,16 @@ def run_training(
     hydra_args: Sequence[str],
     context: Optional[AzureMLContext],
 ) -> None:
+    """Execute SKRL training with IsaacLab environment and optional Azure ML tracking.
+
+    Args:
+        args: Parsed launch arguments including checkpoint behavior.
+        hydra_args: Sequence of Hydra overrides to forward to IsaacLab launcher.
+        context: Azure ML context enabling MLflow tracking and model registration.
+
+    Raises:
+        SystemExit: If IsaacLab dependencies are missing or task is unavailable.
+    """
     try:
         from isaaclab.app import AppLauncher
     except ImportError as exc:
