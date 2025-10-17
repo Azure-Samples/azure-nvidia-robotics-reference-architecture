@@ -16,7 +16,8 @@ The architecture integrates Azure services and NVIDIA robotics frameworks (Isaac
 │   ├── 002-setup/                      # Post-infrastructure setup
 │   ├── 003-data/                       # Data preparation and upload
 │   └── 004-workflow/                   # Training workflow execution
-│       └── job-templates/              # Job configuration templates
+│       ├── job-templates/              # Job configuration templates
+│       └── osmo/                       # OSMO inline workflow submission (see osmo/README.md)
 ├── src/
 │   ├── terraform/                      # Infrastructure as Code
 │   │   └── modules/                    # Reusable Terraform modules
@@ -32,17 +33,39 @@ The architecture integrates Azure services and NVIDIA robotics frameworks (Isaac
 
 ### Infrastructure as Code
 
-- Modular Terraform configurations referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components
+* Modular Terraform configurations referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components
 
-## Prerequisites
+### MLflow Integration
 
-- To be added...
+* Automatic metric logging from SKRL agents to Azure ML
+* Comprehensive tracking of episode statistics, losses, optimization metrics, and timing data
+* Configurable logging intervals and metric filtering
+* See [MLflow Integration Guide](docs/mlflow-integration.md) for details
 
-## Quick Start
+## Local Development Setup
+
+### Prerequisites
+
+* [pyenv](https://github.com/pyenv/pyenv)
+* Python 3.11 (required by Isaac Sim 5.X)
+
+### Quick Start
 
 ```bash
-# To be added...
+./setup-dev.sh
 ```
+
+The setup script installs Python 3.11 via pyenv, creates a virtual environment at `.venv/`, and installs training dependencies.
+
+### VS Code Configuration
+
+The workspace is configured with `python.analysis.extraPaths` pointing to `src/`, enabling imports like:
+
+```python
+from training.utils import AzureMLContext, bootstrap_azure_ml
+```
+
+Select the `.venv/bin/python` interpreter in VS Code for IntelliSense support
 
 ## License
 
@@ -52,13 +75,13 @@ This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for
 
 For issues and questions:
 
-- Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
+* Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
 
 ## Acknowledgments
 
 This reference architecture builds upon:
 
-- [microsoft/edge-ai](https://github.com/microsoft/edge-ai) - Edge AI infrastructure components
-- [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) - RL task framework
-- [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) - Physics simulation
-- [NVIDIA OSMO](https://developer.nvidia.com/osmo) - Workflow orchestration
+* [microsoft/edge-ai](https://github.com/microsoft/edge-ai) - Edge AI infrastructure components
+* [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) - RL task framework
+* [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) - Physics simulation
+* [NVIDIA OSMO](https://developer.nvidia.com/osmo) - Workflow orchestration

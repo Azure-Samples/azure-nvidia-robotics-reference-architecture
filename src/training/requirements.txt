@@ -1,0 +1,6 @@
+azure-identity>=1.13.0
+azure-ai-ml
+azureml-mlflow
+mlflow
+packaging
+skrl>=1.4.3

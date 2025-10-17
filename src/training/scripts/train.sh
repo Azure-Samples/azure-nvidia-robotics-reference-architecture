@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TRAINING_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SRC_DIR="$(cd "${TRAINING_DIR}/.." && pwd)"
+
+declare -a python_cmd
+if [[ -n "${PYTHON:-}" ]]; then
+  IFS=' ' read -r -a python_cmd <<< "${PYTHON}"
+else
+  python_cmd=(python)
+fi
+
+export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
+
+if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
+  if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
+    "${python_cmd[@]}" -m ensurepip --upgrade
+  else
+    echo "Error: pip not available and ensurepip failed" >&2
+    exit 1
+  fi
+fi
+
+"${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+
+exec "${python_cmd[@]}" -m training.scripts.launch "$@"

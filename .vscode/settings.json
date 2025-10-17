@@ -64,6 +64,15 @@
         "editor.tabSize": 4,
     },
 
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab_tasks",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab_assets",
+        "${workspaceFolder}/external/IsaacLab/source/isaaclab_rl",
+        "${workspaceFolder}/external/IsaacLab/scripts"
+    ],
+
     "[powershell]": {
         "debug.saveBeforeStart": "nonUntitledEditorsInActiveGroup",
         "editor.semanticHighlighting.enabled": false,
@@ -104,8 +113,11 @@
         ".github/chatmodes": true,
         "/Users/vscode/repos/chatmodes": true,
         "../../flagship/edge-ai/.github/chatmodes": true,
+        "../../flagship/edge-ai/copilot/beads/chatmodes": true,
         "../../microsoft/edge-ai/.github/chatmodes": true,
+        "../../microsoft/edge-ai/copilot/beads/chatmodes": true,
         "../edge-ai/.github/chatmodes": true,
+        "../edge-ai/copilot/beads/chatmodes": true,
     },
 
     "chat.instructionsFilesLocations": {
@@ -114,8 +126,11 @@
         ".copilot-tracking/instructions": true,
         ".copilot-tracking/plans": true,
         "../../flagship/edge-ai/.github/instructions": true,
+        "../../flagship/edge-ai/copilot/beads/instructions": true,
         "../../microsoft/edge-ai/.github/instructions": true,
+        "../../microsoft/edge-ai/copilot/beads/instructions": true,
         "../edge-ai/.github/instructions": true,
+        "../edge-ai/copilot/beads/instructions": true,
     },
 
     "chat.promptFilesLocations": {
@@ -123,7 +138,10 @@
         "/Users/vscode/repos/prompts": true,
         ".copilot-tracking/prompts": true,
         "../../flagship/edge-ai/.github/prompts": true,
+        "../../flagship/edge-ai/copilot/beads/prompts": true,
         "../../microsoft/edge-ai/.github/prompts": true,
+        "../../microsoft/edge-ai/copilot/beads/prompts": true,
         "../edge-ai/.github/prompts": true,
+        "../edge-ai/copilot/beads/prompts": true,
     },
 }

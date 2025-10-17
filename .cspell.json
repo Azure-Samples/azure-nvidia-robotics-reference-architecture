@@ -1,0 +1,67 @@
+{
+	"$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/packages/cspell-types/cspell.schema.json",
+	"version": "0.2",
+	"language": "en-US",
+	"noConfigSearch": true,
+	"flagWords": [
+		"TODO"
+	],
+	"ignorePaths": [
+		"**/.github/chatmodes/**",
+		"**/node_modules/**",
+		"**/vscode-extension/**",
+		"**/.git/**",
+		"**/.pnpm-lock.json",
+		".vscode",
+		"megalinter",
+		"package-lock.json",
+		"report",
+		"**/.gitignore",
+		".vscodeignore",
+		".gitattributes",
+		"**/.devcontainer/**",
+		"**/.github/workflows/**",
+		"*.lock",
+		"*.log",
+		".cspell.json",
+		".cspell-dictionary.txt",
+		"**/.mega-linter.yml",
+		"*megalinter_file_names_cspell.txt"
+	],
+	"dictionaryDefinitions": [
+		{
+			"name": "cspell-dictionary",
+			"path": ".cspell-dictionary.txt",
+			"addWords": true
+		}
+	],
+	"dictionaries": [
+		"en_US",
+		"!en-GB",
+		"!en_GB",
+		"companies",
+		"softwareTerms",
+		"misc",
+		"typescript",
+		"node",
+		"php",
+		"go",
+		"python",
+		"powershell",
+		"html",
+		"css",
+		"cpp",
+		"csharp",
+		"latex",
+		"bash",
+		"filetypes",
+		"npm",
+		"cspell-dictionary"
+	],
+	"caseSensitive": false,
+	"useGitignore": true,
+	"ignoreRegExpList": [
+		"/^\\s*```[\\s\\S]*?^\\s*```/gm",
+		"/^authors?:.*(?:\\r?\\n\\s*-.*)*$/gmi"
+	],
+}
