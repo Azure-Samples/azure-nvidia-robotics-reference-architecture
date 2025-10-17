@@ -16,7 +16,8 @@ The architecture integrates Azure services and NVIDIA robotics frameworks (Isaac
 │   ├── 002-setup/                      # Post-infrastructure setup
 │   ├── 003-data/                       # Data preparation and upload
 │   └── 004-workflow/                   # Training workflow execution
-│       └── job-templates/              # Job configuration templates
+│       ├── job-templates/              # Job configuration templates
+│       └── osmo/                       # OSMO inline workflow submission (see osmo/README.md)
 ├── src/
 │   ├── terraform/                      # Infrastructure as Code
 │   │   └── modules/                    # Reusable Terraform modules
