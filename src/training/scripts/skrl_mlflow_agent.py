@@ -246,14 +246,14 @@ def create_mlflow_logging_wrapper(
             "Cannot extract metrics from non-dict tracking_data."
         )
 
-    _LOGGER.info(
+    _LOGGER.debug(
         "Creating MLflow logging wrapper for agent type: %s (tracking_data validated)",
         type(agent).__name__,
     )
 
     original_update = agent._update
-    _LOGGER.info(
-        "Monkey patching ready: original _update method captured from %s",
+    _LOGGER.debug(
+        "Original _update method captured from %s",
         type(agent).__name__,
     )
 
@@ -265,8 +265,8 @@ def create_mlflow_logging_wrapper(
             metrics = _extract_metrics_from_agent(agent, metric_filter)
             if metrics and mlflow_module:
                 mlflow_module.log_metrics(metrics, step=timestep)
-                _LOGGER.info(
-                    "MLflow metrics logged successfully: metrics at timestep %d, %s",
+                _LOGGER.debug(
+                    "Logged MLflow metrics at timestep %d: %s",
                     timestep,
                     ", ".join(sorted(metrics.keys())),
                 )

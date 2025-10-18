@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import logging
-import os
 import shutil
 import sys
 import tempfile
@@ -128,9 +127,6 @@ def _bootstrap(args: argparse.Namespace) -> tuple[AzureMLContext | None, str | N
         _LOGGER.warning("MLflow integration disabled via --disable-mlflow")
         return None, None
 
-    os.environ.setdefault("MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES", "3")
-    os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "60")
-
     experiment_name = args.experiment_name or (f"isaaclab-{args.task}" if args.task else "isaaclab-training")
     context = bootstrap_azure_ml(experiment_name=experiment_name)
     _LOGGER.info("MLflow context ready: %s", {"experiment": experiment_name, "tracking_uri": context.tracking_uri})
@@ -213,7 +209,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             _LOGGER.exception("SKRL training failed: %s", run_context)
             raise
         else:
-            _LOGGER.info("Completed SKRL training: %s", run_context)
+            _LOGGER.debug("Completed SKRL training: %s", run_context)
 
 
 if __name__ == "__main__":

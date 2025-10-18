@@ -13,18 +13,31 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import random
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, NamedTuple, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Sequence, Tuple
 
 from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
-from training.utils import AzureMLContext
+from training.utils import AzureMLContext, set_env_defaults
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
+
+_DEFAULT_MLFLOW_INTERVAL = 10
+_MLFLOW_INTERVAL_PRESETS = {
+    "step": 1,
+    "balanced": _DEFAULT_MLFLOW_INTERVAL,
+}
+_MLFLOW_ROLLOUT_PRESET = "rollout"
+
+_AGENT_ENTRY_DEFAULT = "skrl_cfg_entry_point"
+_AGENT_ENTRY_MAP = {
+    "ippo": "skrl_ippo_cfg_entry_point",
+    "mappo": "skrl_mappo_cfg_entry_point",
+    "amp": "skrl_amp_cfg_entry_point",
+}
 
 
 def _parse_mlflow_log_interval(interval_arg: str, rollouts: int) -> int:
@@ -38,21 +51,25 @@ def _parse_mlflow_log_interval(interval_arg: str, rollouts: int) -> int:
         Integer interval for metric logging
     """
     interval_arg = interval_arg.strip().lower()
-    if interval_arg == "step":
-        return 1
-    if interval_arg == "balanced":
-        return 10
-    if interval_arg == "rollout":
-        return rollouts if rollouts > 0 else 10
+    if not interval_arg:
+        return _DEFAULT_MLFLOW_INTERVAL
+
+    preset_value = _MLFLOW_INTERVAL_PRESETS.get(interval_arg)
+    if preset_value is not None:
+        return preset_value
+
+    if interval_arg == _MLFLOW_ROLLOUT_PRESET:
+        return rollouts if rollouts > 0 else _DEFAULT_MLFLOW_INTERVAL
     try:
         interval = int(interval_arg)
-        if interval < 1:
-            _LOGGER.warning("MLflow log interval must be >= 1, using default (10)")
-            return 10
-        return interval
+        return max(1, interval)
     except ValueError:
-        _LOGGER.warning("Invalid mlflow_log_interval '%s', using default (10)", interval_arg)
-        return 10
+        _LOGGER.warning(
+            "Invalid mlflow_log_interval '%s', using default (%d)",
+            interval_arg,
+            _DEFAULT_MLFLOW_INTERVAL,
+        )
+        return _DEFAULT_MLFLOW_INTERVAL
 
 
 def _build_parser(app_launcher_cls) -> argparse.ArgumentParser:
@@ -98,11 +115,7 @@ def _agent_entry(args_cli: argparse.Namespace) -> str:
     if args_cli.agent:
         return args_cli.agent
     algorithm = (args_cli.algorithm or "").lower()
-    if algorithm == "ppo":
-        return "skrl_cfg_entry_point"
-    if algorithm in {"ippo", "mappo", "amp"}:
-        return f"skrl_{algorithm}_cfg_entry_point"
-    return "skrl_cfg_entry_point"
+    return _AGENT_ENTRY_MAP.get(algorithm, _AGENT_ENTRY_DEFAULT)
 
 
 def _prepare_log_paths(agent_cfg: Dict, args_cli: argparse.Namespace) -> Path:
@@ -275,46 +288,42 @@ def _resolve_checkpoint(retrieve_file_path, checkpoint: Optional[str]) -> Option
         raise SystemExit(f"Checkpoint path not found: {checkpoint}") from exc
 
 
-def _namespace_to_tokens(args: argparse.Namespace) -> Sequence[str]:
-    """Convert namespace values into CLI tokens suitable for parser invocation.
+def _namespace_snapshot(namespace: argparse.Namespace) -> Tuple[Dict[str, object], Sequence[str]]:
+    """Provide a serializable snapshot and CLI token list for a namespace."""
 
-    Args:
-        args: Launch arguments namespace from external caller.
-
-    Returns:
-        Sequence of tokens representing namespace values.
-    """
-    tokens = []
-    if getattr(args, "task", None):
-        tokens.extend(["--task", str(args.task)])
-    if getattr(args, "num_envs", None) is not None:
-        tokens.extend(["--num_envs", str(args.num_envs)])
-    if getattr(args, "max_iterations", None) is not None:
-        tokens.extend(["--max_iterations", str(args.max_iterations)])
-    if getattr(args, "headless", False):
-        tokens.append("--headless")
-    if getattr(args, "checkpoint", None):
-        tokens.extend(["--checkpoint", str(args.checkpoint)])
-    return tokens
-
-
-def _namespace_payload(namespace: argparse.Namespace) -> Dict[str, object]:
-    """Render argparse namespace into JSON-serializable payload."""
     payload: Dict[str, object] = {}
     for key, value in vars(namespace).items():
         if isinstance(value, (str, int, float, bool)) or value is None:
             payload[key] = value
         else:
             payload[key] = str(value)
-    return payload
+
+    tokens: list[str] = []
+    task = payload.get("task")
+    if task:
+        tokens.extend(["--task", str(task)])
+    num_envs = payload.get("num_envs")
+    if num_envs is not None:
+        tokens.extend(["--num_envs", str(num_envs)])
+    max_iterations = payload.get("max_iterations")
+    if max_iterations is not None:
+        tokens.extend(["--max_iterations", str(max_iterations)])
+    if payload.get("headless"):
+        tokens.append("--headless")
+    checkpoint = payload.get("checkpoint")
+    if checkpoint:
+        tokens.extend(["--checkpoint", str(checkpoint)])
+
+    return payload, tokens
 
 
 def _normalize_agent_config(agent_cfg: Any) -> Dict[str, Any]:
     """Return agent configuration as a plain dictionary."""
 
-    if isinstance(agent_cfg, dict):
-        return agent_cfg
-    return agent_cfg.to_dict()
+    to_dict = getattr(agent_cfg, "to_dict", None)
+    if callable(to_dict):
+        return to_dict()
+    return agent_cfg
 
 
 def _configure_environment(
@@ -330,8 +339,10 @@ def _configure_environment(
 
     random_seed = args_cli.seed if args_cli.seed is not None else random.randint(1, 1_000_000)
     random.seed(random_seed)
-    os.environ.setdefault("PYTHONHASHSEED", str(random_seed))
-    os.environ.setdefault("HYDRA_FULL_ERROR", "1")
+    set_env_defaults({
+        "PYTHONHASHSEED": str(random_seed),
+        "HYDRA_FULL_ERROR": "1",
+    })
 
     if isinstance(env_cfg, manager_cfg_type):
         env_cfg.scene.num_envs = args_cli.num_envs or env_cfg.scene.num_envs
@@ -599,12 +610,14 @@ def _prepare_cli_arguments(
 ) -> tuple[argparse.Namespace, Sequence[str]]:
     """Parse CLI inputs and emit launch argument logging."""
 
-    tokens = list(_namespace_to_tokens(args)) + list(hydra_args)
+    _, base_tokens = _namespace_snapshot(args)
+    tokens = list(base_tokens) + list(hydra_args)
     args_cli, leftover = parser.parse_known_args(tokens)
     if args_cli.video:
         args_cli.enable_cameras = True
+    parsed_payload, _ = _namespace_snapshot(args_cli)
     parse_report = {
-        "parsed": _namespace_payload(args_cli),
+        "parsed": parsed_payload,
         "hydra_overrides": list(leftover),
         "launcher_hydra_args": list(hydra_args),
     }
@@ -620,7 +633,7 @@ def _initialize_simulation(app_launcher_cls, args_cli: argparse.Namespace, lefto
     simulation_app = app_launcher.app
     kit_log_dir = getattr(getattr(simulation_app, "config", None), "log_dir", None)
     if kit_log_dir:
-        _LOGGER.info("Kit logs located at %s", kit_log_dir)
+        _LOGGER.debug("Kit logs located at %s", kit_log_dir)
     return app_launcher, simulation_app
 
 
@@ -906,7 +919,7 @@ def _run_hydra_training(
                     active_run = modules.mlflow_module.active_run()
                     if active_run:
                         descriptor["mlflow_run_id"] = active_run.info.run_id
-                _LOGGER.info("SKRL runner completed: %s", descriptor)
+                _LOGGER.debug("SKRL runner completed: %s", descriptor)
         finally:
             if env is not None:
                 env.close()
