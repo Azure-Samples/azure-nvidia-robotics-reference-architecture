@@ -123,7 +123,7 @@ def _prepare_log_paths(agent_cfg: dict[str, Any], cli_args: argparse.Namespace) 
 
     Args:
         agent_cfg: Agent configuration dictionary to populate with experiment details.
-        args_cli: Parsed CLI arguments that drive naming and algorithm metadata.
+        cli_args: Parsed CLI arguments that drive naming and algorithm metadata.
 
     Returns:
         Absolute path to the run-specific log directory.

@@ -91,26 +91,32 @@ class MLflowModule(Protocol):
 
 
 def _is_tensor_scalar(value: Any) -> bool:
+    """Check if value is a single-element tensor."""
     return hasattr(value, "item") and hasattr(value, "numel") and value.numel() == 1
 
 
 def _is_tensor_array(value: Any) -> bool:
+    """Check if value is a multi-element tensor."""
     return hasattr(value, "item") and hasattr(value, "numel") and value.numel() > 1
 
 
 def _is_numpy_array(value: Any) -> bool:
+    """Check if value is a multi-element numpy array."""
     return hasattr(value, "mean") and hasattr(value, "__len__") and len(value) > 1
 
 
 def _is_single_element_sequence(value: Any) -> bool:
+    """Check if value is a sequence with exactly one element."""
     return hasattr(value, "__len__") and len(value) == 1
 
 
 def _extract_tensor_scalar(name: str, value: Any, metrics: dict[str, float]) -> None:
+    """Extract scalar value from single-element tensor."""
     metrics[name] = float(value.item())
 
 
 def _extract_tensor_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
+    """Extract mean, std, min, max statistics from tensor array."""
     if hasattr(value, "mean"):
         metrics[f"{name}/mean"] = float(value.mean().item())
     if hasattr(value, "std"):
@@ -122,6 +128,7 @@ def _extract_tensor_statistics(name: str, value: Any, metrics: dict[str, float])
 
 
 def _extract_numpy_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
+    """Extract mean, std, min, max statistics from numpy array."""
     import numpy as np
 
     arr = np.asarray(value)
@@ -134,13 +141,13 @@ def _extract_numpy_statistics(name: str, value: Any, metrics: dict[str, float]) 
 def _extract_from_value(name: str, value: int | float | Any, metrics: dict[str, float]) -> None:
     """Extract numeric value and add to metrics dict.
 
-    Handles tensors, arrays, and numeric types. For tensors/arrays with multiple
-    elements, extracts mean, std, min, max statistics.
+    Handles tensors, numpy arrays, and scalar types. Multi-element arrays
+    are converted to mean/std/min/max statistics.
 
     Args:
-        name: Metric name
-        value: Value to extract (can be tensor, array, or numeric)
-        metrics: Output dictionary to populate
+        name: Metric name.
+        value: Value to extract (tensor, array, or scalar).
+        metrics: Output dictionary to populate.
     """
     if value is None:
         return
@@ -171,10 +178,10 @@ def _extract_from_tracking_data(
     """Recursively extract metrics from tracking_data dict.
 
     Args:
-        data: Dictionary to extract from (tracking_data or nested dict)
-        metrics: Output dictionary to populate with metrics
-        prefix: Metric name prefix for nested structures
-        max_depth: Maximum recursion depth to prevent infinite loops
+        data: Dictionary to extract from.
+        metrics: Output dictionary to populate.
+        prefix: Metric name prefix for nested structures.
+        max_depth: Maximum recursion depth.
     """
     if max_depth <= 0:
         return
@@ -221,6 +228,7 @@ _STANDARD_METRIC_ATTRS = [
 
 
 def _has_tracking_data(agent: SkrlAgent) -> bool:
+    """Check if agent has valid tracking_data dict."""
     return hasattr(agent, "tracking_data") and isinstance(agent.tracking_data, dict)
 
 
@@ -228,20 +236,17 @@ def _extract_metrics_from_agent(
     agent: SkrlAgent,
     metric_filter: set[str] | None = None,
 ) -> dict[str, float]:
-    """Extract metrics from the SKRL agent's internal state.
+    """Extract metrics from SKRL agent's internal state.
 
-    Extracts metrics from multiple sources:
-    - agent.tracking_data dict (SKRL's primary tracking mechanism)
-    - Direct agent attributes for common metrics
-    - Nested structures in tracking_data
-    - Statistical aggregations (mean, std, min, max) when available
+    Extracts from agent.tracking_data dict, direct attributes, and nested
+    structures. Multi-element values produce mean/std/min/max statistics.
 
     Args:
-        agent: SKRL agent instance with tracking_data dict
-        metric_filter: Optional set of metric names to include
+        agent: SKRL agent instance with tracking_data dict.
+        metric_filter: Optional set of metric names to include.
 
     Returns:
-        Dictionary of metric names to float values, filtered by metric_filter if set
+        Dictionary of metric names to float values.
     """
     metrics: dict[str, float] = {}
 
@@ -265,38 +270,34 @@ def create_mlflow_logging_wrapper(
 ) -> Callable[[int, int], Any]:
     """Create closure that wraps agent._update with MLflow logging.
 
-    Returns a function suitable for monkey-patching agent._update. The returned
-    closure will call the original agent._update method and then extract and log
-    metrics to MLflow.
+    Returns a function that calls the original agent._update method then
+    extracts and logs metrics to MLflow.
 
     Args:
-        agent: SKRL agent instance to extract metrics from
-        mlflow_module: MLflow module for logging metrics
-        metric_filter: Optional set of metric names to include
+        agent: SKRL agent instance to extract metrics from.
+        mlflow_module: MLflow module for logging metrics.
+        metric_filter: Optional set of metric names to include.
 
     Returns:
-        Closure function with signature (timestep: int, timesteps: int) -> Any
-        that can be assigned to agent._update for monkey-patching
+        Closure function suitable for monkey-patching agent._update.
+
+    Raises:
+        AttributeError: If agent lacks tracking_data attribute.
 
     Example:
-        >>> wrapper_func = create_mlflow_logging_wrapper(runner.agent, mlflow, None)
-        >>> runner.agent._update = wrapper_func
+        >>> wrapper = create_mlflow_logging_wrapper(runner.agent, mlflow)
+        >>> runner.agent._update = wrapper
     """
     if not _has_tracking_data(agent):
-        if not hasattr(agent, "tracking_data"):
-            raise AttributeError(
-                "Agent must have 'tracking_data' attribute for MLflow metric logging. "
-                f"Agent type {type(agent).__name__} does not support metric tracking."
-            )
-        raise TypeError(
-            f"Agent 'tracking_data' must be a dict, got {type(agent.tracking_data).__name__}. "
-            "Cannot extract metrics from non-dict tracking_data."
+        raise AttributeError(
+            "Agent must have 'tracking_data' attribute for MLflow metric logging. "
+            f"Agent type {type(agent).__name__} does not support metric tracking."
         )
 
     original_update = agent._update
 
     def mlflow_logging_update(timestep: int, timesteps: int) -> Any:
-        """Wrapped _update that logs metrics to MLflow after each training update."""
+        """Call original _update and log metrics to MLflow."""
         result = original_update(timestep, timesteps)
 
         try:
