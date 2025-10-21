@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from azure.ai.ml import MLClient
-
+from azure.ai.ml import MLClient
 from azure.identity import DefaultAzureCredential
 import mlflow
 
