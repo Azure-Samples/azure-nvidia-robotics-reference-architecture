@@ -87,8 +87,7 @@ class SkrlAgent(Protocol):
 class MLflowModule(Protocol):
     """Protocol defining the MLflow API used for logging metrics."""
 
-    def log_metrics(self, metrics: dict[str, float], step: int | None = None) -> None:
-        ...
+    def log_metrics(self, metrics: dict[str, float], step: int | None = None) -> None: ...
 
 
 def _is_tensor_scalar(value: Any) -> bool:

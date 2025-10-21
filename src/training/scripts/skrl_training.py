@@ -168,6 +168,7 @@ def _wrap_with_video_recorder(gym_module: Any, env: Any, cli_args: argparse.Name
     _LOGGER.info("Recording training videos to %s", video_dir)
     return gym_module.wrappers.RecordVideo(env, **video_kwargs)
 
+
 def _log_artifacts(mlflow: Any, log_dir: Path, resume_path: str | None) -> str | None:
     """Log training artifacts to MLflow and derive latest checkpoint URI.
 
@@ -347,10 +348,12 @@ def _configure_environment(
 
     random_seed = cli_args.seed if cli_args.seed is not None else random.randint(1, 1_000_000)
     random.seed(random_seed)
-    set_env_defaults({
-        "PYTHONHASHSEED": str(random_seed),
-        "HYDRA_FULL_ERROR": "1",
-    })
+    set_env_defaults(
+        {
+            "PYTHONHASHSEED": str(random_seed),
+            "HYDRA_FULL_ERROR": "1",
+        }
+    )
 
     if isinstance(env_cfg, manager_cfg_type):
         _set_num_envs_for_manager_cfg(env_cfg, cli_args.num_envs)
@@ -625,7 +628,9 @@ def _prepare_cli_arguments(
     return cli_args, unparsed_args
 
 
-def _initialize_simulation(app_launcher_cls: Any, cli_args: argparse.Namespace, unparsed_args: Sequence[str]) -> tuple[Any, Any]:
+def _initialize_simulation(
+    app_launcher_cls: Any, cli_args: argparse.Namespace, unparsed_args: Sequence[str]
+) -> tuple[Any, Any]:
     """Launch IsaacLab simulation application using parsed arguments."""
 
     sys.argv = [sys.argv[0]] + list(unparsed_args)
@@ -658,6 +663,7 @@ def _load_training_modules(
     from isaaclab.utils.assets import retrieve_file_path
     from isaaclab.utils.dict import print_dict
     from isaaclab.utils.io import dump_yaml
+
     try:
         from isaaclab.utils.io import dump_pickle
     except ImportError:
@@ -907,7 +913,12 @@ def _run_hydra_training(
                 log_interval,
             )
             descriptor = dict(run_descriptor)
-            _LOGGER.info("Starting SKRL training: task=%s iterations=%s run_descriptor=%s", cli_args.task, cli_args.max_iterations, run_descriptor)
+            _LOGGER.info(
+                "Starting SKRL training: task=%s iterations=%s run_descriptor=%s",
+                cli_args.task,
+                cli_args.max_iterations,
+                run_descriptor,
+            )
             try:
                 descriptor = _execute_training_loop(runner, descriptor)
             except Exception:
