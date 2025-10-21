@@ -74,6 +74,8 @@ azure-identity>=1.13.0
 azure-ai-ml
 azureml-mlflow
 mlflow
+psutil>=5.9.0  # CPU, memory, disk metrics
+pynvml>=11.5.0  # NVIDIA GPU metrics (optional)
 
 # Linux-only dependencies (x86_64)
 # These are installed conditionally based on platform
