@@ -32,6 +32,13 @@ Extracts the following metric categories from SKRL agents:
 All entries in agent.tracking_data dict are extracted, supporting custom metrics
 from different SKRL algorithms (PPO, SAC, TD3, DDPG, A2C, etc.).
 
+**System Metrics:**
+Collected via psutil and pynvml with system/ prefix:
+- CPU: system/cpu_utilization_percentage
+- Memory: system/memory_used_megabytes, system/memory_percent, system/memory_available_megabytes
+- GPU: system/gpu_{i}_utilization_percentage, system/gpu_{i}_memory_percent, system/gpu_{i}_memory_used_megabytes, system/gpu_{i}_power_watts
+- Disk: system/disk_used_gigabytes, system/disk_percent, system/disk_available_gigabytes
+
 Metric Logging
 --------------
 Metrics are logged to MLflow after each agent._update() call, which is when SKRL
@@ -57,6 +64,7 @@ wrapper_func = create_mlflow_logging_wrapper(
     agent=runner.agent,
     mlflow_module=mlflow,
     metric_filter=None,
+    collect_gpu_metrics=True,
 )
 
 # Monkey-patch the agent's _update method
@@ -87,7 +95,12 @@ class SkrlAgent(Protocol):
 class MLflowModule(Protocol):
     """Protocol defining the MLflow API used for logging metrics."""
 
-    def log_metrics(self, metrics: dict[str, float], step: int | None = None) -> None: ...
+    def log_metrics(
+        self,
+        metrics: dict[str, float],
+        step: int | None = None,
+        synchronous: bool = True,
+    ) -> None: ...
 
 
 def _is_tensor_scalar(value: Any) -> bool:
@@ -263,10 +276,130 @@ def _extract_metrics_from_agent(
     return metrics
 
 
+class SystemMetricsCollector:
+    """Collects system metrics using psutil and pynvml."""
+
+    def __init__(self, collect_gpu: bool = True, collect_disk: bool = True) -> None:
+        """Initialize system metrics collector.
+
+        Args:
+            collect_gpu: Enable GPU metrics collection (requires pynvml).
+            collect_disk: Enable disk metrics collection.
+        """
+        self._collect_disk = collect_disk
+        self._gpu_available = False
+        self._gpu_handles: list[Any] = []
+
+        if collect_gpu:
+            self._initialize_gpu()
+
+    def _initialize_gpu(self) -> None:
+        """Initialize GPU monitoring (NVIDIA via pynvml)."""
+        try:
+            import pynvml
+
+            pynvml.nvmlInit()
+            device_count = pynvml.nvmlDeviceGetCount()
+            self._gpu_handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(device_count)]
+            self._gpu_available = True
+            _LOGGER.debug("GPU metrics collection initialized (%d devices)", device_count)
+        except Exception as exc:
+            _LOGGER.debug("GPU metrics unavailable: %s", exc)
+            self._gpu_available = False
+
+    def collect_metrics(self) -> dict[str, float]:
+        """Collect all system metrics.
+
+        Returns:
+            Dictionary of system metrics with system/ prefix.
+        """
+        metrics: dict[str, float] = {}
+
+        metrics.update(self._collect_cpu_metrics())
+        metrics.update(self._collect_gpu_metrics())
+
+        if self._collect_disk:
+            metrics.update(self._collect_disk_metrics())
+
+        return metrics
+
+    def _collect_cpu_metrics(self) -> dict[str, float]:
+        """Collect CPU and memory metrics using psutil.
+
+        Returns:
+            Dictionary with cpu_utilization_percentage and memory metrics.
+        """
+        import psutil
+
+        metrics: dict[str, float] = {}
+
+        try:
+            metrics["system/cpu_utilization_percentage"] = psutil.cpu_percent(interval=None)
+
+            mem = psutil.virtual_memory()
+            metrics["system/memory_used_megabytes"] = mem.used / (1024 * 1024)
+            metrics["system/memory_available_megabytes"] = mem.available / (1024 * 1024)
+            metrics["system/memory_percent"] = mem.percent
+        except Exception as exc:
+            _LOGGER.debug("CPU/memory metrics collection failed: %s", exc)
+
+        return metrics
+
+    def _collect_gpu_metrics(self) -> dict[str, float]:
+        """Collect GPU metrics using pynvml (NVIDIA only).
+
+        Returns:
+            Dictionary with gpu_{i}_* metrics, or empty dict if unavailable.
+        """
+        if not self._gpu_available:
+            return {}
+
+        import pynvml
+
+        metrics: dict[str, float] = {}
+
+        for i, handle in enumerate(self._gpu_handles):
+            try:
+                util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                metrics[f"system/gpu_{i}_utilization_percentage"] = float(util.gpu)
+
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                metrics[f"system/gpu_{i}_memory_used_megabytes"] = mem_info.used / (1024 * 1024)
+                metrics[f"system/gpu_{i}_memory_percent"] = (mem_info.used / mem_info.total) * 100
+
+                power = pynvml.nvmlDeviceGetPowerUsage(handle)
+                metrics[f"system/gpu_{i}_power_watts"] = power / 1000
+            except Exception as exc:
+                _LOGGER.debug("GPU %d metrics collection failed: %s", i, exc)
+
+        return metrics
+
+    def _collect_disk_metrics(self) -> dict[str, float]:
+        """Collect disk usage metrics using psutil.
+
+        Returns:
+            Dictionary with disk usage metrics for root filesystem.
+        """
+        import psutil
+
+        metrics: dict[str, float] = {}
+
+        try:
+            disk = psutil.disk_usage("/")
+            metrics["system/disk_used_gigabytes"] = disk.used / (1024 * 1024 * 1024)
+            metrics["system/disk_available_gigabytes"] = disk.free / (1024 * 1024 * 1024)
+            metrics["system/disk_percent"] = disk.percent
+        except Exception as exc:
+            _LOGGER.debug("Disk metrics collection failed: %s", exc)
+
+        return metrics
+
+
 def create_mlflow_logging_wrapper(
     agent: SkrlAgent,
     mlflow_module: MLflowModule,
     metric_filter: set[str] | None = None,
+    collect_gpu_metrics: bool = True,
 ) -> Callable[[int, int], Any]:
     """Create closure that wraps agent._update with MLflow logging.
 
@@ -277,6 +410,7 @@ def create_mlflow_logging_wrapper(
         agent: SKRL agent instance to extract metrics from.
         mlflow_module: MLflow module for logging metrics.
         metric_filter: Optional set of metric names to include.
+        collect_gpu_metrics: Enable GPU metrics collection (default: True).
 
     Returns:
         Closure function suitable for monkey-patching agent._update.
@@ -294,6 +428,15 @@ def create_mlflow_logging_wrapper(
             f"Agent type {type(agent).__name__} does not support metric tracking."
         )
 
+    system_metrics_collector = SystemMetricsCollector(
+        collect_gpu=collect_gpu_metrics,
+        collect_disk=True,
+    )
+    _LOGGER.debug(
+        "System metrics collector initialized (GPU: %s)",
+        collect_gpu_metrics,
+    )
+
     original_update = agent._update
 
     def mlflow_logging_update(timestep: int, timesteps: int) -> Any:
@@ -301,10 +444,23 @@ def create_mlflow_logging_wrapper(
         result = original_update(timestep, timesteps)
 
         try:
-            metrics = _extract_metrics_from_agent(agent, metric_filter)
-            if metrics and mlflow_module:
-                mlflow_module.log_metrics(metrics, step=timestep)
-            elif not metrics:
+            training_metrics = _extract_metrics_from_agent(agent, metric_filter)
+
+            system_metrics = {}
+            try:
+                system_metrics = system_metrics_collector.collect_metrics()
+                _LOGGER.debug(
+                    "System metrics collected: %d metrics",
+                    len(system_metrics),
+                )
+            except Exception as exc:
+                _LOGGER.debug("System metrics collection failed: %s", exc)
+
+            all_metrics = {**training_metrics, **system_metrics}
+
+            if all_metrics and mlflow_module:
+                mlflow_module.log_metrics(all_metrics, step=timestep, synchronous=False)
+            elif not all_metrics:
                 _LOGGER.debug("No metrics extracted at timestep %d", timestep)
         except Exception as exc:
             _LOGGER.warning("Failed to log metrics at timestep %d: %s", timestep, exc)

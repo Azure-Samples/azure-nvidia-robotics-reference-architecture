@@ -3,4 +3,6 @@ azure-ai-ml
 azureml-mlflow
 mlflow
 packaging
+psutil>=5.9.0  # CPU, memory, disk metrics
+pynvml>=11.5.0  # NVIDIA GPU metrics (optional)
 skrl>=1.4.3
