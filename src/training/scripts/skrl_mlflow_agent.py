@@ -75,6 +75,47 @@ from typing import Any, Callable, Dict, Optional, Set
 _LOGGER = logging.getLogger(__name__)
 
 
+def _is_tensor_scalar(value: Any) -> bool:
+    return hasattr(value, "item") and hasattr(value, "numel") and value.numel() == 1
+
+
+def _is_tensor_array(value: Any) -> bool:
+    return hasattr(value, "item") and hasattr(value, "numel") and value.numel() > 1
+
+
+def _is_numpy_array(value: Any) -> bool:
+    return hasattr(value, "mean") and hasattr(value, "__len__") and len(value) > 1
+
+
+def _is_single_element_sequence(value: Any) -> bool:
+    return hasattr(value, "__len__") and len(value) == 1
+
+
+def _extract_tensor_scalar(name: str, value: Any, metrics: Dict[str, float]) -> None:
+    metrics[name] = float(value.item())
+
+
+def _extract_tensor_statistics(name: str, value: Any, metrics: Dict[str, float]) -> None:
+    if hasattr(value, "mean"):
+        metrics[f"{name}/mean"] = float(value.mean().item())
+    if hasattr(value, "std"):
+        metrics[f"{name}/std"] = float(value.std().item())
+    if hasattr(value, "min"):
+        metrics[f"{name}/min"] = float(value.min().item())
+    if hasattr(value, "max"):
+        metrics[f"{name}/max"] = float(value.max().item())
+
+
+def _extract_numpy_statistics(name: str, value: Any, metrics: Dict[str, float]) -> None:
+    import numpy as np
+
+    arr = np.asarray(value)
+    metrics[f"{name}/mean"] = float(np.mean(arr))
+    metrics[f"{name}/std"] = float(np.std(arr))
+    metrics[f"{name}/min"] = float(np.min(arr))
+    metrics[f"{name}/max"] = float(np.max(arr))
+
+
 def _extract_from_value(name: str, value: Any, metrics: Dict[str, float]) -> None:
     """Extract numeric value and add to metrics dict.
 
@@ -90,29 +131,15 @@ def _extract_from_value(name: str, value: Any, metrics: Dict[str, float]) -> Non
         return
 
     try:
-        if hasattr(value, "item"):
-            if hasattr(value, "numel") and value.numel() == 1:
-                metrics[name] = float(value.item())
-            elif hasattr(value, "numel") and value.numel() > 1:
-                if hasattr(value, "mean"):
-                    metrics[f"{name}/mean"] = float(value.mean().item())
-                if hasattr(value, "std"):
-                    metrics[f"{name}/std"] = float(value.std().item())
-                if hasattr(value, "min"):
-                    metrics[f"{name}/min"] = float(value.min().item())
-                if hasattr(value, "max"):
-                    metrics[f"{name}/max"] = float(value.max().item())
-            else:
-                metrics[name] = float(value.item())
-        elif hasattr(value, "mean") and hasattr(value, "__len__") and len(value) > 1:
-            import numpy as np
-
-            arr = np.asarray(value)
-            metrics[f"{name}/mean"] = float(np.mean(arr))
-            metrics[f"{name}/std"] = float(np.std(arr))
-            metrics[f"{name}/min"] = float(np.min(arr))
-            metrics[f"{name}/max"] = float(np.max(arr))
-        elif hasattr(value, "__len__") and len(value) == 1:
+        if _is_tensor_scalar(value):
+            _extract_tensor_scalar(name, value, metrics)
+        elif _is_tensor_array(value):
+            _extract_tensor_statistics(name, value, metrics)
+        elif hasattr(value, "item"):
+            metrics[name] = float(value.item())
+        elif _is_numpy_array(value):
+            _extract_numpy_statistics(name, value, metrics)
+        elif _is_single_element_sequence(value):
             metrics[name] = float(value[0])
         else:
             metrics[name] = float(value)
@@ -146,6 +173,42 @@ def _extract_from_tracking_data(
             _extract_from_value(metric_name, value, metrics)
 
 
+_STANDARD_METRIC_ATTRS = [
+    "episode_reward",
+    "episode_reward_mean",
+    "episode_length",
+    "episode_length_mean",
+    "cumulative_rewards",
+    "mean_rewards",
+    "episode_lengths",
+    "success_rate",
+    "policy_loss",
+    "value_loss",
+    "critic_loss",
+    "entropy",
+    "learning_rate",
+    "lr",
+    "grad_norm",
+    "gradient_norm",
+    "kl_divergence",
+    "kl",
+    "timesteps",
+    "timesteps_total",
+    "total_timesteps",
+    "iterations",
+    "iterations_total",
+    "fps",
+    "time_elapsed",
+    "epoch_time",
+    "rollout_time",
+    "learning_time",
+]
+
+
+def _has_tracking_data(agent: Any) -> bool:
+    return hasattr(agent, "tracking_data") and isinstance(agent.tracking_data, dict)
+
+
 def _extract_metrics_from_agent(
     agent: Any,
     metric_filter: Optional[Set[str]] = None,
@@ -167,41 +230,10 @@ def _extract_metrics_from_agent(
     """
     metrics: Dict[str, float] = {}
 
-    if hasattr(agent, "tracking_data") and isinstance(agent.tracking_data, dict):
+    if _has_tracking_data(agent):
         _extract_from_tracking_data(agent.tracking_data, metrics, prefix="")
 
-    metric_attrs = [
-        "episode_reward",
-        "episode_reward_mean",
-        "episode_length",
-        "episode_length_mean",
-        "cumulative_rewards",
-        "mean_rewards",
-        "episode_lengths",
-        "success_rate",
-        "policy_loss",
-        "value_loss",
-        "critic_loss",
-        "entropy",
-        "learning_rate",
-        "lr",
-        "grad_norm",
-        "gradient_norm",
-        "kl_divergence",
-        "kl",
-        "timesteps",
-        "timesteps_total",
-        "total_timesteps",
-        "iterations",
-        "iterations_total",
-        "fps",
-        "time_elapsed",
-        "epoch_time",
-        "rollout_time",
-        "learning_time",
-    ]
-
-    for attr_name in metric_attrs:
+    for attr_name in _STANDARD_METRIC_ATTRS:
         if hasattr(agent, attr_name):
             _extract_from_value(attr_name, getattr(agent, attr_name), metrics)
 
@@ -235,12 +267,12 @@ def create_mlflow_logging_wrapper(
         >>> wrapper_func = create_mlflow_logging_wrapper(runner.agent, mlflow, None)
         >>> runner.agent._update = wrapper_func
     """
-    if not hasattr(agent, "tracking_data"):
-        raise AttributeError(
-            "Agent must have 'tracking_data' attribute for MLflow metric logging. "
-            f"Agent type {type(agent).__name__} does not support metric tracking."
-        )
-    if not isinstance(agent.tracking_data, dict):
+    if not _has_tracking_data(agent):
+        if not hasattr(agent, "tracking_data"):
+            raise AttributeError(
+                "Agent must have 'tracking_data' attribute for MLflow metric logging. "
+                f"Agent type {type(agent).__name__} does not support metric tracking."
+            )
         raise TypeError(
             f"Agent 'tracking_data' must be a dict, got {type(agent.tracking_data).__name__}. "
             "Cannot extract metrics from non-dict tracking_data."

@@ -19,33 +19,29 @@ _DEFAULT_RUN_NAME = "azure-connectivity-smoke-test"
 _DEFAULT_METRIC = "connectivity"
 
 
+_IDENTITY_ENV_VARS = {
+    "AZURE_CLIENT_ID": "client_id",
+    "AZURE_TENANT_ID": "tenant_id",
+    "AZURE_FEDERATED_TOKEN_FILE": "token_file",
+}
+
+
+def _check_identity_env_var(env_var: str, info_key: str, identity_info: Dict[str, str]) -> None:
+    value = os.environ.get(env_var)
+    if value:
+        identity_info[info_key] = value
+        _LOGGER.info("Workload identity %s: %s", info_key, value)
+        if info_key == "token_file" and not os.path.exists(value):
+            _LOGGER.warning("%s set but file does not exist: %s", env_var, value)
+    else:
+        _LOGGER.warning("%s not set", env_var)
+
+
 def _validate_workload_identity() -> Dict[str, str]:
     """Validate workload identity environment variables are present."""
-    identity_info = {}
-
-    azure_client_id = os.environ.get("AZURE_CLIENT_ID")
-    azure_tenant_id = os.environ.get("AZURE_TENANT_ID")
-    azure_federated_token_file = os.environ.get("AZURE_FEDERATED_TOKEN_FILE")
-
-    if azure_client_id:
-        identity_info["client_id"] = azure_client_id
-        _LOGGER.info("Workload identity client_id: %s", azure_client_id)
-    else:
-        _LOGGER.warning("AZURE_CLIENT_ID not set")
-
-    if azure_tenant_id:
-        identity_info["tenant_id"] = azure_tenant_id
-        _LOGGER.info("Workload identity tenant_id: %s", azure_tenant_id)
-    else:
-        _LOGGER.warning("AZURE_TENANT_ID not set")
-
-    if azure_federated_token_file:
-        identity_info["token_file"] = azure_federated_token_file
-        if not os.path.exists(azure_federated_token_file):
-            _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE set but file does not exist: %s", azure_federated_token_file)
-    else:
-        _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE not set")
-
+    identity_info: Dict[str, str] = {}
+    for env_var, info_key in _IDENTITY_ENV_VARS.items():
+        _check_identity_env_var(env_var, info_key, identity_info)
     return identity_info
 
 
@@ -76,16 +72,21 @@ def _test_workspace_permissions(client: Any, workspace_name: str) -> None:
         raise
 
 
+def _parse_single_tag(raw: str) -> tuple[str, str]:
+    if "=" not in raw:
+        raise ValueError(f"Tag '{raw}' must use KEY=VALUE format")
+    key, value = raw.split("=", 1)
+    key = key.strip()
+    if not key:
+        raise ValueError("Tag key cannot be empty")
+    return key, value.strip()
+
+
 def _parse_tags(values: Sequence[str]) -> Dict[str, str]:
     tags: Dict[str, str] = {}
     for raw in values:
-        if "=" not in raw:
-            raise ValueError(f"Tag '{raw}' must use KEY=VALUE format")
-        key, value = raw.split("=", 1)
-        key = key.strip()
-        if not key:
-            raise ValueError("Tag key cannot be empty")
-        tags[key] = value.strip()
+        key, value = _parse_single_tag(raw)
+        tags[key] = value
     return tags
 
 

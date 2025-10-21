@@ -326,6 +326,14 @@ def _normalize_agent_config(agent_cfg: Any) -> Dict[str, Any]:
     return agent_cfg
 
 
+def _set_num_envs_for_manager_cfg(env_cfg: Any, num_envs: int | None) -> None:
+    env_cfg.scene.num_envs = num_envs or env_cfg.scene.num_envs
+
+
+def _set_num_envs_for_direct_cfg(env_cfg: Any, num_envs: int | None) -> None:
+    env_cfg.num_envs = num_envs or env_cfg.num_envs
+
+
 def _configure_environment(
     env_cfg: Any,
     args_cli: argparse.Namespace,
@@ -345,11 +353,9 @@ def _configure_environment(
     })
 
     if isinstance(env_cfg, manager_cfg_type):
-        env_cfg.scene.num_envs = args_cli.num_envs or env_cfg.scene.num_envs
-    elif isinstance(env_cfg, direct_cfg_type):
-        env_cfg.num_envs = args_cli.num_envs or env_cfg.num_envs
-    elif isinstance(env_cfg, direct_mar_cfg_type):
-        env_cfg.num_envs = args_cli.num_envs or env_cfg.num_envs
+        _set_num_envs_for_manager_cfg(env_cfg, args_cli.num_envs)
+    elif isinstance(env_cfg, (direct_cfg_type, direct_mar_cfg_type)):
+        _set_num_envs_for_direct_cfg(env_cfg, args_cli.num_envs)
 
     if args_cli.distributed:
         env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"

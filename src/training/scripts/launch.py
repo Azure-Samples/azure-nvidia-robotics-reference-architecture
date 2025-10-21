@@ -86,15 +86,22 @@ def _ensure_dependencies() -> None:
         raise SystemExit(message)
 
 
+_CHECKPOINT_MODE_MAP = {
+    "fresh": "from-scratch",
+    "from-scratch": "from-scratch",
+    "warm-start": "warm-start",
+    "resume": "resume",
+}
+
+
 def _normalize_checkpoint_mode(value: str | None) -> str:
     if not value:
         return "from-scratch"
     normalized = value.lower()
-    if normalized == "fresh":
-        return "from-scratch"
-    if normalized in {"from-scratch", "warm-start", "resume"}:
-        return normalized
-    raise SystemExit(f"Unsupported checkpoint mode: {value}")
+    mode = _CHECKPOINT_MODE_MAP.get(normalized)
+    if mode is None:
+        raise SystemExit(f"Unsupported checkpoint mode: {value}")
+    return mode
 
 
 @contextmanager
@@ -155,10 +162,18 @@ def _run_smoke_test() -> None:
     smoke_test_azure.main([])
 
 
+def _mlflow_required_for_checkpoint_uri(args: argparse.Namespace) -> bool:
+    return args.disable_mlflow and args.checkpoint_uri
+
+
+def _mlflow_required_for_registration(args: argparse.Namespace) -> bool:
+    return args.disable_mlflow and args.register_checkpoint
+
+
 def _validate_mlflow_flags(args: argparse.Namespace) -> None:
-    if args.disable_mlflow and args.checkpoint_uri:
+    if _mlflow_required_for_checkpoint_uri(args):
         raise SystemExit("--checkpoint-uri requires MLflow integration; remove --disable-mlflow")
-    if args.disable_mlflow and args.register_checkpoint:
+    if _mlflow_required_for_registration(args):
         raise SystemExit("--register-checkpoint requires MLflow integration; remove --disable-mlflow")
 
 
