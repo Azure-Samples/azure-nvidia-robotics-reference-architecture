@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
 
-from azure.ai.ml import MLClient
+if TYPE_CHECKING:
+    from azure.ai.ml import MLClient
+
 from azure.identity import DefaultAzureCredential
 import mlflow
 
@@ -19,7 +21,7 @@ class AzureConfigError(RuntimeError):
 
 @dataclass(frozen=True)
 class AzureMLContext:
-    client: Any
+    client: MLClient
     tracking_uri: str
     workspace_name: str
 

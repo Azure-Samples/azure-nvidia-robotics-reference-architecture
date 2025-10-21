@@ -9,7 +9,7 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Iterator, List, Sequence
+from typing import Iterator, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
 
@@ -32,7 +32,7 @@ def _optional_str(raw: str | None) -> str | None:
     return None if raw in (None, "") else raw
 
 
-def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, List[str]]:
+def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description="IsaacLab unified launcher")
     parser.add_argument("--mode", choices=("train", "smoke-test"), default="train", help="Execution mode")
     parser.add_argument("--task", type=_optional_str, default=None, help="IsaacLab task identifier")
@@ -73,7 +73,7 @@ def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, List[st
 
 
 def _ensure_dependencies() -> None:
-    missing: List[str] = []
+    missing: list[str] = []
     for module_name, package_name in _REQUIRED_MODULES.items():
         if importlib.util.find_spec(module_name) is None:
             missing.append(package_name)

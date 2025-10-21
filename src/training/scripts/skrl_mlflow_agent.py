@@ -70,9 +70,25 @@ runner.run()
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional, Set
+from typing import Any, Callable, Protocol, runtime_checkable
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class SkrlAgent(Protocol):
+    """Protocol defining the interface expected from SKRL agents for metric extraction."""
+
+    tracking_data: dict[str, Any]
+    _update: Callable[[int, int], Any]
+
+
+@runtime_checkable
+class MLflowModule(Protocol):
+    """Protocol defining the MLflow API used for logging metrics."""
+
+    def log_metrics(self, metrics: dict[str, float], step: int | None = None) -> None:
+        ...
 
 
 def _is_tensor_scalar(value: Any) -> bool:
@@ -91,11 +107,11 @@ def _is_single_element_sequence(value: Any) -> bool:
     return hasattr(value, "__len__") and len(value) == 1
 
 
-def _extract_tensor_scalar(name: str, value: Any, metrics: Dict[str, float]) -> None:
+def _extract_tensor_scalar(name: str, value: Any, metrics: dict[str, float]) -> None:
     metrics[name] = float(value.item())
 
 
-def _extract_tensor_statistics(name: str, value: Any, metrics: Dict[str, float]) -> None:
+def _extract_tensor_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
     if hasattr(value, "mean"):
         metrics[f"{name}/mean"] = float(value.mean().item())
     if hasattr(value, "std"):
@@ -106,7 +122,7 @@ def _extract_tensor_statistics(name: str, value: Any, metrics: Dict[str, float])
         metrics[f"{name}/max"] = float(value.max().item())
 
 
-def _extract_numpy_statistics(name: str, value: Any, metrics: Dict[str, float]) -> None:
+def _extract_numpy_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
     import numpy as np
 
     arr = np.asarray(value)
@@ -116,7 +132,7 @@ def _extract_numpy_statistics(name: str, value: Any, metrics: Dict[str, float]) 
     metrics[f"{name}/max"] = float(np.max(arr))
 
 
-def _extract_from_value(name: str, value: Any, metrics: Dict[str, float]) -> None:
+def _extract_from_value(name: str, value: int | float | Any, metrics: dict[str, float]) -> None:
     """Extract numeric value and add to metrics dict.
 
     Handles tensors, arrays, and numeric types. For tensors/arrays with multiple
@@ -148,8 +164,8 @@ def _extract_from_value(name: str, value: Any, metrics: Dict[str, float]) -> Non
 
 
 def _extract_from_tracking_data(
-    data: Dict[str, Any],
-    metrics: Dict[str, float],
+    data: dict[str, Any],
+    metrics: dict[str, float],
     prefix: str,
     max_depth: int = 2,
 ) -> None:
@@ -205,14 +221,14 @@ _STANDARD_METRIC_ATTRS = [
 ]
 
 
-def _has_tracking_data(agent: Any) -> bool:
+def _has_tracking_data(agent: SkrlAgent) -> bool:
     return hasattr(agent, "tracking_data") and isinstance(agent.tracking_data, dict)
 
 
 def _extract_metrics_from_agent(
-    agent: Any,
-    metric_filter: Optional[Set[str]] = None,
-) -> Dict[str, float]:
+    agent: SkrlAgent,
+    metric_filter: set[str] | None = None,
+) -> dict[str, float]:
     """Extract metrics from the SKRL agent's internal state.
 
     Extracts metrics from multiple sources:
@@ -228,7 +244,7 @@ def _extract_metrics_from_agent(
     Returns:
         Dictionary of metric names to float values, filtered by metric_filter if set
     """
-    metrics: Dict[str, float] = {}
+    metrics: dict[str, float] = {}
 
     if _has_tracking_data(agent):
         _extract_from_tracking_data(agent.tracking_data, metrics, prefix="")
@@ -244,9 +260,9 @@ def _extract_metrics_from_agent(
 
 
 def create_mlflow_logging_wrapper(
-    agent: Any,
-    mlflow_module: Any,
-    metric_filter: Optional[Set[str]] = None,
+    agent: SkrlAgent,
+    mlflow_module: MLflowModule,
+    metric_filter: set[str] | None = None,
 ) -> Callable[[int, int], Any]:
     """Create closure that wraps agent._update with MLflow logging.
 

@@ -18,7 +18,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, NamedTuple, Optional, Sequence, Tuple
+from typing import Any, NamedTuple, Sequence
 
 from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
 from training.utils import AzureMLContext, set_env_defaults
@@ -72,7 +72,7 @@ def _parse_mlflow_log_interval(interval_arg: str, rollouts: int) -> int:
         return _DEFAULT_MLFLOW_INTERVAL
 
 
-def _build_parser(app_launcher_cls) -> argparse.ArgumentParser:
+def _build_parser(app_launcher_cls: Any) -> argparse.ArgumentParser:
     """Build argument parser for SKRL training with IsaacLab launcher args."""
     parser = argparse.ArgumentParser(description="Train IsaacLab SKRL policies")
     parser.add_argument("--task", type=str, default=None, help="IsaacLab task identifier")
@@ -118,7 +118,7 @@ def _agent_entry(args_cli: argparse.Namespace) -> str:
     return _AGENT_ENTRY_MAP.get(algorithm, _AGENT_ENTRY_DEFAULT)
 
 
-def _prepare_log_paths(agent_cfg: Dict, args_cli: argparse.Namespace) -> Path:
+def _prepare_log_paths(agent_cfg: dict[str, Any], args_cli: argparse.Namespace) -> Path:
     """Configure experiment metadata and create log directory for the run.
 
     Args:
@@ -143,7 +143,7 @@ def _prepare_log_paths(agent_cfg: Dict, args_cli: argparse.Namespace) -> Path:
     return log_dir
 
 
-def _maybe_wrap_video(gym_module, env, args_cli: argparse.Namespace, log_dir: Path):
+def _maybe_wrap_video(gym_module: Any, env: Any, args_cli: argparse.Namespace, log_dir: Path) -> Any:
     """Wrap environment with video capture when video recording is enabled.
 
     Args:
@@ -168,7 +168,7 @@ def _maybe_wrap_video(gym_module, env, args_cli: argparse.Namespace, log_dir: Pa
     _LOGGER.info("Recording training videos to %s", video_dir)
     return gym_module.wrappers.RecordVideo(env, **video_kwargs)
 
-def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> Optional[str]:
+def _log_artifacts(mlflow_module: Any, log_dir: Path, resume_path: str | None) -> str | None:
     """Log training artifacts to MLflow and derive latest checkpoint URI.
 
     Args:
@@ -188,10 +188,10 @@ def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> 
         mlflow_module.log_artifact(resume_path, artifact_path="skrl-run/checkpoints")
     checkpoint_dir = log_dir / "checkpoints"
     active_run = mlflow_module.active_run()
-    latest_uri: Optional[str] = None
+    latest_uri: str | None = None
     if checkpoint_dir.exists() and checkpoint_dir.is_dir():
         mlflow_module.log_artifacts(str(checkpoint_dir), artifact_path="skrl-run/checkpoints")
-        latest_file: Optional[Path] = None
+        latest_file: Path | None = None
         for candidate in checkpoint_dir.rglob("*"):
             if candidate.is_file():
                 if latest_file is None or candidate.stat().st_mtime > latest_file.stat().st_mtime:
@@ -215,11 +215,11 @@ def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> 
 
 def _register_checkpoint_model(
     *,
-    context: Optional[AzureMLContext],
+    context: AzureMLContext | None,
     model_name: str,
     checkpoint_uri: str,
-    checkpoint_mode: Optional[str],
-    task: Optional[str],
+    checkpoint_mode: str | None,
+    task: str | None,
 ) -> None:
     """Register a checkpoint artifact as an Azure ML model when context is available.
 
@@ -259,7 +259,7 @@ def _register_checkpoint_model(
         _LOGGER.error("Failed to register checkpoint model %s: %s", model_name, exc)
 
 
-def _resolve_env_count(env_cfg) -> Optional[int]:
+def _resolve_env_count(env_cfg: Any) -> int | None:
     """Extract environment count from configuration object regardless of env type."""
     scene = getattr(env_cfg, "scene", None)
     if scene and hasattr(scene, "env") and hasattr(scene.env, "num_envs"):
@@ -267,7 +267,7 @@ def _resolve_env_count(env_cfg) -> Optional[int]:
     return getattr(env_cfg, "num_envs", None)
 
 
-def _resolve_checkpoint(retrieve_file_path, checkpoint: Optional[str]) -> Optional[str]:
+def _resolve_checkpoint(retrieve_file_path: Any, checkpoint: str | None) -> str | None:
     """Resolve checkpoint location via IsaacLab asset resolver.
 
     Args:
@@ -288,10 +288,10 @@ def _resolve_checkpoint(retrieve_file_path, checkpoint: Optional[str]) -> Option
         raise SystemExit(f"Checkpoint path not found: {checkpoint}") from exc
 
 
-def _namespace_snapshot(namespace: argparse.Namespace) -> Tuple[Dict[str, object], Sequence[str]]:
+def _namespace_snapshot(namespace: argparse.Namespace) -> tuple[dict[str, object], Sequence[str]]:
     """Provide a serializable snapshot and CLI token list for a namespace."""
 
-    payload: Dict[str, object] = {}
+    payload: dict[str, object] = {}
     for key, value in vars(namespace).items():
         if isinstance(value, (str, int, float, bool)) or value is None:
             payload[key] = value
@@ -317,7 +317,7 @@ def _namespace_snapshot(namespace: argparse.Namespace) -> Tuple[Dict[str, object
     return payload, tokens
 
 
-def _normalize_agent_config(agent_cfg: Any) -> Dict[str, Any]:
+def _normalize_agent_config(agent_cfg: Any) -> dict[str, Any]:
     """Return agent configuration as a plain dictionary."""
 
     to_dict = getattr(agent_cfg, "to_dict", None)
@@ -365,7 +365,7 @@ def _configure_environment(
 
 
 def _configure_agent_training(
-    agent_dict: Dict[str, Any],
+    agent_dict: dict[str, Any],
     args_cli: argparse.Namespace,
     random_seed: int,
 ) -> int:
@@ -383,7 +383,7 @@ def _configure_agent_training(
     return rollouts
 
 
-def _configure_jax_backend(ml_framework: str, skrl_module) -> None:
+def _configure_jax_backend(ml_framework: str, skrl_module: Any) -> None:
     """Select JAX backend when running with a JAX-based framework."""
 
     if not ml_framework.startswith("jax"):
@@ -394,9 +394,9 @@ def _configure_jax_backend(ml_framework: str, skrl_module) -> None:
 def _dump_config_files(
     log_dir: Path,
     env_cfg: Any,
-    agent_dict: Dict[str, Any],
-    dump_yaml_func,
-    dump_pickle_func,
+    agent_dict: dict[str, Any],
+    dump_yaml_func: Any,
+    dump_pickle_func: Any | None,
 ) -> None:
     """Persist environment and agent configuration snapshots."""
 
@@ -412,7 +412,7 @@ def _dump_config_files(
 def _log_configuration_snapshot(
     args_cli: argparse.Namespace,
     env_cfg: Any,
-    agent_dict: Dict[str, Any],
+    agent_dict: dict[str, Any],
     random_seed: int,
     rollouts: int,
 ) -> None:
@@ -433,7 +433,7 @@ def _log_configuration_snapshot(
     _LOGGER.info("SKRL training configuration: %s", snapshot)
 
 
-def _validate_gym_registry(task: Optional[str], gym_module) -> None:
+def _validate_gym_registry(task: str | None, gym_module: Any) -> None:
     """Ensure the requested task is available in the Gymnasium registry."""
 
     if not task:
@@ -443,7 +443,7 @@ def _validate_gym_registry(task: Optional[str], gym_module) -> None:
         raise ValueError(f"Task {task} not found in gym registry. Available Isaac tasks: {isaac_envs}")
 
 
-def _create_gym_environment(task: str, env_cfg: Any, enable_video: bool, gym_module):
+def _create_gym_environment(task: str, env_cfg: Any, enable_video: bool, gym_module: Any) -> Any:
     """Instantiate the IsaacLab task environment."""
 
     render_mode = "rgb_array" if enable_video else None
@@ -451,15 +451,15 @@ def _create_gym_environment(task: str, env_cfg: Any, enable_video: bool, gym_mod
 
 
 def _wrap_environment(
-    env,
+    env: Any,
     *,
     args_cli: argparse.Namespace,
     log_dir: Path,
-    gym_module,
-    multi_agent_to_single_agent,
+    gym_module: Any,
+    multi_agent_to_single_agent: Any,
     direct_mar_env_type: Any,
-    vec_wrapper_cls,
-):
+    vec_wrapper_cls: Any,
+) -> Any:
     """Apply optional transformations and SKRL vector environment wrapper."""
 
     if isinstance(env.unwrapped, direct_mar_env_type) and args_cli.algorithm.lower() == "ppo":
@@ -468,7 +468,7 @@ def _wrap_environment(
     return vec_wrapper_cls(env, ml_framework=args_cli.ml_framework)
 
 
-def _setup_agent_checkpoint(runner, resume_path: Optional[str]) -> None:
+def _setup_agent_checkpoint(runner: Any, resume_path: str | None) -> None:
     """Load checkpoint into the runner agent when a resume path is provided."""
 
     if not resume_path:
@@ -476,7 +476,7 @@ def _setup_agent_checkpoint(runner, resume_path: Optional[str]) -> None:
     runner.agent.load(resume_path)
 
 
-def _apply_mlflow_logging(runner, mlflow_module) -> None:
+def _apply_mlflow_logging(runner: Any, mlflow_module: Any | None) -> None:
     """Attach MLflow metric logging to the agent update loop."""
 
     if mlflow_module is None:
@@ -490,15 +490,15 @@ def _apply_mlflow_logging(runner, mlflow_module) -> None:
 
 
 def _start_mlflow_run(
-    mlflow_module,
+    mlflow_module: Any,
     *,
-    context: Optional[AzureMLContext],
+    context: AzureMLContext | None,
     args: argparse.Namespace,
     args_cli: argparse.Namespace,
     env_cfg: Any,
-    agent_dict: Dict[str, Any],
+    agent_dict: dict[str, Any],
     log_dir: Path,
-    resume_path: Optional[str],
+    resume_path: str | None,
     random_seed: int,
     rollouts: int,
 ) -> int:
@@ -536,12 +536,12 @@ def _start_mlflow_run(
 
 
 def _finalize_mlflow_run(
-    mlflow_module,
+    mlflow_module: Any,
     *,
     outcome: str,
     log_dir: Path,
-    resume_path: Optional[str],
-    context: Optional[AzureMLContext],
+    resume_path: str | None,
+    context: AzureMLContext | None,
     args: argparse.Namespace,
     args_cli: argparse.Namespace,
 ) -> None:
@@ -560,7 +560,7 @@ def _finalize_mlflow_run(
     mlflow_module.end_run()
 
 
-def _execute_training_loop(runner, descriptor: Dict[str, Any]) -> Dict[str, Any]:
+def _execute_training_loop(runner: Any, descriptor: dict[str, Any]) -> dict[str, Any]:
     """Run the SKRL training loop and attach elapsed seconds to the descriptor."""
 
     start = time.perf_counter()
@@ -588,19 +588,19 @@ class TrainingModules(NamedTuple):
     retrieve_file_path: Any
     print_dict: Any
     dump_yaml: Any
-    dump_pickle: Optional[Any]
+    dump_pickle: Any | None
     vec_env_wrapper: Any
-    mlflow_module: Optional[Any]
+    mlflow_module: Any | None
 
 
 class LaunchState(NamedTuple):
     """Holds precomputed launch artifacts shared across training steps."""
 
-    agent_dict: Dict[str, Any]
+    agent_dict: dict[str, Any]
     random_seed: int
     rollouts: int
     log_dir: Path
-    resume_path: Optional[str]
+    resume_path: str | None
 
 
 def _prepare_cli_arguments(
@@ -625,7 +625,7 @@ def _prepare_cli_arguments(
     return args_cli, leftover
 
 
-def _initialize_simulation(app_launcher_cls, args_cli: argparse.Namespace, leftover: Sequence[str]):
+def _initialize_simulation(app_launcher_cls: Any, args_cli: argparse.Namespace, leftover: Sequence[str]) -> tuple[Any, Any]:
     """Launch IsaacLab simulation application using parsed arguments."""
 
     sys.argv = [sys.argv[0]] + list(leftover)
@@ -639,7 +639,7 @@ def _initialize_simulation(app_launcher_cls, args_cli: argparse.Namespace, lefto
 
 def _load_training_modules(
     args_cli: argparse.Namespace,
-    context: Optional[AzureMLContext],
+    context: AzureMLContext | None,
 ) -> TrainingModules:
     """Import IsaacLab, SKRL, and optional MLflow modules."""
 
@@ -692,7 +692,7 @@ def _load_training_modules(
     )
 
 
-def _close_simulation(simulation_app) -> None:
+def _close_simulation(simulation_app: Any | None) -> None:
     """Close simulation app and suppress expected shutdown issues."""
 
     if simulation_app is None:
@@ -706,14 +706,14 @@ def _close_simulation(simulation_app) -> None:
 def _build_run_descriptor(
     args_cli: argparse.Namespace,
     log_dir: Path,
-    resume_path: Optional[str],
-    agent_dict: Dict[str, Any],
+    resume_path: str | None,
+    agent_dict: dict[str, Any],
     rollouts: int,
-    log_interval: Optional[int],
-) -> Dict[str, Any]:
+    log_interval: int | None,
+) -> dict[str, Any]:
     """Compose structured payload for runner logging."""
 
-    descriptor: Dict[str, Any] = {
+    descriptor: dict[str, Any] = {
         "algorithm": args_cli.algorithm,
         "ml_framework": args_cli.ml_framework,
         "log_dir": str(log_dir),
@@ -732,7 +732,7 @@ def _prepare_launch_state(
     env_cfg: Any,
     agent_cfg: Any,
     args_cli: argparse.Namespace,
-    app_launcher,
+    app_launcher: Any,
     modules: TrainingModules,
 ) -> LaunchState:
     """Compute seed, agent config, and logging paths for a launch."""
@@ -776,7 +776,7 @@ def _instantiate_environment(
     args_cli: argparse.Namespace,
     modules: TrainingModules,
     log_dir: Path,
-):
+) -> Any:
     """Create and wrap the target environment for training."""
 
     _validate_gym_registry(args_cli.task, modules.gym_module)
@@ -793,7 +793,7 @@ def _instantiate_environment(
     )
 
 
-def _initialize_runner(env, state: LaunchState, modules: TrainingModules):
+def _initialize_runner(env: Any, state: LaunchState, modules: TrainingModules) -> Any:
     """Instantiate the SKRL runner and apply optional checkpointing/logging."""
 
     runner = modules.runner_cls(env, state.agent_dict)
@@ -805,16 +805,16 @@ def _initialize_runner(env, state: LaunchState, modules: TrainingModules):
 def _start_mlflow_if_needed(
     modules: TrainingModules,
     *,
-    context: Optional[AzureMLContext],
+    context: AzureMLContext | None,
     args: argparse.Namespace,
     args_cli: argparse.Namespace,
     env_cfg: Any,
-    agent_dict: Dict[str, Any],
+    agent_dict: dict[str, Any],
     log_dir: Path,
-    resume_path: Optional[str],
+    resume_path: str | None,
     random_seed: int,
     rollouts: int,
-) -> Tuple[Optional[int], bool]:
+) -> tuple[int | None, bool]:
     """Start an MLflow run when tracking is enabled on the context."""
 
     if modules.mlflow_module is None:
@@ -840,8 +840,8 @@ def _finalize_mlflow_if_needed(
     mlflow_active: bool,
     outcome: str,
     log_dir: Path,
-    resume_path: Optional[str],
-    context: Optional[AzureMLContext],
+    resume_path: str | None,
+    context: AzureMLContext | None,
     args: argparse.Namespace,
     args_cli: argparse.Namespace,
 ) -> None:
@@ -864,8 +864,8 @@ def _run_hydra_training(
     *,
     args: argparse.Namespace,
     args_cli: argparse.Namespace,
-    context: Optional[AzureMLContext],
-    app_launcher,
+    context: AzureMLContext | None,
+    app_launcher: Any,
     modules: TrainingModules,
 ) -> None:
     """Execute hydra-configured IsaacLab training launch."""
@@ -941,7 +941,7 @@ def run_training(
     *,
     args: argparse.Namespace,
     hydra_args: Sequence[str],
-    context: Optional[AzureMLContext],
+    context: AzureMLContext | None,
 ) -> None:
     """Execute SKRL training with IsaacLab environment and optional Azure ML tracking.
 

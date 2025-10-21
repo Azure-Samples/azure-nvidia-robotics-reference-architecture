@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict, Sequence
+from typing import Any, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
 from training.scripts import launch as launch_entrypoint
@@ -26,7 +26,7 @@ _IDENTITY_ENV_VARS = {
 }
 
 
-def _check_identity_env_var(env_var: str, info_key: str, identity_info: Dict[str, str]) -> None:
+def _check_identity_env_var(env_var: str, info_key: str, identity_info: dict[str, str]) -> None:
     value = os.environ.get(env_var)
     if value:
         identity_info[info_key] = value
@@ -37,9 +37,9 @@ def _check_identity_env_var(env_var: str, info_key: str, identity_info: Dict[str
         _LOGGER.warning("%s not set", env_var)
 
 
-def _validate_workload_identity() -> Dict[str, str]:
+def _validate_workload_identity() -> dict[str, str]:
     """Validate workload identity environment variables are present."""
-    identity_info: Dict[str, str] = {}
+    identity_info: dict[str, str] = {}
     for env_var, info_key in _IDENTITY_ENV_VARS.items():
         _check_identity_env_var(env_var, info_key, identity_info)
     return identity_info
@@ -82,8 +82,8 @@ def _parse_single_tag(raw: str) -> tuple[str, str]:
     return key, value.strip()
 
 
-def _parse_tags(values: Sequence[str]) -> Dict[str, str]:
-    tags: Dict[str, str] = {}
+def _parse_tags(values: Sequence[str]) -> dict[str, str]:
+    tags: dict[str, str] = {}
     for raw in values:
         key, value = _parse_single_tag(raw)
         tags[key] = value
@@ -122,12 +122,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _load_mlflow():
+def _load_mlflow() -> Any:
     return importlib.import_module("mlflow")
 
 
 def _start_run(
-    context: AzureMLContext, args: argparse.Namespace, user_tags: Dict[str, str], identity_info: Dict[str, str]
+    context: AzureMLContext, args: argparse.Namespace, user_tags: dict[str, str], identity_info: dict[str, str]
 ) -> str:
     mlflow_module = _load_mlflow()
 
