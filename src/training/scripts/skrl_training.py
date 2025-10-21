@@ -50,23 +50,23 @@ def _parse_mlflow_log_interval(interval_arg: str, rollouts: int) -> int:
     Returns:
         Integer interval for metric logging
     """
-    interval_arg = interval_arg.strip().lower()
-    if not interval_arg:
+    normalized_arg = interval_arg.strip().lower()
+    if not normalized_arg:
         return _DEFAULT_MLFLOW_INTERVAL
 
-    preset_value = _MLFLOW_INTERVAL_PRESETS.get(interval_arg)
+    preset_value = _MLFLOW_INTERVAL_PRESETS.get(normalized_arg)
     if preset_value is not None:
         return preset_value
 
-    if interval_arg == _MLFLOW_ROLLOUT_PRESET:
+    if normalized_arg == _MLFLOW_ROLLOUT_PRESET:
         return rollouts if rollouts > 0 else _DEFAULT_MLFLOW_INTERVAL
     try:
-        interval = int(interval_arg)
+        interval = int(normalized_arg)
         return max(1, interval)
     except ValueError:
         _LOGGER.warning(
             "Invalid mlflow_log_interval '%s', using default (%d)",
-            interval_arg,
+            normalized_arg,
             _DEFAULT_MLFLOW_INTERVAL,
         )
         return _DEFAULT_MLFLOW_INTERVAL
@@ -110,15 +110,15 @@ def _build_parser(app_launcher_cls: Any) -> argparse.ArgumentParser:
     return parser
 
 
-def _agent_entry(args_cli: argparse.Namespace) -> str:
+def _get_agent_config_entry_point(cli_args: argparse.Namespace) -> str:
     """Resolve agent configuration entry point for selected algorithm."""
-    if args_cli.agent:
-        return args_cli.agent
-    algorithm = (args_cli.algorithm or "").lower()
+    if cli_args.agent:
+        return cli_args.agent
+    algorithm = (cli_args.algorithm or "").lower()
     return _AGENT_ENTRY_MAP.get(algorithm, _AGENT_ENTRY_DEFAULT)
 
 
-def _prepare_log_paths(agent_cfg: dict[str, Any], args_cli: argparse.Namespace) -> Path:
+def _prepare_log_paths(agent_cfg: dict[str, Any], cli_args: argparse.Namespace) -> Path:
     """Configure experiment metadata and create log directory for the run.
 
     Args:
@@ -131,8 +131,8 @@ def _prepare_log_paths(agent_cfg: dict[str, Any], args_cli: argparse.Namespace) 
     experiment_cfg = agent_cfg.setdefault("agent", {}).setdefault("experiment", {})
     root_path = Path(experiment_cfg.get("directory") or Path("logs") / "skrl").resolve()
     timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
-    algorithm_label = (args_cli.algorithm or "rl").lower()
-    run_name = f"{timestamp}_{algorithm_label}_{args_cli.ml_framework}"
+    algorithm_label = (cli_args.algorithm or "rl").lower()
+    run_name = f"{timestamp}_{algorithm_label}_{cli_args.ml_framework}"
     custom_name = experiment_cfg.get("experiment_name")
     if custom_name:
         run_name = f"{run_name}_{custom_name}"
@@ -143,36 +143,36 @@ def _prepare_log_paths(agent_cfg: dict[str, Any], args_cli: argparse.Namespace) 
     return log_dir
 
 
-def _maybe_wrap_video(gym_module: Any, env: Any, args_cli: argparse.Namespace, log_dir: Path) -> Any:
+def _wrap_with_video_recorder(gym_module: Any, env: Any, cli_args: argparse.Namespace, log_dir: Path) -> Any:
     """Wrap environment with video capture when video recording is enabled.
 
     Args:
         gym_module: Gymnasium module providing wrappers.
         env: Environment instance to optionally wrap.
-        args_cli: Parsed CLI arguments containing video options.
+        cli_args: Parsed CLI arguments containing video options.
         log_dir: Base directory for run artifacts.
 
     Returns:
         Environment wrapped with video recorder when requested; otherwise original env.
     """
-    if not args_cli.video:
+    if not cli_args.video:
         return env
     video_dir = log_dir / "videos" / "train"
     video_dir.mkdir(parents=True, exist_ok=True)
     video_kwargs = {
         "video_folder": str(video_dir),
-        "step_trigger": lambda step: step % args_cli.video_interval == 0,
-        "video_length": args_cli.video_length,
+        "step_trigger": lambda step: step % cli_args.video_interval == 0,
+        "video_length": cli_args.video_length,
         "disable_logger": True,
     }
     _LOGGER.info("Recording training videos to %s", video_dir)
     return gym_module.wrappers.RecordVideo(env, **video_kwargs)
 
-def _log_artifacts(mlflow_module: Any, log_dir: Path, resume_path: str | None) -> str | None:
+def _log_artifacts(mlflow: Any, log_dir: Path, resume_path: str | None) -> str | None:
     """Log training artifacts to MLflow and derive latest checkpoint URI.
 
     Args:
-        mlflow_module: MLflow module used for logging operations.
+        mlflow: MLflow module used for logging operations.
         log_dir: Log directory containing artifacts to upload.
         resume_path: Path to the resumed checkpoint, if any.
 
@@ -183,14 +183,14 @@ def _log_artifacts(mlflow_module: Any, log_dir: Path, resume_path: str | None) -
     for rel_path in ("env.yaml", "agent.yaml", "env.pkl", "agent.pkl"):
         candidate = params_dir / rel_path
         if candidate.exists():
-            mlflow_module.log_artifact(str(candidate), artifact_path="skrl-run")
+            mlflow.log_artifact(str(candidate), artifact_path="skrl-run")
     if resume_path:
-        mlflow_module.log_artifact(resume_path, artifact_path="skrl-run/checkpoints")
+        mlflow.log_artifact(resume_path, artifact_path="skrl-run/checkpoints")
     checkpoint_dir = log_dir / "checkpoints"
-    active_run = mlflow_module.active_run()
+    active_run = mlflow.active_run()
     latest_uri: str | None = None
     if checkpoint_dir.exists() and checkpoint_dir.is_dir():
-        mlflow_module.log_artifacts(str(checkpoint_dir), artifact_path="skrl-run/checkpoints")
+        mlflow.log_artifacts(str(checkpoint_dir), artifact_path="skrl-run/checkpoints")
         latest_file: Path | None = None
         for candidate in checkpoint_dir.rglob("*"):
             if candidate.is_file():
@@ -201,15 +201,15 @@ def _log_artifacts(mlflow_module: Any, log_dir: Path, resume_path: str | None) -
             relative_path = latest_file.relative_to(checkpoint_dir)
             directory_uri = f"runs:/{run_id}/skrl-run/checkpoints"
             latest_uri = f"{directory_uri}/{relative_path.as_posix()}"
-            mlflow_module.set_tag("checkpoint_directory", directory_uri)
-            mlflow_module.set_tag("checkpoint_latest", latest_uri)
+            mlflow.set_tag("checkpoint_directory", directory_uri)
+            mlflow.set_tag("checkpoint_latest", latest_uri)
             token = f"::checkpoint_uri::{latest_uri}"
-            mlflow_module.set_tag("checkpoint_log_token", token)
+            mlflow.set_tag("checkpoint_log_token", token)
             _LOGGER.info("Latest checkpoint: %s", latest_uri)
             print(token)
     videos_dir = log_dir / "videos"
     if videos_dir.exists():
-        mlflow_module.log_artifacts(str(videos_dir), artifact_path="videos")
+        mlflow.log_artifacts(str(videos_dir), artifact_path="videos")
     return latest_uri
 
 
@@ -336,7 +336,7 @@ def _set_num_envs_for_direct_cfg(env_cfg: Any, num_envs: int | None) -> None:
 
 def _configure_environment(
     env_cfg: Any,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     app_launcher,
     *,
     manager_cfg_type: Any,
@@ -345,7 +345,7 @@ def _configure_environment(
 ) -> int:
     """Update environment configuration with CLI overrides and return seed."""
 
-    random_seed = args_cli.seed if args_cli.seed is not None else random.randint(1, 1_000_000)
+    random_seed = cli_args.seed if cli_args.seed is not None else random.randint(1, 1_000_000)
     random.seed(random_seed)
     set_env_defaults({
         "PYTHONHASHSEED": str(random_seed),
@@ -353,11 +353,11 @@ def _configure_environment(
     })
 
     if isinstance(env_cfg, manager_cfg_type):
-        _set_num_envs_for_manager_cfg(env_cfg, args_cli.num_envs)
+        _set_num_envs_for_manager_cfg(env_cfg, cli_args.num_envs)
     elif isinstance(env_cfg, (direct_cfg_type, direct_mar_cfg_type)):
-        _set_num_envs_for_direct_cfg(env_cfg, args_cli.num_envs)
+        _set_num_envs_for_direct_cfg(env_cfg, cli_args.num_envs)
 
-    if args_cli.distributed:
+    if cli_args.distributed:
         env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
 
     env_cfg.seed = random_seed
@@ -366,7 +366,7 @@ def _configure_environment(
 
 def _configure_agent_training(
     agent_dict: dict[str, Any],
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     random_seed: int,
 ) -> int:
     """Align agent training configuration with CLI overrides."""
@@ -375,8 +375,8 @@ def _configure_agent_training(
     agent_section = agent_dict.setdefault("agent", {})
     rollouts = agent_section.get("rollouts", 1)
 
-    if args_cli.max_iterations:
-        trainer_cfg["timesteps"] = args_cli.max_iterations * rollouts
+    if cli_args.max_iterations:
+        trainer_cfg["timesteps"] = cli_args.max_iterations * rollouts
 
     trainer_cfg["close_environment_at_exit"] = False
     agent_dict["seed"] = random_seed
@@ -410,7 +410,7 @@ def _dump_config_files(
 
 
 def _log_configuration_snapshot(
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     env_cfg: Any,
     agent_dict: dict[str, Any],
     random_seed: int,
@@ -420,13 +420,13 @@ def _log_configuration_snapshot(
 
     trainer_cfg = agent_dict.get("trainer", {})
     snapshot = {
-        "algorithm": args_cli.algorithm,
-        "ml_framework": args_cli.ml_framework,
+        "algorithm": cli_args.algorithm,
+        "ml_framework": cli_args.ml_framework,
         "num_envs": _resolve_env_count(env_cfg),
-        "max_iterations": args_cli.max_iterations,
+        "max_iterations": cli_args.max_iterations,
         "trainer_timesteps": trainer_cfg.get("timesteps"),
         "rollouts": rollouts,
-        "distributed": args_cli.distributed,
+        "distributed": cli_args.distributed,
         "seed": random_seed,
         "device": env_cfg.sim.device,
     }
@@ -443,17 +443,17 @@ def _validate_gym_registry(task: str | None, gym_module: Any) -> None:
         raise ValueError(f"Task {task} not found in gym registry. Available Isaac tasks: {isaac_envs}")
 
 
-def _create_gym_environment(task: str, env_cfg: Any, enable_video: bool, gym_module: Any) -> Any:
+def _create_gym_environment(task: str, env_cfg: Any, is_video_enabled: bool, gym_module: Any) -> Any:
     """Instantiate the IsaacLab task environment."""
 
-    render_mode = "rgb_array" if enable_video else None
+    render_mode = "rgb_array" if is_video_enabled else None
     return gym_module.make(task, cfg=env_cfg, render_mode=render_mode)
 
 
 def _wrap_environment(
     env: Any,
     *,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     log_dir: Path,
     gym_module: Any,
     multi_agent_to_single_agent: Any,
@@ -462,10 +462,10 @@ def _wrap_environment(
 ) -> Any:
     """Apply optional transformations and SKRL vector environment wrapper."""
 
-    if isinstance(env.unwrapped, direct_mar_env_type) and args_cli.algorithm.lower() == "ppo":
+    if isinstance(env.unwrapped, direct_mar_env_type) and cli_args.algorithm.lower() == "ppo":
         env = multi_agent_to_single_agent(env)
-    env = _maybe_wrap_video(gym_module, env, args_cli, log_dir)
-    return vec_wrapper_cls(env, ml_framework=args_cli.ml_framework)
+    env = _wrap_with_video_recorder(gym_module, env, cli_args, log_dir)
+    return vec_wrapper_cls(env, ml_framework=cli_args.ml_framework)
 
 
 def _setup_agent_checkpoint(runner: Any, resume_path: str | None) -> None:
@@ -476,25 +476,25 @@ def _setup_agent_checkpoint(runner: Any, resume_path: str | None) -> None:
     runner.agent.load(resume_path)
 
 
-def _apply_mlflow_logging(runner: Any, mlflow_module: Any | None) -> None:
+def _apply_mlflow_logging(runner: Any, mlflow: Any | None) -> None:
     """Attach MLflow metric logging to the agent update loop."""
 
-    if mlflow_module is None:
+    if mlflow is None:
         return
     wrapper_func = create_mlflow_logging_wrapper(
         agent=runner.agent,
-        mlflow_module=mlflow_module,
+        mlflow_module=mlflow,
         metric_filter=None,
     )
     runner.agent._update = wrapper_func
 
 
 def _start_mlflow_run(
-    mlflow_module: Any,
+    mlflow: Any,
     *,
     context: AzureMLContext | None,
     args: argparse.Namespace,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     env_cfg: Any,
     agent_dict: dict[str, Any],
     log_dir: Path,
@@ -504,60 +504,60 @@ def _start_mlflow_run(
 ) -> int:
     """Bootstrap MLflow tracking and return the computed log interval."""
 
-    mlflow_module.autolog(log_models=False)
-    mlflow_module.start_run(run_name=log_dir.name)
+    mlflow.autolog(log_models=False)
+    mlflow.start_run(run_name=log_dir.name)
 
     env_count = _resolve_env_count(env_cfg)
-    log_interval = _parse_mlflow_log_interval(args_cli.mlflow_log_interval, rollouts)
-    mlflow_module.log_params(
+    log_interval = _parse_mlflow_log_interval(cli_args.mlflow_log_interval, rollouts)
+    mlflow.log_params(
         {
-            "algorithm": args_cli.algorithm,
-            "ml_framework": args_cli.ml_framework,
+            "algorithm": cli_args.algorithm,
+            "ml_framework": cli_args.ml_framework,
             "num_envs": env_count,
-            "distributed": args_cli.distributed,
+            "distributed": cli_args.distributed,
             "resume_checkpoint": bool(resume_path),
             "seed": random_seed,
             "mlflow_log_interval": log_interval,
-            "mlflow_log_interval_preset": args_cli.mlflow_log_interval,
+            "mlflow_log_interval_preset": cli_args.mlflow_log_interval,
         }
     )
 
     if resume_path:
-        mlflow_module.set_tag("checkpoint_resume", resume_path)
-    mlflow_module.set_tag("log_dir", str(log_dir))
-    mlflow_module.set_tag("task", args_cli.task or "")
-    mlflow_module.set_tag("entrypoint", "training/scripts/train.py")
+        mlflow.set_tag("checkpoint_resume", resume_path)
+    mlflow.set_tag("log_dir", str(log_dir))
+    mlflow.set_tag("task", cli_args.task or "")
+    mlflow.set_tag("entrypoint", "training/scripts/train.py")
     if context:
-        mlflow_module.set_tag("azureml_workspace", context.workspace_name)
-    mlflow_module.set_tag("checkpoint_mode", args.checkpoint_mode)
+        mlflow.set_tag("azureml_workspace", context.workspace_name)
+    mlflow.set_tag("checkpoint_mode", args.checkpoint_mode)
     if args.checkpoint_uri:
-        mlflow_module.set_tag("checkpoint_source_uri", args.checkpoint_uri)
+        mlflow.set_tag("checkpoint_source_uri", args.checkpoint_uri)
     return log_interval
 
 
 def _finalize_mlflow_run(
-    mlflow_module: Any,
+    mlflow: Any,
     *,
-    outcome: str,
+    training_outcome: str,
     log_dir: Path,
     resume_path: str | None,
     context: AzureMLContext | None,
     args: argparse.Namespace,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
 ) -> None:
     """Log artifacts, register models, and close the MLflow run."""
 
-    mlflow_module.set_tag("training_outcome", outcome)
-    latest_checkpoint_uri = _log_artifacts(mlflow_module, log_dir, resume_path)
+    mlflow.set_tag("training_outcome", training_outcome)
+    latest_checkpoint_uri = _log_artifacts(mlflow, log_dir, resume_path)
     if args.register_checkpoint and latest_checkpoint_uri:
         _register_checkpoint_model(
             context=context,
             model_name=args.register_checkpoint,
             checkpoint_uri=latest_checkpoint_uri,
             checkpoint_mode=args.checkpoint_mode,
-            task=args_cli.task,
+            task=cli_args.task,
         )
-    mlflow_module.end_run()
+    mlflow.end_run()
 
 
 def _execute_training_loop(runner: Any, descriptor: dict[str, Any]) -> dict[str, Any]:
@@ -612,24 +612,24 @@ def _prepare_cli_arguments(
 
     _, base_tokens = _namespace_snapshot(args)
     tokens = list(base_tokens) + list(hydra_args)
-    args_cli, leftover = parser.parse_known_args(tokens)
-    if args_cli.video:
-        args_cli.enable_cameras = True
-    parsed_payload, _ = _namespace_snapshot(args_cli)
+    cli_args, unparsed_args = parser.parse_known_args(tokens)
+    if cli_args.video:
+        cli_args.enable_cameras = True
+    parsed_payload, _ = _namespace_snapshot(cli_args)
     parse_report = {
         "parsed": parsed_payload,
-        "hydra_overrides": list(leftover),
+        "hydra_overrides": list(unparsed_args),
         "launcher_hydra_args": list(hydra_args),
     }
     _LOGGER.info("SKRL runner arguments: %s", parse_report)
-    return args_cli, leftover
+    return cli_args, unparsed_args
 
 
-def _initialize_simulation(app_launcher_cls: Any, args_cli: argparse.Namespace, leftover: Sequence[str]) -> tuple[Any, Any]:
+def _initialize_simulation(app_launcher_cls: Any, cli_args: argparse.Namespace, unparsed_args: Sequence[str]) -> tuple[Any, Any]:
     """Launch IsaacLab simulation application using parsed arguments."""
 
-    sys.argv = [sys.argv[0]] + list(leftover)
-    app_launcher = app_launcher_cls(args_cli)
+    sys.argv = [sys.argv[0]] + list(unparsed_args)
+    app_launcher = app_launcher_cls(cli_args)
     simulation_app = app_launcher.app
     kit_log_dir = getattr(getattr(simulation_app, "config", None), "log_dir", None)
     if kit_log_dir:
@@ -638,7 +638,7 @@ def _initialize_simulation(app_launcher_cls: Any, args_cli: argparse.Namespace, 
 
 
 def _load_training_modules(
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     context: AzureMLContext | None,
 ) -> TrainingModules:
     """Import IsaacLab, SKRL, and optional MLflow modules."""
@@ -664,7 +664,7 @@ def _load_training_modules(
         dump_pickle = None
     from isaaclab_rl.skrl import SkrlVecEnvWrapper
 
-    if args_cli.ml_framework.startswith("torch"):
+    if cli_args.ml_framework.startswith("torch"):
         from skrl.utils.runner.torch import Runner as runner_cls
     else:
         from skrl.utils.runner.jax import Runner as runner_cls
@@ -704,7 +704,7 @@ def _close_simulation(simulation_app: Any | None) -> None:
 
 
 def _build_run_descriptor(
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     log_dir: Path,
     resume_path: str | None,
     agent_dict: dict[str, Any],
@@ -714,13 +714,13 @@ def _build_run_descriptor(
     """Compose structured payload for runner logging."""
 
     descriptor: dict[str, Any] = {
-        "algorithm": args_cli.algorithm,
-        "ml_framework": args_cli.ml_framework,
+        "algorithm": cli_args.algorithm,
+        "ml_framework": cli_args.ml_framework,
         "log_dir": str(log_dir),
         "resume_checkpoint": bool(resume_path),
         "resume_path": resume_path,
         "trainer_timesteps": agent_dict.get("trainer", {}).get("timesteps"),
-        "max_iterations": args_cli.max_iterations,
+        "max_iterations": cli_args.max_iterations,
         "rollouts": rollouts,
     }
     if log_interval is not None:
@@ -731,36 +731,36 @@ def _build_run_descriptor(
 def _prepare_launch_state(
     env_cfg: Any,
     agent_cfg: Any,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     app_launcher: Any,
     modules: TrainingModules,
 ) -> LaunchState:
     """Compute seed, agent config, and logging paths for a launch."""
 
-    resume_path = _resolve_checkpoint(modules.retrieve_file_path, args_cli.checkpoint)
+    resume_path = _resolve_checkpoint(modules.retrieve_file_path, cli_args.checkpoint)
     agent_dict = _normalize_agent_config(agent_cfg)
     random_seed = _configure_environment(
         env_cfg,
-        args_cli,
+        cli_args,
         app_launcher,
         manager_cfg_type=modules.manager_cfg_type,
         direct_cfg_type=modules.direct_cfg_type,
         direct_mar_cfg_type=modules.direct_mar_cfg_type,
     )
-    rollouts = _configure_agent_training(agent_dict, args_cli, random_seed)
-    _configure_jax_backend(args_cli.ml_framework, modules.skrl_module)
+    rollouts = _configure_agent_training(agent_dict, cli_args, random_seed)
+    _configure_jax_backend(cli_args.ml_framework, modules.skrl_module)
 
-    log_dir = _prepare_log_paths(agent_dict, args_cli)
+    log_dir = _prepare_log_paths(agent_dict, cli_args)
     _dump_config_files(log_dir, env_cfg, agent_dict, modules.dump_yaml, modules.dump_pickle)
 
-    if isinstance(env_cfg, modules.manager_cfg_type) and args_cli.export_io_descriptors:
+    if isinstance(env_cfg, modules.manager_cfg_type) and cli_args.export_io_descriptors:
         env_cfg.export_io_descriptors = True
         env_cfg.io_descriptors_output_dir = str(log_dir)
 
     env_cfg.log_dir = str(log_dir)
     modules.print_dict(env_cfg.to_dict())
     modules.print_dict(agent_dict)
-    _log_configuration_snapshot(args_cli, env_cfg, agent_dict, random_seed, rollouts)
+    _log_configuration_snapshot(cli_args, env_cfg, agent_dict, random_seed, rollouts)
 
     return LaunchState(
         agent_dict=agent_dict,
@@ -773,18 +773,18 @@ def _prepare_launch_state(
 
 def _instantiate_environment(
     env_cfg: Any,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     modules: TrainingModules,
     log_dir: Path,
 ) -> Any:
     """Create and wrap the target environment for training."""
 
-    _validate_gym_registry(args_cli.task, modules.gym_module)
-    _LOGGER.info("Creating environment for task %s", args_cli.task)
-    env = _create_gym_environment(args_cli.task, env_cfg, args_cli.video, modules.gym_module)
+    _validate_gym_registry(cli_args.task, modules.gym_module)
+    _LOGGER.info("Creating environment for task %s", cli_args.task)
+    env = _create_gym_environment(cli_args.task, env_cfg, cli_args.video, modules.gym_module)
     return _wrap_environment(
         env,
-        args_cli=args_cli,
+        cli_args=cli_args,
         log_dir=log_dir,
         gym_module=modules.gym_module,
         multi_agent_to_single_agent=modules.multi_agent_to_single_agent,
@@ -807,7 +807,7 @@ def _start_mlflow_if_needed(
     *,
     context: AzureMLContext | None,
     args: argparse.Namespace,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     env_cfg: Any,
     agent_dict: dict[str, Any],
     log_dir: Path,
@@ -823,7 +823,7 @@ def _start_mlflow_if_needed(
         modules.mlflow_module,
         context=context,
         args=args,
-        args_cli=args_cli,
+        cli_args=cli_args,
         env_cfg=env_cfg,
         agent_dict=agent_dict,
         log_dir=log_dir,
@@ -838,12 +838,12 @@ def _finalize_mlflow_if_needed(
     modules: TrainingModules,
     *,
     mlflow_active: bool,
-    outcome: str,
+    training_outcome: str,
     log_dir: Path,
     resume_path: str | None,
     context: AzureMLContext | None,
     args: argparse.Namespace,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
 ) -> None:
     """Close MLflow run when it was previously started."""
 
@@ -851,45 +851,45 @@ def _finalize_mlflow_if_needed(
         return
     _finalize_mlflow_run(
         modules.mlflow_module,
-        outcome=outcome,
+        training_outcome=training_outcome,
         log_dir=log_dir,
         resume_path=resume_path,
         context=context,
         args=args,
-        args_cli=args_cli,
+        cli_args=cli_args,
     )
 
 
 def _run_hydra_training(
     *,
     args: argparse.Namespace,
-    args_cli: argparse.Namespace,
+    cli_args: argparse.Namespace,
     context: AzureMLContext | None,
     app_launcher: Any,
     modules: TrainingModules,
 ) -> None:
     """Execute hydra-configured IsaacLab training launch."""
 
-    if args_cli.seed == -1:
-        args_cli.seed = random.randint(0, 10000)
+    if cli_args.seed == -1:
+        cli_args.seed = random.randint(0, 10000)
 
-    agent_entry = _agent_entry(args_cli)
+    agent_entry = _get_agent_config_entry_point(cli_args)
 
-    @modules.hydra_task_config(args_cli.task, agent_entry)
+    @modules.hydra_task_config(cli_args.task, agent_entry)
     def _launch(env_cfg, agent_cfg):
         env = None
-        outcome = "success"
-        state = _prepare_launch_state(env_cfg, agent_cfg, args_cli, app_launcher, modules)
+        training_outcome = "success"
+        state = _prepare_launch_state(env_cfg, agent_cfg, cli_args, app_launcher, modules)
         log_interval = None
         mlflow_active = False
         try:
-            env = _instantiate_environment(env_cfg, args_cli, modules, state.log_dir)
+            env = _instantiate_environment(env_cfg, cli_args, modules, state.log_dir)
             runner = _initialize_runner(env, state, modules)
             log_interval, mlflow_active = _start_mlflow_if_needed(
                 modules,
                 context=context,
                 args=args,
-                args_cli=args_cli,
+                cli_args=cli_args,
                 env_cfg=env_cfg,
                 agent_dict=state.agent_dict,
                 log_dir=state.log_dir,
@@ -899,7 +899,7 @@ def _run_hydra_training(
             )
 
             run_descriptor = _build_run_descriptor(
-                args_cli,
+                cli_args,
                 state.log_dir,
                 state.resume_path,
                 state.agent_dict,
@@ -907,11 +907,11 @@ def _run_hydra_training(
                 log_interval,
             )
             descriptor = dict(run_descriptor)
-            _LOGGER.info("Starting SKRL training: task=%s iterations=%s run_descriptor=%s", args_cli.task, args_cli.max_iterations, run_descriptor)
+            _LOGGER.info("Starting SKRL training: task=%s iterations=%s run_descriptor=%s", cli_args.task, cli_args.max_iterations, run_descriptor)
             try:
                 descriptor = _execute_training_loop(runner, descriptor)
             except Exception:
-                outcome = "failed"
+                training_outcome = "failed"
                 _LOGGER.exception("Training failed after %.2f seconds", descriptor.get("elapsed_seconds", 0))
                 raise
             else:
@@ -926,12 +926,12 @@ def _run_hydra_training(
             _finalize_mlflow_if_needed(
                 modules,
                 mlflow_active=mlflow_active,
-                outcome=outcome,
+                training_outcome=training_outcome,
                 log_dir=state.log_dir,
                 resume_path=state.resume_path,
                 context=context,
                 args=args,
-                args_cli=args_cli,
+                cli_args=cli_args,
             )
 
     _launch()
@@ -960,14 +960,14 @@ def run_training(
         raise SystemExit("IsaacLab packages are required for SKRL training") from exc
 
     parser = _build_parser(AppLauncher)
-    args_cli, leftover = _prepare_cli_arguments(parser, args, hydra_args)
+    cli_args, unparsed_args = _prepare_cli_arguments(parser, args, hydra_args)
 
     try:
-        app_launcher, simulation_app = _initialize_simulation(AppLauncher, args_cli, leftover)
-        modules = _load_training_modules(args_cli, context)
+        app_launcher, simulation_app = _initialize_simulation(AppLauncher, cli_args, unparsed_args)
+        modules = _load_training_modules(cli_args, context)
         _run_hydra_training(
             args=args,
-            args_cli=args_cli,
+            cli_args=cli_args,
             context=context,
             app_launcher=app_launcher,
             modules=modules,

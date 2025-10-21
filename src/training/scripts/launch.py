@@ -22,14 +22,14 @@ _REQUIRED_MODULES = {
 }
 
 
-def _optional_int(raw: str | None) -> int | None:
-    if raw in (None, ""):
+def _optional_int(value_str: str | None) -> int | None:
+    if value_str in (None, ""):
         return None
-    return int(raw)
+    return int(value_str)
 
 
-def _optional_str(raw: str | None) -> str | None:
-    return None if raw in (None, "") else raw
+def _optional_str(value_str: str | None) -> str | None:
+    return None if value_str in (None, "") else value_str
 
 
 def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, list[str]]:
@@ -129,7 +129,7 @@ def _materialized_checkpoint(artifact_uri: str | None) -> Iterator[str | None]:
         shutil.rmtree(download_root, ignore_errors=True)
 
 
-def _bootstrap(args: argparse.Namespace) -> tuple[AzureMLContext | None, str | None]:
+def _initialize_mlflow_context(args: argparse.Namespace) -> tuple[AzureMLContext | None, str | None]:
     if args.disable_mlflow:
         _LOGGER.info("MLflow integration disabled")
         return None, None
@@ -196,7 +196,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     _validate_mlflow_flags(args)
 
     try:
-        context, experiment_name = _bootstrap(args)
+        context, experiment_name = _initialize_mlflow_context(args)
     except AzureConfigError as exc:
         raise SystemExit(str(exc)) from exc
 
