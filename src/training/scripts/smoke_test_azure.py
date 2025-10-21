@@ -41,10 +41,8 @@ def _validate_workload_identity() -> Dict[str, str]:
 
     if azure_federated_token_file:
         identity_info["token_file"] = azure_federated_token_file
-        if os.path.exists(azure_federated_token_file):
-            _LOGGER.info("Federated token file exists: %s", azure_federated_token_file)
-        else:
-            _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE is set but file does not exist: %s", azure_federated_token_file)
+        if not os.path.exists(azure_federated_token_file):
+            _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE set but file does not exist: %s", azure_federated_token_file)
     else:
         _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE not set")
 
@@ -57,9 +55,8 @@ def _test_credential_acquisition() -> bool:
         identity = importlib.import_module("azure.identity")
         credential_cls = getattr(identity, "DefaultAzureCredential")
         credential = credential_cls()
-
-        token = credential.get_token("https://management.azure.com/.default")
-        _LOGGER.info("Successfully acquired token (expires: %s)", token.expires_on)
+        credential.get_token("https://management.azure.com/.default")
+        _LOGGER.info("Successfully acquired Azure credential")
         return True
     except Exception as exc:
         _LOGGER.error("Credential acquisition failed: %s", exc)
@@ -71,11 +68,9 @@ def _test_workspace_permissions(client: Any, workspace_name: str) -> None:
     try:
         client.workspaces.get(workspace_name)
         _LOGGER.info("✓ Workspace read access confirmed")
-
         experiments = client.jobs.list(max_results=1)
         list(experiments)
-        _LOGGER.info("✓ Experiment/job listing access confirmed")
-
+        _LOGGER.info("✓ Experiment listing access confirmed")
     except Exception as exc:
         _LOGGER.warning("Permission test failed: %s", exc)
         raise
@@ -195,9 +190,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     _test_workspace_permissions(context.client, context.workspace_name)
 
     run_id = _start_run(context, args, user_tags, identity_info)
-    _LOGGER.info("Azure connectivity validation succeeded for workspace %s", context.workspace_name)
-    _LOGGER.debug("Run tracking URI %s", context.tracking_uri)
-    _LOGGER.debug("Recorded run ID %s", run_id)
+    _LOGGER.info("Azure connectivity validated for workspace %s (run: %s)", context.workspace_name, run_id)
 
 
 if __name__ == "__main__":

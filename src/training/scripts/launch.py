@@ -116,7 +116,7 @@ def _materialized_checkpoint(artifact_uri: str | None) -> Iterator[str | None]:
         raise SystemExit(f"Failed to download checkpoint from {artifact_uri}: {exc}") from exc
 
     try:
-        _LOGGER.info("Checkpoint artifact %s materialized at %s", artifact_uri, local_path)
+        _LOGGER.info("Downloaded checkpoint from %s to %s", artifact_uri, local_path)
         yield local_path
     finally:
         shutil.rmtree(download_root, ignore_errors=True)
@@ -124,12 +124,12 @@ def _materialized_checkpoint(artifact_uri: str | None) -> Iterator[str | None]:
 
 def _bootstrap(args: argparse.Namespace) -> tuple[AzureMLContext | None, str | None]:
     if args.disable_mlflow:
-        _LOGGER.warning("MLflow integration disabled via --disable-mlflow")
+        _LOGGER.info("MLflow integration disabled")
         return None, None
 
     experiment_name = args.experiment_name or (f"isaaclab-{args.task}" if args.task else "isaaclab-training")
     context = bootstrap_azure_ml(experiment_name=experiment_name)
-    _LOGGER.info("MLflow context ready: %s", {"experiment": experiment_name, "tracking_uri": context.tracking_uri})
+    _LOGGER.info("MLflow tracking configured: experiment=%s, uri=%s", experiment_name, context.tracking_uri)
     return context, experiment_name
 
 
@@ -188,28 +188,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     with _materialized_checkpoint(args.checkpoint_uri) as checkpoint_path:
         if checkpoint_path:
             args.checkpoint = checkpoint_path
-        _LOGGER.info(
-            "Resolved checkpoint parameters: %s",
-            {
-                "mode": args.checkpoint_mode,
-                "materialized_path": args.checkpoint,
-                "source_uri": args.checkpoint_uri,
-            },
-        )
-
-        run_context = {
-            "mode": args.mode,
-            "experiment": experiment_name,
-            "checkpoint_path": args.checkpoint,
-        }
-        _LOGGER.info("Entering SKRL training: %s", run_context)
-        try:
-            _run_training(args=args, hydra_args=hydra_args, context=context)
-        except Exception:
-            _LOGGER.exception("SKRL training failed: %s", run_context)
-            raise
-        else:
-            _LOGGER.debug("Completed SKRL training: %s", run_context)
+            _LOGGER.info("Using checkpoint: mode=%s, path=%s", args.checkpoint_mode, checkpoint_path)
+        elif args.checkpoint_mode != "from-scratch":
+            _LOGGER.info("No checkpoint provided, mode=%s", args.checkpoint_mode)
+        _run_training(args=args, hydra_args=hydra_args, context=context)
 
 
 if __name__ == "__main__":

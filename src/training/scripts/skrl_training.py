@@ -205,7 +205,7 @@ def _log_artifacts(mlflow_module, log_dir: Path, resume_path: Optional[str]) -> 
             mlflow_module.set_tag("checkpoint_latest", latest_uri)
             token = f"::checkpoint_uri::{latest_uri}"
             mlflow_module.set_tag("checkpoint_log_token", token)
-            _LOGGER.info("Latest SKRL checkpoint stored at %s", latest_uri)
+            _LOGGER.info("Latest checkpoint: %s", latest_uri)
             print(token)
     videos_dir = log_dir / "videos"
     if videos_dir.exists():
@@ -231,12 +231,12 @@ def _register_checkpoint_model(
         task: IsaacLab task identifier for tagging.
     """
     if context is None:
-        _LOGGER.warning("Azure ML context unavailable; skipping checkpoint registration for %s", model_name)
+        _LOGGER.info("Skipping checkpoint registration (no Azure ML context)")
         return
     try:
         from azure.ai.ml.entities import Model
-    except ImportError as exc:  # pragma: no cover - dependency guard
-        _LOGGER.error("Azure ML SDK missing; cannot register checkpoint %s: %s", model_name, exc)
+    except ImportError as exc:
+        _LOGGER.error("Azure ML SDK missing; cannot register checkpoint: %s", exc)
         return
 
     tags = {
@@ -254,9 +254,9 @@ def _register_checkpoint_model(
             tags=tags,
         )
         context.client.models.create_or_update(model)
-        _LOGGER.info("Registered SKRL checkpoint %s as Azure ML model %s", checkpoint_uri, model_name)
-    except Exception as exc:  # pragma: no cover - AzureML errors are environment-dependent
-        _LOGGER.error("Failed to register checkpoint %s as Azure ML model %s: %s", checkpoint_uri, model_name, exc)
+        _LOGGER.info("Registered checkpoint as Azure ML model: %s", model_name)
+    except Exception as exc:
+        _LOGGER.error("Failed to register checkpoint model %s: %s", model_name, exc)
 
 
 def _resolve_env_count(env_cfg) -> Optional[int]:
@@ -467,10 +467,7 @@ def _setup_agent_checkpoint(runner, resume_path: Optional[str]) -> None:
 
     if not resume_path:
         return
-    try:
-        runner.agent.load(resume_path)
-    except AttributeError as exc:  # pragma: no cover - defensive guard
-        raise RuntimeError("Runner agent unavailable during checkpoint load") from exc
+    runner.agent.load(resume_path)
 
 
 def _apply_mlflow_logging(runner, mlflow_module) -> None:
@@ -478,15 +475,12 @@ def _apply_mlflow_logging(runner, mlflow_module) -> None:
 
     if mlflow_module is None:
         return
-    try:
-        wrapper_func = create_mlflow_logging_wrapper(
-            agent=runner.agent,
-            mlflow_module=mlflow_module,
-            metric_filter=None,
-        )
-        runner.agent._update = wrapper_func
-    except AttributeError as exc:  # pragma: no cover - defensive guard
-        raise RuntimeError("Runner agent unavailable for MLflow logging") from exc
+    wrapper_func = create_mlflow_logging_wrapper(
+        agent=runner.agent,
+        mlflow_module=mlflow_module,
+        metric_filter=None,
+    )
+    runner.agent._update = wrapper_func
 
 
 def _start_mlflow_run(
@@ -700,7 +694,7 @@ def _close_simulation(simulation_app) -> None:
     try:
         simulation_app.close()
     except Exception:
-        _LOGGER.exception("Failed to close simulation app")
+        _LOGGER.info("Simulation app close raised exception (expected during shutdown)")
 
 
 def _build_run_descriptor(
@@ -907,19 +901,19 @@ def _run_hydra_training(
                 log_interval,
             )
             descriptor = dict(run_descriptor)
-            _LOGGER.info("SKRL runner starting: %s", run_descriptor)
+            _LOGGER.info("Starting SKRL training: task=%s iterations=%s run_descriptor=%s", args_cli.task, args_cli.max_iterations, run_descriptor)
             try:
                 descriptor = _execute_training_loop(runner, descriptor)
             except Exception:
                 outcome = "failed"
-                _LOGGER.exception("SKRL runner failed: %s", descriptor)
+                _LOGGER.exception("Training failed after %.2f seconds", descriptor.get("elapsed_seconds", 0))
                 raise
             else:
                 if modules.mlflow_module:
                     active_run = modules.mlflow_module.active_run()
                     if active_run:
                         descriptor["mlflow_run_id"] = active_run.info.run_id
-                _LOGGER.debug("SKRL runner completed: %s", descriptor)
+            _LOGGER.info("Finished SKRL training: %s", descriptor)
         finally:
             if env is not None:
                 env.close()
@@ -934,11 +928,7 @@ def _run_hydra_training(
                 args_cli=args_cli,
             )
 
-    try:
-        _launch()
-    except Exception:
-        _LOGGER.exception("Exception during hydra launch execution")
-        raise
+    _launch()
 
 
 def run_training(
@@ -976,11 +966,5 @@ def run_training(
             app_launcher=app_launcher,
             modules=modules,
         )
-    except ImportError as exc:
-        _LOGGER.error("ImportError caught in run_training: %s", exc)
-        raise SystemExit("Required IsaacLab dependencies are missing for SKRL training") from exc
-    except Exception:
-        _LOGGER.exception("Unexpected exception in run_training")
-        raise
     finally:
         _close_simulation(simulation_app)

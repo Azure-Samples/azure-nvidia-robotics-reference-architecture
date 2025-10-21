@@ -246,16 +246,7 @@ def create_mlflow_logging_wrapper(
             "Cannot extract metrics from non-dict tracking_data."
         )
 
-    _LOGGER.debug(
-        "Creating MLflow logging wrapper for agent type: %s (tracking_data validated)",
-        type(agent).__name__,
-    )
-
     original_update = agent._update
-    _LOGGER.debug(
-        "Original _update method captured from %s",
-        type(agent).__name__,
-    )
 
     def mlflow_logging_update(timestep: int, timesteps: int) -> Any:
         """Wrapped _update that logs metrics to MLflow after each training update."""
@@ -265,23 +256,10 @@ def create_mlflow_logging_wrapper(
             metrics = _extract_metrics_from_agent(agent, metric_filter)
             if metrics and mlflow_module:
                 mlflow_module.log_metrics(metrics, step=timestep)
-                _LOGGER.debug(
-                    "Logged MLflow metrics at timestep %d: %s",
-                    timestep,
-                    ", ".join(sorted(metrics.keys())),
-                )
             elif not metrics:
-                _LOGGER.warning(
-                    "No metrics extracted from agent at timestep %d (tracking_data may be empty)",
-                    timestep,
-                )
-            elif not mlflow_module:
-                _LOGGER.warning(
-                    "MLflow module not available at timestep %d (metrics extracted but not logged)",
-                    timestep,
-                )
+                _LOGGER.debug("No metrics extracted at timestep %d", timestep)
         except Exception as exc:
-            _LOGGER.warning("Failed to extract or log metrics at timestep %d: %s", timestep, exc)
+            _LOGGER.warning("Failed to log metrics at timestep %d: %s", timestep, exc)
 
         return result
 
