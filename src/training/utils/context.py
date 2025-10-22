@@ -47,20 +47,30 @@ def bootstrap_azure_ml(
 
     credential = _build_credential()
 
-    client = MLClient(
-        credential=credential,
-        subscription_id=subscription_id,
-        resource_group_name=resource_group,
-        workspace_name=workspace_name,
-    )
+    try:
+        client = MLClient(
+            credential=credential,
+            subscription_id=subscription_id,
+            resource_group_name=resource_group,
+            workspace_name=workspace_name,
+        )
+    except Exception as exc:
+        raise AzureConfigError(f"Failed to create Azure ML client: {exc}") from exc
 
-    workspace = client.workspaces.get(workspace_name)
+    try:
+        workspace = client.workspaces.get(workspace_name)
+    except Exception as exc:
+        raise AzureConfigError(f"Failed to access workspace {workspace_name}: {exc}") from exc
+
     tracking_uri = workspace.mlflow_tracking_uri
     if not tracking_uri:
         raise AzureConfigError("Azure ML workspace does not expose an MLflow tracking URI")
 
-    mlflow.set_tracking_uri(tracking_uri)
-    if experiment_name:
-        mlflow.set_experiment(experiment_name)
+    try:
+        mlflow.set_tracking_uri(tracking_uri)
+        if experiment_name:
+            mlflow.set_experiment(experiment_name)
+    except Exception as exc:
+        raise AzureConfigError(f"Failed to configure MLflow tracking: {exc}") from exc
 
     return AzureMLContext(client=client, tracking_uri=tracking_uri, workspace_name=workspace_name)

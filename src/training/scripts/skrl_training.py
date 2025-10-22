@@ -705,8 +705,8 @@ def _close_simulation(simulation_app: Any | None) -> None:
         return
     try:
         simulation_app.close()
-    except Exception:
-        _LOGGER.info("Simulation app close raised exception (expected during shutdown)")
+    except Exception as exc:
+        _LOGGER.info("Simulation app close raised exception (expected during shutdown): %s", exc)
 
 
 def _build_run_descriptor(
