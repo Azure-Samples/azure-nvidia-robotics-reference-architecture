@@ -7,10 +7,13 @@ import importlib
 import logging
 import os
 import sys
+import tempfile
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
+from training.utils.context import AzureStorageContext
 from training.scripts import launch as launch_entrypoint
 
 _LOGGER = logging.getLogger("isaaclab.azure-smoke")
@@ -44,7 +47,10 @@ def _validate_workload_identity() -> Dict[str, str]:
         if os.path.exists(azure_federated_token_file):
             _LOGGER.info("Federated token file exists: %s", azure_federated_token_file)
         else:
-            _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE is set but file does not exist: %s", azure_federated_token_file)
+            _LOGGER.warning(
+                "AZURE_FEDERATED_TOKEN_FILE is set but file does not exist: %s",
+                azure_federated_token_file,
+            )
     else:
         _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE not set")
 
@@ -79,6 +85,38 @@ def _test_workspace_permissions(client: Any, workspace_name: str) -> None:
     except Exception as exc:
         _LOGGER.warning("Permission test failed: %s", exc)
         raise
+
+
+def _test_storage_upload(storage: AzureStorageContext) -> None:
+    """Test uploading a checkpoint artifact to Azure Storage."""
+    fd, checkpoint_path = tempfile.mkstemp(prefix="azure-smoke-", suffix=".chkpt")
+    model_name = f"smoke-test-{uuid.uuid4().hex[:8]}"
+
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(b"azure storage smoke test payload")
+
+        blob_name = storage.upload_checkpoint(
+            local_path=checkpoint_path,
+            model_name=model_name,
+        )
+        _LOGGER.info(
+            "✓ Storage upload to container %s succeeded (blob %s)",
+            storage.container_name,
+            blob_name,
+        )
+    except Exception as exc:
+        _LOGGER.warning(
+            "Storage upload validation failed for container %s: %s",
+            storage.container_name,
+            exc,
+        )
+        raise
+    finally:
+        try:
+            os.remove(checkpoint_path)
+        except FileNotFoundError:
+            pass
 
 
 def _parse_tags(values: Sequence[str]) -> Dict[str, str]:
@@ -131,7 +169,10 @@ def _load_mlflow():
 
 
 def _start_run(
-    context: AzureMLContext, args: argparse.Namespace, user_tags: Dict[str, str], identity_info: Dict[str, str]
+    context: AzureMLContext,
+    args: argparse.Namespace,
+    user_tags: Dict[str, str],
+    identity_info: Dict[str, str],
 ) -> str:
     mlflow_module = _load_mlflow()
 
@@ -155,11 +196,21 @@ def _start_run(
             "tenant_id": identity_info.get("tenant_id", "not-set"),
             "federated_token_present": bool(identity_info.get("token_file")),
         },
+        "storage": {
+            "configured": bool(context.storage),
+            "container": (
+                context.storage.container_name if context.storage else "not-set"
+            ),
+        },
     }
 
     with mlflow_module.start_run(run_name=args.run_name) as run:
         mlflow_module.set_tags(tags)
         mlflow_module.log_param("workspace_name", context.workspace_name)
+        mlflow_module.log_param(
+            "storage_container",
+            context.storage.container_name if context.storage else "not-configured",
+        )
         mlflow_module.log_metric(args.metric_name, 1.0)
         mlflow_module.log_dict(summary, "smoke-test-summary.json")
         _LOGGER.info("Smoke test run created with ID %s", run.info.run_id)
@@ -167,7 +218,9 @@ def _start_run(
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s"
+    )
     args = _parse_args(argv)
 
     launch_entrypoint._ensure_dependencies()
@@ -194,8 +247,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     _LOGGER.info("Testing workspace permissions...")
     _test_workspace_permissions(context.client, context.workspace_name)
 
+    if context.storage:
+        _LOGGER.info(
+            "Testing storage upload to container %s...",
+            context.storage.container_name,
+        )
+        _test_storage_upload(context.storage)
+    else:
+        _LOGGER.info("Skipping storage upload test (no storage context configured)")
+
     run_id = _start_run(context, args, user_tags, identity_info)
-    _LOGGER.info("Azure connectivity validation succeeded for workspace %s", context.workspace_name)
+    _LOGGER.info(
+        "Azure connectivity validation succeeded for workspace %s",
+        context.workspace_name,
+    )
     _LOGGER.debug("Run tracking URI %s", context.tracking_uri)
     _LOGGER.debug("Recorded run ID %s", run_id)
 
@@ -203,6 +268,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 if __name__ == "__main__":
     try:
         main(sys.argv[1:])
-    except Exception:  # pragma: no cover - ensures non-zero exit when unexpected errors occur
+    except (
+        Exception
+    ):  # pragma: no cover - ensures non-zero exit when unexpected errors occur
         _LOGGER.exception("Azure connectivity smoke test failed")
         raise SystemExit(1)

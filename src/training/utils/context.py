@@ -10,7 +10,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 from azure.ai.ml import MLClient
 from azure.identity import DefaultAzureCredential
-import mlflow
+import mlflow  # type: ignore[import-not-found]
 
 
 if TYPE_CHECKING:  # pragma: no cover - optional dependency import guard
@@ -71,13 +71,18 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _optional_env(name: str) -> Optional[str]:
+    value = os.environ.get(name)
+    return value or None
+
+
 def _build_credential() -> Any:
     try:
         from training.scripts.rsl_rl.utils.auth_helpers import AzureAuthenticator
     except ImportError:
         return DefaultAzureCredential(
-            managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"),
-            authority=os.environ.get("AZURE_AUTHORITY_HOST"),
+            managed_identity_client_id=_optional_env("AZURE_CLIENT_ID"),
+            authority=_optional_env("AZURE_AUTHORITY_HOST"),
         )
 
     credential = AzureAuthenticator().get_credential()
@@ -87,7 +92,7 @@ def _build_credential() -> Any:
 
 
 def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
-    account_name = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME")
+    account_name = _optional_env("AZURE_STORAGE_ACCOUNT_NAME")
     if not account_name:
         return None
 
@@ -99,9 +104,8 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
             "azure-storage-blob is required to upload checkpoints. Install the package or unset AZURE_STORAGE_ACCOUNT_NAME."
         ) from exc
 
-    container_name = os.environ.get(
-        "AZURE_STORAGE_CONTAINER_NAME",
-        "isaaclab-training-logs",
+    container_name = (
+        _optional_env("AZURE_STORAGE_CONTAINER_NAME") or "isaaclab-training-logs"
     )
     account_url = f"https://{account_name}.blob.core.windows.net/"
 
@@ -139,7 +143,7 @@ def bootstrap_azure_ml(
     )
 
     workspace = client.workspaces.get(workspace_name)
-    tracking_uri = workspace.mlflow_tracking_uri
+    tracking_uri = getattr(workspace, "mlflow_tracking_uri", None)
     if not tracking_uri:
         raise AzureConfigError(
             "Azure ML workspace does not expose an MLflow tracking URI"
