@@ -1,0 +1,17 @@
+# Applications service stays on system nodes; streaming sessions consume GPUs separately
+image:
+  repository: "{{ACR_NAME}}.azurecr.io/helm/omniverse/kit-appstreaming-applications"
+  tag: "{{APP_VERSION}}"  # Match mirror-omniverse.sh --app-version
+  pullPolicy: IfNotPresent
+helm_repositories:
+  - name: omniverse-oci
+    type: oci
+    url: "oci://{{ACR_NAME}}.azurecr.io/helm/omniverse"
+    interval: 10m
+resources:
+  requests:
+    cpu: 300m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

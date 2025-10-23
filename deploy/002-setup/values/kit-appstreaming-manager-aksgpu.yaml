@@ -1,0 +1,22 @@
+# Session manager uses system nodes; only application pods consume GPUs
+image:
+  repository: "{{ACR_NAME}}.azurecr.io/helm/omniverse/kit-appstreaming-manager"
+  tag: "{{APP_VERSION}}"  # Match mirror-omniverse.sh --app-version
+  pullPolicy: IfNotPresent
+helm_repositories:
+  - name: omniverse-oci
+    type: oci
+    url: "oci://{{ACR_NAME}}.azurecr.io/helm/omniverse"
+    interval: 10m
+serviceConfig:
+  session_capacity: 2
+  backend_csp_args:
+    enable_wss: false
+    base_domain: ""
+  stream_ports:
+    tcp:
+      start: 31000
+      end: 31010
+    udp:
+      start: 31000
+      end: 31010

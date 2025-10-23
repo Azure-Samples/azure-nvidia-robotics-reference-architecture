@@ -1,0 +1,2 @@
+# Flux controllers stay on system nodes to reserve GPUs for streaming pods
+# Using defaults
