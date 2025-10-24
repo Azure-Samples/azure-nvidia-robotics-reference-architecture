@@ -60,9 +60,12 @@
     },
 
     "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
         "editor.formatOnSave": true,
         "editor.tabSize": 4,
     },
+
+    "black-formatter.args": ["--line-length", "120"],
 
     "python.analysis.extraPaths": [
         "${workspaceFolder}/src",

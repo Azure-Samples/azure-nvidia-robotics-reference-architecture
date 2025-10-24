@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict, Sequence
+from typing import Any, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
 from training.scripts import launch as launch_entrypoint
@@ -19,35 +19,29 @@ _DEFAULT_RUN_NAME = "azure-connectivity-smoke-test"
 _DEFAULT_METRIC = "connectivity"
 
 
-def _validate_workload_identity() -> Dict[str, str]:
+_IDENTITY_ENV_VARS = {
+    "AZURE_CLIENT_ID": "client_id",
+    "AZURE_TENANT_ID": "tenant_id",
+    "AZURE_FEDERATED_TOKEN_FILE": "token_file",
+}
+
+
+def _check_identity_env_var(env_var: str, info_key: str, identity_info: dict[str, str]) -> None:
+    value = os.environ.get(env_var)
+    if value:
+        identity_info[info_key] = value
+        _LOGGER.info("Workload identity %s: %s", info_key, value)
+        if info_key == "token_file" and not os.path.exists(value):
+            _LOGGER.warning("%s set but file does not exist: %s", env_var, value)
+    else:
+        _LOGGER.warning("%s not set", env_var)
+
+
+def _validate_workload_identity() -> dict[str, str]:
     """Validate workload identity environment variables are present."""
-    identity_info = {}
-
-    azure_client_id = os.environ.get("AZURE_CLIENT_ID")
-    azure_tenant_id = os.environ.get("AZURE_TENANT_ID")
-    azure_federated_token_file = os.environ.get("AZURE_FEDERATED_TOKEN_FILE")
-
-    if azure_client_id:
-        identity_info["client_id"] = azure_client_id
-        _LOGGER.info("Workload identity client_id: %s", azure_client_id)
-    else:
-        _LOGGER.warning("AZURE_CLIENT_ID not set")
-
-    if azure_tenant_id:
-        identity_info["tenant_id"] = azure_tenant_id
-        _LOGGER.info("Workload identity tenant_id: %s", azure_tenant_id)
-    else:
-        _LOGGER.warning("AZURE_TENANT_ID not set")
-
-    if azure_federated_token_file:
-        identity_info["token_file"] = azure_federated_token_file
-        if os.path.exists(azure_federated_token_file):
-            _LOGGER.info("Federated token file exists: %s", azure_federated_token_file)
-        else:
-            _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE is set but file does not exist: %s", azure_federated_token_file)
-    else:
-        _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE not set")
-
+    identity_info: dict[str, str] = {}
+    for env_var, info_key in _IDENTITY_ENV_VARS.items():
+        _check_identity_env_var(env_var, info_key, identity_info)
     return identity_info
 
 
@@ -57,9 +51,8 @@ def _test_credential_acquisition() -> bool:
         identity = importlib.import_module("azure.identity")
         credential_cls = getattr(identity, "DefaultAzureCredential")
         credential = credential_cls()
-
-        token = credential.get_token("https://management.azure.com/.default")
-        _LOGGER.info("Successfully acquired token (expires: %s)", token.expires_on)
+        credential.get_token("https://management.azure.com/.default")
+        _LOGGER.info("Successfully acquired Azure credential")
         return True
     except Exception as exc:
         _LOGGER.error("Credential acquisition failed: %s", exc)
@@ -71,26 +64,29 @@ def _test_workspace_permissions(client: Any, workspace_name: str) -> None:
     try:
         client.workspaces.get(workspace_name)
         _LOGGER.info("✓ Workspace read access confirmed")
-
         experiments = client.jobs.list(max_results=1)
         list(experiments)
-        _LOGGER.info("✓ Experiment/job listing access confirmed")
-
+        _LOGGER.info("✓ Experiment listing access confirmed")
     except Exception as exc:
         _LOGGER.warning("Permission test failed: %s", exc)
         raise
 
 
-def _parse_tags(values: Sequence[str]) -> Dict[str, str]:
-    tags: Dict[str, str] = {}
+def _parse_single_tag(raw: str) -> tuple[str, str]:
+    if "=" not in raw:
+        raise ValueError(f"Tag '{raw}' must use KEY=VALUE format")
+    key, value = raw.split("=", 1)
+    key = key.strip()
+    if not key:
+        raise ValueError("Tag key cannot be empty")
+    return key, value.strip()
+
+
+def _parse_tags(values: Sequence[str]) -> dict[str, str]:
+    tags: dict[str, str] = {}
     for raw in values:
-        if "=" not in raw:
-            raise ValueError(f"Tag '{raw}' must use KEY=VALUE format")
-        key, value = raw.split("=", 1)
-        key = key.strip()
-        if not key:
-            raise ValueError("Tag key cannot be empty")
-        tags[key] = value.strip()
+        key, value = _parse_single_tag(raw)
+        tags[key] = value
     return tags
 
 
@@ -126,12 +122,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _load_mlflow():
+def _load_mlflow() -> Any:
     return importlib.import_module("mlflow")
 
 
 def _start_run(
-    context: AzureMLContext, args: argparse.Namespace, user_tags: Dict[str, str], identity_info: Dict[str, str]
+    context: AzureMLContext, args: argparse.Namespace, user_tags: dict[str, str], identity_info: dict[str, str]
 ) -> str:
     mlflow_module = _load_mlflow()
 
@@ -195,9 +191,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     _test_workspace_permissions(context.client, context.workspace_name)
 
     run_id = _start_run(context, args, user_tags, identity_info)
-    _LOGGER.info("Azure connectivity validation succeeded for workspace %s", context.workspace_name)
-    _LOGGER.debug("Run tracking URI %s", context.tracking_uri)
-    _LOGGER.debug("Recorded run ID %s", run_id)
+    _LOGGER.info("Azure connectivity validated for workspace %s (run: %s)", context.workspace_name, run_id)
 
 
 if __name__ == "__main__":
