@@ -5,6 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRAINING_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SRC_DIR="$(cd "${TRAINING_DIR}/.." && pwd)"
 
+ENV_FILE="${TRAINING_DIR}/.env"
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+fi
+
 declare -a python_cmd
 if [[ -n "${PYTHON:-}" ]]; then
   IFS=' ' read -r -a python_cmd <<< "${PYTHON}"
@@ -25,4 +33,14 @@ fi
 
 "${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
 
-exec "${python_cmd[@]}" -m training.scripts.launch "$@"
+backend="${TRAINING_BACKEND:-skrl}"
+backend_lc="${backend,,}"
+
+case "${backend_lc}" in
+  rsl-rl|rsl_rl|rslrl)
+    exec "${python_cmd[@]}" "${TRAINING_DIR}/scripts/rsl_rl/train.py" "$@"
+    ;;
+  *)
+    exec "${python_cmd[@]}" -m training.scripts.launch "$@"
+    ;;
+esac

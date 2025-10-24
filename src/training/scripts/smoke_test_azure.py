@@ -22,7 +22,25 @@ _DEFAULT_RUN_NAME = "azure-connectivity-smoke-test"
 _DEFAULT_METRIC = "connectivity"
 
 
-def _validate_workload_identity() -> Dict[str, str]:
+_IDENTITY_ENV_VARS = {
+    "AZURE_CLIENT_ID": "client_id",
+    "AZURE_TENANT_ID": "tenant_id",
+    "AZURE_FEDERATED_TOKEN_FILE": "token_file",
+}
+
+
+def _check_identity_env_var(env_var: str, info_key: str, identity_info: dict[str, str]) -> None:
+    value = os.environ.get(env_var)
+    if value:
+        identity_info[info_key] = value
+        _LOGGER.info("Workload identity %s: %s", info_key, value)
+        if info_key == "token_file" and not os.path.exists(value):
+            _LOGGER.warning("%s set but file does not exist: %s", env_var, value)
+    else:
+        _LOGGER.warning("%s not set", env_var)
+
+
+def _validate_workload_identity() -> dict[str, str]:
     """Validate workload identity environment variables are present."""
     identity_info = {}
 
@@ -54,6 +72,9 @@ def _validate_workload_identity() -> Dict[str, str]:
     else:
         _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE not set")
 
+    identity_info: dict[str, str] = {}
+    for env_var, info_key in _IDENTITY_ENV_VARS.items():
+        _check_identity_env_var(env_var, info_key, identity_info)
     return identity_info
 
 
@@ -63,9 +84,8 @@ def _test_credential_acquisition() -> bool:
         identity = importlib.import_module("azure.identity")
         credential_cls = getattr(identity, "DefaultAzureCredential")
         credential = credential_cls()
-
-        token = credential.get_token("https://management.azure.com/.default")
-        _LOGGER.info("Successfully acquired token (expires: %s)", token.expires_on)
+        credential.get_token("https://management.azure.com/.default")
+        _LOGGER.info("Successfully acquired Azure credential")
         return True
     except Exception as exc:
         _LOGGER.error("Credential acquisition failed: %s", exc)
@@ -77,11 +97,9 @@ def _test_workspace_permissions(client: Any, workspace_name: str) -> None:
     try:
         client.workspaces.get(workspace_name)
         _LOGGER.info("✓ Workspace read access confirmed")
-
         experiments = client.jobs.list(max_results=1)
         list(experiments)
-        _LOGGER.info("✓ Experiment/job listing access confirmed")
-
+        _LOGGER.info("✓ Experiment listing access confirmed")
     except Exception as exc:
         _LOGGER.warning("Permission test failed: %s", exc)
         raise
@@ -121,14 +139,23 @@ def _test_storage_upload(storage: AzureStorageContext) -> None:
 
 def _parse_tags(values: Sequence[str]) -> Dict[str, str]:
     tags: Dict[str, str] = {}
+
+
+def _parse_single_tag(raw: str) -> tuple[str, str]:
+    if "=" not in raw:
+        raise ValueError(f"Tag '{raw}' must use KEY=VALUE format")
+    key, value = raw.split("=", 1)
+    key = key.strip()
+    if not key:
+        raise ValueError("Tag key cannot be empty")
+    return key, value.strip()
+
+
+def _parse_tags(values: Sequence[str]) -> dict[str, str]:
+    tags: dict[str, str] = {}
     for raw in values:
-        if "=" not in raw:
-            raise ValueError(f"Tag '{raw}' must use KEY=VALUE format")
-        key, value = raw.split("=", 1)
-        key = key.strip()
-        if not key:
-            raise ValueError("Tag key cannot be empty")
-        tags[key] = value.strip()
+        key, value = _parse_single_tag(raw)
+        tags[key] = value
     return tags
 
 
@@ -164,7 +191,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _load_mlflow():
+def _load_mlflow() -> Any:
     return importlib.import_module("mlflow")
 
 
@@ -198,9 +225,7 @@ def _start_run(
         },
         "storage": {
             "configured": bool(context.storage),
-            "container": (
-                context.storage.container_name if context.storage else "not-set"
-            ),
+            "container": (context.storage.container_name if context.storage else "not-set"),
         },
     }
 
@@ -218,9 +243,7 @@ def _start_run(
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    logging.basicConfig(
-        level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
     args = _parse_args(argv)
 
     launch_entrypoint._ensure_dependencies()
@@ -263,13 +286,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     _LOGGER.debug("Run tracking URI %s", context.tracking_uri)
     _LOGGER.debug("Recorded run ID %s", run_id)
+    _LOGGER.info("Azure connectivity validated for workspace %s (run: %s)", context.workspace_name, run_id)
 
 
 if __name__ == "__main__":
     try:
         main(sys.argv[1:])
-    except (
-        Exception
-    ):  # pragma: no cover - ensures non-zero exit when unexpected errors occur
+    except Exception:  # pragma: no cover - ensures non-zero exit when unexpected errors occur
         _LOGGER.exception("Azure connectivity smoke test failed")
         raise SystemExit(1)

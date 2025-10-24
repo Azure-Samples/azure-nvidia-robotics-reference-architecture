@@ -70,12 +70,68 @@ runner.run()
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional, Set
+from typing import Any, Callable, Protocol, runtime_checkable
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _extract_from_value(name: str, value: Any, metrics: Dict[str, float]) -> None:
+@runtime_checkable
+class SkrlAgent(Protocol):
+    """Protocol defining the interface expected from SKRL agents for metric extraction."""
+
+    tracking_data: dict[str, Any]
+    _update: Callable[[int, int], Any]
+
+
+@runtime_checkable
+class MLflowModule(Protocol):
+    """Protocol defining the MLflow API used for logging metrics."""
+
+    def log_metrics(self, metrics: dict[str, float], step: int | None = None) -> None: ...
+
+
+def _is_tensor_scalar(value: Any) -> bool:
+    return hasattr(value, "item") and hasattr(value, "numel") and value.numel() == 1
+
+
+def _is_tensor_array(value: Any) -> bool:
+    return hasattr(value, "item") and hasattr(value, "numel") and value.numel() > 1
+
+
+def _is_numpy_array(value: Any) -> bool:
+    return hasattr(value, "mean") and hasattr(value, "__len__") and len(value) > 1
+
+
+def _is_single_element_sequence(value: Any) -> bool:
+    return hasattr(value, "__len__") and len(value) == 1
+
+
+def _extract_tensor_scalar(name: str, value: Any, metrics: dict[str, float]) -> None:
+    metrics[name] = float(value.item())
+
+
+def _extract_tensor_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
+    if hasattr(value, "mean"):
+        metrics[f"{name}/mean"] = float(value.mean().item())
+    if hasattr(value, "std"):
+        metrics[f"{name}/std"] = float(value.std().item())
+    if hasattr(value, "min"):
+        metrics[f"{name}/min"] = float(value.min().item())
+    if hasattr(value, "max"):
+        metrics[f"{name}/max"] = float(value.max().item())
+
+
+def _extract_numpy_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
+    import numpy as np
+
+    arr = np.asarray(value)
+    metrics[f"{name}/mean"] = float(np.mean(arr))
+    metrics[f"{name}/std"] = float(np.std(arr))
+    metrics[f"{name}/min"] = float(np.min(arr))
+    metrics[f"{name}/max"] = float(np.max(arr))
+
+
+def _extract_from_value(name: str, value: int | float | Any, metrics: dict[str, float]) -> None:
     """Extract numeric value and add to metrics dict.
 
     Handles tensors, arrays, and numeric types. For tensors/arrays with multiple
@@ -90,29 +146,15 @@ def _extract_from_value(name: str, value: Any, metrics: Dict[str, float]) -> Non
         return
 
     try:
-        if hasattr(value, "item"):
-            if hasattr(value, "numel") and value.numel() == 1:
-                metrics[name] = float(value.item())
-            elif hasattr(value, "numel") and value.numel() > 1:
-                if hasattr(value, "mean"):
-                    metrics[f"{name}/mean"] = float(value.mean().item())
-                if hasattr(value, "std"):
-                    metrics[f"{name}/std"] = float(value.std().item())
-                if hasattr(value, "min"):
-                    metrics[f"{name}/min"] = float(value.min().item())
-                if hasattr(value, "max"):
-                    metrics[f"{name}/max"] = float(value.max().item())
-            else:
-                metrics[name] = float(value.item())
-        elif hasattr(value, "mean") and hasattr(value, "__len__") and len(value) > 1:
-            import numpy as np
-
-            arr = np.asarray(value)
-            metrics[f"{name}/mean"] = float(np.mean(arr))
-            metrics[f"{name}/std"] = float(np.std(arr))
-            metrics[f"{name}/min"] = float(np.min(arr))
-            metrics[f"{name}/max"] = float(np.max(arr))
-        elif hasattr(value, "__len__") and len(value) == 1:
+        if _is_tensor_scalar(value):
+            _extract_tensor_scalar(name, value, metrics)
+        elif _is_tensor_array(value):
+            _extract_tensor_statistics(name, value, metrics)
+        elif hasattr(value, "item"):
+            metrics[name] = float(value.item())
+        elif _is_numpy_array(value):
+            _extract_numpy_statistics(name, value, metrics)
+        elif _is_single_element_sequence(value):
             metrics[name] = float(value[0])
         else:
             metrics[name] = float(value)
@@ -121,8 +163,8 @@ def _extract_from_value(name: str, value: Any, metrics: Dict[str, float]) -> Non
 
 
 def _extract_from_tracking_data(
-    data: Dict[str, Any],
-    metrics: Dict[str, float],
+    data: dict[str, Any],
+    metrics: dict[str, float],
     prefix: str,
     max_depth: int = 2,
 ) -> None:
@@ -146,10 +188,46 @@ def _extract_from_tracking_data(
             _extract_from_value(metric_name, value, metrics)
 
 
+_STANDARD_METRIC_ATTRS = [
+    "episode_reward",
+    "episode_reward_mean",
+    "episode_length",
+    "episode_length_mean",
+    "cumulative_rewards",
+    "mean_rewards",
+    "episode_lengths",
+    "success_rate",
+    "policy_loss",
+    "value_loss",
+    "critic_loss",
+    "entropy",
+    "learning_rate",
+    "lr",
+    "grad_norm",
+    "gradient_norm",
+    "kl_divergence",
+    "kl",
+    "timesteps",
+    "timesteps_total",
+    "total_timesteps",
+    "iterations",
+    "iterations_total",
+    "fps",
+    "time_elapsed",
+    "epoch_time",
+    "rollout_time",
+    "learning_time",
+]
+
+
+def _has_tracking_data(agent: SkrlAgent) -> bool:
+    return hasattr(agent, "tracking_data") and isinstance(agent.tracking_data, dict)
+
+
 def _extract_metrics_from_agent(
-    agent: Any,
-    metric_filter: Optional[Set[str]] = None,
-) -> Dict[str, float]:
+    agent: SkrlAgent,
+    metric_filter: set[str] | None = None,
+) -> dict[str, float]:
     """Extract metrics from the SKRL agent's internal state.
 
     Extracts metrics from multiple sources:
@@ -165,43 +243,12 @@ def _extract_metrics_from_agent(
     Returns:
         Dictionary of metric names to float values, filtered by metric_filter if set
     """
-    metrics: Dict[str, float] = {}
+    metrics: dict[str, float] = {}
 
-    if hasattr(agent, "tracking_data") and isinstance(agent.tracking_data, dict):
+    if _has_tracking_data(agent):
         _extract_from_tracking_data(agent.tracking_data, metrics, prefix="")
 
-    metric_attrs = [
-        "episode_reward",
-        "episode_reward_mean",
-        "episode_length",
-        "episode_length_mean",
-        "cumulative_rewards",
-        "mean_rewards",
-        "episode_lengths",
-        "success_rate",
-        "policy_loss",
-        "value_loss",
-        "critic_loss",
-        "entropy",
-        "learning_rate",
-        "lr",
-        "grad_norm",
-        "gradient_norm",
-        "kl_divergence",
-        "kl",
-        "timesteps",
-        "timesteps_total",
-        "total_timesteps",
-        "iterations",
-        "iterations_total",
-        "fps",
-        "time_elapsed",
-        "epoch_time",
-        "rollout_time",
-        "learning_time",
-    ]
-
-    for attr_name in metric_attrs:
+    for attr_name in _STANDARD_METRIC_ATTRS:
         if hasattr(agent, attr_name):
             _extract_from_value(attr_name, getattr(agent, attr_name), metrics)
 
@@ -212,9 +259,9 @@ def _extract_metrics_from_agent(
 
 
 def create_mlflow_logging_wrapper(
-    agent: Any,
-    mlflow_module: Any,
-    metric_filter: Optional[Set[str]] = None,
+    agent: SkrlAgent,
+    mlflow_module: MLflowModule,
+    metric_filter: set[str] | None = None,
 ) -> Callable[[int, int], Any]:
     """Create closure that wraps agent._update with MLflow logging.
 
@@ -235,27 +282,18 @@ def create_mlflow_logging_wrapper(
         >>> wrapper_func = create_mlflow_logging_wrapper(runner.agent, mlflow, None)
         >>> runner.agent._update = wrapper_func
     """
-    if not hasattr(agent, "tracking_data"):
-        raise AttributeError(
-            "Agent must have 'tracking_data' attribute for MLflow metric logging. "
-            f"Agent type {type(agent).__name__} does not support metric tracking."
-        )
-    if not isinstance(agent.tracking_data, dict):
+    if not _has_tracking_data(agent):
+        if not hasattr(agent, "tracking_data"):
+            raise AttributeError(
+                "Agent must have 'tracking_data' attribute for MLflow metric logging. "
+                f"Agent type {type(agent).__name__} does not support metric tracking."
+            )
         raise TypeError(
             f"Agent 'tracking_data' must be a dict, got {type(agent.tracking_data).__name__}. "
             "Cannot extract metrics from non-dict tracking_data."
         )
 
-    _LOGGER.info(
-        "Creating MLflow logging wrapper for agent type: %s (tracking_data validated)",
-        type(agent).__name__,
-    )
-
     original_update = agent._update
-    _LOGGER.info(
-        "Monkey patching ready: original _update method captured from %s",
-        type(agent).__name__,
-    )
 
     def mlflow_logging_update(timestep: int, timesteps: int) -> Any:
         """Wrapped _update that logs metrics to MLflow after each training update."""
@@ -265,23 +303,10 @@ def create_mlflow_logging_wrapper(
             metrics = _extract_metrics_from_agent(agent, metric_filter)
             if metrics and mlflow_module:
                 mlflow_module.log_metrics(metrics, step=timestep)
-                _LOGGER.info(
-                    "MLflow metrics logged successfully: metrics at timestep %d, %s",
-                    timestep,
-                    ", ".join(sorted(metrics.keys())),
-                )
             elif not metrics:
-                _LOGGER.warning(
-                    "No metrics extracted from agent at timestep %d (tracking_data may be empty)",
-                    timestep,
-                )
-            elif not mlflow_module:
-                _LOGGER.warning(
-                    "MLflow module not available at timestep %d (metrics extracted but not logged)",
-                    timestep,
-                )
+                _LOGGER.debug("No metrics extracted at timestep %d", timestep)
         except Exception as exc:
-            _LOGGER.warning("Failed to extract or log metrics at timestep %d: %s", timestep, exc)
+            _LOGGER.warning("Failed to log metrics at timestep %d: %s", timestep, exc)
 
         return result
 

@@ -7,6 +7,7 @@ import sys
 
 import os
 from pathlib import Path
+from typing import Any, Optional
 
 from isaaclab.app import AppLauncher
 
@@ -125,7 +126,6 @@ if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
 
 import gymnasium as gym
 import torch
-import yaml
 from datetime import datetime
 
 import omni
@@ -165,22 +165,12 @@ except Exception as e:
 
 from rsl_rl.runners import OnPolicyRunner, DistillationRunner
 
-# Azure integration imports
-_AZURE_IMPORT_ERROR: Exception | None = None
-
 _CURRENT_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _CURRENT_DIR.parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-try:
-    from scripts.rsl_rl.azure_integration import AzureIntegrationManager
-
-    AZURE_AVAILABLE = True
-except ImportError as exc:  # noqa: F841 - used for logging later
-    AzureIntegrationManager = None
-    AZURE_AVAILABLE = False
-    _AZURE_IMPORT_ERROR = exc
+from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -204,91 +194,178 @@ torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
 
-def _load_azure_config(config_path=None) -> dict:
-    """Load Azure configuration from file or environment variables.
+def _is_primary_rank(args_cli: argparse.Namespace, app_launcher: AppLauncher) -> bool:
+    """Return True when current process is responsible for logging side effects."""
 
-    Args:
-        config_path: Optional path to YAML configuration file
+    if not args_cli.distributed:
+        return True
+    return getattr(app_launcher, "local_rank", 0) == 0
 
-    Returns:
-        Dictionary with Azure configuration
-    """
-    config = {"enabled": False}
 
-    # Try to load from file first
-    if config_path and os.path.exists(config_path):
-        try:
-            with open(config_path, "r") as f:
-                config = yaml.safe_load(f)
-            print(f"[INFO] Loaded Azure config from: {config_path}")
-            return config
-        except Exception as e:
-            print(f"[WARNING] Failed to load Azure config from {config_path}: {e}")
+def _resolve_env_count(env_cfg: object) -> Optional[int]:
+    """Best-effort extraction of the configured number of environments."""
 
-    # Try to find default config file
-    default_config_paths = [
-        "scripts/azure_config.yaml",
-        "scripts/rsl_rl/config/azure_config.yaml",
-        "azure_config.yaml",
-        "config/azure_config.yaml",
-    ]
+    scene = getattr(env_cfg, "scene", None)
+    if scene is not None and hasattr(scene, "num_envs"):
+        return scene.num_envs
+    return getattr(env_cfg, "num_envs", None)
 
-    for path in default_config_paths:
-        if os.path.exists(path):
+
+def _collect_training_metrics(runner: object) -> dict[str, float]:
+    """Extract a small set of scalar metrics from the runner when available."""
+
+    metrics: dict[str, float] = {}
+
+    alg = getattr(runner, "alg", None)
+    storage = getattr(alg, "storage", None)
+    if storage is not None:
+        advantages = getattr(storage, "advantages", None)
+        if advantages is not None and hasattr(advantages, "mean"):
             try:
-                with open(path, "r") as f:
-                    config = yaml.safe_load(f)
-                print(f"[INFO] Loaded Azure config from: {path}")
-                return config
-            except Exception as e:
-                print(f"[WARNING] Failed to load Azure config from {path}: {e}")
-                continue
+                metrics["mean_advantage"] = float(advantages.mean())
+            except Exception:
+                pass
+        values = getattr(storage, "values", None)
+        if values is not None and hasattr(values, "mean"):
+            try:
+                metrics["mean_value"] = float(values.mean())
+            except Exception:
+                pass
 
-    # Fallback to environment variables
-    env_config = {
-        "enabled": os.getenv("AZURE_INTEGRATION_ENABLED", "false").lower() == "true",
-        "storage": {
-            "enabled": True,
-            "account_name": os.getenv("AZURE_STORAGE_ACCOUNT_NAME"),
-            "container_name": os.getenv(
-                "AZURE_STORAGE_CONTAINER_NAME", "isaaclab-training-logs"
-            ),
-            "upload_interval": int(os.getenv("AZURE_STORAGE_UPLOAD_INTERVAL", "300")),
-            "local_backup": os.getenv("AZURE_STORAGE_LOCAL_BACKUP", "true").lower()
-            == "true",
-            "background_sync": os.getenv(
-                "AZURE_STORAGE_BACKGROUND_SYNC", "true"
-            ).lower()
-            == "true",
-        },
-        "ml": {
-            "enabled": True,
-            "subscription_id": os.getenv("AZURE_SUBSCRIPTION_ID"),
-            "resource_group": os.getenv("AZURE_RESOURCE_GROUP"),
-            "workspace_name": os.getenv("AZURE_ML_WORKSPACE_NAME"),
-        },
-        "auth": {
-            "method": "service_principal",
-            "tenant_id": os.getenv("AZURE_TENANT_ID"),
-        },
+    learning_rate = getattr(alg, "learning_rate", None)
+    if isinstance(learning_rate, (int, float)):
+        metrics["learning_rate"] = float(learning_rate)
+
+    return metrics
+
+
+def _start_mlflow_run(
+    *,
+    context: AzureMLContext,
+    experiment_name: str,
+    run_name: str,
+    tags: dict[str, str],
+    params: dict[str, object],
+) -> tuple[Optional[Any], bool]:
+    """Start an MLflow run and return the module with activation state."""
+
+    try:
+        import mlflow
+    except ImportError as exc:
+        print(f"[WARNING] MLflow not available: {exc}")
+        return None, False
+
+    try:
+        mlflow.set_tracking_uri(context.tracking_uri)
+        mlflow.set_experiment(experiment_name)
+        mlflow.start_run(run_name=run_name)
+        if tags:
+            mlflow.set_tags(tags)
+        if params:
+            serializable = {k: str(v) for k, v in params.items() if v is not None}
+            if serializable:
+                mlflow.log_params(serializable)
+        print(
+            f"[INFO] MLflow run started: experiment='{experiment_name}', run='{run_name}'"
+        )
+        return mlflow, True
+    except (
+        Exception
+    ) as exc:  # pragma: no cover - network issues are environment specific
+        print(f"[WARNING] Failed to start MLflow run: {exc}")
+        return None, False
+
+
+def _log_config_artifacts(mlflow_module: Optional[Any], log_dir: str) -> None:
+    """Upload environment and agent configuration artifacts to MLflow."""
+
+    if mlflow_module is None:
+        return
+
+    params_dir = Path(log_dir) / "params"
+    if not params_dir.exists():
+        return
+
+    artifact_map = {
+        "env.yaml": "config",
+        "agent.yaml": "config",
+        "env.pkl": "config",
+        "agent.pkl": "config",
     }
 
-    # Check if we have minimum required environment variables
-    required_vars = [
-        "AZURE_STORAGE_ACCOUNT_NAME",
-        "AZURE_SUBSCRIPTION_ID",
-        "AZURE_RESOURCE_GROUP",
-        "AZURE_ML_WORKSPACE_NAME",
-    ]
-    if all(os.getenv(var) for var in required_vars):
-        env_config["enabled"] = True
-        print("[INFO] Using Azure config from environment variables")
-        return env_config
-    else:
-        print(
-            "[INFO] Azure integration not configured (missing environment variables or config file)"
+    for relative_path, artifact_path in artifact_map.items():
+        candidate = params_dir / relative_path
+        if candidate.exists():
+            try:
+                mlflow_module.log_artifact(str(candidate), artifact_path=artifact_path)
+            except Exception as exc:  # pragma: no cover - filesystem/MLflow issues
+                print(f"[WARNING] Failed to log artifact {candidate}: {exc}")
+
+
+def _sync_logs_to_storage(
+    storage_context: Optional[Any],
+    *,
+    log_dir: str,
+    experiment_name: str,
+) -> None:
+    """Upload log directory contents to Azure Storage when available."""
+
+    if storage_context is None:
+        return
+
+    root = Path(log_dir)
+    if not root.exists():
+        return
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    for file_path in root.rglob("*"):
+        if not file_path.is_file():
+            continue
+        blob_name = (
+            f"training_logs/{experiment_name}/{timestamp}/"
+            f"{file_path.relative_to(root).as_posix()}"
         )
-        return {"enabled": False}
+        try:
+            storage_context.upload_file(
+                local_path=str(file_path),
+                blob_name=blob_name,
+            )
+        except Exception as exc:  # pragma: no cover - depends on storage environment
+            print(f"[WARNING] Failed to upload log '{file_path}': {exc}")
+
+
+def _register_final_model(
+    *,
+    context: Optional[AzureMLContext],
+    model_path: str,
+    model_name: str,
+    tags: dict[str, str],
+) -> bool:
+    """Register a trained model in Azure ML if dependencies are available."""
+
+    if context is None:
+        return False
+
+    try:
+        from azure.ai.ml.entities import Model
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        print(f"[WARNING] azure-ai-ml not available for model registration: {exc}")
+        return False
+
+    try:
+        model = Model(
+            name=model_name,
+            path=model_path,
+            type="custom_model",
+            description="RSL-RL checkpoint registered via Azure ML",
+            tags=tags,
+        )
+        context.client.models.create_or_update(model)
+        print(f"[INFO] Registered final model '{model_name}' with Azure ML")
+        return True
+    except Exception as exc:  # pragma: no cover - backend specific failures
+        print(f"[WARNING] Failed to register final model '{model_name}': {exc}")
+        return False
 
 
 @hydra_task_config(args_cli.task, args_cli.agent)
@@ -337,113 +414,95 @@ def main(
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
-    # Initialize Azure integration
-    azure_manager = None
-    if not args_cli.disable_azure and AZURE_AVAILABLE:
-        try:
-            # Load Azure configuration
-            azure_config = _load_azure_config(args_cli.azure_config)
-            if azure_config and azure_config.get("enabled", True):
-                azure_manager = AzureIntegrationManager(azure_config)
-
-                storage_available = (
-                    azure_manager.storage_manager is not None
-                    and azure_manager.storage_manager.is_available()
-                )
-                ml_available = (
-                    azure_manager.ml_manager is not None
-                    and azure_manager.ml_manager.is_available()
-                )
-                print(
-                    "[DEBUG] Azure connectivity status: "
-                    f"storage_available={storage_available}, ml_available={ml_available}"
-                )
-
-                if azure_manager.is_available():
-                    print("[INFO] Azure integration initialized successfully")
-
-                    # Setup experiment in Azure ML
-                    experiment_name = f"rsl_rl_{agent_cfg.experiment_name}"
-                    run_name = f"{log_dir.split('/')[-1]}_{args_cli.task}"
-
-                    # Prepare training parameters for logging
-                    training_params = {
-                        "task": args_cli.task,
-                        "num_envs": env_cfg.scene.num_envs,
-                        "max_iterations": agent_cfg.max_iterations,
-                        "seed": agent_cfg.seed,
-                        "device": env_cfg.sim.device,
-                        "distributed": args_cli.distributed,
-                        "algorithm": (
-                            agent_cfg.algorithm.class_name
-                            if hasattr(agent_cfg, "algorithm")
-                            else "unknown"
-                        ),
-                    }
-
-                    # Add agent-specific parameters if available
-                    if hasattr(agent_cfg, "to_dict"):
-                        try:
-                            agent_dict = agent_cfg.to_dict()
-                            training_params.update(
-                                {
-                                    f"agent_{k}": str(v)
-                                    for k, v in agent_dict.items()
-                                    if k not in ["device", "max_iterations", "seed"]
-                                    and not isinstance(v, dict)
-                                }
-                            )
-                        except Exception as e:
-                            print(f"[WARNING] Could not extract agent parameters: {e}")
-
-                    if azure_manager.setup_experiment(
-                        experiment_name, run_name, training_params
-                    ):
-                        current_run = None
-                        if (
-                            azure_manager.ml_manager is not None
-                            and azure_manager.ml_manager.current_run is not None
-                        ):
-                            current_run = (
-                                azure_manager.ml_manager.current_run.info.run_id
-                                if hasattr(azure_manager.ml_manager.current_run, "info")
-                                else None
-                            )
-                        print(
-                            "[INFO] Azure ML experiment ready: "
-                            f"experiment='{experiment_name}', run='{run_name}', run_id='{current_run}'"
-                        )
-                    else:
-                        print(
-                            "[WARNING] Azure ML experiment setup failed; metrics will not reach AML"
-                        )
-                else:
-                    print(
-                        "[WARNING] Azure services not available, continuing without Azure integration"
-                    )
-                    azure_manager = None
-            else:
-                print("[INFO] Azure integration disabled by configuration")
-        except Exception as e:
-            print(f"[WARNING] Failed to initialize Azure integration: {e}")
-            azure_manager = None
-    elif args_cli.disable_azure:
-        print("[INFO] Azure integration disabled via command line")
-    elif not AZURE_AVAILABLE:
-        detail = f" ImportError: {_AZURE_IMPORT_ERROR}" if _AZURE_IMPORT_ERROR else ""
-        print(
-            "[INFO] Azure integration not available (modules not imported)." f"{detail}"
+    resume_path: Optional[str] = None
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+        resume_path = get_checkpoint_path(
+            log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
         )
+
+    if args_cli.azure_config:
         print(
-            "[INFO] Install `azure-ai-ml`, `azureml-mlflow`, and `mlflow` as described in "
-            "https://learn.microsoft.com/en-us/azure/machine-learning/how-to-use-mlflow-configure-tracking"
+            "[WARNING] --azure_config is deprecated and ignored; provide Azure settings via environment variables."
+        )
+
+    azure_context: Optional[AzureMLContext] = None
+    mlflow_module: Optional[Any] = None
+    mlflow_run_active = False
+    is_primary_process = _is_primary_rank(args_cli, app_launcher)
+    experiment_name = f"rsl_rl_{agent_cfg.experiment_name}"
+
+    if args_cli.disable_azure:
+        print("[INFO] Azure integration disabled via command line")
+    elif not is_primary_process:
+        print(
+            "[INFO] Skipping Azure bootstrap on non-primary rank; metrics will be reported by rank 0."
+        )
+    else:
+        try:
+            azure_context = bootstrap_azure_ml(experiment_name=experiment_name)
+            print(
+                "[INFO] Azure ML context initialized with workspace "
+                f"'{azure_context.workspace_name}'"
+            )
+        except AzureConfigError as exc:
+            print(f"[WARNING] Azure ML bootstrap failed: {exc}")
+        except Exception as exc:  # pragma: no cover - environment specific failures
+            print(f"[WARNING] Unexpected Azure ML bootstrap failure: {exc}")
+
+        if azure_context:
+            env_count = _resolve_env_count(env_cfg)
+            algorithm_name = getattr(
+                getattr(agent_cfg, "algorithm", None),
+                "class_name",
+                getattr(agent_cfg, "class_name", "unknown"),
+            )
+            params = {
+                "task": args_cli.task,
+                "num_envs": env_count,
+                "max_iterations": agent_cfg.max_iterations,
+                "seed": agent_cfg.seed,
+                "device": env_cfg.sim.device,
+                "distributed": args_cli.distributed,
+                "algorithm": algorithm_name,
+                "clip_actions": agent_cfg.clip_actions,
+                "resume": bool(agent_cfg.resume),
+            }
+            tags = {
+                "entrypoint": "training/scripts/rsl_rl/train.py",
+                "task": args_cli.task or "",
+                "distributed": str(args_cli.distributed).lower(),
+                "log_dir": log_dir,
+                "azureml_workspace": azure_context.workspace_name,
+            }
+            if azure_context.storage:
+                tags["storage_container"] = azure_context.storage.container_name
+
+            run_name = Path(log_dir).name
+            mlflow_module, mlflow_run_active = _start_mlflow_run(
+                context=azure_context,
+                experiment_name=experiment_name,
+                run_name=run_name,
+                tags=tags,
+                params=params,
+            )
+            if mlflow_run_active and mlflow_module is not None:
+                if resume_path:
+                    mlflow_module.set_tag("resume_checkpoint_path", str(resume_path))
+                mlflow_module.set_tag(
+                    "is_primary_rank", str(is_primary_process).lower()
+                )
+
+    storage_context = azure_context.storage if azure_context else None
+    if azure_context and storage_context is None:
+        print(
+            "[INFO] Azure Storage account not configured; checkpoint uploads will be skipped"
         )
 
     # set the IO descriptors export flag if requested
     if isinstance(env_cfg, ManagerBasedRLEnvCfg):
         env_cfg.export_io_descriptors = args_cli.export_io_descriptors
     else:
-        omni.log.warn(
+        omni.log.warn(  # type: ignore[attr-defined]
             "IO descriptors are only supported for manager based RL environments. No IO descriptors will be exported."
         )
 
@@ -458,12 +517,6 @@ def main(
     # convert to single-agent instance if required by the RL algorithm
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
-
-    # save resume path before creating a new log_dir
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
-        resume_path = get_checkpoint_path(
-            log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
-        )
 
     # wrap for video recording
     if args_cli.video:
@@ -494,7 +547,7 @@ def main(
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+    if resume_path:
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
         runner.load(resume_path)
@@ -504,145 +557,126 @@ def main(
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
+    if is_primary_process and mlflow_module and mlflow_run_active:
+        _log_config_artifacts(mlflow_module, log_dir)
 
-    # Setup checkpoint tracking callback if Azure is available
-    if azure_manager is not None:
-        # Monkey patch the runner's save method to track checkpoints
+    if is_primary_process and (mlflow_run_active or storage_context):
         original_save = runner.save
 
         def enhanced_save(path, *args, **kwargs):
-            """Enhanced save method that tracks checkpoints to Azure."""
-            # Call original save method
             result = original_save(path, *args, **kwargs)
 
             try:
-                # Only log checkpoints from main process in distributed training
-                if not args_cli.distributed or (
-                    hasattr(app_launcher, "local_rank") and app_launcher.local_rank == 0
-                ):
-                    # Get current iteration from runner
-                    current_iter = getattr(runner, "current_learning_iteration", 0)
+                current_iter = getattr(runner, "current_learning_iteration", 0)
+                full_path = path if os.path.isabs(path) else os.path.join(log_dir, path)
 
-                    # Get current metrics if available
-                    metrics = {}
-                    if hasattr(runner, "alg") and hasattr(runner.alg, "storage"):
-                        try:
-                            # Extract metrics from algorithm storage
-                            storage = runner.alg.storage
-                            metrics = {
-                                "mean_reward": float(storage.advantages.mean()),
-                                "mean_value": float(storage.values.mean()),
-                            }
+                metrics = _collect_training_metrics(runner)
 
-                            # Add learning statistics if available
-                            if hasattr(runner.alg, "learning_rate"):
-                                metrics["learning_rate"] = float(
-                                    runner.alg.learning_rate
-                                )
-                        except Exception as e:
-                            print(f"[DEBUG] Could not extract storage metrics: {e}")
-
-                    # Try to get metrics from writer
-                    if hasattr(runner, "writer") and hasattr(runner.writer, "writer"):
-                        try:
-                            # TensorBoard writer - try to get recent scalars
-                            tb_writer = runner.writer.writer
-                            if hasattr(tb_writer, "scalar_dict"):
-                                metrics.update(
-                                    {
-                                        k: float(v)
-                                        for k, v in tb_writer.scalar_dict.items()
-                                        if isinstance(v, (int, float))
-                                    }
-                                )
-                        except Exception as e:
-                            print(f"[DEBUG] Could not extract writer metrics: {e}")
-
-                    # Log checkpoint to Azure
-                    model_name = f"{args_cli.task}_{agent_cfg.experiment_name}"
-
-                    # Construct full path if relative
-                    full_path = (
-                        path if os.path.isabs(path) else os.path.join(log_dir, path)
-                    )
-
-                    azure_manager.log_checkpoint(
-                        full_path, model_name, current_iter, metrics
-                    )
-
-                    aml_state = (
-                        "available"
-                        if (
-                            azure_manager.ml_manager is not None
-                            and azure_manager.ml_manager.is_available()
+                if mlflow_module and mlflow_run_active:
+                    for name, value in metrics.items():
+                        mlflow_module.log_metric(name, value, step=current_iter)
+                    if os.path.isfile(full_path):
+                        mlflow_module.log_artifact(
+                            full_path, artifact_path="checkpoints"
                         )
-                        else "unavailable"
+                        mlflow_module.set_tag("last_checkpoint_path", full_path)
+
+                blob_name = None
+                if storage_context and os.path.isfile(full_path):
+                    blob_name = storage_context.upload_checkpoint(
+                        local_path=full_path,
+                        model_name=f"{args_cli.task}_{agent_cfg.experiment_name}",
+                        step=current_iter,
                     )
                     print(
-                        "[INFO] Logged checkpoint to Azure: "
-                        f"{full_path} (iteration {current_iter}); AML logging {aml_state}"
+                        "[INFO] Uploaded checkpoint to Azure Storage: "
+                        f"{blob_name} (iteration {current_iter})"
                     )
-
-                    # Also log metrics to Azure ML if available
-                    if (
-                        metrics
-                        and azure_manager.ml_manager
-                        and azure_manager.ml_manager.is_available()
-                    ):
-                        azure_manager.log_training_metrics(metrics, current_iter)
-
-            except Exception as e:
-                print(f"[WARNING] Failed to log checkpoint to Azure: {e}")
-                import traceback
-
-                traceback.print_exc()
+                if mlflow_module and mlflow_run_active and blob_name:
+                    mlflow_module.set_tag("last_checkpoint_blob", blob_name)
+            except Exception as exc:  # pragma: no cover - telemetry only
+                print(f"[WARNING] Failed to process checkpoint for Azure/MLflow: {exc}")
 
             return result
 
         runner.save = enhanced_save
-        print("[INFO] Enhanced checkpoint tracking enabled for Azure integration")
+        print("[INFO] Primary rank will stream checkpoints to Azure and MLflow")
 
-        # Also patch the learn method to log metrics periodically
-        if hasattr(runner, "learn"):
-            original_learn = runner.learn
+    training_outcome = "success"
+    try:
+        runner.learn(
+            num_learning_iterations=agent_cfg.max_iterations,
+            init_at_random_ep_len=True,
+        )
+    except Exception:
+        training_outcome = "failed"
+        if mlflow_module and mlflow_run_active:
+            mlflow_module.set_tag("training_outcome", training_outcome)
+        raise
+    else:
+        if mlflow_module and mlflow_run_active:
+            mlflow_module.set_tag("training_outcome", training_outcome)
+    finally:
+        if is_primary_process:
+            if storage_context:
+                try:
+                    _sync_logs_to_storage(
+                        storage_context,
+                        log_dir=log_dir,
+                        experiment_name=agent_cfg.experiment_name,
+                    )
+                    print("[INFO] Uploaded training logs to Azure Storage")
+                except Exception as exc:
+                    print(f"[WARNING] Failed to upload training logs: {exc}")
 
-            def enhanced_learn(*args, **kwargs):
-                """Enhanced learn method that logs metrics to Azure ML."""
-                # Store reference to azure_manager in runner for access during training
-                runner._azure_manager = azure_manager
-                runner._azure_log_interval = 10  # Log every 10 iterations
-
-                return original_learn(*args, **kwargs)
-
-            runner.learn = enhanced_learn
-            print("[INFO] Enhanced metrics logging enabled for Azure integration")
-
-    # run training
-    runner.learn(
-        num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True
-    )
-
-    # Finalize Azure integration after training
-    if azure_manager is not None:
-        try:
-            # Sync final logs to Azure Storage
-            azure_manager.sync_training_logs(log_dir, agent_cfg.experiment_name)
-
-            # Find and register final model if it exists
             final_model_path = None
-            model_files = list(Path(log_dir).glob("**/model_*.pt"))
-            if not model_files:
-                model_files = list(Path(log_dir).glob("**/policy_*.pt"))
-            if model_files:
-                # Use the most recent model file
-                final_model_path = str(max(model_files, key=os.path.getctime))
+            model_candidates = list(Path(log_dir).glob("**/model_*.pt"))
+            if not model_candidates:
+                model_candidates = list(Path(log_dir).glob("**/policy_*.pt"))
+            if model_candidates:
+                final_model_path = str(max(model_candidates, key=os.path.getctime))
                 print(f"[INFO] Found final model: {final_model_path}")
 
-            azure_manager.finalize_training(final_model_path)
-            print("[INFO] Azure integration finalized successfully")
+                if storage_context:
+                    try:
+                        final_blob = storage_context.upload_checkpoint(
+                            local_path=final_model_path,
+                            model_name=f"{args_cli.task}_{agent_cfg.experiment_name}_final",
+                            step=None,
+                        )
+                        print(
+                            "[INFO] Uploaded final model to Azure Storage: "
+                            f"{final_blob}"
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[WARNING] Failed to upload final model to Azure Storage: {exc}"
+                        )
 
-        except Exception as e:
-            print(f"[WARNING] Failed to finalize Azure integration: {e}")
+                if mlflow_module and mlflow_run_active:
+                    try:
+                        mlflow_module.log_artifact(
+                            final_model_path, artifact_path="checkpoints/final"
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[WARNING] Failed to log final model artifact to MLflow: {exc}"
+                        )
+
+                _register_final_model(
+                    context=azure_context,
+                    model_path=final_model_path,
+                    model_name=f"rsl_rl_model_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+                    tags={
+                        "task": args_cli.task or "",
+                        "experiment": experiment_name,
+                        "entrypoint": "training/scripts/rsl_rl/train.py",
+                    },
+                )
+
+        if mlflow_module and mlflow_run_active:
+            mlflow_module.end_run()
+            mlflow_run_active = False
 
     # close the simulator
     env.close()
@@ -650,6 +684,6 @@ def main(
 
 if __name__ == "__main__":
     # run the main function
-    main()
+    main()  # type: ignore[arg-type]
     # close sim app
     simulation_app.close()

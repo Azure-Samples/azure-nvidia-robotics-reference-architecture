@@ -16,6 +16,8 @@ import mlflow  # type: ignore[import-not-found]
 if TYPE_CHECKING:  # pragma: no cover - optional dependency import guard
     from azure.storage.blob import BlobServiceClient
 
+from training.utils.env import require_env, set_env_defaults
+
 
 class AzureConfigError(RuntimeError):
     """Raised when required Azure ML configuration is unavailable."""
@@ -56,39 +58,15 @@ class AzureStorageContext:
 
 @dataclass(frozen=True)
 class AzureMLContext:
-    client: Any
+    client: MLClient
     tracking_uri: str
     workspace_name: str
     storage: Optional[AzureStorageContext] = None
 
 
-def _require_env(name: str) -> str:
-    value = os.environ.get(name)
-    if not value:
-        raise AzureConfigError(
-            f"Environment variable {name} is required for Azure ML bootstrap"
-        )
-    return value
-
-
 def _optional_env(name: str) -> Optional[str]:
     value = os.environ.get(name)
     return value or None
-
-
-def _build_credential() -> Any:
-    try:
-        from training.scripts.rsl_rl.utils.auth_helpers import AzureAuthenticator
-    except ImportError:
-        return DefaultAzureCredential(
-            managed_identity_client_id=_optional_env("AZURE_CLIENT_ID"),
-            authority=_optional_env("AZURE_AUTHORITY_HOST"),
-        )
-
-    credential = AzureAuthenticator().get_credential()
-    if credential is None:
-        raise AzureConfigError("Failed to obtain Azure credential for ML bootstrap")
-    return credential
 
 
 def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
@@ -104,8 +82,27 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
             "azure-storage-blob is required to upload checkpoints. Install the package or unset AZURE_STORAGE_ACCOUNT_NAME."
         ) from exc
 
-    container_name = (
-        _optional_env("AZURE_STORAGE_CONTAINER_NAME") or "isaaclab-training-logs"
+    container_name = _optional_env("AZURE_STORAGE_CONTAINER_NAME") or "isaaclab-training-logs"
+    account_url = f"https://{account_name}.blob.core.windows.net/"
+
+    try:
+        blob_client = BlobServiceClient(account_url=account_url, credential=credential)
+        container_client = blob_client.get_container_client(container_name)
+        try:
+            container_client.create_container()
+        except ResourceExistsError:
+            pass
+        return AzureStorageContext(blob_client=blob_client, container_name=container_name)
+    except AzureError as exc:
+        raise AzureConfigError(
+            f"Failed to initialize Azure Storage container '{container_name}' in account '{account_name}': {exc}"
+        ) from exc
+
+
+def _build_credential() -> DefaultAzureCredential:
+    return DefaultAzureCredential(
+        managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"),
+        authority=os.environ.get("AZURE_AUTHORITY_HOST"),
     )
     account_url = f"https://{account_name}.blob.core.windows.net/"
 
@@ -116,9 +113,7 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
             container_client.create_container()
         except ResourceExistsError:
             pass
-        return AzureStorageContext(
-            blob_client=blob_client, container_name=container_name
-        )
+        return AzureStorageContext(blob_client=blob_client, container_name=container_name)
     except AzureError as exc:
         raise AzureConfigError(
             f"Failed to initialize Azure Storage container '{container_name}' in account '{account_name}': {exc}"
@@ -129,9 +124,16 @@ def bootstrap_azure_ml(
     *,
     experiment_name: str,
 ) -> AzureMLContext:
-    subscription_id = _require_env("AZURE_SUBSCRIPTION_ID")
-    resource_group = _require_env("AZURE_RESOURCE_GROUP")
-    workspace_name = _require_env("AZUREML_WORKSPACE_NAME")
+    subscription_id = require_env("AZURE_SUBSCRIPTION_ID", error_type=AzureConfigError)
+    resource_group = require_env("AZURE_RESOURCE_GROUP", error_type=AzureConfigError)
+    workspace_name = require_env("AZUREML_WORKSPACE_NAME", error_type=AzureConfigError)
+
+    set_env_defaults(
+        {
+            "MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES": "3",
+            "MLFLOW_HTTP_REQUEST_TIMEOUT": "60",
+        }
+    )
 
     credential = _build_credential()
 
@@ -145,9 +147,7 @@ def bootstrap_azure_ml(
     workspace = client.workspaces.get(workspace_name)
     tracking_uri = getattr(workspace, "mlflow_tracking_uri", None)
     if not tracking_uri:
-        raise AzureConfigError(
-            "Azure ML workspace does not expose an MLflow tracking URI"
-        )
+        raise AzureConfigError("Azure ML workspace does not expose an MLflow tracking URI")
 
     mlflow.set_tracking_uri(tracking_uri)
     if experiment_name:

@@ -5,12 +5,11 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import logging
-import os
 import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Iterator, List, Sequence
+from typing import Iterator, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
 
@@ -23,17 +22,17 @@ _REQUIRED_MODULES = {
 }
 
 
-def _optional_int(raw: str | None) -> int | None:
-    if raw in (None, ""):
+def _optional_int(value_str: str | None) -> int | None:
+    if value_str in (None, ""):
         return None
-    return int(raw)
+    return int(value_str)
 
 
-def _optional_str(raw: str | None) -> str | None:
-    return None if raw in (None, "") else raw
+def _optional_str(value_str: str | None) -> str | None:
+    return None if value_str in (None, "") else value_str
 
 
-def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, List[str]]:
+def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description="IsaacLab unified launcher")
     parser.add_argument("--mode", choices=("train", "smoke-test"), default="train", help="Execution mode")
     parser.add_argument("--task", type=_optional_str, default=None, help="IsaacLab task identifier")
@@ -74,7 +73,7 @@ def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, List[st
 
 
 def _ensure_dependencies() -> None:
-    missing: List[str] = []
+    missing: list[str] = []
     for module_name, package_name in _REQUIRED_MODULES.items():
         if importlib.util.find_spec(module_name) is None:
             missing.append(package_name)
@@ -87,15 +86,22 @@ def _ensure_dependencies() -> None:
         raise SystemExit(message)
 
 
+_CHECKPOINT_MODE_MAP = {
+    "fresh": "from-scratch",
+    "from-scratch": "from-scratch",
+    "warm-start": "warm-start",
+    "resume": "resume",
+}
+
+
 def _normalize_checkpoint_mode(value: str | None) -> str:
     if not value:
         return "from-scratch"
     normalized = value.lower()
-    if normalized == "fresh":
-        return "from-scratch"
-    if normalized in {"from-scratch", "warm-start", "resume"}:
-        return normalized
-    raise SystemExit(f"Unsupported checkpoint mode: {value}")
+    mode = _CHECKPOINT_MODE_MAP.get(normalized)
+    if mode is None:
+        raise SystemExit(f"Unsupported checkpoint mode: {value}")
+    return mode
 
 
 @contextmanager
@@ -117,23 +123,20 @@ def _materialized_checkpoint(artifact_uri: str | None) -> Iterator[str | None]:
         raise SystemExit(f"Failed to download checkpoint from {artifact_uri}: {exc}") from exc
 
     try:
-        _LOGGER.info("Checkpoint artifact %s materialized at %s", artifact_uri, local_path)
+        _LOGGER.info("Downloaded checkpoint from %s to %s", artifact_uri, local_path)
         yield local_path
     finally:
         shutil.rmtree(download_root, ignore_errors=True)
 
 
-def _bootstrap(args: argparse.Namespace) -> tuple[AzureMLContext | None, str | None]:
+def _initialize_mlflow_context(args: argparse.Namespace) -> tuple[AzureMLContext | None, str | None]:
     if args.disable_mlflow:
-        _LOGGER.warning("MLflow integration disabled via --disable-mlflow")
+        _LOGGER.info("MLflow integration disabled")
         return None, None
-
-    os.environ.setdefault("MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES", "3")
-    os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "60")
 
     experiment_name = args.experiment_name or (f"isaaclab-{args.task}" if args.task else "isaaclab-training")
     context = bootstrap_azure_ml(experiment_name=experiment_name)
-    _LOGGER.info("MLflow context ready: %s", {"experiment": experiment_name, "tracking_uri": context.tracking_uri})
+    _LOGGER.info("MLflow tracking configured: experiment=%s, uri=%s", experiment_name, context.tracking_uri)
     return context, experiment_name
 
 
@@ -159,10 +162,18 @@ def _run_smoke_test() -> None:
     smoke_test_azure.main([])
 
 
+def _mlflow_required_for_checkpoint_uri(args: argparse.Namespace) -> bool:
+    return args.disable_mlflow and args.checkpoint_uri
+
+
+def _mlflow_required_for_registration(args: argparse.Namespace) -> bool:
+    return args.disable_mlflow and args.register_checkpoint
+
+
 def _validate_mlflow_flags(args: argparse.Namespace) -> None:
-    if args.disable_mlflow and args.checkpoint_uri:
+    if _mlflow_required_for_checkpoint_uri(args):
         raise SystemExit("--checkpoint-uri requires MLflow integration; remove --disable-mlflow")
-    if args.disable_mlflow and args.register_checkpoint:
+    if _mlflow_required_for_registration(args):
         raise SystemExit("--register-checkpoint requires MLflow integration; remove --disable-mlflow")
 
 
@@ -185,35 +196,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     _validate_mlflow_flags(args)
 
     try:
-        context, experiment_name = _bootstrap(args)
+        context, experiment_name = _initialize_mlflow_context(args)
     except AzureConfigError as exc:
         raise SystemExit(str(exc)) from exc
 
     with _materialized_checkpoint(args.checkpoint_uri) as checkpoint_path:
         if checkpoint_path:
             args.checkpoint = checkpoint_path
-        _LOGGER.info(
-            "Resolved checkpoint parameters: %s",
-            {
-                "mode": args.checkpoint_mode,
-                "materialized_path": args.checkpoint,
-                "source_uri": args.checkpoint_uri,
-            },
-        )
-
-        run_context = {
-            "mode": args.mode,
-            "experiment": experiment_name,
-            "checkpoint_path": args.checkpoint,
-        }
-        _LOGGER.info("Entering SKRL training: %s", run_context)
-        try:
-            _run_training(args=args, hydra_args=hydra_args, context=context)
-        except Exception:
-            _LOGGER.exception("SKRL training failed: %s", run_context)
-            raise
-        else:
-            _LOGGER.info("Completed SKRL training: %s", run_context)
+            _LOGGER.info("Using checkpoint: mode=%s, path=%s", args.checkpoint_mode, checkpoint_path)
+        elif args.checkpoint_mode != "from-scratch":
+            _LOGGER.info("No checkpoint provided, mode=%s", args.checkpoint_mode)
+        _run_training(args=args, hydra_args=hydra_args, context=context)
 
 
 if __name__ == "__main__":
