@@ -85,9 +85,11 @@ workflow:
               train_args=(
                 --task "${TASK:-}"
                 --num_envs "${NUM_ENVS:-}"
-                --max_iterations "${MAX_ITERATIONS:-}"
                 --headless
               )
+              if [[ -n "${MAX_ITERATIONS:-}" ]]; then
+                train_args+=(--max_iterations "${MAX_ITERATIONS}")
+              fi
               if [[ -n "${CHECKPOINT_URI:-}" ]]; then
                 train_args+=(--checkpoint "${CHECKPOINT_URI}")
               fi
@@ -96,12 +98,14 @@ workflow:
                 --mode "${MODE}"
                 --task "${TASK:-}"
                 --num_envs "${NUM_ENVS:-}"
-                --max_iterations "${MAX_ITERATIONS:-}"
                 --checkpoint-uri "${CHECKPOINT_URI:-}"
                 --checkpoint-mode "${CHECKPOINT_MODE:-from-scratch}"
                 --register-checkpoint "${REGISTER_CHECKPOINT:-}"
                 --headless
               )
+              if [[ -n "${MAX_ITERATIONS:-}" ]]; then
+                train_args+=(--max_iterations "${MAX_ITERATIONS}")
+              fi
             fi
 
             export TRAINING_BACKEND="${TRAINING_BACKEND:-skrl}"

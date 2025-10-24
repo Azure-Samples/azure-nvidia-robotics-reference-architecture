@@ -1,3 +1,6 @@
-packaging
+packaging==23.0
+azure-core==1.28.0
+azure-storage-blob==12.17.0
+pyperclip==1.8.0
 skrl>=1.4.3
 rsl-rl-lib==3.0.1
