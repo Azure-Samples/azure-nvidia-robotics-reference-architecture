@@ -3,8 +3,8 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: aks-bootstrap.sh --acr-name NAME [--namespace NAME] \
-  [--ngc-token TOKEN] [--acr-username USER] [--acr-password PASS] \
+Usage: aks-bootstrap.sh [--namespace NAME] \
+  [--ngc-token TOKEN] \
   [--regcred-name NAME] [--ngc-secret-name NAME] [--use-az-token] \
   [--dry-run] [--verbose] [--skip-verify]
 
@@ -12,16 +12,12 @@ Prepare the target AKS namespace with pull secrets required by
 Omniverse Kit App Streaming workloads.
 
 Required arguments:
-  --acr-name NAME          Azure Container Registry name (no fqdn)
+  --ngc-token TOKEN        NGC API token (required, or set $NGC_API_TOKEN)
 
 Optional arguments:
   --namespace NAME         Namespace for Omniverse resources (default: omni-streaming)
-  --ngc-token TOKEN        NGC API token (defaults to $NGC_API_TOKEN)
-  --acr-username USER      Username for ACR pull secret (defaults to $ACR_USERNAME)
-  --acr-password PASS      Password for ACR pull secret (defaults to $ACR_PASSWORD)
-  --regcred-name NAME      Name of Docker registry secret (default: regcred)
+  --regcred-name NAME      Name of Docker registry secret (default: ngc-registry-secret)
   --ngc-secret-name NAME   Name of NGC API secret (default: ngc-omni-user)
-  --use-az-token           Fetch temporary ACR token via az acr login --expose-token
   --dry-run                Print rendered manifests instead of applying
   --verbose                Enable verbose logging
   --skip-verify            Skip kubectl get checks after apply
@@ -68,34 +64,9 @@ encode_secret_value() {
   fi
 }
 
-acr_registry_fqdn() {
-  printf '%s.azurecr.io' "$ACR_NAME"
-}
-
-resolve_acr_credentials() {
-  if [[ "$USE_AZ_TOKEN" == "true" ]]; then
-    require_command az
-    local token
-    verbose_log "Requesting temporary ACR token via az"
-    token=$(az acr login --name "$ACR_NAME" --expose-token --output tsv --query accessToken) \
-      || fail "Unable to obtain ACR token from az"
-    ACR_SECRET_USERNAME="00000000-0000-0000-0000-000000000000"
-    ACR_SECRET_PASSWORD="$token"
-    return
-  fi
-
-  if [[ -z "$ACR_SECRET_PASSWORD" ]]; then
-    fail "Provide --acr-password, export ACR_PASSWORD, or use --use-az-token"
-  fi
-
-  if [[ -z "$ACR_SECRET_USERNAME" ]]; then
-    ACR_SECRET_USERNAME="00000000-0000-0000-0000-000000000000"
-  fi
-}
-
 docker_config_payload() {
   local registry auth_json auth_value
-  registry="$(acr_registry_fqdn)"
+  registry="nvcr.io"
 
   if [[ "$DRY_RUN" == "true" ]]; then
     auth_json=$(cat <<EOF
@@ -103,9 +74,9 @@ docker_config_payload() {
 EOF
 )
   else
-    auth_value=$(printf '%s:%s' "$ACR_SECRET_USERNAME" "$ACR_SECRET_PASSWORD" | base64_no_wrap)
+    auth_value=$(base64_no_wrap "\$oauthtoken:$NGC_TOKEN")
     auth_json=$(cat <<EOF
-{"auths":{"$registry":{"username":"$ACR_SECRET_USERNAME","password":"$ACR_SECRET_PASSWORD","email":"none","auth":"$auth_value"}}}
+{"auths":{"$registry":{"username":"\$oauthtoken","password":"$NGC_TOKEN","email":"none","auth":"$auth_value"}}}
 EOF
 )
   fi
@@ -145,7 +116,7 @@ metadata:
 type: Opaque
 data:
   username: $(encode_secret_value "$NGC_SECRET_USERNAME_VALUE")
-  api-key: $(encode_secret_value "$NGC_TOKEN")
+  password: $(encode_secret_value "$NGC_TOKEN")
 EOF
 }
 
@@ -189,26 +160,17 @@ verify_secret() {
   log "Verified secret $secret_name in namespace $KUBE_NAMESPACE"
 }
 
-ACR_NAME=""
 KUBE_NAMESPACE="omni-streaming"
 NGC_TOKEN="${NGC_API_TOKEN:-}"
-ACR_SECRET_USERNAME="${ACR_USERNAME:-}"
-ACR_SECRET_PASSWORD="${ACR_PASSWORD:-}"
-REGCRED_NAME="regcred"
+REGCRED_NAME="ngc-registry-secret"
 NGC_SECRET_NAME="ngc-omni-user"
 NGC_SECRET_USERNAME_VALUE="\$oauthtoken"
-USE_AZ_TOKEN="false"
 DRY_RUN="false"
 VERBOSE="false"
 SKIP_VERIFY="false"
 
 while (($#)); do
   case "$1" in
-    --acr-name)
-      [[ $# -lt 2 ]] && fail "--acr-name requires a value"
-      ACR_NAME="$2"
-      shift 2
-      ;;
     --namespace)
       [[ $# -lt 2 ]] && fail "--namespace requires a value"
       KUBE_NAMESPACE="$2"
@@ -217,16 +179,6 @@ while (($#)); do
     --ngc-token)
       [[ $# -lt 2 ]] && fail "--ngc-token requires a value"
       NGC_TOKEN="$2"
-      shift 2
-      ;;
-    --acr-username)
-      [[ $# -lt 2 ]] && fail "--acr-username requires a value"
-      ACR_SECRET_USERNAME="$2"
-      shift 2
-      ;;
-    --acr-password)
-      [[ $# -lt 2 ]] && fail "--acr-password requires a value"
-      ACR_SECRET_PASSWORD="$2"
       shift 2
       ;;
     --regcred-name)
@@ -238,10 +190,6 @@ while (($#)); do
       [[ $# -lt 2 ]] && fail "--ngc-secret-name requires a value"
       NGC_SECRET_NAME="$2"
       shift 2
-      ;;
-    --use-az-token)
-      USE_AZ_TOKEN="true"
-      shift 1
       ;;
     --dry-run)
       DRY_RUN="true"
@@ -266,17 +214,11 @@ while (($#)); do
   esac
 done
 
-if [[ -z "$ACR_NAME" ]]; then
-  fail "--acr-name is required"
-fi
-
 if [[ -z "$NGC_TOKEN" ]]; then
   fail "Provide --ngc-token or export NGC_API_TOKEN"
 fi
 
 require_command kubectl
-
-resolve_acr_credentials
 
 namespace_manifest="$(generate_namespace_manifest)"
 apply_manifest "namespace ${KUBE_NAMESPACE}" "$namespace_manifest"

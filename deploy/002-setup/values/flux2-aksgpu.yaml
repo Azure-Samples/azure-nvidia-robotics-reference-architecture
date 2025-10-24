@@ -1,2 +1,3 @@
 # Flux controllers stay on system nodes to reserve GPUs for streaming pods
-# Using defaults
+# Enable cluster-wide watching for all namespaces
+watchAllNamespaces: true

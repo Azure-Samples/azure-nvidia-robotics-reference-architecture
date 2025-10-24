@@ -1,12 +1,17 @@
 # RMCP runs on system nodes; GPUs reserved for streaming applications
-image:
-  repository: "{{ACR_NAME}}.azurecr.io/helm/omniverse/kit-appstreaming-rmcp"
-  tag: "{{APP_VERSION}}"  # Match mirror-omniverse.sh --app-version
-  pullPolicy: IfNotPresent
-helm_repositories:
-  - name: omniverse-oci
-    type: oci
-    url: "oci://{{ACR_NAME}}.azurecr.io/helm/omniverse"
-    interval: 10m
-service:
-  type: ClusterIP
+# Uses NVIDIA NGC registry for Omniverse charts and images
+# NOTE: HelmRepository will be created without type:oci field due to chart bug
+# Must patch after deployment: kubectl patch helmrepository omniverse-ngc -n omni-streaming --type=merge -p '{"spec":{"type":"oci"}}'
+imagePullSecrets:
+  - name: ngc-registry-secret
+
+rmcp:
+  helmRepositories:
+    - name: ngc-omniverse
+      url: "https://helm.ngc.nvidia.com/nvidia/omniverse/"
+      interval: 5m
+      secretRef: ngc-omni-user
+  service:
+    type: ClusterIP
+  serviceConfig:
+    helm_release_namespace: "omni-streaming"

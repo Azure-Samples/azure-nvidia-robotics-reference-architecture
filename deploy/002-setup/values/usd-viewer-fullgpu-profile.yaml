@@ -1,0 +1,47 @@
+apiVersion: omniverse.nvidia.com/v1
+kind: ApplicationProfile
+metadata:
+  name: usd-viewer-fullgpu
+  namespace: omni-streaming
+spec:
+  supportedApplications:
+    - name: usd-viewer
+      versions:
+        - "*"
+  chartMappings:
+    container: streamingKit.image.repository
+    container_version: streamingKit.image.tag
+    name: streamingKit.name
+  chartValues:
+    global:
+      imagePullSecrets:
+        - name: ngc-omni-user
+    streamingKit:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      nodeSelector:
+        accelerator: nvidia-tesla-a100
+      resources:
+        requests:
+          nvidia.com/gpu: 1
+          cpu: 8000m
+          memory: 16Gi
+        limits:
+          nvidia.com/gpu: 1
+          cpu: 16000m
+          memory: 32Gi
+      env:
+        - name: USD_PATH
+          value: "'${omni.usd_viewer.samples}/samples_data/stage01.usd'"
+        - name: AUTO_ENABLE_DRIVER_SHADER_CACHE_WRAPPER
+          value: "true"
+      service:
+        type: ClusterIP
+        signalingPort: 31000
+        mediaPort: 31001

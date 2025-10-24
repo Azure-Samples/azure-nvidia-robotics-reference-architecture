@@ -1,0 +1,59 @@
+apiVersion: omniverse.nvidia.com/v1
+kind: ApplicationProfile
+metadata:
+  name: usd-viewer-partialgpu
+  namespace: omni-streaming
+spec:
+  name: USD Viewer - Partial GPU Profile
+  description: USD Viewer application profile for partial GPU nodes with spot tolerations
+  supportedApplications:
+    - name: usd-viewer
+      versions:
+        - "*"
+  chartMappings:
+    container: streamingKit.image.repository
+    container_version: streamingKit.image.tag
+    name: streamingKit.name
+  chartValues:
+    global:
+      imagePullSecrets:
+        - name: ngc-registry-secret
+    streamingKit:
+      image:
+        repository: nvcr.io/nvidia/omniverse/usd-viewer
+        pullPolicy: Always
+        tag: '107.3.2'
+      sessionId: session_id
+      name: kit-app
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+        - key: partialgpu
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      nodeSelector:
+        agentpool: partialgpu
+      resources:
+        requests:
+          nvidia.com/gpu: 1
+          cpu: 4000m
+          memory: 8Gi
+        limits:
+          nvidia.com/gpu: 1
+          cpu: 8000m
+          memory: 16Gi
+      env:
+        - name: USD_PATH
+          value: "'${omni.usd_viewer.samples}/samples_data/stage01.usd'"
+        - name: AUTO_ENABLE_DRIVER_SHADER_CACHE_WRAPPER
+          value: "true"
+      service:
+        type: NodePort
+        signalingPort: 31000
+        mediaPort: 31001

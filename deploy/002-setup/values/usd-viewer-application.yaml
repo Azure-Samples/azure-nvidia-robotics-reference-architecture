@@ -1,0 +1,11 @@
+apiVersion: omniverse.nvidia.com/v1
+kind: Application
+metadata:
+  name: usd-viewer
+  namespace: omni-streaming
+  labels:
+    USD: "true"
+    visualisation: "true"
+spec:
+  name: "USD Viewer"
+  description: "NVIDIA Omniverse USD Viewer streaming application"

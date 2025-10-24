@@ -3,25 +3,22 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: deploy-omniverse.sh --acr-name NAME --app-version VERSION \
+Usage: deploy-omniverse.sh --app-version VERSION --ngc-token TOKEN \
   [--namespace NS] [--flux-namespace NS] [--values-dir DIR] \
-  [--target-repo PATH] [--dry-run] [--skip-validate] [--verbose]
+  [--dry-run] [--skip-validate] [--verbose]
 
-Install Omniverse Kit App Streaming on AKS using mirrored Helm charts
-from Azure Container Registry (ACR) while keeping FluxCD and
-Memcached charts upstream.
+Install Omniverse Kit App Streaming on AKS using NVIDIA NGC Helm charts
+and container registry directly.
 
 Required arguments:
-  --acr-name NAME          Azure Container Registry name (no fqdn)
   --app-version VERSION    Omniverse chart version to deploy
+  --ngc-token TOKEN        NGC API token (or set $NGC_API_TOKEN)
 
 Optional arguments:
   --namespace NS           Application namespace (default: omni-streaming)
   --flux-namespace NS      Flux namespace (default: flux-operators)
   --values-dir DIR         Directory containing Helm values overlays
                            (default: ../values relative to this script)
-  --target-repo PATH       OCI repository path inside ACR
-                           (default: helm/omniverse)
   --dry-run                Log the commands without executing them
   --skip-validate          Skip kubectl rollout validation checks
   --verbose                Print executed commands
@@ -30,8 +27,7 @@ Optional arguments:
 Prerequisites:
   * helm >= 3.8
   * kubectl >= 1.29 (required unless --dry-run)
-  * az CLI with acr module (required unless --dry-run)
-  * Mirrored Omniverse charts pushed to <acr-name>.azurecr.io
+  * NGC secret 'ngc-omni-user' in target namespace for image pulls
 EOF
 }
 
@@ -82,21 +78,17 @@ run_command() {
   "${cmd[@]}"
 }
 
-login_acr_registry() {
-  local registry token
-  registry="${ACR_NAME}.azurecr.io"
+login_ngc_registry() {
   if [[ "$DRY_RUN" == "true" ]]; then
-    log "[dry-run] helm registry login ${registry}"
+    log "[dry-run] helm repo add omniverse https://helm.ngc.nvidia.com/nvidia/omniverse"
     return
   fi
-  helm registry logout "$registry" >/dev/null 2>&1 || true
-  token=$(az acr login --name "$ACR_NAME" --expose-token \
-    --output tsv --query accessToken) \
-    || fail "Unable to obtain ACR access token"
-  helm registry login "$registry" \
-    --username "00000000-0000-0000-0000-000000000000" \
-    --password "$token" >/dev/null \
-    || fail "Helm registry login failed for ${registry}"
+  helm repo remove omniverse >/dev/null 2>&1 || true
+  helm repo add omniverse https://helm.ngc.nvidia.com/nvidia/omniverse \
+    --username "\$oauthtoken" \
+    --password "$NGC_TOKEN" \
+    --force-update >/dev/null \
+    || fail "Unable to add NGC Helm repository"
 }
 
 ensure_namespace() {
@@ -123,8 +115,7 @@ render_values() {
     fail "Values file not found: ${source}"
   fi
   output="${WORK_DIR}/${name}.yaml"
-  sed -e "s|{{ACR_NAME}}|${ACR_NAME}|g" \
-    -e "s|{{APP_VERSION}}|${APP_VERSION}|g" \
+  sed -e "s|{{APP_VERSION}}|${APP_VERSION}|g" \
     "$source" >"$output"
   printf '%s\n' "$output"
 }
@@ -166,12 +157,11 @@ run_helm_upgrade() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_VALUES_DIR="$(cd "${SCRIPT_DIR}/../values" && pwd)"
 
-ACR_NAME=""
+NGC_TOKEN="${NGC_API_TOKEN:-}"
 APP_VERSION=""
 APP_NAMESPACE="omni-streaming"
 FLUX_NAMESPACE="flux-operators"
 VALUES_DIR=""
-TARGET_REPO="helm/omniverse"
 DRY_RUN="false"
 VERBOSE="false"
 SKIP_VALIDATE="false"
@@ -181,8 +171,8 @@ WORK_DIR=""
 
 while (($#)); do
   case "$1" in
-    --acr-name)
-      ACR_NAME="$2"
+    --ngc-token)
+      NGC_TOKEN="$2"
       shift 2
       ;;
     --app-version)
@@ -199,10 +189,6 @@ while (($#)); do
       ;;
     --values-dir)
       VALUES_DIR="$2"
-      shift 2
-      ;;
-    --target-repo)
-      TARGET_REPO="$2"
       shift 2
       ;;
     --dry-run)
@@ -228,7 +214,7 @@ while (($#)); do
   esac
 done
 
-: "${ACR_NAME:?--acr-name is required}"
+: "${NGC_TOKEN:?Provide --ngc-token or export NGC_API_TOKEN}"
 : "${APP_VERSION:?--app-version is required}"
 
 if [[ -z "$VALUES_DIR" ]]; then
@@ -243,17 +229,9 @@ if [[ ! -d "$VALUES_DIR" ]]; then
   fail "Values directory not found: ${VALUES_DIR}"
 fi
 
-TARGET_REPO="${TARGET_REPO#/}"
-TARGET_REPO="${TARGET_REPO%/}"
-if [[ -z "$TARGET_REPO" ]]; then
-  fail "--target-repo cannot be empty"
-fi
-REGISTRY_PATH="oci://${ACR_NAME}.azurecr.io/${TARGET_REPO}"
-
 require_command helm
 if [[ "$DRY_RUN" == "false" ]]; then
   require_command kubectl
-  require_command az
 fi
 
 OUT_DIR="${PWD}/out"
@@ -278,7 +256,7 @@ RMCP_VALUES="$(render_values "$RMCP_TEMPLATE" "kit-appstreaming-rmcp")"
 MANAGER_VALUES="$(render_values "$MANAGER_TEMPLATE" "kit-appstreaming-manager")"
 APPS_VALUES="$(render_values "$APPS_TEMPLATE" "kit-appstreaming-applications")"
 
-login_acr_registry
+login_ngc_registry
 
 run_command helm repo add fluxcd-community \
   https://fluxcd-community.github.io/helm-charts --force-update >/dev/null
@@ -305,9 +283,9 @@ run_release() {
 
 run_release flux fluxcd-community/flux2 "$FLUX_NAMESPACE" "$FLUX_VALUES" "" "--create-namespace"
 run_release omni-memcached bitnami/memcached "$APP_NAMESPACE" "$MEMCACHED_VALUES" ""
-run_release omni-rmcp "${REGISTRY_PATH}/kit-appstreaming-rmcp" "$APP_NAMESPACE" "$RMCP_VALUES" "$APP_VERSION"
-run_release omni-manager "${REGISTRY_PATH}/kit-appstreaming-manager" "$APP_NAMESPACE" "$MANAGER_VALUES" "$APP_VERSION"
-run_release omni-applications "${REGISTRY_PATH}/kit-appstreaming-applications" "$APP_NAMESPACE" "$APPS_VALUES" "$APP_VERSION"
+run_release omni-rmcp omniverse/kit-appstreaming-rmcp "$APP_NAMESPACE" "$RMCP_VALUES" "$APP_VERSION"
+run_release omni-manager omniverse/kit-appstreaming-manager "$APP_NAMESPACE" "$MANAGER_VALUES" "$APP_VERSION"
+run_release omni-applications omniverse/kit-appstreaming-applications "$APP_NAMESPACE" "$APPS_VALUES" "$APP_VERSION"
 
 log "Releases processed:"
 for entry in "${DEPLOYED_RELEASES[@]}"; do
