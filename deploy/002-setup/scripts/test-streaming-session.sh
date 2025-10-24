@@ -3,34 +3,27 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: test-streaming-session.sh [--namespace NS] [--service-name NAME] \
-  [--local-signaling-port PORT] [--local-media-port PORT] \
-  [--session-id ID] [--dry-run] [--verbose]
+Usage: test-streaming-session.sh [--namespace NS] [--session-id ID] \
+  [--dry-run] [--verbose]
 
-Port-forward Omniverse streaming service to local workstation for testing
-with Web Viewer client. Optionally clean up streaming sessions.
+Get NodePort connection details for Omniverse streaming session to access
+over VPN with Web Viewer client. Works with NodePort service type.
 
 Optional arguments:
-  --namespace NS               Namespace for streaming service
-                               (default: omni-streaming)
-  --service-name NAME          Service name to port-forward
-                               (default: auto-detect from profile)
-  --local-signaling-port PORT  Local port for WebRTC signaling
-                               (default: 30100)
-  --local-media-port PORT      Local port for WebRTC media
-                               (default: 30101)
-  --session-id ID              Streaming session ID to clean up on exit
-  --dry-run                    Print commands without executing
+  --namespace NS               Namespace pattern for streaming session
+                               (default: auto-detect UUID namespace)
+  --session-id ID              Streaming session ID (UUID)
+  --dry-run                    Print information without executing
   --verbose                    Enable verbose logging
   --help                       Show this message
 
 Prerequisites:
   * kubectl with context pointed to the target cluster
-  * Streaming session service deployed
-  * USD Viewer application deployed via deploy-usd-viewer-app.sh
+  * VPN connection to AKS cluster network
+  * Active streaming session created via streaming manager API
 
 Example:
-  ./test-streaming-session.sh --service-name usd-viewer-session
+  ./test-streaming-session.sh --session-id 2549622e-58fd-4470-9bf0-c27da927c4d7
 EOF
 }
 
@@ -55,46 +48,24 @@ require_command() {
   fi
 }
 
-cleanup_port_forward() {
-  if [[ -n "${PORT_FORWARD_PID:-}" ]]; then
-    log "Terminating port-forward (PID: $PORT_FORWARD_PID)"
-    kill "$PORT_FORWARD_PID" 2>/dev/null || true
-    wait "$PORT_FORWARD_PID" 2>/dev/null || true
-  fi
-
+cleanup_session() {
   if [[ -n "${SESSION_ID:-}" && "$DRY_RUN" == "false" ]]; then
     log "Cleaning up session ${SESSION_ID}"
-    verbose_log "Sending DELETE request to streaming manager"
+    verbose_log "Namespace with session resources will be deleted automatically by session manager"
   fi
 }
 
-trap cleanup_port_forward EXIT SIGINT SIGTERM
+trap cleanup_session EXIT SIGINT SIGTERM
 
-NAMESPACE="omni-streaming"
-SERVICE_NAME=""
-LOCAL_SIGNALING_PORT="30100"
-LOCAL_MEDIA_PORT="30101"
+NAMESPACE=""
 SESSION_ID=""
 DRY_RUN="false"
 VERBOSE="false"
-PORT_FORWARD_PID=""
 
 while (($#)); do
   case "$1" in
     --namespace)
       NAMESPACE="$2"
-      shift 2
-      ;;
-    --service-name)
-      SERVICE_NAME="$2"
-      shift 2
-      ;;
-    --local-signaling-port)
-      LOCAL_SIGNALING_PORT="$2"
-      shift 2
-      ;;
-    --local-media-port)
-      LOCAL_MEDIA_PORT="$2"
       shift 2
       ;;
     --session-id)
@@ -121,98 +92,111 @@ while (($#)); do
 done
 
 require_command kubectl
+require_command jq
 
-if [[ -z "$SERVICE_NAME" ]]; then
-  verbose_log "Auto-detecting streaming session service"
-  if [[ "$DRY_RUN" == "true" ]]; then
-    SERVICE_NAME="usd-viewer-session-example"
-    log "[dry-run] Would auto-detect service in namespace ${NAMESPACE}"
-  else
-    mapfile -t services < <(kubectl get svc -n "$NAMESPACE" \
-      -o jsonpath='{range .items[?(@.spec.ports[?(@.port==31000)])]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
-    if ((${#services[@]} == 0)); then
-      log "No streaming session services found (looking for services with port 31000)"
-      log ""
-      log "Available services in ${NAMESPACE}:"
-      kubectl get svc -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,PORTS:.spec.ports[*].port 2>/dev/null || true
-      log ""
-      log "Note: You need to create a streaming session first."
-      log "The 'streaming' service is the session manager API (port 80),"
-      log "not the actual WebRTC streaming endpoint."
-      log ""
-      log "To create a session, use the streaming manager API:"
-      log "  kubectl port-forward -n ${NAMESPACE} svc/streaming 8080:80"
-      log "  curl -X POST http://localhost:8080/stream \\"
-      log "    -H 'Content-Type: application/json' \\"
-      log "    -d '{\"id\":\"usd-viewer\",\"version\":\"107.3.2\",\"profile\":\"usd-viewer-partialgpu\"}'"
-      fail "No active streaming session services found"
-    fi
-    SERVICE_NAME="${services[0]}"
-    verbose_log "Detected service: ${SERVICE_NAME}"
+if [[ -z "$NAMESPACE" && -z "$SESSION_ID" ]]; then
+  verbose_log "Auto-detecting active streaming session namespaces"
+  namespaces=$(kubectl get ns -o json 2>/dev/null | \
+    jq -r '.items[].metadata.name | select(test("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"))' || true)
+  namespace_count=$(echo "$namespaces" | grep -c . || echo 0)
+  if [[ $namespace_count -eq 0 ]]; then
+    fail "No active streaming session namespaces found (UUID format)"
   fi
+  if [[ $namespace_count -gt 1 ]]; then
+    log "Multiple streaming sessions found:"
+    echo "$namespaces" | sed 's/^/  /'
+    fail "Please specify --session-id or --namespace"
+  fi
+  NAMESPACE="$namespaces"
+  SESSION_ID="$NAMESPACE"
+  verbose_log "Detected session namespace: ${NAMESPACE}"
+elif [[ -n "$SESSION_ID" && -z "$NAMESPACE" ]]; then
+  NAMESPACE="$SESSION_ID"
 fi
 
 if [[ "$DRY_RUN" == "false" ]]; then
-  if ! kubectl get svc -n "$NAMESPACE" "$SERVICE_NAME" \
-    >/dev/null 2>&1; then
-    fail "Service ${SERVICE_NAME} not found in namespace ${NAMESPACE}"
+  if ! kubectl get ns "$NAMESPACE" >/dev/null 2>&1; then
+    fail "Namespace ${NAMESPACE} not found"
   fi
 fi
 
-if [[ "$DRY_RUN" == "true" ]]; then
-  log "[dry-run] Would execute:"
-  log "kubectl port-forward -n ${NAMESPACE} svc/${SERVICE_NAME} \\"
-  log "  ${LOCAL_SIGNALING_PORT}:31000 ${LOCAL_MEDIA_PORT}:31001"
-else
-  verbose_log "Starting port-forward for service ${SERVICE_NAME}"
-  kubectl port-forward -n "$NAMESPACE" \
-    "svc/$SERVICE_NAME" \
-    "${LOCAL_SIGNALING_PORT}:31000" \
-    "${LOCAL_MEDIA_PORT}:31001" \
-    >/dev/null 2>&1 &
-  PORT_FORWARD_PID=$!
-
-  sleep 2
-  if ! kill -0 "$PORT_FORWARD_PID" 2>/dev/null; then
-    fail "Port-forward process died immediately"
+verbose_log "Getting service details for session ${SESSION_ID:-$NAMESPACE}"
+if [[ "$DRY_RUN" == "false" ]]; then
+  SERVICE_NAME=$(kubectl get svc -n "$NAMESPACE" -o json 2>/dev/null | \
+    jq -r '.items[] | select(.metadata.name | contains("kit-app")) | .metadata.name' | head -1 || true)
+  if [[ -z "$SERVICE_NAME" ]]; then
+    fail "No kit-app service found in namespace ${NAMESPACE}"
   fi
+
+  NODE_IP=$(kubectl get pod -n "$NAMESPACE" -o json 2>/dev/null | \
+    jq -r '.items[0].status.hostIP // ""' || echo "")
+  if [[ -z "$NODE_IP" ]]; then
+    fail "Could not determine node IP for session pod"
+  fi
+
+  SIGNALING_NODEPORT=$(kubectl get svc -n "$NAMESPACE" "$SERVICE_NAME" -o json 2>/dev/null | \
+    jq -r '.spec.ports[] | select(.port == 31000) | .nodePort // ""' || echo "")
+  MEDIA_NODEPORT=$(kubectl get svc -n "$NAMESPACE" "$SERVICE_NAME" -o json 2>/dev/null | \
+    jq -r '.spec.ports[] | select(.port == 31001) | .nodePort // ""' || echo "")
+
+  if [[ -z "$SIGNALING_NODEPORT" || -z "$MEDIA_NODEPORT" ]]; then
+    fail "Could not retrieve NodePort mappings from service ${SERVICE_NAME}"
+  fi
+else
+  log "[dry-run] Would query service and pod details from namespace"
+  SERVICE_NAME="kit-app-<session-id>"
+  NODE_IP="<node-ip>"
+  SIGNALING_NODEPORT="<signaling-nodeport>"
+  MEDIA_NODEPORT="<media-nodeport>"
 fi
 
 cat <<EOF
 
-Port-forward active (PID: ${PORT_FORWARD_PID:-N/A})
+Omniverse Streaming Session Details
+====================================
 
-Web Viewer Configuration:
-  source: local
-  server: 127.0.0.1
-  signalingPort: ${LOCAL_SIGNALING_PORT}
-  mediaPort: ${LOCAL_MEDIA_PORT}
+Session ID: ${SESSION_ID:-$NAMESPACE}
+Service: ${SERVICE_NAME}
+Node IP: ${NODE_IP}
+
+NodePort Mappings:
+  Signaling (TCP): 31000 → ${SIGNALING_NODEPORT}
+  Media (UDP):     31001 → ${MEDIA_NODEPORT}
+
+Web Viewer Configuration (stream.config.json):
+{
+  "source": "local",
+  "local": {
+    "server": "${NODE_IP}",
+    "signalingPort": ${SIGNALING_NODEPORT},
+    "mediaPort": ${MEDIA_NODEPORT}
+  }
+}
 
 Instructions:
   1. Clone web-viewer-sample:
      git clone -b 1.5.2 https://github.com/NVIDIA-Omniverse/web-viewer-sample.git
 
-  2. Configure stream.config.json:
-     {
-       "source": "local",
-       "server": "127.0.0.1",
-       "signalingPort": ${LOCAL_SIGNALING_PORT},
-       "mediaPort": ${LOCAL_MEDIA_PORT},
-       "resolution": "1920x1080",
-       "fps": 30
-     }
+  2. Update stream.config.json with the configuration above
 
   3. Start Web Viewer:
      cd web-viewer-sample
      npm install
      npm run dev
 
-  4. Open browser:
+  4. Open browser (must be on VPN):
      http://localhost:5173/
 
-Press Ctrl+C to terminate port-forward
-EOF
+  5. The Web Viewer will connect to ${NODE_IP}:${SIGNALING_NODEPORT} (signaling)
+     and ${NODE_IP}:${MEDIA_NODEPORT} (media)
 
-if [[ "$DRY_RUN" == "false" ]]; then
-  wait "$PORT_FORWARD_PID"
-fi
+Notes:
+  * You must be connected to the AKS cluster VPN to access node IP ${NODE_IP}
+  * Any node IP works with NodePort, but using the pod's node is recommended
+  * To get all available node IPs: kubectl get nodes -o wide
+  * To terminate session:
+      curl -X DELETE http://localhost:8080/stream \\
+        -H 'Content-Type: application/json' \\
+        -d '{"id": "${SESSION_ID:-$NAMESPACE}"}'
+
+EOF
