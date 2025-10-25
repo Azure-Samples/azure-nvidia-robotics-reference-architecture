@@ -83,15 +83,16 @@ workflow:
 
             if [[ "${BACKEND_NORMALIZED}" == "rsl-rl" || "${BACKEND_NORMALIZED}" == "rsl_rl" || "${BACKEND_NORMALIZED}" == "rslrl" ]]; then
               train_args=(
+                --mode "${MODE}"
                 --task "${TASK:-}"
                 --num_envs "${NUM_ENVS:-}"
+                --checkpoint-uri "${CHECKPOINT_URI:-}"
+                --checkpoint-mode "${CHECKPOINT_MODE:-from-scratch}"
+                --register-checkpoint "${REGISTER_CHECKPOINT:-}"
                 --headless
               )
               if [[ -n "${MAX_ITERATIONS:-}" ]]; then
                 train_args+=(--max_iterations "${MAX_ITERATIONS}")
-              fi
-              if [[ -n "${CHECKPOINT_URI:-}" ]]; then
-                train_args+=(--checkpoint "${CHECKPOINT_URI}")
               fi
             else
               train_args=(

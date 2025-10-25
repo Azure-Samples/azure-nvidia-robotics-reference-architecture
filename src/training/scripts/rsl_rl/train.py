@@ -1,24 +1,33 @@
-"""Script to train RL agent with RSL-RL."""
+"""RSL-RL training orchestration with IsaacLab environments and Azure MLflow integration.
 
-"""Launch Isaac Sim Simulator first."""
+This module provides the main training loop for reinforcement learning agents using
+the RSL-RL library with IsaacLab simulation environments. It handles:
+- Environment and agent configuration via Hydra
+- Checkpoint loading and model registration
+- MLflow metric logging and artifact tracking
+- Video recording of training rollouts
+- Integration with Azure ML workspaces
+"""
+
+from __future__ import annotations
 
 import argparse
-import sys
-
+import logging
 import os
+import random
+import sys
+import time
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, NamedTuple, Sequence
 
 from isaaclab.app import AppLauncher
 
-# local imports
-import cli_args  # isort: skip
+import cli_args
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
-parser.add_argument(
-    "--video", action="store_true", default=False, help="Record videos during training."
-)
+parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument(
     "--video_length",
     type=int,
@@ -31,9 +40,7 @@ parser.add_argument(
     default=2000,
     help="Interval between video recordings (in steps).",
 )
-parser.add_argument(
-    "--num_envs", type=int, default=None, help="Number of environments to simulate."
-)
+parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
     "--agent",
@@ -41,12 +48,8 @@ parser.add_argument(
     default="rsl_rl_cfg_entry_point",
     help="Name of the RL agent configuration entry point.",
 )
-parser.add_argument(
-    "--seed", type=int, default=None, help="Seed used for the environment"
-)
-parser.add_argument(
-    "--max_iterations", type=int, default=None, help="RL Policy training iterations."
-)
+parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
+parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument(
     "--distributed",
     action="store_true",
@@ -136,9 +139,7 @@ try:
     import rsl_rl
 
     print(f"[DEBUG] rsl_rl location: {rsl_rl.__file__}")
-    print(
-        f"[DEBUG] rsl_rl version: {rsl_rl.__version__ if hasattr(rsl_rl, '__version__') else 'unknown'}"
-    )
+    print(f"[DEBUG] rsl_rl version: {rsl_rl.__version__ if hasattr(rsl_rl, '__version__') else 'unknown'}")
     print(f"[DEBUG] rsl_rl contents: {dir(rsl_rl)}")
 
     # Check if runners exists
@@ -265,13 +266,9 @@ def _start_mlflow_run(
             serializable = {k: str(v) for k, v in params.items() if v is not None}
             if serializable:
                 mlflow.log_params(serializable)
-        print(
-            f"[INFO] MLflow run started: experiment='{experiment_name}', run='{run_name}'"
-        )
+        print(f"[INFO] MLflow run started: experiment='{experiment_name}', run='{run_name}'")
         return mlflow, True
-    except (
-        Exception
-    ) as exc:  # pragma: no cover - network issues are environment specific
+    except Exception as exc:  # pragma: no cover - network issues are environment specific
         print(f"[WARNING] Failed to start MLflow run: {exc}")
         return None, False
 
@@ -321,10 +318,7 @@ def _sync_logs_to_storage(
     for file_path in root.rglob("*"):
         if not file_path.is_file():
             continue
-        blob_name = (
-            f"training_logs/{experiment_name}/{timestamp}/"
-            f"{file_path.relative_to(root).as_posix()}"
-        )
+        blob_name = f"training_logs/{experiment_name}/{timestamp}/" f"{file_path.relative_to(root).as_posix()}"
         try:
             storage_context.upload_file(
                 local_path=str(file_path),
@@ -376,21 +370,15 @@ def main(
     """Train with RSL-RL agent."""
     # override configurations with non-hydra CLI arguments
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
-    env_cfg.scene.num_envs = (
-        args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
-    )
+    env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     agent_cfg.max_iterations = (
-        args_cli.max_iterations
-        if args_cli.max_iterations is not None
-        else agent_cfg.max_iterations
+        args_cli.max_iterations if args_cli.max_iterations is not None else agent_cfg.max_iterations
     )
 
     # set the environment seed
     # note: certain randomizations occur in the environment initialization so we set the seed here
     env_cfg.seed = agent_cfg.seed
-    env_cfg.sim.device = (
-        args_cli.device if args_cli.device is not None else env_cfg.sim.device
-    )
+    env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
     # multi-gpu training configuration
     if args_cli.distributed:
@@ -416,14 +404,10 @@ def main(
 
     resume_path: Optional[str] = None
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
-        resume_path = get_checkpoint_path(
-            log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
-        )
+        resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
 
     if args_cli.azure_config:
-        print(
-            "[WARNING] --azure_config is deprecated and ignored; provide Azure settings via environment variables."
-        )
+        print("[WARNING] --azure_config is deprecated and ignored; provide Azure settings via environment variables.")
 
     azure_context: Optional[AzureMLContext] = None
     mlflow_module: Optional[Any] = None
@@ -434,16 +418,11 @@ def main(
     if args_cli.disable_azure:
         print("[INFO] Azure integration disabled via command line")
     elif not is_primary_process:
-        print(
-            "[INFO] Skipping Azure bootstrap on non-primary rank; metrics will be reported by rank 0."
-        )
+        print("[INFO] Skipping Azure bootstrap on non-primary rank; metrics will be reported by rank 0.")
     else:
         try:
             azure_context = bootstrap_azure_ml(experiment_name=experiment_name)
-            print(
-                "[INFO] Azure ML context initialized with workspace "
-                f"'{azure_context.workspace_name}'"
-            )
+            print("[INFO] Azure ML context initialized with workspace " f"'{azure_context.workspace_name}'")
         except AzureConfigError as exc:
             print(f"[WARNING] Azure ML bootstrap failed: {exc}")
         except Exception as exc:  # pragma: no cover - environment specific failures
@@ -488,15 +467,11 @@ def main(
             if mlflow_run_active and mlflow_module is not None:
                 if resume_path:
                     mlflow_module.set_tag("resume_checkpoint_path", str(resume_path))
-                mlflow_module.set_tag(
-                    "is_primary_rank", str(is_primary_process).lower()
-                )
+                mlflow_module.set_tag("is_primary_rank", str(is_primary_process).lower())
 
     storage_context = azure_context.storage if azure_context else None
     if azure_context and storage_context is None:
-        print(
-            "[INFO] Azure Storage account not configured; checkpoint uploads will be skipped"
-        )
+        print("[INFO] Azure Storage account not configured; checkpoint uploads will be skipped")
 
     # set the IO descriptors export flag if requested
     if isinstance(env_cfg, ManagerBasedRLEnvCfg):
@@ -510,9 +485,7 @@ def main(
     env_cfg.log_dir = log_dir
 
     # create isaac environment
-    env = gym.make(
-        args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None
-    )
+    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
     # convert to single-agent instance if required by the RL algorithm
     if isinstance(env.unwrapped, DirectMARLEnv):
@@ -535,13 +508,9 @@ def main(
 
     # create runner from rsl-rl
     if agent_cfg.class_name == "OnPolicyRunner":
-        runner = OnPolicyRunner(
-            env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
-        )
+        runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     elif agent_cfg.class_name == "DistillationRunner":
-        runner = DistillationRunner(
-            env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
-        )
+        runner = DistillationRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     else:
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
     # write git state to logs
@@ -576,9 +545,7 @@ def main(
                     for name, value in metrics.items():
                         mlflow_module.log_metric(name, value, step=current_iter)
                     if os.path.isfile(full_path):
-                        mlflow_module.log_artifact(
-                            full_path, artifact_path="checkpoints"
-                        )
+                        mlflow_module.log_artifact(full_path, artifact_path="checkpoints")
                         mlflow_module.set_tag("last_checkpoint_path", full_path)
 
                 blob_name = None
@@ -588,10 +555,7 @@ def main(
                         model_name=f"{args_cli.task}_{agent_cfg.experiment_name}",
                         step=current_iter,
                     )
-                    print(
-                        "[INFO] Uploaded checkpoint to Azure Storage: "
-                        f"{blob_name} (iteration {current_iter})"
-                    )
+                    print("[INFO] Uploaded checkpoint to Azure Storage: " f"{blob_name} (iteration {current_iter})")
                 if mlflow_module and mlflow_run_active and blob_name:
                     mlflow_module.set_tag("last_checkpoint_blob", blob_name)
             except Exception as exc:  # pragma: no cover - telemetry only
@@ -644,24 +608,15 @@ def main(
                             model_name=f"{args_cli.task}_{agent_cfg.experiment_name}_final",
                             step=None,
                         )
-                        print(
-                            "[INFO] Uploaded final model to Azure Storage: "
-                            f"{final_blob}"
-                        )
+                        print("[INFO] Uploaded final model to Azure Storage: " f"{final_blob}")
                     except Exception as exc:
-                        print(
-                            f"[WARNING] Failed to upload final model to Azure Storage: {exc}"
-                        )
+                        print(f"[WARNING] Failed to upload final model to Azure Storage: {exc}")
 
                 if mlflow_module and mlflow_run_active:
                     try:
-                        mlflow_module.log_artifact(
-                            final_model_path, artifact_path="checkpoints/final"
-                        )
+                        mlflow_module.log_artifact(final_model_path, artifact_path="checkpoints/final")
                     except Exception as exc:
-                        print(
-                            f"[WARNING] Failed to log final model artifact to MLflow: {exc}"
-                        )
+                        print(f"[WARNING] Failed to log final model artifact to MLflow: {exc}")
 
                 _register_final_model(
                     context=azure_context,

@@ -38,7 +38,7 @@ backend_lc="${backend,,}"
 
 case "${backend_lc}" in
   rsl-rl|rsl_rl|rslrl)
-    exec "${python_cmd[@]}" "${TRAINING_DIR}/scripts/rsl_rl/train.py" "$@"
+    exec "${python_cmd[@]}" -m training.scripts.launch_rsl_rl "$@"
     ;;
   *)
     exec "${python_cmd[@]}" -m training.scripts.launch "$@"
