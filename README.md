@@ -51,7 +51,6 @@ This reference architecture integrates:
 - **Cost Optimization** - Pay-per-use compute with automatic scaling
 - **Enterprise Security** - Azure AD integration and compliance certifications
 - **Global Deployment** - Multi-region support for worldwide teams
-- **Vendor Agnostic** - Open-source solution avoiding vendor lock-in
 - **ROI Tracking** - Comprehensive metrics and cost analysis dashboards
 
 ## 🧑🏽‍💻 Local Development Setup
