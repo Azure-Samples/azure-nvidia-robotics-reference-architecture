@@ -5,7 +5,7 @@ This reference architecture provides a production-ready framework for orchestrat
 ## 🗼 Architecture Overview
 
 This reference architecture integrates:
-- **NVIDIA Osmo** - Workflow orchestration and job scheduling
+- **NVIDIA OSMO** - Workflow orchestration and job scheduling
 - **Azure Machine Learning** - Experiment tracking and model management
 - **Azure Container Instances/AKS** - Scalable compute for Isaac Lab training
 - **Azure Storage** - Persistent data and checkpoint storage
