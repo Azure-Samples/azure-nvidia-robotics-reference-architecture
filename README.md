@@ -1,10 +1,18 @@
-# Azure Robotics Reference Architecture with NVIDIA OSMO
+# 🤖 Azure Robotics Reference Architecture with NVIDIA OSMO
 
-This reference architecture demonstrates end-to-end reinforcement learning workflows for robotics using Azure infrastructure and NVIDIA technologies including Isaac Lab, Isaac Sim, and OSMO. The architecture provides production-ready infrastructure, training pipelines, and deployment workflows with Azure-native authentication and storage integration.
+This reference architecture provides a production-ready framework for orchestrating robotics and AI workloads on Azure using NVIDIA technologies such as Isaac Lab, Isaac Sim, and Osmo. It demonstrates end-to-end reinforcement learning workflows, scalable training pipelines, and deployment processes with Azure-native authentication, storage, and ML services.
 
-## Architecture Overview
+## 🗼 Architecture Overview
 
-The architecture integrates Azure services and NVIDIA robotics frameworks (Isaac Lab, Isaac Sim, OSMO) to provide scalable, secure RL training infrastructure.
+This reference architecture integrates:
+- **NVIDIA OSMO** - Workflow orchestration and job scheduling
+- **Azure Machine Learning** - Experiment tracking and model management
+- **Azure Container Instances/AKS** - Scalable compute for Isaac Lab training
+- **Azure Storage** - Persistent data and checkpoint storage
+- **Azure Key Vault** - Secure credential management
+- **Azure Monitor** - Comprehensive logging and metrics
+
+**INSERT ARCHITECTURE DIAGRAM HERE**
 
 ## Repository Structure
 
@@ -29,25 +37,41 @@ The architecture integrates Azure services and NVIDIA robotics frameworks (Isaac
 │       └── tasks/                      # Placeholder for Isaac Lab training tasks
 ```
 
-## Key Features
+## 🚀 Key Features
 
-### Infrastructure as Code
+- **Infrastructure as Code** - Terraform modules referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components for reproducible deployments
+- **Containerized Workflows** - Docker-based Isaac Lab training with NVIDIA GPU support
+- **CI/CD Integration** - Automated deployment pipelines with GitHub Actions
+- **MLflow Integration** - Automatic experiment tracking and model versioning
+    - Automatic metric logging from SKRL agents to Azure ML
+    - Comprehensive tracking of episode statistics, losses, optimization metrics, and timing data
+    - Configurable logging intervals and metric filtering
+    - See [MLflow Integration Guide](docs/mlflow-integration.md) for details
+- **Scalable Compute** - Auto-scaling GPU nodes based on workload demands
+- **Cost Optimization** - Pay-per-use compute with automatic scaling
+- **Enterprise Security** - Azure AD integration and compliance certifications
+- **Global Deployment** - Multi-region support for worldwide teams
+- **ROI Tracking** - Comprehensive metrics and cost analysis dashboards
 
-* Modular Terraform configurations referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components
+## 🧑🏽‍💻 Local Development Setup
 
-### MLflow Integration
+### Required Tools
 
-* Automatic metric logging from SKRL agents to Azure ML
-* Comprehensive tracking of episode statistics, losses, optimization metrics, and timing data
-* Configurable logging intervals and metric filtering
-* See [MLflow Integration Guide](docs/mlflow-integration.md) for details
+- [pyenv](https://github.com/pyenv/pyenv)
+- Python 3.11 (required by Isaac Sim 5.X)
+- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) (v2.50+)
+- [Terraform](https://www.terraform.io/downloads) (v1.5+)
+- [NVIDIA Osmo CLI](https://developer.nvidia.com/osmo) (latest)
+- [Docker](https://docs.docker.com/get-docker/) with NVIDIA Container Toolkit
 
-## Local Development Setup
+### Azure Requirements
+- Azure subscription with contributor access
+- Sufficient quota for GPU VMs (Standard_NC6s_v3 or higher)
+- Azure Machine Learning workspace (or permissions to create one)
 
-### Prerequisites
-
-* [pyenv](https://github.com/pyenv/pyenv)
-* Python 3.11 (required by Isaac Sim 5.X)
+### NVIDIA Requirements
+- NVIDIA Developer account with Osmo access
+- NGC API key for container registry access
 
 ### Quick Start
 
@@ -67,17 +91,17 @@ from training.utils import AzureMLContext, bootstrap_azure_ml
 
 Select the `.venv/bin/python` interpreter in VS Code for IntelliSense support
 
-## License
+## 🪪 License
 
 This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
 
-## Support
+## 🤝 Support
 
 For issues and questions:
 
 * Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 This reference architecture builds upon:
 
