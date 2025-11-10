@@ -52,12 +52,6 @@ variable "osmo_loadbalancer_ip" {
  * OSMO Private DNS Configuration - Optional
  */
 
-variable "should_create_osmo_private_dns" {
-  type        = bool
-  description = "Whether to create private DNS zone for OSMO service internal resolution"
-  default     = true
-}
-
 variable "osmo_private_dns_zone_name" {
   type        = string
   description = "Private DNS zone name for OSMO services (e.g., osmo.local, osmo.internal)"
