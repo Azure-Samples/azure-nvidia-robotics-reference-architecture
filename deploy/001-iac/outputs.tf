@@ -28,6 +28,11 @@ output "resource_group" {
   value       = module.robotics.resource_group
 }
 
+output "key_vault_name" {
+  description = "Name of the Key Vault storing robotics secrets"
+  value       = try(module.robotics.key_vault.name, null)
+}
+
 output "virtual_network" {
   description = "Virtual network for robotics infrastructure"
   value       = module.robotics.virtual_network

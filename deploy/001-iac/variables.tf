@@ -81,14 +81,6 @@ variable "postgresql_subnet_address_prefixes" {
   default     = ["10.0.12.0/24"]
 }
 
-variable "postgresql_should_enable_geo_redundant_backup" {
-  type        = bool
-  description = "Whether to enable geo-redundant backups for PostgreSQL"
-  default     = false
-}
-
-
-
 variable "postgresql_sku_name" {
   type        = string
   description = "SKU name for PostgreSQL server"
@@ -121,12 +113,6 @@ variable "redis_sku_name" {
   type        = string
   description = "SKU name for Azure Managed Redis cache"
   default     = "Balanced_B10"
-}
-
-variable "redis_should_enable_high_availability" {
-  type        = bool
-  description = "Whether to enable high availability for Redis cache"
-  default     = false
 }
 
 variable "redis_clustering_policy" {

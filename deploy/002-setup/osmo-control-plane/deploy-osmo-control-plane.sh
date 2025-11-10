@@ -7,7 +7,6 @@ terraform_dir="${script_dir}/../../001-iac"
 values_dir="${script_dir}/values"
 namespace="osmo-control-plane"
 chart_version="1.0.0-2025.10.8.c18411774"
-keyvault_name="kv-osmo-robotics-001"
 
 help="Usage: deploy-osmo-control-plane.sh --ngc-token TOKEN [OPTIONS]
 
@@ -103,13 +102,20 @@ pg_fqdn=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.fqdn')
 pg_user=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.admin_username')
 redis_hostname=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.hostname')
 redis_port=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.port')
+keyvault_name=$(echo "${tf_output}" | jq -r '.key_vault_name.value // empty')
 postgres_server_name=${pg_fqdn%%.*}
 redis_cluster=${redis_hostname%%.*}
+
+if [[ -z "${keyvault_name}" ]]; then
+  echo "Error: key_vault_name output not found in terraform state" >&2
+  exit 1
+fi
 
 echo "  AKS Cluster: ${aks_name}"
 echo "  Resource Group: ${resource_group}"
 echo "  PostgreSQL: ${pg_fqdn}"
 echo "  Redis: ${redis_hostname}:${redis_port}"
+echo "  Key Vault: ${keyvault_name}"
 
 echo "Acquiring AKS credentials..."
 az aks get-credentials \
