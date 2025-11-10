@@ -19,7 +19,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, NamedTuple, Sequence
+from typing import Any, NamedTuple, Optional, Sequence
 
 from isaaclab.app import AppLauncher
 
@@ -181,7 +181,7 @@ from isaaclab.envs import (
     multi_agent_to_single_agent,
 )
 from isaaclab.utils.dict import print_dict
-from isaaclab.utils.io import dump_pickle, dump_yaml
+from isaaclab.utils.io import dump_yaml
 
 from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
 
@@ -286,8 +286,6 @@ def _log_config_artifacts(mlflow_module: Optional[Any], log_dir: str) -> None:
     artifact_map = {
         "env.yaml": "config",
         "agent.yaml": "config",
-        "env.pkl": "config",
-        "agent.pkl": "config",
     }
 
     for relative_path, artifact_path in artifact_map.items():
@@ -524,8 +522,6 @@ def main(
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
-    dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
-    dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
     if is_primary_process and mlflow_module and mlflow_run_active:
         _log_config_artifacts(mlflow_module, log_dir)
 

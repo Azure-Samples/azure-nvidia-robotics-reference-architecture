@@ -100,24 +100,14 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
 
 
 def _build_credential() -> DefaultAzureCredential:
+    # Check if we should exclude managed identity (for local dev on Azure VMs)
+    exclude_managed_identity = os.environ.get("AZURE_EXCLUDE_MANAGED_IDENTITY", "false").lower() == "true"
+
     return DefaultAzureCredential(
         managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"),
         authority=os.environ.get("AZURE_AUTHORITY_HOST"),
+        exclude_managed_identity_credential=exclude_managed_identity,
     )
-    account_url = f"https://{account_name}.blob.core.windows.net/"
-
-    try:
-        blob_client = BlobServiceClient(account_url=account_url, credential=credential)
-        container_client = blob_client.get_container_client(container_name)
-        try:
-            container_client.create_container()
-        except ResourceExistsError:
-            pass
-        return AzureStorageContext(blob_client=blob_client, container_name=container_name)
-    except AzureError as exc:
-        raise AzureConfigError(
-            f"Failed to initialize Azure Storage container '{container_name}' in account '{account_name}': {exc}"
-        ) from exc
 
 
 def bootstrap_azure_ml(
