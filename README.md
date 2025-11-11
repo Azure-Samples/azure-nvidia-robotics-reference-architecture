@@ -1,6 +1,6 @@
 # 🤖 Azure Robotics Reference Architecture with NVIDIA OSMO
 
-This reference architecture provides a production-ready framework for orchestrating robotics and AI workloads on Azure using NVIDIA technologies such as Isaac Lab, Isaac Sim, and OSMO. It demonstrates end-to-end reinforcement learning workflows, scalable training pipelines, and deployment processes with Azure-native authentication, storage, and ML services.
+This reference architecture provides a production-ready framework for orchestrating robotics and AI workloads on [Microsoft Azure](https://azure.microsoft.com/) using NVIDIA technologies such as [Isaac Lab](https://developer.nvidia.com/isaac/lab), [Isaac Sim](https://developer.nvidia.com/isaac/sim), and [OSMO](https://developer.nvidia.com/osmo). It demonstrates end-to-end reinforcement learning workflows, scalable training pipelines, and deployment processes with Azure-native authentication, storage, and ML services.
 
 ## 🚀 Key Features
 
@@ -122,3 +122,4 @@ This reference architecture builds upon:
 * [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) - RL task framework
 * [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) - Physics simulation
 * [NVIDIA OSMO](https://developer.nvidia.com/osmo) - Workflow orchestration
+* [NVIDIA OSMO GitHub](https://github.com/NVIDIA/OSMO) - Workflow orchestration
