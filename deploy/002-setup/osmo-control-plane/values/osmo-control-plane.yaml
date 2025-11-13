@@ -1,7 +1,7 @@
 # Global configuration shared across all OSMO services
 global:
   osmoImageLocation: nvcr.io/nvidia/osmo
-  osmoImageTag: 2025.10.8.c18411774
+  osmoImageTag: 6.0.0
   imagePullSecret: nvcr-secret
   serviceAccountName: osmo-control-plane
 
@@ -15,7 +15,6 @@ services:
   # Configuration file service settings
   configFile:
     enabled: true
-    path: /opt/osmo/config.yaml
 
   # PostgreSQL database configuration
   postgres:

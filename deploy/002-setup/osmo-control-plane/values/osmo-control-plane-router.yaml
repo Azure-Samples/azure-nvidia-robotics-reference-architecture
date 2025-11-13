@@ -1,7 +1,7 @@
 # Global configuration shared across router services
 global:
   osmoImageLocation: nvcr.io/nvidia/osmo
-  osmoImageTag: 2025.10.8.c18411774
+  osmoImageTag: 6.0.0
   imagePullSecret: nvcr-secret
 
   logs:
@@ -14,7 +14,6 @@ services:
   # Configuration file service settings
   configFile:
     enabled: true
-    path: /opt/osmo/config.yaml
 
   postgres:
     # Settings still in use internal to osmo
