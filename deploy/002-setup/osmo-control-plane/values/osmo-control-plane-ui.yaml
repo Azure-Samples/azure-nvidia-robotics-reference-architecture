@@ -1,7 +1,7 @@
 # Global configuration shared across UI services
 global:
   osmoImageLocation: nvcr.io/nvidia/osmo
-  osmoImageTag: 2025.10.8.c18411774
+  osmoImageTag: 6.0.0
   imagePullSecret: nvcr-secret
 
 # UI service configurations
@@ -9,6 +9,7 @@ services:
   # UI service configuration
   ui:
     serviceAccountName: default
+    apiHostname: "osmo-service.osmo-control-plane.svc.cluster.local:80"
 
     # hostname: "dev.osmo.local"
 
