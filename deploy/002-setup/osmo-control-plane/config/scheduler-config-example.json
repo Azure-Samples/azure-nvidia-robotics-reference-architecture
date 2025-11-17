@@ -1,0 +1,8 @@
+{
+  "scheduler_settings": {
+    "scheduler_type": "kai",
+    "scheduler_name": "kai-scheduler",
+    "coscheduling": true,
+    "scheduler_timeout": 30
+  }
+}
