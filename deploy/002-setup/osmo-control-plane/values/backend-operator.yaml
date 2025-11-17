@@ -1,0 +1,25 @@
+global:
+  osmoImageTag: "<osmo-image-tag>"
+  imagePullSecret: "nvcr-secret"
+  serviceUrl: "https://<your-domain>"
+  agentNamespace: "osmo-operator"
+  backendNamespace: "osmo-workflows"
+  backendName: "default"
+  accountTokenSecret: "osmo-operator-token"
+  loginMethod: "token"
+
+  services:
+    backendListener:
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          memory: "1Gi"
+    backendWorker:
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          memory: "1Gi"
