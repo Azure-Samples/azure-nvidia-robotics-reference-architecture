@@ -38,6 +38,11 @@ output "virtual_network" {
   value       = module.robotics.virtual_network
 }
 
+output "storage_account" {
+  description = "Storage account for robotics data services"
+  value       = module.robotics.storage_account
+}
+
 /*
  * Azure Managed Redis Outputs
  */

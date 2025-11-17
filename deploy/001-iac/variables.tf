@@ -279,8 +279,8 @@ variable "node_pools" {
       gpu_driver                  = "Install"
       priority                    = "Spot"
       enable_auto_scaling         = true
-      min_count                   = 0
-      max_count                   = 0
+      min_count                   = 1
+      max_count                   = 1
       zones                       = []
       eviction_policy             = "Delete"
     }
