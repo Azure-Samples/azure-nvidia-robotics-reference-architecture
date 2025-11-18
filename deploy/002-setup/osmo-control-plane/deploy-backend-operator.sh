@@ -8,8 +8,11 @@ values_dir="${script_dir}/values"
 config_dir="${script_dir}/config"
 scheduler_example="${config_dir}/scheduler-config-example.json"
 scheduler_tmp="/tmp/scheduler_settings.json"
-pool_config="${config_dir}/out/pool_config.json"
 values_file="${values_dir}/backend-operator.yaml"
+pod_template_example="${config_dir}/pod-template-config-example.json"
+pod_template_output="${config_dir}/out/pod-template-config.json"
+default_pool_example="${config_dir}/default-pool-config-example.json"
+default_pool_output="${config_dir}/out/default-pool-config.json"
 
 chart_version="1.0.0"
 osmo_image_tag="6.0.0"
@@ -168,7 +171,10 @@ if [[ "$config_preview" == true ]]; then
   printf 'script_dir=%s\n' "$script_dir"
   printf 'values_file=%s\n' "$values_file"
   printf 'scheduler_example=%s\n' "$scheduler_example"
-  printf 'pool_config=%s\n' "$pool_config"
+  printf 'pod_template_example=%s\n' "$pod_template_example"
+  printf 'default_pool_example=%s\n' "$default_pool_example"
+  printf 'pod_template_output=%s\n' "$pod_template_output"
+  printf 'default_pool_output=%s\n' "$default_pool_output"
   printf 'chart_version=%s\n' "$chart_version"
   printf 'osmo_image_tag=%s\n' "$osmo_image_tag"
   printf 'backend_name=%s\n' "$backend_name"
@@ -200,6 +206,16 @@ fi
 
 if [[ ! -f "$scheduler_example" ]]; then
   echo "Error: Scheduler example not found: $scheduler_example" >&2
+  exit 1
+fi
+
+if [[ ! -f "$pod_template_example" ]]; then
+  echo "Error: Pod template example not found: $pod_template_example" >&2
+  exit 1
+fi
+
+if [[ ! -f "$default_pool_example" ]]; then
+  echo "Error: Default pool example not found: $default_pool_example" >&2
   exit 1
 fi
 
@@ -251,6 +267,23 @@ EOF
 else
   echo "Secret ${account_secret} already exists in namespace ${agent_namespace}; skipping token generation."
 fi
+
+echo "Writing pod template configuration to ${pod_template_output}..."
+cp "$pod_template_example" "$pod_template_output"
+
+echo "Rendering default pool configuration..."
+default_pool_payload=$(jq --arg backend "$backend_name" --arg desc "$backend_description" '
+  .name = $backend
+  | .backend = $backend
+  | .description = $desc
+' "$default_pool_example")
+
+if [[ -z "$default_pool_payload" ]]; then
+  echo "Error: Failed to render default pool configuration" >&2
+  exit 1
+fi
+
+printf '%s\n' "$default_pool_payload" >"$default_pool_output"
 echo "Ensuring OSMO Helm repository is configured..."
 if ! helm repo list -o json | jq -e '.[] | select(.name == "osmo")' >/dev/null; then
   helm repo add osmo https://helm.ngc.nvidia.com/nvidia/osmo >/dev/null
@@ -280,11 +313,11 @@ printf '%s\n' "$scheduler_payload" >"$scheduler_tmp"
 echo "Updating backend configuration..."
 osmo config update BACKEND "$backend_name" --file "$scheduler_tmp"
 
-pool_json=$(jq -n --arg backend "$backend_name" --arg desc "$backend_description" '{default: {backend: $backend, description: $desc}}')
-printf '%s\n' "$pool_json" >"$pool_config"
-
 echo "Updating pool configuration..."
-osmo config update POOL --file "$pool_config"
+osmo config update POOL --file "$default_pool_output"
+
+echo "Updating pod template configuration..."
+osmo config update POD_TEMPLATE --file "$pod_template_output"
 
 echo
 printf 'Backend operator deployed with chart version %s\n' "$chart_version"
@@ -293,4 +326,6 @@ printf 'Backend namespace: %s\n' "$backend_namespace"
 printf 'Agent namespace: %s\n' "$agent_namespace"
 printf 'Service URL: %s\n' "$service_url"
 printf 'Values file: %s\n' "$values_file"
-printf 'Pool config: %s\n' "$pool_config"
+printf 'Scheduler config example: %s\n' "$scheduler_example"
+printf 'Default pool config: %s\n' "$default_pool_output"
+printf 'Pod template config: %s\n' "$pod_template_output"
