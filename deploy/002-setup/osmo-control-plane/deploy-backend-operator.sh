@@ -319,6 +319,9 @@ osmo config update POOL --file "$default_pool_output"
 echo "Updating pod template configuration..."
 osmo config update POD_TEMPLATE --file "$pod_template_output"
 
+echo "Setting default pool profile to ${backend_name}..."
+osmo profile set pool "$backend_name"
+
 echo
 printf 'Backend operator deployed with chart version %s\n' "$chart_version"
 printf 'Backend name: %s\n' "$backend_name"
