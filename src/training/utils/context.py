@@ -41,6 +41,49 @@ class AzureStorageContext:
             blob.upload_blob(data_stream, overwrite=True)
         return blob_name
 
+    def upload_files_batch(self, files: list[tuple[str, str]]) -> list[str]:
+        """Upload multiple files in parallel using Azure SDK.
+
+        Args:
+            files: List of (local_path, blob_name) tuples
+
+        Returns:
+            List of successfully uploaded blob names
+        """
+        if not files:
+            return []
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        uploaded_blobs = []
+        failed_uploads = []
+
+        with ThreadPoolExecutor(max_workers=min(10, len(files))) as executor:
+            future_to_file = {
+                executor.submit(self.upload_file, local_path=local_path, blob_name=blob_name): (
+                    local_path,
+                    blob_name,
+                )
+                for local_path, blob_name in files
+            }
+
+            for future in as_completed(future_to_file):
+                local_path, blob_name = future_to_file[future]
+                try:
+                    result = future.result()
+                    uploaded_blobs.append(result)
+                except Exception as exc:
+                    failed_uploads.append((local_path, str(exc)))
+
+        if failed_uploads:
+            print(f"[WARNING] Failed to upload {len(failed_uploads)} files:")
+            for local_path, error in failed_uploads[:5]:
+                print(f"  - {local_path}: {error}")
+            if len(failed_uploads) > 5:
+                print(f"  ... and {len(failed_uploads) - 5} more")
+
+        return uploaded_blobs
+
     def upload_checkpoint(
         self,
         *,
@@ -127,21 +170,32 @@ def bootstrap_azure_ml(
 
     credential = _build_credential()
 
-    client = MLClient(
-        credential=credential,
-        subscription_id=subscription_id,
-        resource_group_name=resource_group,
-        workspace_name=workspace_name,
-    )
+    try:
+        client = MLClient(
+            credential=credential,
+            subscription_id=subscription_id,
+            resource_group_name=resource_group,
+            workspace_name=workspace_name,
+        )
+    except Exception as exc:
+        raise AzureConfigError(f"Failed to create Azure ML client: {exc}") from exc
+
+    try:
+        workspace = client.workspaces.get(workspace_name)
+    except Exception as exc:
+        raise AzureConfigError(f"Failed to access workspace {workspace_name}: {exc}") from exc
 
     workspace = client.workspaces.get(workspace_name)
     tracking_uri = getattr(workspace, "mlflow_tracking_uri", None)
     if not tracking_uri:
         raise AzureConfigError("Azure ML workspace does not expose an MLflow tracking URI")
 
-    mlflow.set_tracking_uri(tracking_uri)
-    if experiment_name:
-        mlflow.set_experiment(experiment_name)
+    try:
+        mlflow.set_tracking_uri(tracking_uri)
+        if experiment_name:
+            mlflow.set_experiment(experiment_name)
+    except Exception as exc:
+        raise AzureConfigError(f"Failed to configure MLflow tracking: {exc}") from exc
 
     storage_context = _build_storage_context(credential)
 

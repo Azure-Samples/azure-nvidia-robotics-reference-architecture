@@ -292,6 +292,6 @@ def main(argv: Sequence[str] | None = None) -> None:
 if __name__ == "__main__":
     try:
         main(sys.argv[1:])
-    except Exception:  # pragma: no cover - ensures non-zero exit when unexpected errors occur
+    except Exception as exc:
         _LOGGER.exception("Azure connectivity smoke test failed")
-        raise SystemExit(1)
+        raise SystemExit(1) from exc
