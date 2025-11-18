@@ -1,0 +1,80 @@
+{
+    "aks_a10": {
+        "spec": {
+            "tolerations": [
+                {
+                    "key": "kubernetes.azure.com/scalesetpriority",
+                    "value": "spot",
+                    "effect": "NoSchedule",
+                    "operator": "Equal"
+                },
+                {
+                    "key": "nvidia.com/gpu",
+                    "effect": "NoSchedule",
+                    "operator": "Exists"
+                }
+            ],
+            "nodeSelector": {
+                "node.kubernetes.io/instance-type": "Standard_NV36ads_A10_v5"
+            }
+        }
+    },
+    "workload_identity": {
+        "metadata": {
+            "labels": {
+                "azure.workload.identity/use": "true"
+            }
+        }
+    },
+    "default_amd64": {
+        "spec": {
+            "nodeSelector": {
+                "kubernetes.io/arch": "amd64"
+            }
+        }
+    },
+    "default_ctrl": {
+        "spec": {
+            "containers": [
+                {
+                    "name": "osmo-ctrl",
+                    "resources": {
+                        "limits": {
+                            "cpu": "{{USER_CPU}}",
+                            "memory": "{{USER_MEMORY}}",
+                            "ephemeral-storage": "{{USER_STORAGE}}"
+                        },
+                        "requests": {
+                            "cpu": "{% if USER_CPU > 2 %}2{% else %}{{USER_CPU}}{% endif %}",
+                            "memory": "1Gi",
+                            "ephemeral-storage": "4Gi"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "default_user": {
+        "spec": {
+            "containers": [
+                {
+                    "name": "{{USER_CONTAINER_NAME}}",
+                    "resources": {
+                        "limits": {
+                            "cpu": "{{USER_CPU}}",
+                            "memory": "{{USER_MEMORY}}",
+                            "nvidia.com/gpu": "{{USER_GPU}}",
+                            "ephemeral-storage": "{{USER_STORAGE}}"
+                        },
+                        "requests": {
+                            "cpu": "{{USER_CPU}}",
+                            "memory": "{{USER_MEMORY}}",
+                            "nvidia.com/gpu": "{{USER_GPU}}",
+                            "ephemeral-storage": "{{USER_STORAGE}}"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
