@@ -170,10 +170,12 @@ except ImportError:
 # Import Azure utilities
 try:
     from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
+    from training.utils.metrics import SystemMetricsCollector
 except ImportError:
     AzureConfigError = None
     AzureMLContext = None
     bootstrap_azure_ml = None
+    SystemMetricsCollector = None
     print("[WARNING] Azure utilities not available. Training will proceed without Azure integration.")
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -384,8 +386,36 @@ def _register_final_model(
         return False
 
 
-def _create_enhanced_log(original_log, mlflow_module: Optional[Any], mlflow_run_active: bool, runner: Any):
-    """Create wrapped log function that streams metrics to MLflow."""
+def _create_enhanced_log(
+    original_log,
+    mlflow_module: Optional[Any],
+    mlflow_run_active: bool,
+    runner: Any,
+    collect_system_metrics: bool = True,
+):
+    """Create wrapped log function that streams metrics to MLflow.
+
+    Args:
+        original_log: Original runner.log method to wrap.
+        mlflow_module: MLflow module for logging metrics.
+        mlflow_run_active: Whether MLflow run is currently active.
+        runner: RSL-RL runner instance.
+        collect_system_metrics: Enable system resource metrics collection (default: True).
+    """
+    system_metrics_collector = None
+    if collect_system_metrics and SystemMetricsCollector is not None:
+        try:
+            system_metrics_collector = SystemMetricsCollector(
+                collect_gpu=True,
+                collect_disk=True,
+            )
+            print("[INFO] System metrics collection enabled (CPU, GPU, Memory, Disk)")
+            if system_metrics_collector._gpu_available:
+                print(f"[INFO] GPU metrics enabled for {len(system_metrics_collector._gpu_handles)} device(s)")
+            else:
+                print("[WARNING] GPU metrics unavailable - only CPU/Memory/Disk will be logged")
+        except Exception as exc:
+            print(f"[WARNING] Failed to initialize system metrics collector: {exc}")
 
     def enhanced_log(locs, *args, **kwargs):
         result = original_log(locs, *args, **kwargs)
@@ -440,8 +470,17 @@ def _create_enhanced_log(original_log, mlflow_module: Optional[Any], mlflow_run_
                                 metric_name = f"episode_{key}"
                             metrics_batch[metric_name] = value.item()
 
-                if metrics_batch:
-                    mlflow_module.log_metrics(metrics_batch, step=current_iter, synchronous=False)
+                system_metrics = {}
+                if system_metrics_collector is not None:
+                    try:
+                        system_metrics = system_metrics_collector.collect_metrics()
+                    except Exception as exc:
+                        print(f"[WARNING] Failed to collect system metrics: {exc}")
+
+                all_metrics = {**metrics_batch, **system_metrics}
+
+                if all_metrics:
+                    mlflow_module.log_metrics(all_metrics, step=current_iter, synchronous=False)
             except Exception as exc:
                 print(f"[WARNING] Failed to log metrics to MLflow: {exc}")
 

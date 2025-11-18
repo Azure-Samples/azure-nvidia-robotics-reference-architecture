@@ -174,9 +174,9 @@ class SystemMetricsCollector:
             device_count = pynvml.nvmlDeviceGetCount()
             self._gpu_handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(device_count)]
             self._gpu_available = True
-            _LOGGER.debug("GPU metrics collection initialized (%d devices)", device_count)
+            _LOGGER.info("GPU metrics collection initialized (%d devices)", device_count)
         except Exception as exc:
-            _LOGGER.debug("GPU metrics unavailable: %s", exc)
+            _LOGGER.warning("GPU metrics unavailable (will only log CPU/memory/disk): %s", exc)
             self._gpu_available = False
 
     def collect_metrics(self) -> dict[str, float]:
