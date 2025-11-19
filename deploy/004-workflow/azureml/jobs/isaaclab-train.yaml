@@ -27,42 +27,27 @@ inputs:
   checkpoint_mode:
     type: literal
     value: from-scratch
-  register_checkpoint:
-    type: literal
-    value: ""
-  run_azure_smoke_test:
-    type: literal
-    value: "0"
   headless_flag:
     type: literal
     value: "--headless"
   subscription_id:
-    type: literal
-    value: ""
+    type: string
   resource_group:
-    type: literal
-    value: ""
+    type: string
   workspace_name:
-    type: literal
-    value: ""
-  client_id:
-    type: literal
-    value: ""
-  tenant_id:
-    type: literal
-    value: ""
-  authority_host:
-    type: literal
-    value: https://login.microsoftonline.com
-  federated_token_file:
-    type: literal
-    value: /var/run/secrets/azure/tokens/azure-identity-token
+    type: string
+  register_checkpoint:
+    type: string
+    optional: true
+  run_azure_smoke_test:
+    type: boolean
+    default: false
   mlflow_token_refresh_retries:
-    type: literal
-    value: "3"
+    type: integer
+    default: 3
   mlflow_http_request_timeout:
-    type: literal
-    value: "60"
+    type: integer
+    default: 60
 command: >-
   bash src/training/scripts/train.sh
   --mode ${{inputs.mode}}
@@ -74,17 +59,13 @@ command: >-
   {{if inputs.register_checkpoint}} --register-checkpoint ${{inputs.register_checkpoint}} {{endif}}
   ${{inputs.headless_flag}}
 environment_variables:
+  TRAINING_CHECKPOINT_OUTPUT: ${{outputs.checkpoints}}
   AZURE_SUBSCRIPTION_ID: ${{inputs.subscription_id}}
   AZURE_RESOURCE_GROUP: ${{inputs.resource_group}}
   AZUREML_WORKSPACE_NAME: ${{inputs.workspace_name}}
-  AZURE_CLIENT_ID: ${{inputs.client_id}}
-  AZURE_TENANT_ID: ${{inputs.tenant_id}}
-  AZURE_AUTHORITY_HOST: ${{inputs.authority_host}}
-  AZURE_FEDERATED_TOKEN_FILE: ${{inputs.federated_token_file}}
   RUN_AZURE_SMOKE_TEST: ${{inputs.run_azure_smoke_test}}
   MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES: ${{inputs.mlflow_token_refresh_retries}}
   MLFLOW_HTTP_REQUEST_TIMEOUT: ${{inputs.mlflow_http_request_timeout}}
-  TRAINING_CHECKPOINT_OUTPUT: ${{outputs.checkpoints}}
 outputs:
   checkpoints:
     type: uri_folder

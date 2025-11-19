@@ -36,10 +36,6 @@ Azure context overrides:
       --subscription-id ID      Azure subscription ID for job inputs (default: $AZURE_SUBSCRIPTION_ID)
       --resource-group NAME     Azure resource group for job inputs (default: $AZURE_RESOURCE_GROUP)
       --workspace-name NAME     Azure ML workspace for job inputs (default: $AZUREML_WORKSPACE_NAME)
-      --tenant-id ID            Azure tenant ID (default: $AZURE_TENANT_ID)
-      --client-id ID            Azure client ID for user-assigned identity (default: $AZURE_CLIENT_ID)
-      --authority-host URL      Azure authority host (default: https://login.microsoftonline.com)
-      --federated-token-file P  Path to federated token file (default: /var/run/secrets/azure/tokens/azure-identity-token)
       --mlflow-token-retries N  MLflow token refresh retries (default: env or 3)
       --mlflow-http-timeout N   MLflow HTTP timeout seconds (default: env or 60)
       --experiment-name NAME    Azure ML experiment name override
@@ -130,17 +126,17 @@ ensure_value() {
 normalize_boolean_flag() {
   local value="$1"
   if [[ -z "$value" ]]; then
-    printf '0\n'
+    printf 'false\n'
     return
   fi
   local lowered
   lowered=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
   case "$lowered" in
     1|true|yes|on)
-      printf '1\n'
+      printf 'true\n'
       ;;
     0|false|no|off)
-      printf '0\n'
+      printf 'false\n'
       ;;
     *)
       fail "Unsupported boolean flag value: $value"
@@ -177,8 +173,17 @@ prepare_training_payload() {
     fail "Training source not found: $source"
   fi
   rm -rf "$destination"
-  mkdir -p "$destination"
-  rsync -a --delete "$source/" "$destination/"
+  mkdir -p "$destination/src"
+  rsync -a --delete "$source/" "$destination/src/training/"
+}
+
+create_payload_archive() {
+  local source_dir="$1"
+  local archive_path="$2"
+  rm -f "$archive_path"
+  pushd "$source_dir" >/dev/null
+  zip -qr "$archive_path" .
+  popd >/dev/null
 }
 
 register_code_asset() {
@@ -242,10 +247,6 @@ main() {
   local subscription_id="${AZURE_SUBSCRIPTION_ID:-}"
   local resource_group="${AZURE_RESOURCE_GROUP:-}"
   local workspace_name="${AZUREML_WORKSPACE_NAME:-}"
-  local tenant_id="${AZURE_TENANT_ID:-}"
-  local client_id="${AZURE_CLIENT_ID:-}"
-  local authority_host="${AZURE_AUTHORITY_HOST:-https://login.microsoftonline.com}"
-  local federated_token_file="${AZURE_FEDERATED_TOKEN_FILE:-/var/run/secrets/azure/tokens/azure-identity-token}"
   local mlflow_token_retries="${MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES:-3}"
   local mlflow_http_timeout="${MLFLOW_HTTP_REQUEST_TIMEOUT:-60}"
 
@@ -342,22 +343,6 @@ main() {
         workspace_name="$2"
         shift 2
         ;;
-      --tenant-id)
-        tenant_id="$2"
-        shift 2
-        ;;
-      --client-id)
-        client_id="$2"
-        shift 2
-        ;;
-      --authority-host)
-        authority_host="$2"
-        shift 2
-        ;;
-      --federated-token-file)
-        federated_token_file="$2"
-        shift 2
-        ;;
       --mlflow-token-retries)
         mlflow_token_retries="$2"
         shift 2
@@ -407,6 +392,7 @@ main() {
 
   require_command az
   require_command rsync
+  require_command zip
   ensure_ml_extension
 
   ensure_value AZURE_SUBSCRIPTION_ID "$subscription_id"
@@ -418,14 +404,18 @@ main() {
 
   local training_src="$repo_root/src/training"
   local code_payload="$staging_dir/code"
+  local code_archive="$staging_dir/code.zip"
   local env_file="$staging_dir/environment.yaml"
   mkdir -p "$staging_dir"
 
   log "Packaging training payload from $training_src"
   prepare_training_payload "$training_src" "$code_payload"
 
+  log "Archiving training payload to $code_archive"
+  create_payload_archive "$code_payload" "$code_archive"
+
   log "Registering AzureML assets"
-  register_code_asset "$code_name" "$code_version" "$code_payload"
+  register_code_asset "$code_name" "$code_version" "$code_archive"
   register_environment "$environment_name" "$environment_version" "$image" "$env_file"
 
   log "Code asset: ${code_name}:${code_version}"
@@ -441,7 +431,7 @@ main() {
     fail "Job file not found: $job_file"
   fi
 
-  if [[ "$run_smoke_test_value" == "1" ]]; then
+  if [[ "$run_smoke_test_value" == "true" ]]; then
     run_local_smoke_test "$repo_root"
   fi
 
@@ -495,10 +485,6 @@ main() {
   az_args+=(--set "inputs.subscription_id.value=$subscription_id")
   az_args+=(--set "inputs.resource_group.value=$resource_group")
   az_args+=(--set "inputs.workspace_name.value=$workspace_name")
-  az_args+=(--set "inputs.client_id.value=$client_id")
-  az_args+=(--set "inputs.tenant_id.value=$tenant_id")
-  az_args+=(--set "inputs.authority_host.value=$authority_host")
-  az_args+=(--set "inputs.federated_token_file.value=$federated_token_file")
   az_args+=(--set "inputs.mlflow_token_refresh_retries.value=$mlflow_token_retries")
   az_args+=(--set "inputs.mlflow_http_request_timeout.value=$mlflow_http_timeout")
 
