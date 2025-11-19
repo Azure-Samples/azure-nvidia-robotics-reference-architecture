@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 usage() {
   cat <<'EOF'
 Usage: submit-azureml-training.sh [options] [-- az-ml-job-flags]
@@ -15,7 +17,7 @@ AzureML asset options:
   --environment-name NAME       AzureML environment name (default: isaaclab-training-env)
   --environment-version VER     Environment version (default: 2.2.0)
   --image IMAGE                 Container image reference (default: nvcr.io/nvidia/isaac-lab:2.2.0)
-  --staging-dir PATH            Directory for intermediate packaging (default: deploy/004-workflow/azureml/.tmp)
+  --staging-dir PATH            Directory for intermediate packaging (default: deploy/004-workflow/azureml/scripts/.tmp)
   --assets-only                 Prepare assets without submitting the job.
 
 Workflow parity options:
@@ -177,14 +179,6 @@ prepare_training_payload() {
   rsync -a --delete "$source/" "$destination/src/training/"
 }
 
-create_payload_archive() {
-  local source_dir="$1"
-  local archive_path="$2"
-  rm -f "$archive_path"
-  pushd "$source_dir" >/dev/null
-  zip -qr "$archive_path" .
-  popd >/dev/null
-}
 
 register_code_asset() {
   local name="$1"
@@ -230,7 +224,7 @@ main() {
   local environment_name="isaaclab-training-env"
   local environment_version="2.2.0"
   local image="nvcr.io/nvidia/isaac-lab:2.2.0"
-  local staging_dir="$repo_root/deploy/004-workflow/azureml/.tmp"
+  local staging_dir="${STAGING_DIR:-$SCRIPT_DIR/.tmp}"
   local assets_only=0
 
   local job_file="$repo_root/deploy/004-workflow/azureml/jobs/isaaclab-train.yaml"
@@ -392,7 +386,6 @@ main() {
 
   require_command az
   require_command rsync
-  require_command zip
   ensure_ml_extension
 
   ensure_value AZURE_SUBSCRIPTION_ID "$subscription_id"
@@ -404,18 +397,14 @@ main() {
 
   local training_src="$repo_root/src/training"
   local code_payload="$staging_dir/code"
-  local code_archive="$staging_dir/code.zip"
   local env_file="$staging_dir/environment.yaml"
   mkdir -p "$staging_dir"
 
   log "Packaging training payload from $training_src"
   prepare_training_payload "$training_src" "$code_payload"
 
-  log "Archiving training payload to $code_archive"
-  create_payload_archive "$code_payload" "$code_archive"
-
   log "Registering AzureML assets"
-  register_code_asset "$code_name" "$code_version" "$code_archive"
+  register_code_asset "$code_name" "$code_version" "$code_payload"
   register_environment "$environment_name" "$environment_version" "$image" "$env_file"
 
   log "Code asset: ${code_name}:${code_version}"

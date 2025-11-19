@@ -50,7 +50,11 @@ inputs:
     default: 60
 command: >-
   bash src/training/scripts/train.sh
+  {{if inputs.run_azure_smoke_test}}
+  --mode smoke-test
+  {{else}}
   --mode ${{inputs.mode}}
+  {{endif}}
   {{if inputs.task}} --task ${{inputs.task}} {{endif}}
   {{if inputs.num_envs}} --num_envs ${{inputs.num_envs}} {{endif}}
   {{if inputs.max_iterations}} --max_iterations ${{inputs.max_iterations}} {{endif}}

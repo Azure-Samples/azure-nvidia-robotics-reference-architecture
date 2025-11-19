@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import random
+import shutil
 import sys
 import time
 from datetime import datetime
@@ -108,6 +110,23 @@ def _build_parser(app_launcher_cls: Any) -> argparse.ArgumentParser:
     )
     app_launcher_cls.add_app_launcher_args(parser)
     return parser
+
+
+def _sync_checkpoint_output(checkpoint_dir: Path) -> None:
+    """Copy checkpoints into AzureML outputs when TRAINING_CHECKPOINT_OUTPUT is set."""
+
+    target = os.environ.get("TRAINING_CHECKPOINT_OUTPUT")
+    if not target or not checkpoint_dir.exists():
+        return
+
+    destination = Path(target)
+    try:
+        if destination.exists():
+            shutil.rmtree(destination)
+        shutil.copytree(checkpoint_dir, destination, dirs_exist_ok=True)
+        _LOGGER.info("Copied checkpoints to %s", destination)
+    except Exception as exc:
+        _LOGGER.warning("Failed to copy checkpoints to %s: %s", destination, exc)
 
 
 def _get_agent_config_entry_point(cli_args: argparse.Namespace) -> str:
@@ -208,6 +227,7 @@ def _log_artifacts(mlflow: Any, log_dir: Path, resume_path: str | None) -> str |
             mlflow.set_tag("checkpoint_log_token", token)
             _LOGGER.info("Latest checkpoint: %s", latest_uri)
             print(token)
+        _sync_checkpoint_output(checkpoint_dir)
     videos_dir = log_dir / "videos"
     if videos_dir.exists():
         mlflow.log_artifacts(str(videos_dir), artifact_path="videos")
