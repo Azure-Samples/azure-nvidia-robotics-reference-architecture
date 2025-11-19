@@ -1,4 +1,12 @@
 {
+  "name": "default",
+  "k8s_namespace": "osmo-workflows",
+  "router_address": "wss://osmo-service.osmo-control-plane.svc.cluster.local:80",
+  "node_conditions": {
+    "prefix": "",
+    "ignore_node_conditions": [],
+    "additional_node_conditions": []
+  },
   "scheduler_settings": {
     "scheduler_type": "kai",
     "scheduler_name": "kai-scheduler",
