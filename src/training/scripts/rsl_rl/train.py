@@ -709,7 +709,6 @@ def main(
 
         if mlflow_module and mlflow_run_active:
             mlflow_module.end_run()
-            mlflow_run_active = False
 
     # close the simulator
     env.close()
