@@ -5,10 +5,13 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import logging
+import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Iterator, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
@@ -56,18 +59,6 @@ def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, list[st
         default=None,
         help="MLflow artifact URI for the checkpoint to materialize before training",
     )
-    parser.add_argument(
-        "--checkpoint-mode",
-        type=_optional_str,
-        default="from-scratch",
-        help="Checkpoint handling mode (fresh is treated as from-scratch)",
-    )
-    parser.add_argument(
-        "--register-checkpoint",
-        type=_optional_str,
-        default=None,
-        help="Register the final checkpoint as this Azure ML model name",
-    )
     args, remaining = parser.parse_known_args(argv)
     return args, list(remaining)
 
@@ -84,24 +75,6 @@ def _ensure_dependencies() -> None:
             f"{packages}. Install the listed packages in the training image."
         )
         raise SystemExit(message)
-
-
-_CHECKPOINT_MODE_MAP = {
-    "fresh": "from-scratch",
-    "from-scratch": "from-scratch",
-    "warm-start": "warm-start",
-    "resume": "resume",
-}
-
-
-def _normalize_checkpoint_mode(value: str | None) -> str:
-    if not value:
-        return "from-scratch"
-    normalized = value.lower()
-    mode = _CHECKPOINT_MODE_MAP.get(normalized)
-    if mode is None:
-        raise SystemExit(f"Unsupported checkpoint mode: {value}")
-    return mode
 
 
 @contextmanager
@@ -143,17 +116,30 @@ def _initialize_mlflow_context(args: argparse.Namespace) -> tuple[AzureMLContext
 def _run_training(
     args: argparse.Namespace,
     hydra_args: Sequence[str],
-    context: AzureMLContext | None,
 ) -> None:
-    try:
-        from training.scripts.rsl_rl import train_refactored
-    except ImportError as exc:
-        raise SystemExit(
-            "training.scripts.rsl_rl.train_refactored module is unavailable. "
-            "Ensure training payload includes RSL-RL training code."
-        ) from exc
+    train_script = Path(__file__).parent / "rsl_rl" / "train.py"
+    if not train_script.exists():
+        raise SystemExit(f"Training script not found: {train_script}")
 
-    train_refactored.run_training(args=args, hydra_args=hydra_args, context=context)
+    cmd = [sys.executable, str(train_script)]
+
+    if args.task:
+        cmd.extend(["--task", args.task])
+    if args.num_envs is not None:
+        cmd.extend(["--num_envs", str(args.num_envs)])
+    if args.max_iterations is not None:
+        cmd.extend(["--max_iterations", str(args.max_iterations)])
+    if args.headless:
+        cmd.append("--headless")
+    if args.checkpoint:
+        cmd.extend(["--checkpoint", args.checkpoint])
+
+    cmd.extend(hydra_args)
+
+    _LOGGER.info("Executing training script: %s", " ".join(cmd))
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        raise SystemExit(f"Training script failed with exit code {result.returncode}")
 
 
 def _run_smoke_test() -> None:
@@ -163,19 +149,9 @@ def _run_smoke_test() -> None:
     smoke_test_azure.main([])
 
 
-def _mlflow_required_for_checkpoint_uri(args: argparse.Namespace) -> bool:
-    return args.disable_mlflow and args.checkpoint_uri
-
-
-def _mlflow_required_for_registration(args: argparse.Namespace) -> bool:
-    return args.disable_mlflow and args.register_checkpoint
-
-
 def _validate_mlflow_flags(args: argparse.Namespace) -> None:
-    if _mlflow_required_for_checkpoint_uri(args):
+    if args.disable_mlflow and args.checkpoint_uri:
         raise SystemExit("--checkpoint-uri requires MLflow integration; remove --disable-mlflow")
-    if _mlflow_required_for_registration(args):
-        raise SystemExit("--register-checkpoint requires MLflow integration; remove --disable-mlflow")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -193,7 +169,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         _run_smoke_test()
         return
 
-    args.checkpoint_mode = _normalize_checkpoint_mode(args.checkpoint_mode)
     _validate_mlflow_flags(args)
 
     try:
@@ -204,10 +179,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     with _materialized_checkpoint(args.checkpoint_uri) as checkpoint_path:
         if checkpoint_path:
             args.checkpoint = checkpoint_path
-            _LOGGER.info("Using checkpoint: mode=%s, path=%s", args.checkpoint_mode, checkpoint_path)
-        elif args.checkpoint_mode != "from-scratch":
-            _LOGGER.info("No checkpoint provided, mode=%s", args.checkpoint_mode)
-        _run_training(args=args, hydra_args=hydra_args, context=context)
+            _LOGGER.info("Using checkpoint from URI: %s", checkpoint_path)
+        _run_training(args=args, hydra_args=hydra_args)
 
 
 if __name__ == "__main__":

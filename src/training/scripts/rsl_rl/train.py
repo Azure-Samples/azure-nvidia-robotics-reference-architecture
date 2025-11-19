@@ -131,10 +131,8 @@ if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
     exit(1)
 
 import gymnasium as gym
-import os
 import statistics
 import torch
-from datetime import datetime
 from typing import Any, Optional
 
 import omni
@@ -169,7 +167,7 @@ except ImportError:
 
 # Import Azure utilities
 try:
-    from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
+    from training.utils import AzureConfigError, bootstrap_azure_ml
     from training.utils.metrics import SystemMetricsCollector
 except ImportError:
     AzureConfigError = None
@@ -199,62 +197,6 @@ def _resolve_env_count(env_cfg: object) -> Optional[int]:
     if scene is not None and hasattr(scene, "num_envs"):
         return scene.num_envs
     return getattr(env_cfg, "num_envs", None)
-
-
-def _collect_training_metrics(runner: object) -> dict[str, float]:
-    """Extract a small set of scalar metrics from the runner when available."""
-    metrics: dict[str, float] = {}
-
-    alg = getattr(runner, "alg", None)
-    storage = getattr(alg, "storage", None)
-    if storage is not None:
-        advantages = getattr(storage, "advantages", None)
-        if advantages is not None and hasattr(advantages, "mean"):
-            try:
-                metrics["mean_advantage"] = float(advantages.mean())
-            except Exception:
-                pass
-        values = getattr(storage, "values", None)
-        if values is not None and hasattr(values, "mean"):
-            try:
-                metrics["mean_value"] = float(values.mean())
-            except Exception:
-                pass
-
-    learning_rate = getattr(alg, "learning_rate", None)
-    if isinstance(learning_rate, (int, float)):
-        metrics["learning_rate"] = float(learning_rate)
-
-    rewbuffer = getattr(runner, "_rewbuffer", None)
-    if rewbuffer is not None and len(rewbuffer) > 0:
-        try:
-            metrics["mean_reward"] = float(statistics.mean(rewbuffer))
-        except Exception:
-            pass
-
-    lenbuffer = getattr(runner, "_lenbuffer", None)
-    if lenbuffer is not None and len(lenbuffer) > 0:
-        try:
-            metrics["mean_episode_length"] = float(statistics.mean(lenbuffer))
-        except Exception:
-            pass
-
-    if hasattr(alg, "rnd") and getattr(alg, "rnd", None):
-        erewbuffer = getattr(runner, "_erewbuffer", None)
-        if erewbuffer is not None and len(erewbuffer) > 0:
-            try:
-                metrics["mean_extrinsic_reward"] = float(statistics.mean(erewbuffer))
-            except Exception:
-                pass
-
-        irewbuffer = getattr(runner, "_irewbuffer", None)
-        if irewbuffer is not None and len(irewbuffer) > 0:
-            try:
-                metrics["mean_intrinsic_reward"] = float(statistics.mean(irewbuffer))
-            except Exception:
-                pass
-
-    return metrics
 
 
 def _start_mlflow_run(
@@ -547,12 +489,6 @@ def main(
     mlflow_module: Optional[Any] = None
     mlflow_run_active = False
 
-    if azure_enabled and bootstrap_azure_ml is not None:
-        try:
-            pass
-        except Exception as exc:
-            print(f"[INFO] Azure integration will be initialized after experiment name is determined")
-
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     agent_cfg.max_iterations = (
@@ -573,9 +509,13 @@ def main(
     if azure_enabled and bootstrap_azure_ml is not None:
         try:
             azure_context = bootstrap_azure_ml(experiment_name=agent_cfg.experiment_name)
-            print(f"[INFO] Azure ML workspace connected: {azure_context.workspace_name}")
-            if azure_context.storage:
-                print(f"[INFO] Azure Storage enabled for checkpoint uploads")
+            if azure_context is None:
+                print("[WARNING] Azure ML bootstrap returned None - missing or invalid configuration.")
+                print("[INFO] Training will proceed without Azure integration.")
+            else:
+                print(f"[INFO] Azure ML workspace connected: {azure_context.workspace_name}")
+                if azure_context.storage:
+                    print(f"[INFO] Azure Storage enabled for checkpoint uploads")
         except Exception as exc:
             if AzureConfigError and isinstance(exc, AzureConfigError):
                 print(f"[WARNING] Azure ML bootstrap failed: {exc}")
