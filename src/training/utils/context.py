@@ -134,6 +134,7 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
         try:
             container_client.create_container()
         except ResourceExistsError:
+            # Container already exists; safe to ignore.
             pass
         return AzureStorageContext(blob_client=blob_client, container_name=container_name)
     except AzureError as exc:

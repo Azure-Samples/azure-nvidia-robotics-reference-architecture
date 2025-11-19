@@ -433,6 +433,9 @@ terraform.rc
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
+# Visual Tudio Code Workspace Settings
+*.code-workspace
+
 # Local History for Visual Studio Code
 .history/
 

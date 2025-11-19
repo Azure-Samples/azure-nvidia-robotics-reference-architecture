@@ -42,7 +42,7 @@ def _check_identity_env_var(env_var: str, info_key: str, identity_info: dict[str
 
 def _validate_workload_identity() -> dict[str, str]:
     """Validate workload identity environment variables are present."""
-    identity_info = {}
+    identity_info: dict[str, str] = {}
 
     azure_client_id = os.environ.get("AZURE_CLIENT_ID")
     azure_tenant_id = os.environ.get("AZURE_TENANT_ID")
@@ -72,7 +72,6 @@ def _validate_workload_identity() -> dict[str, str]:
     else:
         _LOGGER.warning("AZURE_FEDERATED_TOKEN_FILE not set")
 
-    identity_info: dict[str, str] = {}
     for env_var, info_key in _IDENTITY_ENV_VARS.items():
         _check_identity_env_var(env_var, info_key, identity_info)
     return identity_info
@@ -134,11 +133,8 @@ def _test_storage_upload(storage: AzureStorageContext) -> None:
         try:
             os.remove(checkpoint_path)
         except FileNotFoundError:
+            # File may have already been deleted or not created; safe to ignore
             pass
-
-
-def _parse_tags(values: Sequence[str]) -> Dict[str, str]:
-    tags: Dict[str, str] = {}
 
 
 def _parse_single_tag(raw: str) -> tuple[str, str]:

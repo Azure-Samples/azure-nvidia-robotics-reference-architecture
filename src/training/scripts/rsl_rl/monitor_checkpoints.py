@@ -11,9 +11,7 @@ from isaaclab.app import AppLauncher
 import cli_args  # isort: skip
 
 # add argparse arguments
-parser = argparse.ArgumentParser(
-    description="Monitor checkpoints and evaluate new policies with RSL-RL."
-)
+parser = argparse.ArgumentParser(description="Monitor checkpoints and evaluate new policies with RSL-RL.")
 parser.add_argument(
     "--checkpoint_dir",
     type=str,
@@ -50,9 +48,7 @@ parser.add_argument(
     default=False,
     help="Disable fabric and use USD I/O operations.",
 )
-parser.add_argument(
-    "--num_envs", type=int, default=1, help="Number of environments to simulate."
-)
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
     "--agent",
@@ -60,9 +56,7 @@ parser.add_argument(
     default="rsl_rl_cfg_entry_point",
     help="Name of the RL agent configuration entry point.",
 )
-parser.add_argument(
-    "--seed", type=int, default=42, help="Seed used for the environment"
-)
+parser.add_argument("--seed", type=int, default=42, help="Seed used for the environment")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -89,7 +83,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 from rsl_rl.runners import DistillationRunner, OnPolicyRunner
 
@@ -100,7 +94,6 @@ from isaaclab.envs import (
     ManagerBasedRLEnvCfg,
     multi_agent_to_single_agent,
 )
-from isaaclab.utils.dict import print_dict
 
 from isaaclab_rl.rsl_rl import (
     RslRlBaseRunnerCfg,
@@ -159,9 +152,7 @@ class CheckpointMonitor:
             self.env = multi_agent_to_single_agent(self.env)
 
         # wrap around environment for rsl-rl
-        self.env = RslRlVecEnvWrapper(
-            self.env, clip_actions=self.agent_cfg.clip_actions
-        )
+        self.env = RslRlVecEnvWrapper(self.env, clip_actions=self.agent_cfg.clip_actions)
 
     def _load_metrics_history(self) -> Dict:
         """Load existing metrics history from file."""
@@ -222,9 +213,7 @@ class CheckpointMonitor:
 
     def _evaluate_policy(self, policy, checkpoint_number: int) -> Dict:
         """Evaluate a policy and return metrics."""
-        print(
-            f"[INFO] Evaluating checkpoint {checkpoint_number} for {self.eval_episodes} episodes..."
-        )
+        print(f"[INFO] Evaluating checkpoint {checkpoint_number} for {self.eval_episodes} episodes...")
 
         episode_rewards = []
         episode_lengths = []
@@ -257,11 +246,7 @@ class CheckpointMonitor:
                         done = bool(terminated)
 
                     if isinstance(truncated, torch.Tensor):
-                        done = (
-                            done or bool(truncated[0])
-                            if truncated.numel() > 0
-                            else done
-                        )
+                        done = done or bool(truncated[0]) if truncated.numel() > 0 else done
                     else:
                         done = done or bool(truncated)
 
@@ -274,9 +259,7 @@ class CheckpointMonitor:
             episode_lengths.append(episode_length)
 
             if (episode + 1) % 5 == 0:
-                print(
-                    f"  Episode {episode + 1}/{self.eval_episodes} - Reward: {episode_reward:.2f}"
-                )
+                print(f"  Episode {episode + 1}/{self.eval_episodes} - Reward: {episode_reward:.2f}")
 
         # Calculate metrics
         metrics = {
@@ -303,15 +286,9 @@ class CheckpointMonitor:
         print("=" * 60)
         print(f"Timestamp: {metrics['timestamp']}")
         print(f"Episodes: {metrics['episodes_evaluated']}")
-        print(
-            f"Mean Reward: {metrics['mean_reward']:.3f} ± {metrics['std_reward']:.3f}"
-        )
-        print(
-            f"Reward Range: [{metrics['min_reward']:.3f}, {metrics['max_reward']:.3f}]"
-        )
-        print(
-            f"Mean Episode Length: {metrics['mean_episode_length']:.1f} ± {metrics['std_episode_length']:.1f}"
-        )
+        print(f"Mean Reward: {metrics['mean_reward']:.3f} ± {metrics['std_reward']:.3f}")
+        print(f"Reward Range: [{metrics['min_reward']:.3f}, {metrics['max_reward']:.3f}]")
+        print(f"Mean Episode Length: {metrics['mean_episode_length']:.1f} ± {metrics['std_episode_length']:.1f}")
         print(f"Success Rate: {metrics['success_rate']:.1%}")
         print("=" * 60 + "\n")
 
@@ -323,9 +300,7 @@ class CheckpointMonitor:
 
         # Find the most recent previous checkpoint
         previous_checkpoint = None
-        for checkpoint_num in sorted(
-            self.metrics_history.keys(), key=int, reverse=True
-        ):
+        for checkpoint_num in sorted(self.metrics_history.keys(), key=int, reverse=True):
             if int(checkpoint_num) < current_metrics["checkpoint_number"]:
                 previous_checkpoint = self.metrics_history[checkpoint_num]
                 break
@@ -341,18 +316,14 @@ class CheckpointMonitor:
         prev_reward = previous_checkpoint["mean_reward"]
         curr_reward = current_metrics["mean_reward"]
         reward_diff = curr_reward - prev_reward
-        reward_percent_change = (
-            (reward_diff / abs(prev_reward)) * 100 if prev_reward != 0 else 0
-        )
+        reward_percent_change = (reward_diff / abs(prev_reward)) * 100 if prev_reward != 0 else 0
 
         prev_success = previous_checkpoint["success_rate"]
         curr_success = current_metrics["success_rate"]
         success_diff = curr_success - prev_success
 
         print(f"Reward Change: {reward_diff:+.3f} ({reward_percent_change:+.1f}%)")
-        print(
-            f"Success Rate Change: {success_diff:+.3f} ({success_diff*100:+.1f} percentage points)"
-        )
+        print(f"Success Rate Change: {success_diff:+.3f} ({success_diff*100:+.1f} percentage points)")
 
         # Determine if improvement
         if reward_diff > 0 and success_diff >= 0:
@@ -379,9 +350,7 @@ class CheckpointMonitor:
             checkpoint_num = self._extract_checkpoint_number(checkpoint_path)
             self.processed_checkpoints.add(checkpoint_num)
 
-        print(
-            f"[INFO] Found {len(existing_checkpoints)} existing checkpoints: {sorted(self.processed_checkpoints)}"
-        )
+        print(f"[INFO] Found {len(existing_checkpoints)} existing checkpoints: {sorted(self.processed_checkpoints)}")
 
         try:
             while simulation_app.is_running():
@@ -392,9 +361,7 @@ class CheckpointMonitor:
                     checkpoint_num = self._extract_checkpoint_number(checkpoint_path)
 
                     if checkpoint_num not in self.processed_checkpoints:
-                        print(
-                            f"\n[INFO] New checkpoint detected: model_{checkpoint_num}.pt"
-                        )
+                        print(f"\n[INFO] New checkpoint detected: model_{checkpoint_num}.pt")
 
                         try:
                             # Load and evaluate the new policy
@@ -413,9 +380,7 @@ class CheckpointMonitor:
                             self.processed_checkpoints.add(checkpoint_num)
 
                         except Exception as e:
-                            print(
-                                f"[ERROR] Failed to evaluate checkpoint {checkpoint_num}: {e}"
-                            )
+                            print(f"[ERROR] Failed to evaluate checkpoint {checkpoint_num}: {e}")
                             continue
 
                 # Wait before next check
@@ -445,9 +410,7 @@ def main(
 
     # Set environment seed
     env_cfg.seed = agent_cfg.seed
-    env_cfg.sim.device = (
-        args_cli.device if args_cli.device is not None else env_cfg.sim.device
-    )
+    env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
     # Set log directory
     env_cfg.log_dir = args_cli.checkpoint_dir
