@@ -18,25 +18,12 @@ Options:
   -M, --checkpoint-mode MODE  Checkpoint mode (from-scratch, warm-start, resume, fresh).
   -r, --register-checkpoint NAME  Azure ML model name to register the final checkpoint under.
       --sleep-after-unpack VALUE  Provide a non-empty value to sleep post-unpack (ex. 7200 to sleep 2 hours).
-      --azure-client-id VALUE       Azure Client ID to inject into the workflow.
-      --azure-tenant-id VALUE       Azure Tenant ID to inject into the workflow.
-      --azure-subscription-id VALUE Azure subscription ID for the workspace.
-      --azure-resource-group VALUE  Azure resource group for the workspace.
-      --azure-workspace-name VALUE  Azure ML workspace name override.
-      --azure-authority-host VALUE  Azure authority host for the identity endpoint.
-      --azure-federated-token-file PATH  Path to the federated token file inside the pod.
-      --mlflow-token-refresh-retries COUNT  MLflow token refresh retry count.
-      --mlflow-http-request-timeout SECONDS MLflow HTTP timeout in seconds.
-      --python CMD                  Override python launcher prefix (applied to workflow template).
   -s, --run-smoke-test    Enable the Azure connectivity smoke test before training.
   -h, --help              Show this help message and exit.
 
 Environment overrides:
   TASK, NUM_ENVS, MAX_ITERATIONS, IMAGE, PAYLOAD_ROOT, RUN_AZURE_SMOKE_TEST
-  CHECKPOINT_URI, CHECKPOINT_MODE, REGISTER_CHECKPOINT, SLEEP_AFTER_UNPACK, TRAINING_BACKEND
-  AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP,
-  AZURE_WORKSPACE_NAME, AZURE_AUTHORITY_HOST, AZURE_FEDERATED_TOKEN_FILE,
-  MLFLOW_TOKEN_REFRESH_RETRIES, MLFLOW_HTTP_REQUEST_TIMEOUT, PYTHON_OVERRIDE
+  CHECKPOINT_URI, CHECKPOINT_MODE, REGISTER_CHECKPOINT, SLEEP_AFTER_UNPACK
 
 Additional arguments after -- are forwarded to osmo workflow submit.
 EOF
@@ -77,17 +64,6 @@ CHECKPOINT_URI_VALUE=${CHECKPOINT_URI:-}
 CHECKPOINT_MODE_VALUE=${CHECKPOINT_MODE:-from-scratch}
 REGISTER_CHECKPOINT_VALUE=${REGISTER_CHECKPOINT:-}
 SLEEP_AFTER_UNPACK_VALUE=${SLEEP_AFTER_UNPACK:-}
-TRAINING_BACKEND_VALUE=${TRAINING_BACKEND:-skrl}
-AZURE_CLIENT_ID_VALUE=${AZURE_CLIENT_ID:-}
-AZURE_TENANT_ID_VALUE=${AZURE_TENANT_ID:-}
-AZURE_SUBSCRIPTION_ID_VALUE=${AZURE_SUBSCRIPTION_ID:-}
-AZURE_RESOURCE_GROUP_VALUE=${AZURE_RESOURCE_GROUP:-}
-AZURE_WORKSPACE_NAME_VALUE=${AZURE_WORKSPACE_NAME:-}
-AZURE_AUTHORITY_HOST_VALUE=${AZURE_AUTHORITY_HOST:-https://login.microsoftonline.com}
-AZURE_FEDERATED_TOKEN_FILE_VALUE=${AZURE_FEDERATED_TOKEN_FILE:-/var/run/secrets/azure/tokens/azure-identity-token}
-MLFLOW_TOKEN_REFRESH_RETRIES_VALUE=${MLFLOW_TOKEN_REFRESH_RETRIES:-3}
-MLFLOW_HTTP_REQUEST_TIMEOUT_VALUE=${MLFLOW_HTTP_REQUEST_TIMEOUT:-60}
-PYTHON_VALUE=${PYTHON_OVERRIDE:-${PYTHON:-}}
 
 normalize_checkpoint_mode() {
   local mode="$1"
@@ -158,50 +134,6 @@ while [[ $# -gt 0 ]]; do
       SLEEP_AFTER_UNPACK_VALUE="$2"
       shift 2
       ;;
-    -B|--training-backend)
-      TRAINING_BACKEND_VALUE="$2"
-      shift 2
-      ;;
-    --azure-client-id)
-      AZURE_CLIENT_ID_VALUE="$2"
-      shift 2
-      ;;
-    --azure-tenant-id)
-      AZURE_TENANT_ID_VALUE="$2"
-      shift 2
-      ;;
-    --azure-subscription-id)
-      AZURE_SUBSCRIPTION_ID_VALUE="$2"
-      shift 2
-      ;;
-    --azure-resource-group)
-      AZURE_RESOURCE_GROUP_VALUE="$2"
-      shift 2
-      ;;
-    --azure-workspace-name)
-      AZURE_WORKSPACE_NAME_VALUE="$2"
-      shift 2
-      ;;
-    --azure-authority-host)
-      AZURE_AUTHORITY_HOST_VALUE="$2"
-      shift 2
-      ;;
-    --azure-federated-token-file)
-      AZURE_FEDERATED_TOKEN_FILE_VALUE="$2"
-      shift 2
-      ;;
-    --mlflow-token-refresh-retries)
-      MLFLOW_TOKEN_REFRESH_RETRIES_VALUE="$2"
-      shift 2
-      ;;
-    --mlflow-http-request-timeout)
-      MLFLOW_HTTP_REQUEST_TIMEOUT_VALUE="$2"
-      shift 2
-      ;;
-    --python)
-      PYTHON_VALUE="$2"
-      shift 2
-      ;;
     -h|--help)
       usage
       exit 0
@@ -261,8 +193,7 @@ ENCODED_PAYLOAD=$(cat "$B64_PATH")
 
 submit_args=(
   workflow submit "$WORKFLOW_TEMPLATE"
-  --set-string
-  "image=$IMAGE_VALUE"
+  --set-string "image=$IMAGE_VALUE"
   "encoded_archive=$ENCODED_PAYLOAD"
   "task=$TASK_VALUE"
   "num_envs=$NUM_ENVS_VALUE"
@@ -272,21 +203,7 @@ submit_args=(
   "checkpoint_mode=$CHECKPOINT_MODE_VALUE"
   "register_checkpoint=$REGISTER_CHECKPOINT_VALUE"
   "sleep_after_unpack=$SLEEP_AFTER_UNPACK_VALUE"
-  "training_backend=$TRAINING_BACKEND_VALUE"
-  "azure_client_id=$AZURE_CLIENT_ID_VALUE"
-  "azure_tenant_id=$AZURE_TENANT_ID_VALUE"
-  "azure_subscription_id=$AZURE_SUBSCRIPTION_ID_VALUE"
-  "azure_resource_group=$AZURE_RESOURCE_GROUP_VALUE"
-  "azure_workspace_name=$AZURE_WORKSPACE_NAME_VALUE"
-  "azure_authority_host=$AZURE_AUTHORITY_HOST_VALUE"
-  "azure_federated_token_file=$AZURE_FEDERATED_TOKEN_FILE_VALUE"
-  "mlflow_token_refresh_retries=$MLFLOW_TOKEN_REFRESH_RETRIES_VALUE"
-  "mlflow_http_request_timeout=$MLFLOW_HTTP_REQUEST_TIMEOUT_VALUE"
 )
-
-if [[ -n "$PYTHON_VALUE" ]]; then
-  submit_args+=("python=$PYTHON_VALUE")
-fi
 
 if [[ -n "$MAX_ITERATIONS_VALUE" ]]; then
   submit_args+=("max_iterations=$MAX_ITERATIONS_VALUE")
@@ -305,3 +222,4 @@ if ! osmo "${submit_args[@]}"; then
 fi
 
 echo "Workflow submitted successfully"
+
