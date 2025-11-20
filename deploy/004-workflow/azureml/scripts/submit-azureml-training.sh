@@ -1,4 +1,20 @@
 #!/usr/bin/env bash
+#
+# Azure ML Training Job Submission Script
+#
+# This script packages training code, registers the container environment,
+# and submits an Azure ML command job using isaaclab-train.yaml as a template.
+#
+# Key responsibilities:
+# 1. Package src/training/ directory into a staging area
+# 2. Register the IsaacLab container image as an AzureML environment
+# 3. Build a complete training command with all specified parameters
+# 4. Override the YAML template with actual runtime values
+# 5. Submit the job to Azure ML
+#
+# The YAML template (isaaclab-train.yaml) provides structure only.
+# This script provides all actual values via --set flags.
+#
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -7,13 +23,11 @@ usage() {
   cat <<'EOF'
 Usage: submit-azureml-training.sh [options] [-- az-ml-job-flags]
 
-Packages src/training/ as an AzureML code asset, ensures the IsaacLab container
+Packages src/training/ into a staging folder, ensures the IsaacLab container
 image is registered as an environment, and submits the training command job with
 argument parity to the inline OSMO workflow.
 
 AzureML asset options:
-  --code-name NAME              AzureML code asset name (default: isaaclab-training-code)
-  --code-version VERSION        Code asset version (default: git SHA or UTC timestamp)
   --environment-name NAME       AzureML environment name (default: isaaclab-training-env)
   --environment-version VER     Environment version (default: 2.2.0)
   --image IMAGE                 Container image reference (default: nvcr.io/nvidia/isaac-lab:2.2.0)
@@ -42,6 +56,7 @@ Azure context overrides:
       --mlflow-http-timeout N   MLflow HTTP timeout seconds (default: env or 60)
       --experiment-name NAME    Azure ML experiment name override
       --compute TARGET          Compute target override for the job YAML
+      --instance-type NAME      Azure ML compute instance type for resources.instance_type
       --job-name NAME           Azure ML job name override
       --display-name NAME       Azure ML job display name override
       --stream                  Stream logs after job submission
@@ -77,16 +92,6 @@ resolve_repo_root() {
     fail "Run inside the repository working tree"
   fi
   printf '%s\n' "$root"
-}
-
-default_code_version() {
-  local sha
-  sha=$(git rev-parse --short HEAD 2>/dev/null || true)
-  if [[ -n "$sha" ]]; then
-    printf '%s\n' "$sha"
-    return
-  fi
-  date -u +%Y%m%d%H%M%S
 }
 
 ensure_ml_extension() {
@@ -179,48 +184,29 @@ prepare_training_payload() {
   rsync -a --delete "$source/" "$destination/src/training/"
 }
 
-
-register_code_asset() {
-  local name="$1"
-  local version="$2"
-  local path="$3"
-  local create_args=(az ml code create --name "$name" --version "$version" --path "$path")
-  if az ml code show --name "$name" --version "$version" >/dev/null 2>&1; then
-    log "Updating AzureML code asset ${name}:${version}"
-    az ml code update --name "$name" --version "$version" --path "$path" >/dev/null
-    return
-  fi
-  log "Creating AzureML code asset ${name}:${version}"
-  "${create_args[@]}" >/dev/null
-}
-
 register_environment() {
   local name="$1"
   local version="$2"
   local image="$3"
   local env_file="$4"
+  local resource_group="$5"
+  local workspace_name="$6"
   cat >"$env_file" <<EOF
 \$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
 name: $name
 version: $version
 image: $image
 EOF
-  if az ml environment show --name "$name" --version "$version" >/dev/null 2>&1; then
-    log "Updating AzureML environment ${name}:${version}"
-    az ml environment update --file "$env_file" >/dev/null
-    return
-  fi
-  log "Creating AzureML environment ${name}:${version}"
-  az ml environment create --file "$env_file" >/dev/null
+  log "Publishing AzureML environment ${name}:${version}"
+  az ml environment create --file "$env_file" \
+    --name "$name" --version "$version" \
+    --resource-group "$resource_group" --workspace-name "$workspace_name" >/dev/null
 }
 
 main() {
   local repo_root
   repo_root=$(resolve_repo_root)
 
-  local code_name="isaaclab-training-code"
-  local code_version
-  code_version="$(default_code_version)"
   local environment_name="isaaclab-training-env"
   local environment_version="2.2.0"
   local image="nvcr.io/nvidia/isaac-lab:2.2.0"
@@ -236,7 +222,7 @@ main() {
   local checkpoint_mode_value="${CHECKPOINT_MODE:-from-scratch}"
   local register_checkpoint_value="${REGISTER_CHECKPOINT:-}"
   local run_smoke_test_value="${RUN_AZURE_SMOKE_TEST:-0}"
-  local headless_flag="--headless"
+  local headless="true"
 
   local subscription_id="${AZURE_SUBSCRIPTION_ID:-}"
   local resource_group="${AZURE_RESOURCE_GROUP:-}"
@@ -246,6 +232,7 @@ main() {
 
   local experiment_override=""
   local compute_target=""
+  local instance_type=""
   local job_name_override=""
   local display_name_override=""
   local stream_logs=0
@@ -253,14 +240,6 @@ main() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --code-name)
-        code_name="$2"
-        shift 2
-        ;;
-      --code-version)
-        code_version="$2"
-        shift 2
-        ;;
       --environment-name)
         environment_name="$2"
         shift 2
@@ -314,11 +293,11 @@ main() {
         shift
         ;;
       --headless)
-        headless_flag="--headless"
+        headless="true"
         shift
         ;;
       --gui|--no-headless)
-        headless_flag=""
+        headless="false"
         shift
         ;;
       --mode)
@@ -351,6 +330,10 @@ main() {
         ;;
       --compute)
         compute_target="$2"
+        shift 2
+        ;;
+      --instance-type)
+        instance_type="$2"
         shift 2
         ;;
       --job-name)
@@ -388,12 +371,18 @@ main() {
   require_command rsync
   ensure_ml_extension
 
+  # Validate required Azure context is available
   ensure_value AZURE_SUBSCRIPTION_ID "$subscription_id"
   ensure_value AZURE_RESOURCE_GROUP "$resource_group"
   ensure_value AZUREML_WORKSPACE_NAME "$workspace_name"
 
+  # Normalize user-provided values
   checkpoint_mode_value="$(normalize_checkpoint_mode "$checkpoint_mode_value")"
   run_smoke_test_value="$(normalize_boolean_flag "$run_smoke_test_value")"
+
+  # ============================================================================
+  # Phase 1: Package training code and register environment
+  # ============================================================================
 
   local training_src="$repo_root/src/training"
   local code_payload="$staging_dir/code"
@@ -404,10 +393,10 @@ main() {
   prepare_training_payload "$training_src" "$code_payload"
 
   log "Registering AzureML assets"
-  register_code_asset "$code_name" "$code_version" "$code_payload"
-  register_environment "$environment_name" "$environment_version" "$image" "$env_file"
+  register_environment "$environment_name" "$environment_version" "$image" "$env_file" \
+    "$resource_group" "$workspace_name"
 
-  log "Code asset: ${code_name}:${code_version}"
+  log "Using local code path: $code_payload"
   log "Environment: ${environment_name}:${environment_version} ($image)"
   log "Reminder: ensure AKS namespace enforces azure.workload.identity/use labels and service account annotations."
 
@@ -415,6 +404,10 @@ main() {
     log "Assets prepared; skipping job submission per --assets-only"
     return 0
   fi
+
+  # ============================================================================
+  # Phase 2: Validate job template and run pre-submission checks
+  # ============================================================================
 
   if [[ ! -f "$job_file" ]]; then
     fail "Job file not found: $job_file"
@@ -424,11 +417,25 @@ main() {
     run_local_smoke_test "$repo_root"
   fi
 
-  local az_args=(az ml job create --file "$job_file" --query name -o tsv)
-  az_args+=(--set "code=azureml:${code_name}@${code_version}")
-  az_args+=(--set "environment=azureml:${environment_name}@${environment_version}")
+  # ============================================================================
+  # Phase 3: Build Azure ML job submission command
+  # ============================================================================
+
+# ============================================================================
+  # Phase 3: Build Azure ML job submission command
+  # ============================================================================
+
+  local az_args=(az ml job create --resource-group "$resource_group" --workspace-name "$workspace_name" --file "$job_file")
+
+  # Override core job configuration from template
+  az_args+=(--set "code=$code_payload")
+  az_args+=(--set "environment=azureml:${environment_name}:${environment_version}")
+
   if [[ -n "$compute_target" ]]; then
     az_args+=(--set "compute=$compute_target")
+  fi
+  if [[ -n "$instance_type" ]]; then
+    az_args+=(--set "resources.instance_type=$instance_type")
   fi
   if [[ -n "$experiment_override" ]]; then
     az_args+=(--set "experiment_name=$experiment_override")
@@ -440,49 +447,67 @@ main() {
     az_args+=(--set "display_name=$display_name_override")
   fi
 
-  az_args+=(--set "inputs.mode.value=$mode")
-  if [[ -n "$task_value" ]]; then
-    az_args+=(--set "inputs.task.value=$task_value")
-  else
-    az_args+=(--set "inputs.task.value=")
-  fi
-  if [[ -n "$num_envs_value" ]]; then
-    az_args+=(--set "inputs.num_envs.value=$num_envs_value")
-  fi
-  if [[ -n "$max_iterations_value" ]]; then
-    az_args+=(--set "inputs.max_iterations.value=$max_iterations_value")
-  else
-    az_args+=(--set "inputs.max_iterations.value=")
-  fi
-  if [[ -n "$checkpoint_uri_value" ]]; then
-    az_args+=(--set "inputs.checkpoint_uri.value=$checkpoint_uri_value")
-  else
-    az_args+=(--set "inputs.checkpoint_uri.value=")
-  fi
-  az_args+=(--set "inputs.checkpoint_mode.value=$checkpoint_mode_value")
-  if [[ -n "$register_checkpoint_value" ]]; then
-    az_args+=(--set "inputs.register_checkpoint.value=$register_checkpoint_value")
-  else
-    az_args+=(--set "inputs.register_checkpoint.value=")
-  fi
-  az_args+=(--set "inputs.run_azure_smoke_test.value=$run_smoke_test_value")
-  if [[ -n "$headless_flag" ]]; then
-    az_args+=(--set "inputs.headless_flag.value=$headless_flag")
-  else
-    az_args+=(--set "inputs.headless_flag.value=")
-  fi
-  az_args+=(--set "inputs.subscription_id.value=$subscription_id")
-  az_args+=(--set "inputs.resource_group.value=$resource_group")
-  az_args+=(--set "inputs.workspace_name.value=$workspace_name")
-  az_args+=(--set "inputs.mlflow_token_refresh_retries.value=$mlflow_token_retries")
-  az_args+=(--set "inputs.mlflow_http_request_timeout.value=$mlflow_http_timeout")
+  # Build the training command dynamically based on provided parameters
+  # The command uses ${{inputs.X}} notation to reference job inputs
+  local cmd_args="--mode \${{inputs.mode}} --checkpoint-mode \${{inputs.checkpoint_mode}}"
 
+  # Add optional training parameters (only if provided)
+  # Each parameter requires both the command argument AND the input value to be set
+  if [[ -n "$task_value" ]]; then
+    cmd_args="$cmd_args --task \${{inputs.task}}"
+    az_args+=(--set "inputs.task=$task_value")
+  fi
+
+  if [[ -n "$num_envs_value" ]]; then
+    cmd_args="$cmd_args --num_envs \${{inputs.num_envs}}"
+    az_args+=(--set "inputs.num_envs=$num_envs_value")
+  fi
+
+  if [[ -n "$max_iterations_value" ]]; then
+    cmd_args="$cmd_args --max_iterations \${{inputs.max_iterations}}"
+    az_args+=(--set "inputs.max_iterations=$max_iterations_value")
+  fi
+
+  if [[ -n "$checkpoint_uri_value" ]]; then
+    cmd_args="$cmd_args --checkpoint-uri \${{inputs.checkpoint_uri}}"
+    az_args+=(--set "inputs.checkpoint_uri=$checkpoint_uri_value")
+  fi
+
+  if [[ -n "$register_checkpoint_value" ]]; then
+    cmd_args="$cmd_args --register-checkpoint \${{inputs.register_checkpoint}}"
+    az_args+=(--set "inputs.register_checkpoint=$register_checkpoint_value")
+  fi
+
+  if [[ "$headless" == "true" ]]; then
+    cmd_args="$cmd_args --headless"
+  fi
+
+  # Override the command from the template with our constructed command
+  az_args+=(--set "command=bash src/training/scripts/train.sh $cmd_args")
+
+  # Set all required input values (these are always provided)
+  # These are referenced in environment_variables section of the YAML
+  az_args+=(--set "inputs.mode=$mode")
+  az_args+=(--set "inputs.checkpoint_mode=$checkpoint_mode_value")
+  az_args+=(--set "inputs.headless=$headless")
+  az_args+=(--set "inputs.subscription_id=$subscription_id")
+  az_args+=(--set "inputs.resource_group=$resource_group")
+  az_args+=(--set "inputs.workspace_name=$workspace_name")
+  az_args+=(--set "inputs.run_azure_smoke_test=$run_smoke_test_value")
+  az_args+=(--set "inputs.mlflow_token_refresh_retries=$mlflow_token_retries")
+  az_args+=(--set "inputs.mlflow_http_request_timeout=$mlflow_http_timeout")
+
+  # Add any additional az ml arguments passed through via --
   if [[ ${#forward_args[@]} -gt 0 ]]; then
     az_args+=("${forward_args[@]}")
   fi
-  if [[ $stream_logs -ne 0 ]]; then
-    az_args+=(--stream)
-  fi
+
+  # Request only the job name in the output for easier scripting
+  az_args+=(--query "name" -o "tsv")
+
+  # ============================================================================
+  # Phase 4: Submit the job and report results
+  # ============================================================================
 
   log "Submitting AzureML job with template $job_file"
   local job_name
@@ -492,6 +517,11 @@ main() {
 
   log "AzureML job submitted: $job_name"
   log "Download checkpoints via: az ml job download --name $job_name --output-name checkpoints"
+
+  if [[ $stream_logs -ne 0 ]]; then
+    log "Streaming logs for job $job_name..."
+    az ml job stream --name "$job_name" --resource-group "$resource_group" --workspace-name "$workspace_name"
+  fi
 }
 
 main "$@"
