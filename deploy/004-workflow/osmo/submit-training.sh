@@ -222,3 +222,4 @@ if ! osmo "${submit_args[@]}"; then
 fi
 
 echo "Workflow submitted successfully"
+
