@@ -1,0 +1,48 @@
+# NVIDIA GPU Operator Helm values for Azure AKS
+# Disables components already managed by AKS GPU node pools
+
+# Driver is managed by AKS GPU node pools
+driver:
+  enabled: false
+
+# Toolkit is managed by AKS
+toolkit:
+  enabled: false
+
+# Device plugin is managed by AKS GPU node pools
+devicePlugin:
+  enabled: false
+
+# Enable DCGM exporter for GPU metrics
+dcgmExporter:
+  enabled: true
+  serviceMonitor:
+    enabled: false  # Using PodMonitor instead
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+
+# Disable MIG (not used)
+mig:
+  strategy: single
+
+# GPU Feature Discovery
+gfd:
+  enabled: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+# Node labeller for GPU detection
+nodeStatusExporter:
+  enabled: true
+
+# Validator ensures everything is working
+validator:
+  enabled: true

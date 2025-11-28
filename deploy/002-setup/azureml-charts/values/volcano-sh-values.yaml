@@ -1,0 +1,51 @@
+# Volcano Scheduler for AzureML batch job scheduling
+# https://volcano.sh/
+
+# Basic configuration
+basic:
+  image_pull_policy: IfNotPresent
+
+# Scheduler configuration
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+
+# Controller manager
+controllers:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Admission controller
+admission:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Enable specific controllers
+custom:
+  enabled_admissions: "/jobs/mutate,/jobs/validate,/queues/mutate,/queues/validate,/podgroups/mutate,/podgroups/validate"
