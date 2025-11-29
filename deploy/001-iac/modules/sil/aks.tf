@@ -8,6 +8,9 @@
  * - Integration with NAT Gateway for outbound connectivity
  * - Workload identity and OIDC issuer enabled
  * - Data Collection Rule associations for observability
+ * - AcrPull role assignment for container registry access
+ *
+ * Note: Networking, observability, and ACR resources are provided by the platform module.
  */
 
 // ============================================================
@@ -38,8 +41,8 @@ resource "azurerm_kubernetes_cluster" "main" {
     auto_scaling_enabled        = var.aks_config.enable_auto_scaling
     min_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.min_count : null
     max_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.max_count : null
-    vnet_subnet_id              = azurerm_subnet.aks.id
-    pod_subnet_id               = azurerm_subnet.aks_pod.id
+    vnet_subnet_id              = var.subnets.aks.id
+    pod_subnet_id               = var.subnets.aks_pod.id
     os_disk_size_gb             = 128
     os_disk_type                = "Ephemeral"
     temporary_name_for_rotation = "systemtemp"
@@ -73,7 +76,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   }
 
   oms_agent {
-    log_analytics_workspace_id      = azurerm_log_analytics_workspace.main.id
+    log_analytics_workspace_id      = var.log_analytics_workspace.id
     msi_auth_for_monitoring_enabled = true
   }
 
@@ -86,10 +89,6 @@ resource "azurerm_kubernetes_cluster" "main" {
     secret_rotation_enabled  = true
     secret_rotation_interval = "2m"
   }
-
-  depends_on = [
-    azurerm_subnet_nat_gateway_association.aks,
-  ]
 }
 
 // ============================================================
@@ -101,7 +100,7 @@ resource "azurerm_subnet" "gpu_node_pool" {
 
   name                 = "snet-aks-${each.key}-${local.resource_name_suffix}"
   resource_group_name  = var.resource_group.name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = var.virtual_network.name
   address_prefixes     = each.value.subnet_address_prefixes
 }
 
@@ -110,7 +109,7 @@ resource "azurerm_subnet" "gpu_node_pool_pod" {
 
   name                 = "snet-aks-${each.key}-pod-${local.resource_name_suffix}"
   resource_group_name  = var.resource_group.name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = var.virtual_network.name
   address_prefixes     = each.value.pod_subnet_address_prefixes
 }
 
@@ -118,21 +117,21 @@ resource "azurerm_subnet_network_security_group_association" "gpu_node_pool" {
   for_each = var.node_pools
 
   subnet_id                 = azurerm_subnet.gpu_node_pool[each.key].id
-  network_security_group_id = azurerm_network_security_group.main.id
+  network_security_group_id = var.network_security_group.id
 }
 
 resource "azurerm_subnet_network_security_group_association" "gpu_node_pool_pod" {
   for_each = var.node_pools
 
   subnet_id                 = azurerm_subnet.gpu_node_pool_pod[each.key].id
-  network_security_group_id = azurerm_network_security_group.main.id
+  network_security_group_id = var.network_security_group.id
 }
 
 resource "azurerm_subnet_nat_gateway_association" "gpu_node_pool" {
   for_each = var.node_pools
 
   subnet_id      = azurerm_subnet.gpu_node_pool[each.key].id
-  nat_gateway_id = azurerm_nat_gateway.main.id
+  nat_gateway_id = var.nat_gateway.id
 }
 
 resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
@@ -176,14 +175,25 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
 resource "azurerm_monitor_data_collection_rule_association" "logs" {
   name                    = "dcra-logs-${local.resource_name_suffix}"
   target_resource_id      = azurerm_kubernetes_cluster.main.id
-  data_collection_rule_id = azurerm_monitor_data_collection_rule.logs.id
+  data_collection_rule_id = var.data_collection_rules.logs_id
 }
 
 // Associate Prometheus metrics DCR with AKS
 resource "azurerm_monitor_data_collection_rule_association" "metrics" {
   name                    = "dcra-metrics-${local.resource_name_suffix}"
   target_resource_id      = azurerm_kubernetes_cluster.main.id
-  data_collection_rule_id = azurerm_monitor_data_collection_rule.metrics.id
+  data_collection_rule_id = var.data_collection_rules.metrics_id
+}
+
+// ============================================================
+// AKS Role Assignments
+// ============================================================
+
+// Grant AKS kubelet identity AcrPull role
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  scope                = var.container_registry.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
 }
 
 // ============================================================
@@ -196,7 +206,7 @@ resource "azurerm_private_endpoint" "aks" {
   name                = "pe-aks-${local.resource_name_suffix}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  subnet_id           = azurerm_subnet.private_endpoints.id
+  subnet_id           = var.subnets.private_endpoints.id
   tags                = local.tags
 
   private_service_connection {
@@ -208,6 +218,6 @@ resource "azurerm_private_endpoint" "aks" {
 
   private_dns_zone_group {
     name                 = "pdz-aks-${local.resource_name_suffix}"
-    private_dns_zone_ids = [azurerm_private_dns_zone.core["aks"].id]
+    private_dns_zone_ids = [var.private_dns_zones["aks"].id]
   }
 }

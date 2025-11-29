@@ -1,82 +1,10 @@
 /*
- * Core Variables - Required
- */
-
-variable "environment" {
-  type        = string
-  description = "Environment for all resources in this module: dev, test, or prod"
-}
-
-variable "instance" {
-  type        = string
-  description = "Instance identifier for naming resources: 001, 002, etc"
-  default     = "001"
-}
-
-variable "location" {
-  type        = string
-  description = "Location for all resources in this module"
-}
-
-variable "resource_group" {
-  type = object({
-    id       = string
-    name     = string
-    location = string
-  })
-  description = "Resource group object containing name, id, and location"
-}
-
-variable "resource_prefix" {
-  type        = string
-  description = "Prefix for all resources in this module"
-}
-
-/*
- * Networking Variables
- */
-
-variable "virtual_network_config" {
-  type = object({
-    address_space                 = string
-    subnet_address_prefix_main    = string
-    subnet_address_prefix_pe      = string
-    subnet_address_prefix_aks     = string
-    subnet_address_prefix_aks_pod = string
-  })
-  description = "Virtual network address configuration including address space and subnet prefixes"
-  default = {
-    address_space                 = "10.0.0.0/16"
-    subnet_address_prefix_main    = "10.0.1.0/24"
-    subnet_address_prefix_pe      = "10.0.2.0/24"
-    subnet_address_prefix_aks     = "10.0.5.0/23"
-    subnet_address_prefix_aks_pod = "10.0.8.0/22"
-  }
-}
-
-/*
  * Private Endpoint Variables
  */
 
 variable "should_enable_private_endpoints" {
   type        = bool
-  description = "Whether to enable private endpoints for all services"
-  default     = true
-}
-
-variable "should_enable_public_network_access" {
-  type        = bool
-  description = "Whether to allow public network access (set to true for dev/test)"
-  default     = false
-}
-
-/*
- * Security Variables
- */
-
-variable "should_use_current_user_key_vault_admin" {
-  type        = bool
-  description = "Whether to grant current user Key Vault Secrets Officer role"
+  description = "Whether to enable private endpoints for AKS cluster"
   default     = true
 }
 
@@ -139,7 +67,7 @@ variable "node_pools" {
 }
 
 /*
- * AzureML Variables
+ * AzureML Extension Variables
  */
 
 variable "azureml_config" {
@@ -172,64 +100,4 @@ variable "azureml_config" {
     ]
     cluster_integration_instance_types = null
   }
-}
-
-/*
- * OSMO Variables - PostgreSQL
- */
-
-variable "should_deploy_postgresql" {
-  type        = bool
-  description = "Whether to deploy PostgreSQL for OSMO backend"
-  default     = false
-}
-
-variable "postgresql_config" {
-  type = object({
-    sku_name        = string
-    storage_mb      = number
-    version         = string
-    subnet_prefixes = list(string)
-    databases       = map(object({ collation = string, charset = string }))
-  })
-  description = "PostgreSQL configuration for OSMO including SKU, storage, and database definitions"
-  default = {
-    sku_name        = "GP_Standard_D2s_v3"
-    storage_mb      = 32768
-    version         = "16"
-    subnet_prefixes = ["10.0.30.0/24"]
-    databases       = { osmo = { collation = "en_US.utf8", charset = "utf8" } }
-  }
-}
-
-/*
- * OSMO Variables - Redis
- */
-
-variable "should_deploy_redis" {
-  type        = bool
-  description = "Whether to deploy Azure Managed Redis for OSMO"
-  default     = false
-}
-
-variable "redis_config" {
-  type = object({
-    sku_name          = string
-    clustering_policy = string
-  })
-  description = "Redis configuration for OSMO including SKU and clustering policy"
-  default = {
-    sku_name          = "Balanced_B10"
-    clustering_policy = "OSSCluster"
-  }
-}
-
-/*
- * Tags Variable
- */
-
-variable "tags" {
-  type        = map(string)
-  description = "Tags to apply to all resources"
-  default     = {}
 }
