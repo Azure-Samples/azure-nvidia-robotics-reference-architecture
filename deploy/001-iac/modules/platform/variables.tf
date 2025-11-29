@@ -91,3 +91,13 @@ variable "redis_config" {
     clustering_policy = "OSSCluster"
   }
 }
+
+/*
+ * Storage Variables
+ */
+
+variable "should_enable_storage_shared_access_key" {
+  type        = bool
+  description = "Whether to enable Shared Key (SAS token) authorization for the storage account. When false, all requests must use Azure AD authentication"
+  default     = false
+}

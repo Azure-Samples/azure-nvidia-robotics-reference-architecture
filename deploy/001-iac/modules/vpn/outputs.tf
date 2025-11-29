@@ -54,21 +54,21 @@ output "p2s_connection_info" {
 
 output "site_connections" {
   description = "Site-to-Site VPN connection details"
-  value = length(var.vpn_site_connections) > 0 ? {
+  value = try({
     for name, conn in azurerm_virtual_network_gateway_connection.sites : name => {
       id   = conn.id
       name = conn.name
     }
-  } : {}
+  }, {})
 }
 
 output "local_network_gateways" {
   description = "Local network gateway details for each site"
-  value = length(var.vpn_site_connections) > 0 ? {
+  value = try({
     for name, lgw in azurerm_local_network_gateway.sites : name => {
       id            = lgw.id
       name          = lgw.name
       address_space = lgw.address_space
     }
-  } : {}
+  }, {})
 }

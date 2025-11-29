@@ -24,10 +24,10 @@ output "subnets" {
       id   = azurerm_subnet.main.id
       name = azurerm_subnet.main.name
     }
-    private_endpoints = local.pe_enabled ? {
+    private_endpoints = try({
       id   = azurerm_subnet.private_endpoints[0].id
       name = azurerm_subnet.private_endpoints[0].name
-    } : null
+    }, null)
   }
 }
 
@@ -127,6 +127,15 @@ output "storage_account" {
   }
 }
 
+output "storage_account_access" {
+  description = "Storage account access credentials. Only populated when shared_access_key_enabled is true"
+  value = {
+    primary_blob_endpoint = azurerm_storage_account.main.primary_blob_endpoint
+    primary_access_key    = azurerm_storage_account.main.primary_access_key
+  }
+  sensitive = true
+}
+
 /*
  * AzureML Outputs
  */
@@ -156,12 +165,12 @@ output "ml_workload_identity" {
 
 output "private_dns_zones" {
   description = "Private DNS zones for private endpoints"
-  value = local.pe_enabled ? {
+  value = try({
     for key, zone in azurerm_private_dns_zone.core : key => {
       id   = zone.id
       name = zone.name
     }
-  } : {}
+  }, {})
 }
 
 /*
@@ -170,18 +179,18 @@ output "private_dns_zones" {
 
 output "postgresql" {
   description = "PostgreSQL Flexible Server for OSMO (if deployed)"
-  value = var.should_deploy_postgresql ? {
+  value = try({
     id   = azurerm_postgresql_flexible_server.main[0].id
     fqdn = azurerm_postgresql_flexible_server.main[0].fqdn
     name = azurerm_postgresql_flexible_server.main[0].name
-  } : null
+  }, null)
 }
 
 output "redis" {
   description = "Azure Redis Cache for OSMO (if deployed)"
-  value = var.should_deploy_redis ? {
+  value = try({
     id       = azurerm_redis_cache.main[0].id
     hostname = azurerm_redis_cache.main[0].hostname
     name     = azurerm_redis_cache.main[0].name
-  } : null
+  }, null)
 }

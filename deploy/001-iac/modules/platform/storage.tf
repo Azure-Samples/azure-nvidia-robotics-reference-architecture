@@ -19,6 +19,7 @@ resource "azurerm_storage_account" "main" {
   account_replication_type      = "LRS"
   access_tier                   = "Hot"
   min_tls_version               = "TLS1_2"
+  shared_access_key_enabled     = var.should_enable_storage_shared_access_key
   public_network_access_enabled = var.should_enable_public_network_access
   tags                          = local.tags
 
