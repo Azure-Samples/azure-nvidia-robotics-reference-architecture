@@ -41,6 +41,22 @@ resource "azurerm_subnet" "private_endpoints" {
   address_prefixes     = [var.virtual_network_config.subnet_address_prefix_pe]
 }
 
+// AKS Nodes Subnet
+resource "azurerm_subnet" "aks" {
+  name                 = "snet-aks-${local.resource_name_suffix}"
+  resource_group_name  = var.resource_group.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = [var.virtual_network_config.subnet_address_prefix_aks]
+}
+
+// AKS Pods Subnet
+resource "azurerm_subnet" "aks_pod" {
+  name                 = "snet-aks-pod-${local.resource_name_suffix}"
+  resource_group_name  = var.resource_group.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = [var.virtual_network_config.subnet_address_prefix_aks_pod]
+}
+
 // NSG Associations
 resource "azurerm_subnet_network_security_group_association" "main" {
   subnet_id                 = azurerm_subnet.main.id
@@ -49,6 +65,16 @@ resource "azurerm_subnet_network_security_group_association" "main" {
 
 resource "azurerm_subnet_network_security_group_association" "private_endpoints" {
   subnet_id                 = azurerm_subnet.private_endpoints.id
+  network_security_group_id = azurerm_network_security_group.main.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "aks" {
+  subnet_id                 = azurerm_subnet.aks.id
+  network_security_group_id = azurerm_network_security_group.main.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "aks_pod" {
+  subnet_id                 = azurerm_subnet.aks_pod.id
   network_security_group_id = azurerm_network_security_group.main.id
 }
 
@@ -83,5 +109,10 @@ resource "azurerm_nat_gateway_public_ip_association" "main" {
 // NAT Gateway Subnet Associations
 resource "azurerm_subnet_nat_gateway_association" "main" {
   subnet_id      = azurerm_subnet.main.id
+  nat_gateway_id = azurerm_nat_gateway.main.id
+}
+
+resource "azurerm_subnet_nat_gateway_association" "aks" {
+  subnet_id      = azurerm_subnet.aks.id
   nat_gateway_id = azurerm_nat_gateway.main.id
 }
