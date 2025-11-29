@@ -88,15 +88,38 @@ variable "node_pools" {
 
 variable "azureml_config" {
   type = object({
-    should_integrate_aks          = bool
-    aks_cluster_purpose           = string
-    inference_router_service_type = string
-    workload_tolerations = list(object({
-      key      = string
+    // Core integration toggles
+    should_integrate_aks     = bool
+    should_install_extension = optional(bool, true)
+
+    // Training and inference settings
+    enable_training               = optional(bool, true)
+    enable_inference              = optional(bool, true)
+    inference_router_service_type = optional(string, "LoadBalancer")
+    inference_router_ha           = optional(bool, false)
+    allow_insecure_connections    = optional(bool, true)
+    cluster_purpose               = optional(string, "DevTest")
+
+    // Component installation toggles
+    // Set to true: Extension installs and manages the component
+    // Set to false: Use existing component already installed on cluster
+    install_nvidia_device_plugin = optional(bool, false)
+    install_dcgm_exporter        = optional(bool, false)
+    install_volcano              = optional(bool, true)
+    install_prom_op              = optional(bool, true)
+
+    // Workload scheduling tolerations
+    workload_tolerations = optional(list(object({
+      key      = optional(string)
       operator = string
       value    = optional(string)
-      effect   = string
-    }))
+      effect   = optional(string)
+      })), [
+      { key = "nvidia.com/gpu", operator = "Exists", value = null, effect = "NoSchedule" },
+      { key = "kubernetes.azure.com/scalesetpriority", operator = "Equal", value = "spot", effect = "NoSchedule" }
+    ])
+
+    // Instance types for compute target
     cluster_integration_instance_types = optional(map(object({
       nodeSelector = optional(map(string))
       resources = object({
@@ -105,11 +128,20 @@ variable "azureml_config" {
       })
     })))
   })
-  description = "Azure Machine Learning configuration including AKS integration settings"
+  description = "Azure Machine Learning AKS extension configuration including training, inference, and component settings"
   default = {
     should_integrate_aks          = true
-    aks_cluster_purpose           = "DevTest"
-    inference_router_service_type = "NodePort"
+    should_install_extension      = true
+    enable_training               = true
+    enable_inference              = true
+    inference_router_service_type = "LoadBalancer"
+    inference_router_ha           = false
+    allow_insecure_connections    = true
+    cluster_purpose               = "DevTest"
+    install_nvidia_device_plugin  = false
+    install_dcgm_exporter         = false
+    install_volcano               = true
+    install_prom_op               = true
     workload_tolerations = [
       { key = "nvidia.com/gpu", operator = "Exists", value = null, effect = "NoSchedule" },
       { key = "kubernetes.azure.com/scalesetpriority", operator = "Equal", value = "spot", effect = "NoSchedule" }
