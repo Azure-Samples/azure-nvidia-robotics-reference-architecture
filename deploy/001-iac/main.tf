@@ -3,6 +3,10 @@
  *
  * Deploys robotics infrastructure with NVIDIA GPU support, KAI Scheduler,
  * and optional Azure Machine Learning integration.
+ *
+ * Architecture:
+ * - Platform Module: Shared services (networking, security, observability, ACR, storage, ML workspace)
+ * - SiL Module: AKS cluster with GPU node pools and ML extension integration
  */
 
 locals {
@@ -41,25 +45,24 @@ locals {
   }
 }
 
-module "sil" {
-  source = "./modules/sil"
+// ============================================================
+// Platform Module - Shared Services
+// ============================================================
+
+module "platform" {
+  source = "./modules/platform"
 
   depends_on = [azurerm_resource_group.this]
 
-  /**
-   * Core Variables
-   */
-
+  // Core variables
   environment     = var.environment
-  location        = var.location
   resource_prefix = var.resource_prefix
+  location        = var.location
   instance        = var.instance
+  tags            = {}
   resource_group  = local.resource_group
 
-  /**
-   * Networking Configuration
-   */
-
+  // Networking configuration
   virtual_network_config = {
     address_space                 = var.virtual_network_config.address_space
     subnet_address_prefix_main    = var.virtual_network_config.subnet_address_prefix
@@ -68,23 +71,57 @@ module "sil" {
     subnet_address_prefix_aks_pod = try(var.subnet_address_prefixes_aks_pod[0], "10.0.8.0/22")
   }
 
-  /**
-   * Private Endpoint Configuration
-   */
-
-  should_enable_private_endpoints     = var.should_enable_private_endpoints
-  should_enable_public_network_access = var.should_enable_public_network_access
-
-  /**
-   * Security Configuration
-   */
-
+  // Feature flags
+  should_enable_private_endpoints         = var.should_enable_private_endpoints
+  should_enable_public_network_access     = var.should_enable_public_network_access
   should_use_current_user_key_vault_admin = var.should_use_current_user_key_vault_admin
 
-  /**
-   * AKS Configuration
-   */
+  // OSMO optional services
+  should_deploy_postgresql = var.should_deploy_postgresql
+  should_deploy_redis      = var.should_deploy_redis
+  postgresql_config = {
+    sku_name        = var.postgresql_sku_name
+    storage_mb      = var.postgresql_storage_mb
+    version         = var.postgresql_version
+    subnet_prefixes = var.postgresql_subnet_address_prefixes
+    databases       = var.postgresql_databases
+  }
+  redis_config = {
+    sku_name          = var.redis_sku_name
+    clustering_policy = var.redis_clustering_policy
+  }
+}
 
+// ============================================================
+// SiL Module - AKS + AzureML Extension
+// ============================================================
+
+module "sil" {
+  source = "./modules/sil"
+
+  depends_on = [module.platform]
+
+  // Core variables
+  environment     = var.environment
+  resource_prefix = var.resource_prefix
+  location        = var.location
+  instance        = var.instance
+  tags            = {}
+  resource_group  = local.resource_group
+
+  // Dependencies from platform module (passed as typed objects)
+  virtual_network         = module.platform.virtual_network
+  subnets                 = module.platform.subnets
+  network_security_group  = module.platform.network_security_group
+  nat_gateway             = module.platform.nat_gateway
+  log_analytics_workspace = module.platform.log_analytics_workspace
+  data_collection_rules   = module.platform.data_collection_rules
+  container_registry      = module.platform.container_registry
+  azureml_workspace       = module.platform.azureml_workspace
+  ml_workload_identity    = module.platform.ml_workload_identity
+  private_dns_zones       = module.platform.private_dns_zones
+
+  // AKS configuration
   aks_config = {
     node_vm_size        = var.node_vm_size
     node_count          = var.node_count
@@ -96,10 +133,7 @@ module "sil" {
 
   node_pools = var.node_pools
 
-  /**
-   * Azure ML Configuration
-   */
-
+  // AzureML extension configuration
   azureml_config = {
     should_integrate_aks               = var.should_integrate_aks_cluster
     aks_cluster_purpose                = var.aks_cluster_purpose
@@ -108,22 +142,6 @@ module "sil" {
     cluster_integration_instance_types = var.cluster_integration_instance_types
   }
 
-  /**
-   * OSMO Services Configuration
-   */
-
-  should_deploy_postgresql = var.should_deploy_postgresql
-  postgresql_config = {
-    sku_name        = var.postgresql_sku_name
-    storage_mb      = var.postgresql_storage_mb
-    version         = var.postgresql_version
-    subnet_prefixes = var.postgresql_subnet_address_prefixes
-    databases       = var.postgresql_databases
-  }
-
-  should_deploy_redis = var.should_deploy_redis
-  redis_config = {
-    sku_name          = var.redis_sku_name
-    clustering_policy = var.redis_clustering_policy
-  }
+  // Feature flags
+  should_enable_private_endpoints = var.should_enable_private_endpoints
 }
