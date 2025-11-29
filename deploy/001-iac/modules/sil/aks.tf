@@ -46,7 +46,7 @@ resource "azurerm_kubernetes_cluster" "main" {
     os_disk_size_gb             = 128
     os_disk_type                = "Ephemeral"
     temporary_name_for_rotation = "systemtemp"
-    zones                       = ["1", "2", "3"]
+    zones                       = ["1"]
 
     upgrade_settings {
       max_surge                     = "10%"
