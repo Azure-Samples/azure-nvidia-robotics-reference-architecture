@@ -94,21 +94,3 @@ resource "azurerm_private_endpoint" "storage_file" {
     private_dns_zone_ids = [azurerm_private_dns_zone.core["storage_file"].id]
   }
 }
-
-// ============================================================
-// Role Assignments
-// ============================================================
-
-// Grant ML identity Storage Blob Data Contributor role
-resource "azurerm_role_assignment" "ml_storage_blob" {
-  scope                = azurerm_storage_account.main.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.ml.principal_id
-}
-
-// Grant ML identity Storage File Data SMB Share Contributor role
-resource "azurerm_role_assignment" "ml_storage_file" {
-  scope                = azurerm_storage_account.main.id
-  role_definition_name = "Storage File Data SMB Share Contributor"
-  principal_id         = azurerm_user_assigned_identity.ml.principal_id
-}

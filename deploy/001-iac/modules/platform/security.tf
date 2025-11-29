@@ -42,26 +42,6 @@ resource "azurerm_user_assigned_identity" "ml" {
 }
 
 // ============================================================
-// Role Assignments
-// ============================================================
-
-// Grant current user Key Vault Secrets Officer (for initial secret management)
-resource "azurerm_role_assignment" "user_kv_officer" {
-  count = var.should_use_current_user_key_vault_admin ? 1 : 0
-
-  scope                = azurerm_key_vault.main.id
-  role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
-
-// Grant ML identity Key Vault Secrets User (for workload access)
-resource "azurerm_role_assignment" "ml_kv_user" {
-  scope                = azurerm_key_vault.main.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.ml.principal_id
-}
-
-// ============================================================
 // Key Vault Private Endpoint
 // ============================================================
 

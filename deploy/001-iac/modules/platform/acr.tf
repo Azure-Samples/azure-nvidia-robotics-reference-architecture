@@ -49,14 +49,3 @@ resource "azurerm_private_endpoint" "acr" {
     private_dns_zone_ids = [azurerm_private_dns_zone.core["acr"].id]
   }
 }
-
-// ============================================================
-// Role Assignments
-// ============================================================
-
-// Grant ML identity AcrPush role (for training job image builds)
-resource "azurerm_role_assignment" "ml_acr_push" {
-  scope                = azurerm_container_registry.main.id
-  role_definition_name = "AcrPush"
-  principal_id         = azurerm_user_assigned_identity.ml.principal_id
-}

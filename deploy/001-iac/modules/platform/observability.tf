@@ -79,20 +79,6 @@ resource "azurerm_dashboard_grafana" "main" {
   }
 }
 
-// Grant Grafana identity Monitoring Reader on resource group
-resource "azurerm_role_assignment" "grafana_monitoring_reader" {
-  scope                = var.resource_group.id
-  role_definition_name = "Monitoring Reader"
-  principal_id         = azurerm_dashboard_grafana.main.identity[0].principal_id
-}
-
-// Grant Grafana identity Grafana Admin
-resource "azurerm_role_assignment" "grafana_admin" {
-  scope                = azurerm_dashboard_grafana.main.id
-  role_definition_name = "Grafana Admin"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
-
 // ============================================================
 // Data Collection Endpoints
 // ============================================================

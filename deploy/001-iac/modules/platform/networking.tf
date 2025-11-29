@@ -85,7 +85,7 @@ resource "azurerm_public_ip" "nat_gateway" {
   resource_group_name = var.resource_group.name
   allocation_method   = "Static"
   sku                 = "Standard"
-  zones               = ["1", "2", "3"]
+  zones               = ["1"]
   tags                = local.tags
 }
 
