@@ -18,16 +18,16 @@ output "virtual_network" {
 }
 
 output "subnets" {
-  description = "Subnets for SiL resources"
+  description = "Subnets for SiL resources. Private endpoints subnet is null when private endpoints are disabled"
   value = {
     main = {
       id   = azurerm_subnet.main.id
       name = azurerm_subnet.main.name
     }
-    private_endpoints = {
-      id   = azurerm_subnet.private_endpoints.id
-      name = azurerm_subnet.private_endpoints.name
-    }
+    private_endpoints = local.pe_enabled ? {
+      id   = azurerm_subnet.private_endpoints[0].id
+      name = azurerm_subnet.private_endpoints[0].name
+    } : null
   }
 }
 

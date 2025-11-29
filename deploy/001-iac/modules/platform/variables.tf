@@ -6,9 +6,9 @@ variable "virtual_network_config" {
   type = object({
     address_space              = string
     subnet_address_prefix_main = string
-    subnet_address_prefix_pe   = string
+    subnet_address_prefix_pe   = optional(string)
   })
-  description = "Virtual network address configuration including address space and subnet prefixes"
+  description = "Virtual network address configuration including address space and subnet prefixes. PE subnet prefix is only required when should_enable_private_endpoints is true"
   default = {
     address_space              = "10.0.0.0/16"
     subnet_address_prefix_main = "10.0.1.0/24"

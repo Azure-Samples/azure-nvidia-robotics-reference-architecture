@@ -123,7 +123,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
 // ============================================================
 
 resource "azurerm_private_endpoint" "aks" {
-  count = var.aks_config.is_private_cluster && local.pe_enabled ? 1 : 0
+  count = var.aks_config.is_private_cluster && local.pe_enabled && var.subnets.private_endpoints != null ? 1 : 0
 
   name                = "pe-aks-${local.resource_name_suffix}"
   location            = var.resource_group.location

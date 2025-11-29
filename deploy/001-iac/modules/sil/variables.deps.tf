@@ -16,12 +16,12 @@ variable "subnets" {
       id   = string
       name = string
     })
-    private_endpoints = object({
+    private_endpoints = optional(object({
       id   = string
       name = string
-    })
+    }))
   })
-  description = "Subnets from platform module"
+  description = "Subnets from platform module. Private endpoints subnet is optional and only provided when private endpoints are enabled"
 }
 
 variable "network_security_group" {

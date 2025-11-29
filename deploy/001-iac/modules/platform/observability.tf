@@ -147,7 +147,7 @@ resource "azurerm_private_endpoint" "monitor" {
   name                = "pe-monitor-${local.resource_name_suffix}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  subnet_id           = azurerm_subnet.private_endpoints.id
+  subnet_id           = azurerm_subnet.private_endpoints[0].id
   tags                = local.tags
 
   private_service_connection {

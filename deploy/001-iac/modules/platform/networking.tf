@@ -35,8 +35,10 @@ resource "azurerm_subnet" "main" {
   address_prefixes     = [var.virtual_network_config.subnet_address_prefix_main]
 }
 
-// Private Endpoints Subnet
+// Private Endpoints Subnet (conditional - only created when private endpoints are enabled)
 resource "azurerm_subnet" "private_endpoints" {
+  count = local.pe_enabled ? 1 : 0
+
   name                 = "snet-pe-${local.resource_name_suffix}"
   resource_group_name  = var.resource_group.name
   virtual_network_name = azurerm_virtual_network.main.name
@@ -50,7 +52,9 @@ resource "azurerm_subnet_network_security_group_association" "main" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "private_endpoints" {
-  subnet_id                 = azurerm_subnet.private_endpoints.id
+  count = local.pe_enabled ? 1 : 0
+
+  subnet_id                 = azurerm_subnet.private_endpoints[0].id
   network_security_group_id = azurerm_network_security_group.main.id
 }
 
