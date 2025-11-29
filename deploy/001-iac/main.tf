@@ -110,16 +110,17 @@ module "sil" {
   resource_group  = local.resource_group
 
   // Dependencies from platform module (passed as typed objects)
-  virtual_network         = module.platform.virtual_network
-  subnets                 = module.platform.subnets
-  network_security_group  = module.platform.network_security_group
-  nat_gateway             = module.platform.nat_gateway
-  log_analytics_workspace = module.platform.log_analytics_workspace
-  data_collection_rules   = module.platform.data_collection_rules
-  container_registry      = module.platform.container_registry
-  azureml_workspace       = module.platform.azureml_workspace
-  ml_workload_identity    = module.platform.ml_workload_identity
-  private_dns_zones       = module.platform.private_dns_zones
+  virtual_network          = module.platform.virtual_network
+  subnets                  = module.platform.subnets
+  network_security_group   = module.platform.network_security_group
+  nat_gateway              = module.platform.nat_gateway
+  log_analytics_workspace  = module.platform.log_analytics_workspace
+  monitor_workspace        = module.platform.monitor_workspace
+  data_collection_endpoint = module.platform.data_collection_endpoint
+  container_registry       = module.platform.container_registry
+  azureml_workspace        = module.platform.azureml_workspace
+  ml_workload_identity     = module.platform.ml_workload_identity
+  private_dns_zones        = module.platform.private_dns_zones
 
   // AKS configuration
   aks_config = {
