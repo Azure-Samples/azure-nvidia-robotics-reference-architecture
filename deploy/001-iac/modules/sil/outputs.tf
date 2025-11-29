@@ -7,6 +7,24 @@
  */
 
 // ============================================================
+// AKS Networking Outputs
+// ============================================================
+
+output "aks_subnets" {
+  description = "AKS subnets created by the module."
+  value = {
+    aks = {
+      id   = azurerm_subnet.aks.id
+      name = azurerm_subnet.aks.name
+    }
+    aks_pod = {
+      id   = azurerm_subnet.aks_pod.id
+      name = azurerm_subnet.aks_pod.name
+    }
+  }
+}
+
+// ============================================================
 // AKS Cluster Outputs
 // ============================================================
 

@@ -9,6 +9,22 @@ variable "should_enable_private_endpoints" {
 }
 
 /*
+ * AKS Networking Variables
+ */
+
+variable "aks_subnet_config" {
+  type = object({
+    subnet_address_prefix_aks     = string
+    subnet_address_prefix_aks_pod = string
+  })
+  description = "AKS subnet address configuration for system node pool"
+  default = {
+    subnet_address_prefix_aks     = "10.0.5.0/23"
+    subnet_address_prefix_aks_pod = "10.0.8.0/22"
+  }
+}
+
+/*
  * AKS Cluster Variables
  */
 

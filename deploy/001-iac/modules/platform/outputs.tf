@@ -24,14 +24,6 @@ output "subnets" {
       id   = azurerm_subnet.main.id
       name = azurerm_subnet.main.name
     }
-    aks = {
-      id   = azurerm_subnet.aks.id
-      name = azurerm_subnet.aks.name
-    }
-    aks_pod = {
-      id   = azurerm_subnet.aks_pod.id
-      name = azurerm_subnet.aks_pod.name
-    }
     private_endpoints = {
       id   = azurerm_subnet.private_endpoints.id
       name = azurerm_subnet.private_endpoints.name
@@ -65,11 +57,17 @@ output "log_analytics_workspace" {
   }
 }
 
-output "data_collection_rules" {
-  description = "DCRs for AKS Container Insights"
+output "monitor_workspace" {
+  description = "Azure Monitor workspace for Prometheus metrics"
   value = {
-    logs_id    = azurerm_monitor_data_collection_rule.logs.id
-    metrics_id = azurerm_monitor_data_collection_rule.metrics.id
+    id = azurerm_monitor_workspace.main.id
+  }
+}
+
+output "data_collection_endpoint" {
+  description = "Data Collection Endpoint for observability"
+  value = {
+    id = azurerm_monitor_data_collection_endpoint.main.id
   }
 }
 

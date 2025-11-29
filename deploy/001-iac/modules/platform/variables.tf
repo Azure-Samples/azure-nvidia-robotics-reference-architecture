@@ -4,19 +4,15 @@
 
 variable "virtual_network_config" {
   type = object({
-    address_space                 = string
-    subnet_address_prefix_main    = string
-    subnet_address_prefix_pe      = string
-    subnet_address_prefix_aks     = string
-    subnet_address_prefix_aks_pod = string
+    address_space              = string
+    subnet_address_prefix_main = string
+    subnet_address_prefix_pe   = string
   })
   description = "Virtual network address configuration including address space and subnet prefixes"
   default = {
-    address_space                 = "10.0.0.0/16"
-    subnet_address_prefix_main    = "10.0.1.0/24"
-    subnet_address_prefix_pe      = "10.0.2.0/24"
-    subnet_address_prefix_aks     = "10.0.5.0/23"
-    subnet_address_prefix_aks_pod = "10.0.8.0/22"
+    address_space              = "10.0.0.0/16"
+    subnet_address_prefix_main = "10.0.1.0/24"
+    subnet_address_prefix_pe   = "10.0.2.0/24"
   }
 }
 

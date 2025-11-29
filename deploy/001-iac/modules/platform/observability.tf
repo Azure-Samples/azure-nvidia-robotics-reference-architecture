@@ -6,9 +6,10 @@
  * - Application Insights for application telemetry
  * - Azure Monitor Workspace for Prometheus metrics
  * - Azure Managed Grafana for dashboards
- * - Data Collection Rules for logs and metrics
+ * - Data Collection Endpoint
  * - Azure Monitor Private Link Scope (AMPLS) with private endpoint
  *
+ * Note: AKS-specific Data Collection Rules (Container Insights, Prometheus) are in the SiL module
  * Note: AMPLS uses the SHARED storage_blob DNS zone from private-dns-zones.tf
  */
 
@@ -90,77 +91,6 @@ resource "azurerm_monitor_data_collection_endpoint" "main" {
   kind                          = "Linux"
   public_network_access_enabled = var.should_enable_public_network_access
   tags                          = local.tags
-}
-
-// ============================================================
-// Data Collection Rules
-// ============================================================
-
-// DCR for AKS Container Insights Logs
-resource "azurerm_monitor_data_collection_rule" "logs" {
-  name                        = "dcr-logs-${local.resource_name_suffix}"
-  location                    = var.resource_group.location
-  resource_group_name         = var.resource_group.name
-  data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.main.id
-  kind                        = "Linux"
-  tags                        = local.tags
-
-  destinations {
-    log_analytics {
-      workspace_resource_id = azurerm_log_analytics_workspace.main.id
-      name                  = "destination-log"
-    }
-  }
-
-  data_flow {
-    streams      = ["Microsoft-ContainerLog", "Microsoft-ContainerLogV2", "Microsoft-KubeEvents", "Microsoft-KubePodInventory"]
-    destinations = ["destination-log"]
-  }
-
-  data_sources {
-    extension {
-      name           = "ContainerInsightsExtension"
-      extension_name = "ContainerInsights"
-      streams        = ["Microsoft-ContainerLog", "Microsoft-ContainerLogV2", "Microsoft-KubeEvents", "Microsoft-KubePodInventory"]
-
-      extension_json = jsonencode({
-        dataCollectionSettings = {
-          interval               = "1m"
-          namespaceFilteringMode = "Off"
-          enableContainerLogV2   = true
-        }
-      })
-    }
-  }
-}
-
-// DCR for AKS Prometheus Metrics
-resource "azurerm_monitor_data_collection_rule" "metrics" {
-  name                        = "dcr-metrics-${local.resource_name_suffix}"
-  location                    = var.resource_group.location
-  resource_group_name         = var.resource_group.name
-  data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.main.id
-  kind                        = "Linux"
-  tags                        = local.tags
-
-  destinations {
-    monitor_account {
-      monitor_account_id = azurerm_monitor_workspace.main.id
-      name               = "destination-metrics"
-    }
-  }
-
-  data_flow {
-    streams      = ["Microsoft-PrometheusMetrics"]
-    destinations = ["destination-metrics"]
-  }
-
-  data_sources {
-    prometheus_forwarder {
-      name    = "PrometheusDataSource"
-      streams = ["Microsoft-PrometheusMetrics"]
-    }
-  }
 }
 
 // ============================================================

@@ -16,14 +16,6 @@ variable "subnets" {
       id   = string
       name = string
     })
-    aks = object({
-      id   = string
-      name = string
-    })
-    aks_pod = object({
-      id   = string
-      name = string
-    })
     private_endpoints = object({
       id   = string
       name = string
@@ -54,12 +46,18 @@ variable "log_analytics_workspace" {
   description = "Log Analytics from platform module"
 }
 
-variable "data_collection_rules" {
+variable "monitor_workspace" {
   type = object({
-    logs_id    = string
-    metrics_id = string
+    id = string
   })
-  description = "DCRs from platform module"
+  description = "Azure Monitor workspace from platform module"
+}
+
+variable "data_collection_endpoint" {
+  type = object({
+    id = string
+  })
+  description = "Data Collection Endpoint from platform module"
 }
 
 variable "container_registry" {

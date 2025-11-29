@@ -5,12 +5,12 @@
  * - AKS cluster with Azure CNI Overlay networking
  * - System node pool for core workloads
  * - GPU node pools via for_each (configurable)
- * - Integration with NAT Gateway for outbound connectivity
  * - Workload identity and OIDC issuer enabled
- * - Data Collection Rule associations for observability
- * - AcrPull role assignment for container registry access
+ * - Private endpoint for private clusters
  *
- * Note: Networking, observability, and ACR resources are provided by the platform module.
+ * Note: Networking resources are in networking.tf
+ * Note: Observability resources are in observability.tf
+ * Note: Role assignments are in role-assignments.tf
  */
 
 // ============================================================
@@ -41,8 +41,8 @@ resource "azurerm_kubernetes_cluster" "main" {
     auto_scaling_enabled        = var.aks_config.enable_auto_scaling
     min_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.min_count : null
     max_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.max_count : null
-    vnet_subnet_id              = var.subnets.aks.id
-    pod_subnet_id               = var.subnets.aks_pod.id
+    vnet_subnet_id              = azurerm_subnet.aks.id
+    pod_subnet_id               = azurerm_subnet.aks_pod.id
     os_disk_size_gb             = 128
     os_disk_type                = "Ephemeral"
     temporary_name_for_rotation = "systemtemp"
@@ -95,105 +95,27 @@ resource "azurerm_kubernetes_cluster" "main" {
 // GPU Node Pools
 // ============================================================
 
-resource "azurerm_subnet" "gpu_node_pool" {
-  for_each = var.node_pools
-
-  name                 = "snet-aks-${each.key}-${local.resource_name_suffix}"
-  resource_group_name  = var.resource_group.name
-  virtual_network_name = var.virtual_network.name
-  address_prefixes     = each.value.subnet_address_prefixes
-}
-
-resource "azurerm_subnet" "gpu_node_pool_pod" {
-  for_each = var.node_pools
-
-  name                 = "snet-aks-${each.key}-pod-${local.resource_name_suffix}"
-  resource_group_name  = var.resource_group.name
-  virtual_network_name = var.virtual_network.name
-  address_prefixes     = each.value.pod_subnet_address_prefixes
-}
-
-resource "azurerm_subnet_network_security_group_association" "gpu_node_pool" {
-  for_each = var.node_pools
-
-  subnet_id                 = azurerm_subnet.gpu_node_pool[each.key].id
-  network_security_group_id = var.network_security_group.id
-}
-
-resource "azurerm_subnet_network_security_group_association" "gpu_node_pool_pod" {
-  for_each = var.node_pools
-
-  subnet_id                 = azurerm_subnet.gpu_node_pool_pod[each.key].id
-  network_security_group_id = var.network_security_group.id
-}
-
-resource "azurerm_subnet_nat_gateway_association" "gpu_node_pool" {
-  for_each = var.node_pools
-
-  subnet_id      = azurerm_subnet.gpu_node_pool[each.key].id
-  nat_gateway_id = var.nat_gateway.id
-}
-
 resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
   for_each = var.node_pools
 
   name                  = each.key
   kubernetes_cluster_id = azurerm_kubernetes_cluster.main.id
+  node_count            = each.value.node_count
   vm_size               = each.value.vm_size
-  node_count            = each.value.enable_auto_scaling ? null : each.value.node_count
+  vnet_subnet_id        = azurerm_subnet.gpu_node_pool[each.key].id
+  pod_subnet_id         = azurerm_subnet.gpu_node_pool_pod[each.key].id
+  node_taints           = each.value.node_taints
   auto_scaling_enabled  = each.value.enable_auto_scaling
   min_count             = each.value.enable_auto_scaling ? each.value.min_count : null
   max_count             = each.value.enable_auto_scaling ? each.value.max_count : null
-  vnet_subnet_id        = azurerm_subnet.gpu_node_pool[each.key].id
-  pod_subnet_id         = azurerm_subnet.gpu_node_pool_pod[each.key].id
-  os_disk_size_gb       = 128
-  os_disk_type          = "Ephemeral"
   priority              = each.value.priority
-  eviction_policy       = each.value.priority == "Spot" ? each.value.eviction_policy : null
-  spot_max_price        = each.value.priority == "Spot" ? -1 : null
-  node_taints           = each.value.node_taints
   zones                 = each.value.zones
-  gpu_instance          = each.value.gpu_driver
-  tags                  = local.tags
-
-  upgrade_settings {
-    max_surge                     = "10%"
-    drain_timeout_in_minutes      = 0
-    node_soak_duration_in_minutes = 0
-  }
+  eviction_policy       = each.value.eviction_policy
+  gpu_driver            = each.value.gpu_driver
 
   depends_on = [
     azurerm_subnet_nat_gateway_association.gpu_node_pool,
   ]
-}
-
-// ============================================================
-// Data Collection Rule Associations
-// ============================================================
-
-// Associate Container Insights logs DCR with AKS
-resource "azurerm_monitor_data_collection_rule_association" "logs" {
-  name                    = "dcra-logs-${local.resource_name_suffix}"
-  target_resource_id      = azurerm_kubernetes_cluster.main.id
-  data_collection_rule_id = var.data_collection_rules.logs_id
-}
-
-// Associate Prometheus metrics DCR with AKS
-resource "azurerm_monitor_data_collection_rule_association" "metrics" {
-  name                    = "dcra-metrics-${local.resource_name_suffix}"
-  target_resource_id      = azurerm_kubernetes_cluster.main.id
-  data_collection_rule_id = var.data_collection_rules.metrics_id
-}
-
-// ============================================================
-// AKS Role Assignments
-// ============================================================
-
-// Grant AKS kubelet identity AcrPull role
-resource "azurerm_role_assignment" "aks_acr_pull" {
-  scope                = var.container_registry.id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
 }
 
 // ============================================================

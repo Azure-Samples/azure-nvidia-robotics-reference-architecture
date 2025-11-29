@@ -1,0 +1,99 @@
+/**
+ * # AKS Observability Resources
+ *
+ * This file creates the AKS-specific observability infrastructure for the SiL module including:
+ * - Data Collection Rule for Container Insights logs
+ * - Data Collection Rule for Prometheus metrics
+ * - Data Collection Rule associations with AKS cluster
+ *
+ * Note: Shared observability resources (LAW, Monitor Workspace, DCE) are provided by the platform module.
+ */
+
+// ============================================================
+// Data Collection Rules
+// ============================================================
+
+// DCR for AKS Container Insights Logs
+resource "azurerm_monitor_data_collection_rule" "logs" {
+  name                        = "dcr-logs-${local.resource_name_suffix}"
+  location                    = var.resource_group.location
+  resource_group_name         = var.resource_group.name
+  data_collection_endpoint_id = var.data_collection_endpoint.id
+  kind                        = "Linux"
+  tags                        = local.tags
+
+  destinations {
+    log_analytics {
+      workspace_resource_id = var.log_analytics_workspace.id
+      name                  = "destination-log"
+    }
+  }
+
+  data_flow {
+    streams      = ["Microsoft-ContainerLog", "Microsoft-ContainerLogV2", "Microsoft-KubeEvents", "Microsoft-KubePodInventory"]
+    destinations = ["destination-log"]
+  }
+
+  data_sources {
+    extension {
+      name           = "ContainerInsightsExtension"
+      extension_name = "ContainerInsights"
+      streams        = ["Microsoft-ContainerLog", "Microsoft-ContainerLogV2", "Microsoft-KubeEvents", "Microsoft-KubePodInventory"]
+
+      extension_json = jsonencode({
+        dataCollectionSettings = {
+          interval               = "1m"
+          namespaceFilteringMode = "Off"
+          enableContainerLogV2   = true
+        }
+      })
+    }
+  }
+}
+
+// DCR for AKS Prometheus Metrics
+resource "azurerm_monitor_data_collection_rule" "metrics" {
+  name                        = "dcr-metrics-${local.resource_name_suffix}"
+  location                    = var.resource_group.location
+  resource_group_name         = var.resource_group.name
+  data_collection_endpoint_id = var.data_collection_endpoint.id
+  kind                        = "Linux"
+  tags                        = local.tags
+
+  destinations {
+    monitor_account {
+      monitor_account_id = var.monitor_workspace.id
+      name               = "destination-metrics"
+    }
+  }
+
+  data_flow {
+    streams      = ["Microsoft-PrometheusMetrics"]
+    destinations = ["destination-metrics"]
+  }
+
+  data_sources {
+    prometheus_forwarder {
+      name    = "PrometheusDataSource"
+      streams = ["Microsoft-PrometheusMetrics"]
+    }
+  }
+}
+
+// ============================================================
+// Data Collection Rule Associations
+// ============================================================
+
+// Associate Container Insights logs DCR with AKS
+resource "azurerm_monitor_data_collection_rule_association" "logs" {
+  name                    = "dcra-logs-${local.resource_name_suffix}"
+  target_resource_id      = azurerm_kubernetes_cluster.main.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.logs.id
+}
+
+// Associate Prometheus metrics DCR with AKS
+resource "azurerm_monitor_data_collection_rule_association" "metrics" {
+  name                    = "dcra-metrics-${local.resource_name_suffix}"
+  target_resource_id      = azurerm_kubernetes_cluster.main.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.metrics.id
+}
