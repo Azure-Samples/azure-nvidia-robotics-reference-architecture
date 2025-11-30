@@ -1,127 +1,275 @@
-#!/bin/bash
-# =============================================================================
-# install-azureml-extension.sh
-# =============================================================================
-# Installs Azure Machine Learning extension on AKS cluster via Azure CLI.
-# Alternative to Terraform-based deployment for manual or troubleshooting scenarios.
-#
-# Usage:
-#   # Set required environment variables
-#   export EXTENSION_NAME="azureml-sil-dev-001"
-#   export CLUSTER_NAME="aks-sil-dev-001"
-#   export RESOURCE_GROUP="rg-sil-dev-001"
-#
-#   # Run the script
-#   ./install-azureml-extension.sh
-#
-# Examples:
-#   # Basic installation with defaults (dev/test mode)
-#   EXTENSION_NAME="azureml-sil-dev-001" \
-#   CLUSTER_NAME="aks-sil-dev-001" \
-#   RESOURCE_GROUP="rg-sil-dev-001" \
-#   ./install-azureml-extension.sh
-#
-#   # Production installation with HA enabled
-#   EXTENSION_NAME="azureml-sil-prod-001" \
-#   CLUSTER_NAME="aks-sil-prod-001" \
-#   RESOURCE_GROUP="rg-sil-prod-001" \
-#   INFERENCE_ROUTER_HA="true" \
-#   ALLOW_INSECURE_CONNECTIONS="false" \
-#   CLUSTER_PURPOSE="FastProd" \
-#   ./install-azureml-extension.sh
-#
-#   # Bring your own components (existing Volcano, Prometheus, GPU Operator)
-#   EXTENSION_NAME="azureml-sil-prod-001" \
-#   CLUSTER_NAME="aks-sil-prod-001" \
-#   RESOURCE_GROUP="rg-sil-prod-001" \
-#   INSTALL_VOLCANO="false" \
-#   INSTALL_PROM_OP="false" \
-#   INFERENCE_ROUTER_HA="true" \
-#   CLUSTER_PURPOSE="FastProd" \
-#   ./install-azureml-extension.sh
-# =============================================================================
-
+#!/usr/bin/env bash
 set -euo pipefail
 
-# =============================================================================
-# Required Parameters
-# =============================================================================
-EXTENSION_NAME="${EXTENSION_NAME:?EXTENSION_NAME is required}"
-CLUSTER_NAME="${CLUSTER_NAME:?CLUSTER_NAME is required}"
-RESOURCE_GROUP="${RESOURCE_GROUP:?RESOURCE_GROUP is required}"
+#######################################
+# AzureML Extension Installation Script
+#
+# Installs Azure Machine Learning extension on AKS cluster via Azure CLI,
+# attaches the cluster as a compute target, and creates GPU instance types.
+# Reads Terraform outputs for cluster and workspace connection.
+#
+# Usage:
+#   ./install-azureml-extension.sh [OPTIONS]
+#
+# Options:
+#   --terraform-dir PATH      Path to terraform directory (default: ../001-iac)
+#   --extension-name NAME     Extension name (default: azureml-<cluster_name>)
+#   --compute-name NAME       Compute target name (default: aks-<cluster_name>)
+#   --cluster-purpose PURPOSE Cluster purpose: DevTest or FastProd (default: DevTest)
+#   --inference-router-ha     Enable inference router high availability
+#   --secure-connections      Require secure connections (disable insecure)
+#   --skip-volcano            Skip Volcano scheduler installation
+#   --skip-prom-op            Skip Prometheus Operator installation
+#   --skip-gpu-tolerations    Skip GPU spot node tolerations
+#   --skip-compute-attach     Skip attaching cluster as compute target
+#   --skip-instance-types     Skip creating GPU instance types
+#   --help                    Show this help message
+#
+# Examples:
+#   # Deploy with defaults (dev/test mode)
+#   ./install-azureml-extension.sh
+#
+#   # Deploy with custom terraform directory
+#   ./install-azureml-extension.sh --terraform-dir /path/to/terraform
+#
+#   # Production deployment with HA and secure connections
+#   ./install-azureml-extension.sh --cluster-purpose FastProd --inference-router-ha --secure-connections
+#
+#   # Extension only (skip compute attach and instance types)
+#   ./install-azureml-extension.sh --skip-compute-attach --skip-instance-types
+#######################################
 
-# =============================================================================
-# Optional Parameters with Defaults (matching Terraform defaults)
-# =============================================================================
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+terraform_dir="${script_dir}/../001-iac"
 
-# Training and inference settings
-ENABLE_TRAINING="${ENABLE_TRAINING:-true}"
-ENABLE_INFERENCE="${ENABLE_INFERENCE:-true}"
-INFERENCE_ROUTER_SERVICE_TYPE="${INFERENCE_ROUTER_SERVICE_TYPE:-LoadBalancer}"
-INFERENCE_ROUTER_HA="${INFERENCE_ROUTER_HA:-false}"
-ALLOW_INSECURE_CONNECTIONS="${ALLOW_INSECURE_CONNECTIONS:-true}"
-CLUSTER_PURPOSE="${CLUSTER_PURPOSE:-DevTest}"
+# Default configuration
+extension_name=""
+compute_name=""
+cluster_purpose="DevTest"
+enable_training="true"
+enable_inference="true"
+inference_router_service_type="LoadBalancer"
+inference_router_ha="false"
+allow_insecure_connections="true"
+install_nvidia_device_plugin="false"
+install_dcgm_exporter="false"
+install_volcano="true"
+install_prom_op="true"
+enable_gpu_spot_tolerations="true"
+skip_compute_attach="false"
+skip_instance_types="false"
 
-# Component installation toggles
-# Set to true: Extension installs and manages the component
-# Set to false: Use existing component already installed on cluster
-INSTALL_NVIDIA_DEVICE_PLUGIN="${INSTALL_NVIDIA_DEVICE_PLUGIN:-false}"
-INSTALL_DCGM_EXPORTER="${INSTALL_DCGM_EXPORTER:-false}"
-INSTALL_VOLCANO="${INSTALL_VOLCANO:-true}"
-INSTALL_PROM_OP="${INSTALL_PROM_OP:-true}"
+help="Usage: install-azureml-extension.sh [OPTIONS]
 
-# GPU spot node tolerations (enabled by default for scheduling on GPU/spot nodes)
-ENABLE_GPU_SPOT_TOLERATIONS="${ENABLE_GPU_SPOT_TOLERATIONS:-true}"
+Installs Azure Machine Learning extension on AKS cluster via Azure CLI,
+attaches the cluster as a compute target, and creates GPU instance types.
 
-# =============================================================================
-# Script Execution
-# =============================================================================
+OPTIONS:
+  --terraform-dir PATH      Path to terraform directory (default: ../001-iac)
+  --extension-name NAME     Extension name (default: azureml-<cluster_name>)
+  --compute-name NAME       Compute target name (default: aks-<cluster_name>)
+  --cluster-purpose PURPOSE Cluster purpose: DevTest or FastProd (default: DevTest)
+  --inference-router-ha     Enable inference router high availability
+  --secure-connections      Require secure connections (disable insecure)
+  --skip-volcano            Skip Volcano scheduler installation
+  --skip-prom-op            Skip Prometheus Operator installation
+  --skip-gpu-tolerations    Skip GPU spot node tolerations
+  --skip-compute-attach     Skip attaching cluster as compute target
+  --skip-instance-types     Skip creating GPU instance types
+  --help                    Show this help message
 
-echo "============================================================"
-echo "Installing AzureML Extension"
-echo "============================================================"
-echo "Extension Name: ${EXTENSION_NAME}"
-echo "Cluster:        ${CLUSTER_NAME}"
-echo "Resource Group: ${RESOURCE_GROUP}"
+EXAMPLES:
+  # Deploy with defaults (dev/test mode)
+  ./install-azureml-extension.sh
+
+  # Deploy with custom terraform directory
+  ./install-azureml-extension.sh --terraform-dir /path/to/terraform
+
+  # Production deployment with HA and secure connections
+  ./install-azureml-extension.sh --cluster-purpose FastProd --inference-router-ha --secure-connections
+"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --terraform-dir)
+      terraform_dir="$2"
+      shift 2
+      ;;
+    --extension-name)
+      extension_name="$2"
+      shift 2
+      ;;
+    --compute-name)
+      compute_name="$2"
+      shift 2
+      ;;
+    --cluster-purpose)
+      cluster_purpose="$2"
+      shift 2
+      ;;
+    --inference-router-ha)
+      inference_router_ha="true"
+      shift
+      ;;
+    --secure-connections)
+      allow_insecure_connections="false"
+      shift
+      ;;
+    --skip-volcano)
+      install_volcano="false"
+      shift
+      ;;
+    --skip-prom-op)
+      install_prom_op="false"
+      shift
+      ;;
+    --skip-gpu-tolerations)
+      enable_gpu_spot_tolerations="false"
+      shift
+      ;;
+    --skip-compute-attach)
+      skip_compute_attach="true"
+      shift
+      ;;
+    --skip-instance-types)
+      skip_instance_types="true"
+      shift
+      ;;
+    --help)
+      echo "${help}"
+      exit 0
+      ;;
+    *)
+      echo "${help}"
+      echo
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
+# ============================================================
+# Prerequisites Check
+# ============================================================
+
+echo "Checking prerequisites..."
+required_tools=(terraform az kubectl jq)
+missing_tools=()
+for tool in "${required_tools[@]}"; do
+  if ! command -v "${tool}" &>/dev/null; then
+    missing_tools+=("${tool}")
+  fi
+done
+
+if [[ ${#missing_tools[@]} -gt 0 ]]; then
+  echo "Error: Missing required tools: ${missing_tools[*]}" >&2
+  exit 1
+fi
+
+if [[ ! -d "${terraform_dir}" ]]; then
+  echo "Error: Terraform directory not found: ${terraform_dir}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${terraform_dir}/terraform.tfstate" ]]; then
+  echo "Error: terraform.tfstate not found in ${terraform_dir}" >&2
+  exit 1
+fi
+
+# ============================================================
+# Read Terraform Outputs
+# ============================================================
+
+echo "Reading Terraform outputs from ${terraform_dir}..."
+if ! tf_output=$(cd "${terraform_dir}" && terraform output -json); then
+  echo "Error: Unable to read terraform outputs" >&2
+  exit 1
+fi
+
+aks_name=$(echo "${tf_output}" | jq -r '.aks_cluster.value.name // empty')
+aks_id=$(echo "${tf_output}" | jq -r '.aks_cluster.value.id // empty')
+resource_group=$(echo "${tf_output}" | jq -r '.resource_group.value.name // empty')
+ml_workspace_name=$(echo "${tf_output}" | jq -r '.azureml_workspace.value.name // empty')
+
+if [[ -z "${aks_name}" ]] || [[ -z "${resource_group}" ]]; then
+  echo "Error: Could not read AKS cluster info from Terraform outputs" >&2
+  exit 1
+fi
+
+# Set default names if not provided
+if [[ -z "${extension_name}" ]]; then
+  extension_name="azureml-${aks_name}"
+fi
+
+if [[ -z "${compute_name}" ]]; then
+  compute_name="aks-${aks_name}"
+fi
+
+echo "  AKS Cluster:     ${aks_name}"
+echo "  Resource Group:  ${resource_group}"
+echo "  Extension Name:  ${extension_name}"
+echo "  Compute Name:    ${compute_name}"
+if [[ -n "${ml_workspace_name}" ]]; then
+  echo "  ML Workspace:    ${ml_workspace_name}"
+fi
+
+# ============================================================
+# Connect to AKS Cluster
+# ============================================================
+
+echo "Connecting to AKS cluster..."
+az aks get-credentials \
+  --resource-group "${resource_group}" \
+  --name "${aks_name}" \
+  --overwrite-existing
+kubectl cluster-info &>/dev/null
+
+# ============================================================
+# Install AzureML Extension
+# ============================================================
+
 echo ""
+echo "============================"
+echo "Installing AzureML Extension"
+echo "============================"
 echo "Configuration:"
-echo "  Enable Training:             ${ENABLE_TRAINING}"
-echo "  Enable Inference:            ${ENABLE_INFERENCE}"
-echo "  Inference Router Type:       ${INFERENCE_ROUTER_SERVICE_TYPE}"
-echo "  Inference Router HA:         ${INFERENCE_ROUTER_HA}"
-echo "  Allow Insecure Connections:  ${ALLOW_INSECURE_CONNECTIONS}"
-echo "  Cluster Purpose:             ${CLUSTER_PURPOSE}"
+echo "  Enable Training:             ${enable_training}"
+echo "  Enable Inference:            ${enable_inference}"
+echo "  Inference Router Type:       ${inference_router_service_type}"
+echo "  Inference Router HA:         ${inference_router_ha}"
+echo "  Allow Insecure Connections:  ${allow_insecure_connections}"
+echo "  Cluster Purpose:             ${cluster_purpose}"
 echo ""
 echo "Component Installation:"
-echo "  Install NVIDIA Device Plugin: ${INSTALL_NVIDIA_DEVICE_PLUGIN}"
-echo "  Install DCGM Exporter:        ${INSTALL_DCGM_EXPORTER}"
-echo "  Install Volcano:              ${INSTALL_VOLCANO}"
-echo "  Install Prometheus Operator:  ${INSTALL_PROM_OP}"
+echo "  Install NVIDIA Device Plugin: ${install_nvidia_device_plugin}"
+echo "  Install DCGM Exporter:        ${install_dcgm_exporter}"
+echo "  Install Volcano:              ${install_volcano}"
+echo "  Install Prometheus Operator:  ${install_prom_op}"
 echo ""
-echo "GPU Spot Tolerations:          ${ENABLE_GPU_SPOT_TOLERATIONS}"
-echo "============================================================"
+echo "GPU Spot Tolerations:          ${enable_gpu_spot_tolerations}"
+echo "============================"
 
 # Build configuration arguments array
-CONFIG_ARGS=(
-  "enableTraining=${ENABLE_TRAINING}"
-  "enableInference=${ENABLE_INFERENCE}"
-  "inferenceRouterServiceType=${INFERENCE_ROUTER_SERVICE_TYPE}"
-  "inferenceRouterHA=${INFERENCE_ROUTER_HA}"
-  "allowInsecureConnections=${ALLOW_INSECURE_CONNECTIONS}"
-  "clusterPurpose=${CLUSTER_PURPOSE}"
-  "installNvidiaDevicePlugin=${INSTALL_NVIDIA_DEVICE_PLUGIN}"
-  "installDcgmExporter=${INSTALL_DCGM_EXPORTER}"
-  "installVolcano=${INSTALL_VOLCANO}"
-  "installPromOp=${INSTALL_PROM_OP}"
+config_args=(
+  "enableTraining=${enable_training}"
+  "enableInference=${enable_inference}"
+  "inferenceRouterServiceType=${inference_router_service_type}"
+  "inferenceRouterHA=${inference_router_ha}"
+  "allowInsecureConnections=${allow_insecure_connections}"
+  "clusterPurpose=${cluster_purpose}"
+  "installNvidiaDevicePlugin=${install_nvidia_device_plugin}"
+  "installDcgmExporter=${install_dcgm_exporter}"
+  "installVolcano=${install_volcano}"
+  "installPromOp=${install_prom_op}"
   # AKS-specific settings (disable Arc-only features)
   "servicebus.enabled=false"
   "relayserver.enabled=false"
 )
 
 # Add GPU spot tolerations if enabled
-if [[ "${ENABLE_GPU_SPOT_TOLERATIONS}" == "true" ]]; then
+if [[ "${enable_gpu_spot_tolerations}" == "true" ]]; then
   echo "Adding GPU spot node tolerations..."
-  CONFIG_ARGS+=(
+  config_args+=(
     "workLoadToleration[0].key=nvidia.com/gpu"
     "workLoadToleration[0].operator=Exists"
     "workLoadToleration[0].effect=NoSchedule"
@@ -133,46 +281,168 @@ if [[ "${ENABLE_GPU_SPOT_TOLERATIONS}" == "true" ]]; then
 fi
 
 # Build the --config string for az CLI
-CONFIG_STRING=""
-for arg in "${CONFIG_ARGS[@]}"; do
-  CONFIG_STRING+="${arg} "
+config_string=""
+for arg in "${config_args[@]}"; do
+  config_string+="${arg} "
 done
 
 echo ""
 echo "Executing az k8s-extension create..."
-echo ""
 
 # Install the extension
 # shellcheck disable=SC2086
 az k8s-extension create \
-  --name "${EXTENSION_NAME}" \
+  --name "${extension_name}" \
   --extension-type Microsoft.AzureML.Kubernetes \
   --cluster-type managedClusters \
-  --cluster-name "${CLUSTER_NAME}" \
-  --resource-group "${RESOURCE_GROUP}" \
+  --cluster-name "${aks_name}" \
+  --resource-group "${resource_group}" \
   --scope cluster \
   --release-namespace azureml \
   --release-train stable \
-  --config ${CONFIG_STRING}
+  --config ${config_string}
+
+# ============================================================
+# Attach Cluster as Compute Target
+# ============================================================
+
+if [[ "${skip_compute_attach}" != "true" ]]; then
+  if [[ -z "${ml_workspace_name}" ]] || [[ -z "${aks_id}" ]]; then
+    echo ""
+    echo "Warning: ML workspace or AKS ID not found in Terraform outputs."
+    echo "Skipping compute attach. You can attach manually with:"
+    echo "  az ml compute attach --resource-group <rg> --workspace-name <ws> \\"
+    echo "    --type Kubernetes --name ${compute_name} --resource-id <aks-id> \\"
+    echo "    --identity-type SystemAssigned --namespace azureml"
+  else
+    echo ""
+    echo "============================"
+    echo "Attaching Cluster as Compute Target"
+    echo "============================"
+    echo "Compute Name:  ${compute_name}"
+    echo "Namespace:     azureml"
+
+    az ml compute attach \
+      --resource-group "${resource_group}" \
+      --workspace-name "${ml_workspace_name}" \
+      --type Kubernetes \
+      --name "${compute_name}" \
+      --resource-id "${aks_id}" \
+      --identity-type SystemAssigned \
+      --namespace azureml \
+      --no-wait || echo "Warning: Compute attach failed. It may already exist."
+  fi
+else
+  echo ""
+  echo "Skipping compute attach (--skip-compute-attach)"
+fi
+
+# ============================================================
+# Create GPU Instance Types
+# ============================================================
+
+if [[ "${skip_instance_types}" != "true" ]]; then
+  echo ""
+  echo "============================"
+  echo "Creating GPU Instance Types"
+  echo "============================"
+
+  # Create instance types for GPU spot nodes
+  # These allow ML jobs to be scheduled on GPU nodes with spot pricing
+  # Note: Only nodeSelector and resources are officially supported fields
+  # Tolerations must be configured at the extension level via workLoadToleration
+  kubectl apply -f - <<EOF
+apiVersion: amlarc.azureml.com/v1alpha1
+kind: InstanceTypeList
+items:
+  # Default instance type for CPU workloads
+  - metadata:
+      name: defaultinstancetype
+    spec:
+      resources:
+        requests:
+          cpu: "1"
+          memory: "4Gi"
+        limits:
+          cpu: "2"
+          memory: "8Gi"
+
+  # GPU instance type for spot nodes
+  - metadata:
+      name: gpuspot
+    spec:
+      nodeSelector:
+        kubernetes.azure.com/scalesetpriority: spot
+      resources:
+        requests:
+          cpu: "2"
+          memory: "8Gi"
+        limits:
+          cpu: "4"
+          memory: "16Gi"
+          nvidia.com/gpu: 1
+EOF
+
+  echo "Instance types created:"
+  kubectl get instancetype 2>/dev/null || echo "(InstanceType CRD not yet available)"
+else
+  echo ""
+  echo "Skipping instance type creation (--skip-instance-types)"
+fi
+
+# ============================================================
+# Summary
+# ============================================================
 
 echo ""
-echo "============================================================"
-echo "Extension installation initiated successfully!"
-echo "============================================================"
+echo "============================"
+echo "Deployment Verification"
+echo "============================"
+
+echo ""
+echo "AzureML Extension pods:"
+kubectl get pods -n azureml -o wide 2>/dev/null || echo "(azureml namespace not yet created)"
+
+echo ""
+echo "Instance Types:"
+kubectl get instancetype 2>/dev/null || echo "(InstanceType CRD not yet available)"
+
+echo ""
+echo "============================"
+echo "AzureML Deployment Summary"
+echo "============================"
+echo "AKS Cluster:      ${aks_name}"
+echo "Resource Group:   ${resource_group}"
+echo "Extension Name:   ${extension_name}"
+echo "Compute Target:   ${compute_name}"
+echo "Cluster Purpose:  ${cluster_purpose}"
 echo ""
 echo "Check extension status:"
 echo "  az k8s-extension show \\"
-echo "    --name ${EXTENSION_NAME} \\"
+echo "    --name ${extension_name} \\"
 echo "    --cluster-type managedClusters \\"
-echo "    --cluster-name ${CLUSTER_NAME} \\"
-echo "    --resource-group ${RESOURCE_GROUP}"
+echo "    --cluster-name ${aks_name} \\"
+echo "    --resource-group ${resource_group}"
 echo ""
-echo "Check pod status:"
-echo "  kubectl get pods -n azureml"
+if [[ -n "${ml_workspace_name}" ]]; then
+  echo "Check compute target:"
+  echo "  az ml compute show --name ${compute_name} \\"
+  echo "    --resource-group ${resource_group} \\"
+  echo "    --workspace-name ${ml_workspace_name}"
+  echo ""
+fi
+echo "Available instance types for training jobs:"
+echo "  - defaultinstancetype: CPU workloads (2 CPU, 8Gi memory)"
+echo "  - gpuspot: Single GPU on spot nodes (4 CPU, 16Gi memory, 1 GPU)"
 echo ""
-echo "Check events:"
-echo "  kubectl get events -n azureml --sort-by='.lastTimestamp'"
+echo "Example training job with GPU spot instance:"
+echo "  az ml job create --file job.yml"
+echo "  # In job.yml, specify: resources.instance_type: gpuspot"
 echo ""
-echo "Check HealthCheck report:"
-echo "  kubectl describe configmap -n azureml arcml-healthcheck"
+echo "Next Steps:"
+echo "  kubectl get pods -n azureml                              - Check pod status"
+echo "  kubectl get events -n azureml --sort-by='.lastTimestamp' - Check events"
+echo "  kubectl describe configmap -n azureml arcml-healthcheck  - Check health report"
+echo "  kubectl get instancetype                                 - List instance types"
 echo ""
+echo "Deployment completed successfully!"

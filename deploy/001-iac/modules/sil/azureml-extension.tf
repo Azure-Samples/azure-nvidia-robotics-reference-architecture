@@ -138,7 +138,7 @@ locals {
 
 // Federated credential for default service account in azureml namespace
 resource "azurerm_federated_identity_credential" "azureml_default" {
-  count = var.azureml_config.should_integrate_aks && var.azureml_config.should_install_extension ? 1 : 0
+  count = var.azureml_config.should_integrate_aks && var.azureml_config.should_federate_ml_identity ? 1 : 0
 
   name                = "aml-default-fic"
   resource_group_name = var.resource_group.name
@@ -150,7 +150,7 @@ resource "azurerm_federated_identity_credential" "azureml_default" {
 
 // Federated credential for training workloads
 resource "azurerm_federated_identity_credential" "azureml_training" {
-  count = var.azureml_config.should_integrate_aks && var.azureml_config.should_install_extension ? 1 : 0
+  count = var.azureml_config.should_integrate_aks && var.azureml_config.should_federate_ml_identity ? 1 : 0
 
   name                = "aml-training-fic"
   resource_group_name = var.resource_group.name

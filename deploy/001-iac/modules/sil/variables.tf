@@ -89,8 +89,9 @@ variable "node_pools" {
 variable "azureml_config" {
   type = object({
     // Core integration toggles
-    should_integrate_aks     = bool
-    should_install_extension = optional(bool, true)
+    should_integrate_aks        = bool
+    should_install_extension    = optional(bool, true)
+    should_federate_ml_identity = optional(bool, true)
 
     // Training and inference settings
     enable_training               = optional(bool, true)
@@ -132,6 +133,7 @@ variable "azureml_config" {
   default = {
     should_integrate_aks          = true
     should_install_extension      = true
+    should_federate_ml_identity   = true
     enable_training               = true
     enable_inference              = true
     inference_router_service_type = "LoadBalancer"
