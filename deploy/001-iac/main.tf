@@ -64,11 +64,8 @@ module "platform" {
 
   // Networking configuration
   virtual_network_config = {
-    address_space                 = var.virtual_network_config.address_space
-    subnet_address_prefix_main    = var.virtual_network_config.subnet_address_prefix
-    subnet_address_prefix_pe      = "10.0.2.0/24"
-    subnet_address_prefix_aks     = try(var.subnet_address_prefixes_aks[0], "10.0.5.0/23")
-    subnet_address_prefix_aks_pod = try(var.subnet_address_prefixes_aks_pod[0], "10.0.8.0/22")
+    address_space              = var.virtual_network_config.address_space
+    subnet_address_prefix_main = var.virtual_network_config.subnet_address_prefix
   }
 
   // Feature flags
@@ -121,6 +118,12 @@ module "sil" {
   azureml_workspace        = module.platform.azureml_workspace
   ml_workload_identity     = module.platform.ml_workload_identity
   private_dns_zones        = module.platform.private_dns_zones
+
+  // AKS subnet configuration - uses module defaults when null
+  aks_subnet_config = {
+    subnet_address_prefix_aks     = try(var.subnet_address_prefixes_aks[0], null)
+    subnet_address_prefix_aks_pod = try(var.subnet_address_prefixes_aks_pod[0], null)
+  }
 
   // AKS configuration
   aks_config = {

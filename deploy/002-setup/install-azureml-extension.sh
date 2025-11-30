@@ -190,6 +190,7 @@ aks_name=$(echo "${tf_output}" | jq -r '.aks_cluster.value.name // empty')
 aks_id=$(echo "${tf_output}" | jq -r '.aks_cluster.value.id // empty')
 resource_group=$(echo "${tf_output}" | jq -r '.resource_group.value.name // empty')
 ml_workspace_name=$(echo "${tf_output}" | jq -r '.azureml_workspace.value.name // empty')
+ml_identity_id=$(echo "${tf_output}" | jq -r '.ml_workload_identity.value.id // empty')
 
 if [[ -z "${aks_name}" ]] || [[ -z "${resource_group}" ]]; then
   echo "Error: Could not read AKS cluster info from Terraform outputs" >&2
@@ -211,6 +212,9 @@ echo "  Extension Name:  ${extension_name}"
 echo "  Compute Name:    ${compute_name}"
 if [[ -n "${ml_workspace_name}" ]]; then
   echo "  ML Workspace:    ${ml_workspace_name}"
+fi
+if [[ -n "${ml_identity_id}" ]]; then
+  echo "  ML Identity:     ${ml_identity_id}"
 fi
 
 # ============================================================
@@ -313,7 +317,8 @@ if [[ "${skip_compute_attach}" != "true" ]]; then
     echo "Skipping compute attach. You can attach manually with:"
     echo "  az ml compute attach --resource-group <rg> --workspace-name <ws> \\"
     echo "    --type Kubernetes --name ${compute_name} --resource-id <aks-id> \\"
-    echo "    --identity-type SystemAssigned --namespace azureml"
+    echo "    --identity-type UserAssigned --user-assigned-identities <identity-id> \\"
+    echo "    --namespace azureml"
   else
     echo ""
     echo "============================"
@@ -322,15 +327,32 @@ if [[ "${skip_compute_attach}" != "true" ]]; then
     echo "Compute Name:  ${compute_name}"
     echo "Namespace:     azureml"
 
-    az ml compute attach \
-      --resource-group "${resource_group}" \
-      --workspace-name "${ml_workspace_name}" \
-      --type Kubernetes \
-      --name "${compute_name}" \
-      --resource-id "${aks_id}" \
-      --identity-type SystemAssigned \
-      --namespace azureml \
-      --no-wait || echo "Warning: Compute attach failed. It may already exist."
+    # Use User Assigned Identity from Terraform if available, otherwise fall back to SystemAssigned
+    # The User Assigned Identity has pre-configured role assignments for ACR, Storage, and Key Vault
+    if [[ -n "${ml_identity_id}" ]]; then
+      echo "Identity:      UserAssigned (${ml_identity_id})"
+      az ml compute attach \
+        --resource-group "${resource_group}" \
+        --workspace-name "${ml_workspace_name}" \
+        --type Kubernetes \
+        --name "${compute_name}" \
+        --resource-id "${aks_id}" \
+        --identity-type UserAssigned \
+        --user-assigned-identities "${ml_identity_id}" \
+        --namespace azureml \
+        --no-wait || echo "Warning: Compute attach failed. It may already exist."
+    else
+      echo "Identity:      SystemAssigned (no user-assigned identity found in Terraform outputs)"
+      az ml compute attach \
+        --resource-group "${resource_group}" \
+        --workspace-name "${ml_workspace_name}" \
+        --type Kubernetes \
+        --name "${compute_name}" \
+        --resource-id "${aks_id}" \
+        --identity-type SystemAssigned \
+        --namespace azureml \
+        --no-wait || echo "Warning: Compute attach failed. It may already exist."
+    fi
   fi
 else
   echo ""

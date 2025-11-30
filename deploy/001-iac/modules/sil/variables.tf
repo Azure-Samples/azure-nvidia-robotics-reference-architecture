@@ -14,14 +14,11 @@ variable "should_enable_private_endpoints" {
 
 variable "aks_subnet_config" {
   type = object({
-    subnet_address_prefix_aks     = string
-    subnet_address_prefix_aks_pod = string
+    subnet_address_prefix_aks     = optional(string, "10.0.5.0/24")
+    subnet_address_prefix_aks_pod = optional(string, "10.0.6.0/24")
   })
-  description = "AKS subnet address configuration for system node pool"
-  default = {
-    subnet_address_prefix_aks     = "10.0.5.0/23"
-    subnet_address_prefix_aks_pod = "10.0.8.0/22"
-  }
+  description = "AKS subnet address configuration for system node pool. When properties are null, defaults are used"
+  default     = {}
 }
 
 /*
@@ -75,7 +72,7 @@ variable "node_pools" {
       priority                    = "Spot"
       enable_auto_scaling         = true
       min_count                   = 0
-      max_count                   = 3
+      max_count                   = 1
       zones                       = []
       eviction_policy             = "Delete"
     }
@@ -90,7 +87,7 @@ variable "azureml_config" {
   type = object({
     // Core integration toggles
     should_integrate_aks        = bool
-    should_install_extension    = optional(bool, true)
+    should_install_extension    = optional(bool, false)
     should_federate_ml_identity = optional(bool, true)
 
     // Training and inference settings
