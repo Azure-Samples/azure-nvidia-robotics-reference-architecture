@@ -6,10 +6,6 @@
 variable "environment" {
   type        = string
   description = "Environment for all resources in this module: dev, test, or prod"
-  validation {
-    condition     = contains(["dev", "test", "prod"], var.environment)
-    error_message = "Environment must be one of: dev, test, prod"
-  }
 }
 
 variable "instance" {

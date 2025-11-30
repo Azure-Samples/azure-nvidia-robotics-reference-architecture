@@ -60,7 +60,7 @@ resource "azurerm_monitor_workspace" "main" {
 // ============================================================
 
 resource "azurerm_dashboard_grafana" "main" {
-  name                              = "grafana-${local.resource_name_suffix}"
+  name                              = "graf-${local.resource_name_suffix}"
   location                          = var.resource_group.location
   resource_group_name               = var.resource_group.name
   api_key_enabled                   = true
