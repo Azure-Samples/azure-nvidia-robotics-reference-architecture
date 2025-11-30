@@ -1,8 +1,10 @@
-/*
- * Robotics Blueprint Outputs
+/**
+ * # Robotics Blueprint Outputs
  *
- * Platform module outputs: Shared infrastructure (networking, security, observability, etc.)
- * SiL module outputs: AKS cluster and ML extension resources
+ * Outputs organized by consumption:
+ * - 002-setup scripts: AKS cluster info, OSMO connection details, Key Vault name
+ * - Platform module: Shared infrastructure (networking, security, observability)
+ * - SiL module: AKS cluster and ML extension resources
  */
 
 // ============================================================
@@ -15,21 +17,7 @@ output "resource_group" {
 }
 
 // ============================================================
-// Platform Module Outputs - Networking
-// ============================================================
-
-output "virtual_network" {
-  description = "Virtual network for robotics infrastructure."
-  value       = module.platform.virtual_network
-}
-
-output "subnets" {
-  description = "Subnet details from platform module."
-  value       = module.platform.subnets
-}
-
-// ============================================================
-// Platform Module Outputs - Security
+// Security Outputs
 // ============================================================
 
 output "key_vault" {
@@ -37,70 +25,13 @@ output "key_vault" {
   value       = module.platform.key_vault
 }
 
-// ============================================================
-// Platform Module Outputs - Compute Resources
-// ============================================================
-
-output "container_registry" {
-  description = "Azure Container Registry for container images."
-  value       = module.platform.container_registry
-}
-
-output "storage_account" {
-  description = "Storage account for ML workspace and general storage."
-  value       = module.platform.storage_account
+output "key_vault_name" {
+  description = "Key Vault name for script consumption."
+  value       = module.platform.key_vault.name
 }
 
 // ============================================================
-// Platform Module Outputs - ML Workspace
-// ============================================================
-
-output "azureml_workspace" {
-  description = "Azure ML workspace for ML workloads."
-  value       = module.platform.azureml_workspace
-}
-
-output "ml_workload_identity" {
-  description = "ML workload identity for federated credentials."
-  value       = module.platform.ml_workload_identity
-}
-
-// ============================================================
-// Platform Module Outputs - Observability
-// ============================================================
-
-output "log_analytics_workspace" {
-  description = "Log Analytics Workspace for centralized logging."
-  value       = module.platform.log_analytics_workspace
-}
-
-output "application_insights" {
-  description = "Application Insights for application telemetry."
-  value       = module.platform.application_insights
-  sensitive   = true
-}
-
-output "grafana" {
-  description = "Azure Managed Grafana for dashboards."
-  value       = module.platform.grafana
-}
-
-// ============================================================
-// Platform Module Outputs - OSMO Services (Optional)
-// ============================================================
-
-output "postgresql" {
-  description = "PostgreSQL Flexible Server object."
-  value       = module.platform.postgresql
-}
-
-output "redis" {
-  description = "Azure Redis Cache object."
-  value       = module.platform.redis
-}
-
-// ============================================================
-// SiL Module Outputs - AKS Cluster
+// AKS Cluster Outputs
 // ============================================================
 
 output "aks_cluster" {
@@ -120,8 +51,18 @@ output "gpu_node_pool_subnets" {
 }
 
 // ============================================================
-// SiL Module Outputs - ML Extension
+// ML Workspace Outputs
 // ============================================================
+
+output "azureml_workspace" {
+  description = "Azure ML workspace for ML workloads."
+  value       = module.platform.azureml_workspace
+}
+
+output "ml_workload_identity" {
+  description = "ML workload identity for federated credentials."
+  value       = module.platform.ml_workload_identity
+}
 
 output "ml_extension" {
   description = "Azure ML Extension on AKS."
@@ -131,4 +72,90 @@ output "ml_extension" {
 output "kubernetes_compute" {
   description = "Kubernetes compute target registered in ML workspace."
   value       = module.sil.kubernetes_compute
+}
+
+// ============================================================
+// OSMO Connection Outputs (for deploy-osmo-control-plane.sh)
+// ============================================================
+
+output "postgresql_connection_info" {
+  description = "PostgreSQL connection information for OSMO control plane."
+  value = module.platform.postgresql != null ? {
+    fqdn           = module.platform.postgresql.fqdn
+    name           = module.platform.postgresql.name
+    admin_username = module.platform.postgresql.admin_username
+    secret_name    = module.platform.postgresql_secret_name
+  } : null
+}
+
+output "managed_redis_connection_info" {
+  description = "Redis connection information for OSMO control plane."
+  value = module.platform.redis != null ? {
+    hostname    = module.platform.redis.hostname
+    name        = module.platform.redis.name
+    port        = module.platform.redis.port
+    secret_name = module.platform.redis_secret_name
+  } : null
+}
+
+// ============================================================
+// Networking Outputs
+// ============================================================
+
+output "virtual_network" {
+  description = "Virtual network for robotics infrastructure."
+  value       = module.platform.virtual_network
+}
+
+output "subnets" {
+  description = "Subnet details from platform module."
+  value       = module.platform.subnets
+}
+
+// ============================================================
+// Compute Resources Outputs
+// ============================================================
+
+output "container_registry" {
+  description = "Azure Container Registry for container images."
+  value       = module.platform.container_registry
+}
+
+output "storage_account" {
+  description = "Storage account for ML workspace and general storage."
+  value       = module.platform.storage_account
+}
+
+// ============================================================
+// Observability Outputs
+// ============================================================
+
+output "log_analytics_workspace" {
+  description = "Log Analytics Workspace for centralized logging."
+  value       = module.platform.log_analytics_workspace
+}
+
+output "application_insights" {
+  description = "Application Insights for application telemetry."
+  value       = module.platform.application_insights
+  sensitive   = true
+}
+
+output "grafana" {
+  description = "Azure Managed Grafana for dashboards."
+  value       = module.platform.grafana
+}
+
+// ============================================================
+// OSMO Services Outputs (Optional)
+// ============================================================
+
+output "postgresql" {
+  description = "PostgreSQL Flexible Server object."
+  value       = module.platform.postgresql
+}
+
+output "redis" {
+  description = "Azure Redis Cache object."
+  value       = module.platform.redis
 }

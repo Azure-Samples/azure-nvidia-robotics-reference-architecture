@@ -98,16 +98,21 @@ fi
 
 aks_name=$(echo "${tf_output}" | jq -r '.aks_cluster.value.name')
 resource_group=$(echo "${tf_output}" | jq -r '.resource_group.value.name')
-pg_fqdn=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.fqdn')
-pg_user=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.admin_username')
-redis_hostname=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.hostname')
-redis_port=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.port')
+pg_fqdn=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.fqdn // empty')
+pg_user=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.admin_username // empty')
+pg_secret_name=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.secret_name // empty')
+redis_hostname=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.hostname // empty')
+redis_port=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.port // empty')
+redis_secret_name=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.secret_name // empty')
 keyvault_name=$(echo "${tf_output}" | jq -r '.key_vault_name.value // empty')
-postgres_server_name=${pg_fqdn%%.*}
-redis_cluster=${redis_hostname%%.*}
 
 if [[ -z "${keyvault_name}" ]]; then
   echo "Error: key_vault_name output not found in terraform state" >&2
+  exit 1
+fi
+
+if [[ -z "${pg_fqdn}" ]] || [[ -z "${redis_hostname}" ]]; then
+  echo "Error: PostgreSQL or Redis not deployed. Ensure should_deploy_postgresql and should_deploy_redis are true." >&2
   exit 1
 fi
 
@@ -143,31 +148,31 @@ kubectl create secret docker-registry nvcr-secret \
   --docker-password="${ngc_token}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-postgres_secret_name="db-secret"
-redis_secret_name="redis-secret"
+k8s_postgres_secret="db-secret"
+k8s_redis_secret="redis-secret"
 
 echo "Retrieving PostgreSQL password from Key Vault ${keyvault_name}..."
 postgres_password=$(az keyvault secret show \
   --vault-name "${keyvault_name}" \
-  --name "${postgres_server_name}-admin-password" \
+  --name "${pg_secret_name}" \
   --query value \
   --output tsv)
 
-echo "Creating ${postgres_secret_name}..."
-kubectl create secret generic "${postgres_secret_name}" \
+echo "Creating ${k8s_postgres_secret}..."
+kubectl create secret generic "${k8s_postgres_secret}" \
   --namespace="${namespace}" \
   --from-literal=db-password="${postgres_password}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-echo "Retrieving Redis access key for ${redis_cluster}..."
-redis_key=$(az redisenterprise database list-keys \
-  --cluster-name "${redis_cluster}" \
-  --resource-group "${resource_group}" \
-  --query primaryKey \
+echo "Retrieving Redis access key from Key Vault ${keyvault_name}..."
+redis_key=$(az keyvault secret show \
+  --vault-name "${keyvault_name}" \
+  --name "${redis_secret_name}" \
+  --query value \
   --output tsv)
 
-echo "Creating ${redis_secret_name}..."
-kubectl create secret generic "${redis_secret_name}" \
+echo "Creating ${k8s_redis_secret}..."
+kubectl create secret generic "${k8s_redis_secret}" \
   --namespace="${namespace}" \
   --from-literal=redis-password="${redis_key}" \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -246,7 +251,7 @@ echo "Image Version:    2025.10.8.c18411774"
 echo "Image Registry:   nvcr.io/nvidia/osmo"
 echo "PostgreSQL Host:  ${pg_fqdn}"
 echo "Redis Host:       ${redis_hostname}:${redis_port}"
-echo "Secrets:          nvcr-secret, ${postgres_secret_name}, ${redis_secret_name}"
+echo "K8s Secrets:      nvcr-secret, ${k8s_postgres_secret}, ${k8s_redis_secret}"
 echo "Values Files:     ${values_dir}"
 echo
 echo "Next Steps:"

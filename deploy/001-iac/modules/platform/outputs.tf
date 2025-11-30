@@ -180,10 +180,16 @@ output "private_dns_zones" {
 output "postgresql" {
   description = "PostgreSQL Flexible Server for OSMO (if deployed)"
   value = try({
-    id   = azurerm_postgresql_flexible_server.main[0].id
-    fqdn = azurerm_postgresql_flexible_server.main[0].fqdn
-    name = azurerm_postgresql_flexible_server.main[0].name
+    id             = azurerm_postgresql_flexible_server.main[0].id
+    fqdn           = azurerm_postgresql_flexible_server.main[0].fqdn
+    name           = azurerm_postgresql_flexible_server.main[0].name
+    admin_username = azurerm_postgresql_flexible_server.main[0].administrator_login
   }, null)
+}
+
+output "postgresql_secret_name" {
+  description = "Key Vault secret name containing PostgreSQL admin password"
+  value       = try(azurerm_key_vault_secret.postgresql_password[0].name, null)
 }
 
 output "redis" {
@@ -192,5 +198,11 @@ output "redis" {
     id       = azurerm_redis_cache.main[0].id
     hostname = azurerm_redis_cache.main[0].hostname
     name     = azurerm_redis_cache.main[0].name
+    port     = azurerm_redis_cache.main[0].ssl_port
   }, null)
+}
+
+output "redis_secret_name" {
+  description = "Key Vault secret name containing Redis primary access key"
+  value       = try(azurerm_key_vault_secret.redis_primary_key[0].name, null)
 }

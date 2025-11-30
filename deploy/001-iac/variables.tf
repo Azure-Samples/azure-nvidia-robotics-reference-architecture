@@ -53,8 +53,6 @@ variable "should_deploy_postgresql" {
   default     = true
 }
 
-
-
 variable "postgresql_databases" {
   type = map(object({
     collation = string
@@ -67,12 +65,6 @@ variable "postgresql_databases" {
       charset   = "utf8"
     }
   }
-}
-
-variable "postgresql_delegated_subnet_id" {
-  type        = string
-  description = "Subnet ID with delegation to Microsoft.DBforPostgreSQL/flexibleServers. (Otherwise, created when should_create_networking is true)."
-  default     = null
 }
 
 variable "postgresql_subnet_address_prefixes" {
@@ -126,30 +118,6 @@ variable "redis_clustering_policy" {
   }
 }
 
-variable "redis_access_keys_authentication_enabled" {
-  type        = bool
-  description = "Whether to enable access key authentication for Redis. Set to true to use access keys"
-  default     = true
-}
-
-
-
-/*
- * Chart Installation Configuration - Optional
- */
-
-variable "should_install_robotics_charts" {
-  type        = bool
-  description = "Whether to install robotics charts (NVIDIA related)"
-  default     = true
-}
-
-variable "should_install_azureml_charts" {
-  type        = bool
-  description = "Whether to install AzureML charts"
-  default     = true
-}
-
 /*
  * Resource Name Overrides - Optional
  */
@@ -158,30 +126,6 @@ variable "resource_group_name" {
   type        = string
   description = "Existing resource group name containing foundational and ML resources (Otherwise 'rg-{resource_prefix}-{environment}-{instance}')"
   default     = null
-}
-
-variable "virtual_network_name" {
-  type        = string
-  description = "Existing or desired virtual network name (Otherwise 'vnet-{resource_prefix}-{environment}-{instance}')"
-  default     = null
-}
-
-variable "aks_cluster_name" {
-  type        = string
-  description = "Existing AKS cluster name for ML integration (Otherwise 'aks-{resource_prefix}-{environment}-{instance}')"
-  default     = null
-}
-
-variable "azureml_workspace_name" {
-  type        = string
-  description = "Existing or desired Azure ML workspace name (Otherwise 'mlw-{resource_prefix}-{environment}-{instance}')"
-  default     = null
-}
-
-variable "should_create_ml_workload_identity" {
-  type        = bool
-  description = "Whether to create user-assigned managed identity for AzureML workload federation"
-  default     = true
 }
 
 /*
@@ -229,7 +173,7 @@ variable "node_vm_size" {
 variable "node_count" {
   type        = number
   description = "Number of nodes for the agent pool in the AKS cluster"
-  default     = 2
+  default     = 1
 }
 
 variable "enable_auto_scaling" {
@@ -349,23 +293,12 @@ variable "cluster_integration_instance_types" {
           "nvidia.com/gpu" = 1
         }
         requests = {
-          cpu              = "1"
-          memory           = "1Gi"
-          "nvidia.com/gpu" = 1
+          cpu    = "1"
+          memory = "1Gi"
         }
       }
     }
   }
-}
-
-/*
- * Edge Deployment Configuration - Optional
- */
-
-variable "should_deploy_edge_extension" {
-  type        = bool
-  description = "Whether to deploy Azure ML edge extension on a connected cluster"
-  default     = false
 }
 
 /*
@@ -389,121 +322,6 @@ variable "should_enable_public_network_access" {
 }
 
 /*
- * Outbound Access Configuration - Optional
- */
-
-variable "should_enable_managed_outbound_access" {
-  type        = bool
-  description = "Whether to enable managed outbound egress via NAT gateway instead of platform default internet access"
-  default     = true
-}
-
-/*
- * VPN Gateway Configuration - Optional
- */
-
-variable "should_enable_vpn_gateway" {
-  type        = bool
-  description = "Whether to create VPN Gateway for remote access"
-  default     = true
-}
-
-variable "vpn_site_connections" {
-  type = list(object({
-    name                 = string
-    address_spaces       = list(string)
-    shared_key_reference = string
-    gateway_ip_address   = optional(string)
-    gateway_fqdn         = optional(string)
-    bgp_asn              = optional(number)
-    bgp_peering_address  = optional(string)
-    ike_protocol         = optional(string, "IKEv2")
-  }))
-  description = "Site-to-site VPN site definitions for connecting on-premises networks"
-  default     = []
-}
-
-variable "vpn_site_default_ipsec_policy" {
-  type = object({
-    dh_group            = string
-    ike_encryption      = string
-    ike_integrity       = string
-    ipsec_encryption    = string
-    ipsec_integrity     = string
-    pfs_group           = string
-    sa_datasize_kb      = optional(number)
-    sa_lifetime_seconds = optional(number)
-  })
-  description = "Fallback IPsec policy applied when vpn_site_connections omit ipsec_policy overrides"
-  default     = null
-}
-
-variable "vpn_site_shared_keys" {
-  type        = map(string)
-  description = "Pre-shared keys for site-to-site VPN connections indexed by connection name"
-  sensitive   = true
-  default     = {}
-}
-
-/*
- * VM Host Configuration - Optional
- */
-
-variable "should_create_vm_host" {
-  type        = bool
-  description = "Whether to create VM host for GPU workloads and testing"
-  default     = false
-}
-
-variable "vm_host_count" {
-  type        = number
-  description = "Number of VM hosts to create"
-  default     = 1
-}
-
-variable "vm_sku_size" {
-  type        = string
-  description = "VM SKU size for the host"
-  default     = "Standard_D8s_v3"
-}
-
-variable "vm_priority" {
-  type        = string
-  description = "VM priority: Regular or Spot for cost optimization"
-  default     = "Regular"
-}
-
-variable "vm_eviction_policy" {
-  type        = string
-  description = "Eviction policy for Spot VMs: Deallocate or Delete"
-  default     = "Deallocate"
-}
-
-variable "vm_max_bid_price" {
-  type        = number
-  description = "Maximum hourly price for Spot VM (-1 for Azure default)"
-  default     = -1
-}
-
-variable "should_assign_current_user_vm_admin" {
-  type        = bool
-  description = "Whether to assign current user VM admin role for Azure AD login"
-  default     = true
-}
-
-variable "should_use_vm_password_auth" {
-  type        = bool
-  description = "Whether to use password authentication for VM access"
-  default     = false
-}
-
-variable "should_create_vm_ssh_key" {
-  type        = bool
-  description = "Whether to generate SSH key pair for VM access"
-  default     = true
-}
-
-/*
  * Inference Router Configuration - Optional
  */
 
@@ -516,6 +334,3 @@ variable "inference_router_service_type" {
     error_message = "inference_router_service_type must be one of: LoadBalancer, NodePort, or ClusterIP."
   }
 }
-
-
-
