@@ -43,6 +43,12 @@ variable "should_use_current_user_key_vault_admin" {
   default     = true
 }
 
+variable "should_enable_purge_protection" {
+  type        = bool
+  description = "Whether to enable purge protection on Key Vault. Set to false for dev/test to allow easy cleanup. WARNING: Once enabled, purge protection cannot be disabled"
+  default     = false
+}
+
 /*
  * PostgreSQL Configuration
  */
@@ -202,33 +208,31 @@ variable "max_count" {
 
 variable "node_pools" {
   type = map(object({
-    node_count                  = optional(number, null)
-    vm_size                     = string
-    subnet_address_prefixes     = list(string)
-    pod_subnet_address_prefixes = list(string)
-    node_taints                 = optional(list(string), [])
-    enable_auto_scaling         = optional(bool, false)
-    min_count                   = optional(number, null)
-    max_count                   = optional(number, null)
-    priority                    = optional(string, "Regular")
-    zones                       = optional(list(string), null)
-    eviction_policy             = optional(string, "Deallocate")
-    gpu_driver                  = optional(string, null)
+    node_count              = optional(number, null)
+    vm_size                 = string
+    subnet_address_prefixes = list(string)
+    node_taints             = optional(list(string), [])
+    enable_auto_scaling     = optional(bool, false)
+    min_count               = optional(number, null)
+    max_count               = optional(number, null)
+    priority                = optional(string, "Regular")
+    zones                   = optional(list(string), null)
+    eviction_policy         = optional(string, "Deallocate")
+    gpu_driver              = optional(string, null)
   }))
-  description = "Additional node pools for the AKS cluster. Map key is used as the node pool name"
+  description = "Additional node pools for the AKS cluster. Map key is used as the node pool name. Note: Pod subnets are not used with Azure CNI Overlay mode"
   default = {
     gpu = {
-      vm_size                     = "Standard_NV36ads_A10_v5"
-      subnet_address_prefixes     = ["10.0.7.0/24"]
-      pod_subnet_address_prefixes = ["10.0.8.0/24"]
-      node_taints                 = ["nvidia.com/gpu:NoSchedule", "kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
-      gpu_driver                  = "Install"
-      priority                    = "Spot"
-      enable_auto_scaling         = true
-      min_count                   = 0
-      max_count                   = 0
-      zones                       = []
-      eviction_policy             = "Delete"
+      vm_size                 = "Standard_NV36ads_A10_v5"
+      subnet_address_prefixes = ["10.0.7.0/24"]
+      node_taints             = ["nvidia.com/gpu:NoSchedule", "kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
+      gpu_driver              = "Install"
+      priority                = "Spot"
+      enable_auto_scaling     = true
+      min_count               = 0
+      max_count               = 0
+      zones                   = []
+      eviction_policy         = "Delete"
     }
   }
 }

@@ -20,13 +20,14 @@ resource "azurerm_key_vault" "main" {
   sku_name                      = "standard"
   rbac_authorization_enabled    = true
   soft_delete_retention_days    = 7
-  purge_protection_enabled      = true
+  purge_protection_enabled      = var.should_enable_purge_protection
   public_network_access_enabled = var.should_enable_public_network_access
   tags                          = local.tags
 
   network_acls {
-    bypass         = "AzureServices"
-    default_action = local.pe_enabled ? "Deny" : "Allow"
+    bypass = "AzureServices"
+    // Allow public access when enabled, otherwise deny (PE-only)
+    default_action = var.should_enable_public_network_access ? "Allow" : "Deny"
   }
 }
 

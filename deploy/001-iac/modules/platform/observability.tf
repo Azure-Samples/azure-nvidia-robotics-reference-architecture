@@ -66,7 +66,7 @@ resource "azurerm_dashboard_grafana" "main" {
   api_key_enabled                   = true
   deterministic_outbound_ip_enabled = false
   public_network_access_enabled     = var.should_enable_public_network_access
-  grafana_major_version             = 10
+  grafana_major_version             = 11
   sku                               = "Standard"
   zone_redundancy_enabled           = false
   tags                              = local.tags
@@ -168,4 +168,12 @@ resource "azurerm_private_endpoint" "monitor" {
       azurerm_private_dns_zone.core["storage_blob"].id, // SHARED with Storage Account
     ]
   }
+
+  // Ensure all scoped services are linked before creating the private endpoint
+  // to avoid "Mismatching RequiredMembers in Request" error
+  depends_on = [
+    azurerm_monitor_private_link_scoped_service.law,
+    azurerm_monitor_private_link_scoped_service.ai,
+    azurerm_monitor_private_link_scoped_service.dce,
+  ]
 }

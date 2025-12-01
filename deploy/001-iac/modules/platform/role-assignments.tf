@@ -6,6 +6,9 @@
  * - Storage Account access for ML identity
  * - Container Registry access for ML identity
  * - Grafana monitoring and admin access
+ *
+ * Note: Resources that require these role assignments (e.g., ML workspace) must
+ * include depends_on references to ensure proper ordering
  */
 
 // ============================================================
@@ -25,6 +28,18 @@ resource "azurerm_role_assignment" "user_kv_officer" {
 resource "azurerm_role_assignment" "ml_kv_user" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.ml.principal_id
+}
+
+// ============================================================
+// Resource Group Role Assignments
+// ============================================================
+
+// Grant ML identity Contributor at resource group level
+// Required for ML workspace creation to read Key Vault and other resource metadata
+resource "azurerm_role_assignment" "ml_rg_contributor" {
+  scope                = var.resource_group.id
+  role_definition_name = "Contributor"
   principal_id         = azurerm_user_assigned_identity.ml.principal_id
 }
 

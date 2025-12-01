@@ -31,18 +31,8 @@ resource "azurerm_machine_learning_workspace" "main" {
   }
 
   identity {
-    type         = "SystemAssigned, UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.ml.id]
+    type = "SystemAssigned"
   }
-
-  primary_user_assigned_identity = azurerm_user_assigned_identity.ml.id
-
-  depends_on = [
-    azurerm_role_assignment.ml_kv_user,
-    azurerm_role_assignment.ml_storage_blob,
-    azurerm_role_assignment.ml_storage_file,
-    azurerm_role_assignment.ml_acr_push,
-  ]
 }
 
 // ============================================================

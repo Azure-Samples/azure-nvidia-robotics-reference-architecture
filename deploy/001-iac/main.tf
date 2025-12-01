@@ -73,6 +73,7 @@ module "platform" {
   should_enable_private_endpoints         = var.should_enable_private_endpoints
   should_enable_public_network_access     = var.should_enable_public_network_access
   should_use_current_user_key_vault_admin = var.should_use_current_user_key_vault_admin
+  should_enable_purge_protection          = var.should_enable_purge_protection
 
   // OSMO optional services
   should_deploy_postgresql = var.should_deploy_postgresql

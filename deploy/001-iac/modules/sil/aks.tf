@@ -42,7 +42,6 @@ resource "azurerm_kubernetes_cluster" "main" {
     min_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.min_count : null
     max_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.max_count : null
     vnet_subnet_id              = azurerm_subnet.aks.id
-    pod_subnet_id               = azurerm_subnet.aks_pod.id
     os_disk_size_gb             = 128
     os_disk_type                = "Ephemeral"
     temporary_name_for_rotation = "systemtemp"
@@ -89,6 +88,10 @@ resource "azurerm_kubernetes_cluster" "main" {
     secret_rotation_enabled  = true
     secret_rotation_interval = "2m"
   }
+
+  depends_on = [
+    azurerm_subnet_nat_gateway_association.aks,
+  ]
 }
 
 // ============================================================
@@ -103,7 +106,6 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
   node_count            = each.value.node_count
   vm_size               = each.value.vm_size
   vnet_subnet_id        = azurerm_subnet.gpu_node_pool[each.key].id
-  pod_subnet_id         = azurerm_subnet.gpu_node_pool_pod[each.key].id
   node_taints           = each.value.node_taints
   auto_scaling_enabled  = each.value.enable_auto_scaling
   min_count             = each.value.enable_auto_scaling ? each.value.min_count : null
@@ -123,7 +125,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
 // ============================================================
 
 resource "azurerm_private_endpoint" "aks" {
-  count = var.aks_config.is_private_cluster && local.pe_enabled && var.subnets.private_endpoints != null ? 1 : 0
+  // Use known boolean values for count to avoid plan-time dependency issues
+  // pe_enabled ensures the PE subnet exists when this resource is created
+  count = var.aks_config.is_private_cluster && local.pe_enabled ? 1 : 0
 
   name                = "pe-aks-${local.resource_name_suffix}"
   location            = var.resource_group.location

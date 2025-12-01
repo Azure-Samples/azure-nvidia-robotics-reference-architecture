@@ -11,15 +11,11 @@
 // ============================================================
 
 output "aks_subnets" {
-  description = "AKS subnets created by the module."
+  description = "AKS subnets created by the module. Note: Pod subnets are not used with Azure CNI Overlay mode."
   value = {
     aks = {
       id   = azurerm_subnet.aks.id
       name = azurerm_subnet.aks.name
-    }
-    aks_pod = {
-      id   = azurerm_subnet.aks_pod.id
-      name = azurerm_subnet.aks_pod.name
     }
   }
 }

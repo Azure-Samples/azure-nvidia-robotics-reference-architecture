@@ -42,6 +42,12 @@ variable "should_use_current_user_key_vault_admin" {
   default     = true
 }
 
+variable "should_enable_purge_protection" {
+  type        = bool
+  description = "Whether to enable purge protection on Key Vault. Set to false for dev/test to allow easy cleanup. WARNING: Once enabled, purge protection cannot be disabled"
+  default     = false
+}
+
 /*
  * OSMO Variables - PostgreSQL
  */

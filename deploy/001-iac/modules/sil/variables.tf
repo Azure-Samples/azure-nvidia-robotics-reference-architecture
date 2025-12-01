@@ -14,10 +14,9 @@ variable "should_enable_private_endpoints" {
 
 variable "aks_subnet_config" {
   type = object({
-    subnet_address_prefix_aks     = optional(string, "10.0.5.0/24")
-    subnet_address_prefix_aks_pod = optional(string, "10.0.6.0/24")
+    subnet_address_prefix_aks = optional(string, "10.0.5.0/24")
   })
-  description = "AKS subnet address configuration for system node pool. When properties are null, defaults are used"
+  description = "AKS subnet address configuration for system node pool. When properties are null, defaults are used. Note: Pod subnets are not used with Azure CNI Overlay mode"
   default     = {}
 }
 
@@ -47,34 +46,32 @@ variable "aks_config" {
 
 variable "node_pools" {
   type = map(object({
-    vm_size                     = string
-    node_count                  = optional(number, null)
-    subnet_address_prefixes     = list(string)
-    pod_subnet_address_prefixes = list(string)
-    node_taints                 = optional(list(string), [])
-    gpu_driver                  = optional(string)
-    priority                    = optional(string, "Regular")
-    enable_auto_scaling         = optional(bool, false)
-    min_count                   = optional(number, null)
-    max_count                   = optional(number, null)
-    zones                       = optional(list(string), null)
-    eviction_policy             = optional(string, "Deallocate")
+    vm_size                 = string
+    node_count              = optional(number, null)
+    subnet_address_prefixes = list(string)
+    node_taints             = optional(list(string), [])
+    gpu_driver              = optional(string)
+    priority                = optional(string, "Regular")
+    enable_auto_scaling     = optional(bool, false)
+    min_count               = optional(number, null)
+    max_count               = optional(number, null)
+    zones                   = optional(list(string), null)
+    eviction_policy         = optional(string, "Deallocate")
   }))
-  description = "Additional AKS node pools configuration. Map key is used as the node pool name"
+  description = "Additional AKS node pools configuration. Map key is used as the node pool name. Note: Pod subnets are not used with Azure CNI Overlay mode"
   default = {
     gpu = {
-      vm_size                     = "Standard_NV36ads_A10_v5"
-      node_count                  = null
-      subnet_address_prefixes     = ["10.0.16.0/24"]
-      pod_subnet_address_prefixes = ["10.0.20.0/22"]
-      node_taints                 = ["nvidia.com/gpu:NoSchedule", "kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
-      gpu_driver                  = "Install"
-      priority                    = "Spot"
-      enable_auto_scaling         = true
-      min_count                   = 0
-      max_count                   = 1
-      zones                       = []
-      eviction_policy             = "Delete"
+      vm_size                 = "Standard_NV36ads_A10_v5"
+      node_count              = null
+      subnet_address_prefixes = ["10.0.16.0/24"]
+      node_taints             = ["nvidia.com/gpu:NoSchedule", "kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
+      gpu_driver              = "Install"
+      priority                = "Spot"
+      enable_auto_scaling     = true
+      min_count               = 0
+      max_count               = 1
+      zones                   = []
+      eviction_policy         = "Delete"
     }
   }
 }
