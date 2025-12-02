@@ -12,16 +12,17 @@
 // ============================================================
 
 resource "azurerm_storage_account" "main" {
-  name                          = "st${var.resource_prefix}${var.environment}${var.instance}"
-  location                      = var.resource_group.location
-  resource_group_name           = var.resource_group.name
-  account_tier                  = "Standard"
-  account_replication_type      = "LRS"
-  access_tier                   = "Hot"
-  min_tls_version               = "TLS1_2"
-  shared_access_key_enabled     = var.should_enable_storage_shared_access_key
-  public_network_access_enabled = var.should_enable_public_network_access
-  tags                          = local.tags
+  name                            = "st${var.resource_prefix}${var.environment}${var.instance}"
+  location                        = var.resource_group.location
+  resource_group_name             = var.resource_group.name
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  access_tier                     = "Hot"
+  min_tls_version                 = "TLS1_2"
+  shared_access_key_enabled       = var.should_enable_storage_shared_access_key
+  public_network_access_enabled   = var.should_enable_public_network_access
+  allow_nested_items_to_be_public = false
+  tags                            = local.tags
 
   blob_properties {
     delete_retention_policy {

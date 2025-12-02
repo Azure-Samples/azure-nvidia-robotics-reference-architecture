@@ -102,7 +102,7 @@ resource "azurerm_monitor_private_link_scope" "main" {
 
   name                  = "ampls-${local.resource_name_suffix}"
   resource_group_name   = var.resource_group.name
-  ingestion_access_mode = "PrivateOnly"
+  ingestion_access_mode = "Open"
   query_access_mode     = "PrivateOnly"
   tags                  = local.tags
 }

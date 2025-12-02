@@ -1,4 +1,14 @@
 /*
+ * Current User Configuration
+ */
+
+variable "current_user_oid" {
+  type        = string
+  description = "Object ID of the current user for role assignments. Obtained via Microsoft Graph to avoid constant updates from azurerm_client_config"
+  default     = null
+}
+
+/*
  * Networking Variables
  */
 

@@ -12,6 +12,10 @@ terraform {
       source  = "Azure/azapi"
       version = ">= 2.3.0"
     }
+    msgraph = {
+      source  = "microsoft/msgraph"
+      version = ">= 0.2.0"
+    }
     tls = {
       source  = "hashicorp/tls"
       version = ">= 4.0.6"

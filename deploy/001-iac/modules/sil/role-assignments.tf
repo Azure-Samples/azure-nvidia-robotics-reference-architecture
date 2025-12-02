@@ -7,8 +7,6 @@
  * - AKS Cluster Admin role for current user (optional)
  */
 
-data "azurerm_client_config" "current" {}
-
 // ============================================================
 // AKS Cluster Admin Role Assignments
 // ============================================================
@@ -16,22 +14,22 @@ data "azurerm_client_config" "current" {}
 // Grant current user Azure Kubernetes Service Cluster Admin Role
 // This role allows managing the AKS resource in Azure (e.g., scaling, upgrades)
 resource "azurerm_role_assignment" "aks_cluster_admin" {
-  count = var.should_assign_cluster_admin ? 1 : 0
+  count = var.should_assign_cluster_admin && var.current_user_oid != null ? 1 : 0
 
   scope                = azurerm_kubernetes_cluster.main.id
   role_definition_name = "Azure Kubernetes Service Cluster Admin Role"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.current_user_oid
 }
 
 // Grant current user Azure Kubernetes Service RBAC Cluster Admin Role
 // This role is required when azure_rbac_enabled=true to access Kubernetes resources via kubectl
 // Without this role, users cannot run kubectl commands even with az aks get-credentials
 resource "azurerm_role_assignment" "aks_rbac_cluster_admin" {
-  count = var.should_assign_cluster_admin ? 1 : 0
+  count = var.should_assign_cluster_admin && var.current_user_oid != null ? 1 : 0
 
   scope                = azurerm_kubernetes_cluster.main.id
   role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.current_user_oid
 }
 
 // ============================================================

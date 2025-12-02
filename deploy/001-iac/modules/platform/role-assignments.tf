@@ -17,11 +17,11 @@
 
 // Grant current user Key Vault Secrets Officer (for initial secret management)
 resource "azurerm_role_assignment" "user_kv_officer" {
-  count = var.should_use_current_user_key_vault_admin ? 1 : 0
+  count = var.should_use_current_user_key_vault_admin != null ? 1 : 0
 
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.current_user_oid
 }
 
 // Grant ML identity Key Vault Secrets User (for workload access)
@@ -94,5 +94,17 @@ resource "azurerm_role_assignment" "grafana_monitoring_reader" {
 resource "azurerm_role_assignment" "grafana_admin" {
   scope                = azurerm_dashboard_grafana.main.id
   role_definition_name = "Grafana Admin"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.current_user_oid
+}
+
+// ============================================================
+// Application Insights Role Assignments
+// ============================================================
+
+// Grant ML identity Monitoring Metrics Publisher on Application Insights
+// Required for AzureML jobs to send telemetry when using managed identity
+resource "azurerm_role_assignment" "ml_appinsights_publisher" {
+  scope                = azurerm_application_insights.main.id
+  role_definition_name = "Monitoring Metrics Publisher"
+  principal_id         = azurerm_user_assigned_identity.ml.principal_id
 }

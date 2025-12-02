@@ -11,6 +11,18 @@
 
 locals {
   resource_group_name = coalesce(var.resource_group_name, "rg-${var.resource_prefix}-${var.environment}-${var.instance}")
+  current_user_oid    = try(msgraph_resource_action.current_user[0].output.oid, null)
+}
+
+resource "msgraph_resource_action" "current_user" {
+  count = var.should_use_current_user_key_vault_admin ? 1 : 0
+
+  method       = "GET"
+  resource_url = "me"
+
+  response_export_values = {
+    oid = "id"
+  }
 }
 
 resource "azurerm_resource_group" "this" {
@@ -62,6 +74,9 @@ module "platform" {
   tags            = {}
   resource_group  = local.resource_group
 
+  // Current user OID for role assignments (from Microsoft Graph)
+  current_user_oid = local.current_user_oid
+
   // Networking configuration
   virtual_network_config = {
     address_space              = var.virtual_network_config.address_space
@@ -107,6 +122,9 @@ module "sil" {
   instance        = var.instance
   tags            = {}
   resource_group  = local.resource_group
+
+  // Current user OID for cluster admin role assignments (from Microsoft Graph)
+  current_user_oid = local.current_user_oid
 
   // Dependencies from platform module (passed as typed objects)
   virtual_network          = module.platform.virtual_network

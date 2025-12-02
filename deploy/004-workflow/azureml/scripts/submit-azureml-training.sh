@@ -497,6 +497,14 @@ main() {
   az_args+=(--set "inputs.mlflow_token_refresh_retries=$mlflow_token_retries")
   az_args+=(--set "inputs.mlflow_http_request_timeout=$mlflow_http_timeout")
 
+  # Set environment variables directly (AzureML ${{inputs.X}} syntax doesn't work for env vars)
+  az_args+=(--set "environment_variables.AZURE_SUBSCRIPTION_ID=$subscription_id")
+  az_args+=(--set "environment_variables.AZURE_RESOURCE_GROUP=$resource_group")
+  az_args+=(--set "environment_variables.AZUREML_WORKSPACE_NAME=$workspace_name")
+  az_args+=(--set "environment_variables.RUN_AZURE_SMOKE_TEST=$run_smoke_test_value")
+  az_args+=(--set "environment_variables.MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES=$mlflow_token_retries")
+  az_args+=(--set "environment_variables.MLFLOW_HTTP_REQUEST_TIMEOUT=$mlflow_http_timeout")
+
   # Add any additional az ml arguments passed through via --
   if [[ ${#forward_args[@]} -gt 0 ]]; then
     az_args+=("${forward_args[@]}")

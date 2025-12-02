@@ -203,8 +203,15 @@ if [[ -z "${extension_name}" ]]; then
   extension_name="azureml-${aks_name}"
 fi
 
+# Compute name must be 2-16 characters (letters, digits, dashes)
+# Use a short prefix instead of duplicating 'aks-'
 if [[ -z "${compute_name}" ]]; then
-  compute_name="aks-${aks_name}"
+  # Extract the resource suffix (e.g., "osmorobo-tst-001" from "aks-osmorobo-tst-001")
+  # and prefix with 'k8s-' to stay under 16 chars
+  compute_suffix="${aks_name#aks-}"
+  # Truncate to fit within 16 char limit (16 - 4 for "k8s-" = 12 chars max for suffix)
+  compute_suffix="${compute_suffix:0:12}"
+  compute_name="k8s-${compute_suffix}"
 fi
 
 echo "  AKS Cluster:     ${aks_name}"
@@ -230,12 +237,16 @@ az aks get-credentials \
 kubectl cluster-info &>/dev/null
 
 # ============================================================
-# Install AzureML Extension
+# Step 1: Install AzureML Extension
 # ============================================================
+
+# Per Microsoft documentation, the extension MUST be installed first via
+# az k8s-extension create, then the cluster is attached via az ml compute attach.
+# Reference: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-deploy-kubernetes-extension
 
 echo ""
 echo "============================"
-echo "Installing AzureML Extension"
+echo "Step 1: Install AzureML Extension"
 echo "============================"
 echo "Configuration:"
 echo "  Enable Training:             ${enable_training}"
@@ -244,15 +255,6 @@ echo "  Inference Router Type:       ${inference_router_service_type}"
 echo "  Inference Router HA:         ${inference_router_ha}"
 echo "  Allow Insecure Connections:  ${allow_insecure_connections}"
 echo "  Cluster Purpose:             ${cluster_purpose}"
-echo ""
-echo "Component Installation:"
-echo "  Install NVIDIA Device Plugin: ${install_nvidia_device_plugin}"
-echo "  Install DCGM Exporter:        ${install_dcgm_exporter}"
-echo "  Install Volcano:              ${install_volcano}"
-echo "  Install Prometheus Operator:  ${install_prom_op}"
-echo ""
-echo "GPU Spot Tolerations:          ${enable_gpu_spot_tolerations}"
-echo "============================"
 
 # Build configuration arguments array
 config_args=(
@@ -291,90 +293,73 @@ for arg in "${config_args[@]}"; do
   config_string+="${arg} "
 done
 
-echo ""
-echo "Executing az k8s-extension create..."
-
-# Install the extension
-# shellcheck disable=SC2086
-az k8s-extension create \
+# Check if extension already exists
+existing_extension=$(az k8s-extension show \
   --name "${extension_name}" \
-  --extension-type Microsoft.AzureML.Kubernetes \
   --cluster-type managedClusters \
   --cluster-name "${aks_name}" \
   --resource-group "${resource_group}" \
-  --scope cluster \
-  --release-namespace azureml \
-  --release-train stable \
-  --config ${config_string}
+  --query "name" -o tsv 2>/dev/null || true)
 
-# ============================================================
-# Attach Cluster as Compute Target
-# ============================================================
-
-if [[ "${skip_compute_attach}" != "true" ]]; then
-  if [[ -z "${ml_workspace_name}" ]] || [[ -z "${aks_id}" ]]; then
-    echo ""
-    echo "Warning: ML workspace or AKS ID not found in Terraform outputs."
-    echo "Skipping compute attach. You can attach manually with:"
-    echo "  az ml compute attach --resource-group <rg> --workspace-name <ws> \\"
-    echo "    --type Kubernetes --name ${compute_name} --resource-id <aks-id> \\"
-    echo "    --identity-type UserAssigned --user-assigned-identities <identity-id> \\"
-    echo "    --namespace azureml"
-  else
-    echo ""
-    echo "============================"
-    echo "Attaching Cluster as Compute Target"
-    echo "============================"
-    echo "Compute Name:  ${compute_name}"
-    echo "Namespace:     azureml"
-
-    # Use User Assigned Identity from Terraform if available, otherwise fall back to SystemAssigned
-    # The User Assigned Identity has pre-configured role assignments for ACR, Storage, and Key Vault
-    if [[ -n "${ml_identity_id}" ]]; then
-      echo "Identity:      UserAssigned (${ml_identity_id})"
-      az ml compute attach \
-        --resource-group "${resource_group}" \
-        --workspace-name "${ml_workspace_name}" \
-        --type Kubernetes \
-        --name "${compute_name}" \
-        --resource-id "${aks_id}" \
-        --identity-type UserAssigned \
-        --user-assigned-identities "${ml_identity_id}" \
-        --namespace azureml \
-        --no-wait || echo "Warning: Compute attach failed. It may already exist."
-    else
-      echo "Identity:      SystemAssigned (no user-assigned identity found in Terraform outputs)"
-      az ml compute attach \
-        --resource-group "${resource_group}" \
-        --workspace-name "${ml_workspace_name}" \
-        --type Kubernetes \
-        --name "${compute_name}" \
-        --resource-id "${aks_id}" \
-        --identity-type SystemAssigned \
-        --namespace azureml \
-        --no-wait || echo "Warning: Compute attach failed. It may already exist."
-    fi
-  fi
+if [[ -n "${existing_extension}" ]]; then
+  echo ""
+  echo "AzureML extension '${extension_name}' already exists. Skipping installation."
 else
   echo ""
-  echo "Skipping compute attach (--skip-compute-attach)"
+  echo "Installing AzureML extension on AKS cluster..."
+  # shellcheck disable=SC2086
+  az k8s-extension create \
+    --name "${extension_name}" \
+    --extension-type Microsoft.AzureML.Kubernetes \
+    --cluster-type managedClusters \
+    --cluster-name "${aks_name}" \
+    --resource-group "${resource_group}" \
+    --scope cluster \
+    --release-namespace azureml \
+    --release-train stable \
+    --config ${config_string}
+
+  echo ""
+  echo "Extension installation initiated. Waiting for pods to start..."
+  sleep 30
 fi
 
 # ============================================================
-# Create GPU Instance Types
+# Step 2: Create GPU Instance Types
 # ============================================================
+# Instance types MUST be created BEFORE attaching compute target.
+# AzureML syncs instance types during the attach operation, so they
+# must exist in the cluster beforehand.
 
 if [[ "${skip_instance_types}" != "true" ]]; then
   echo ""
   echo "============================"
-  echo "Creating GPU Instance Types"
+  echo "Step 2: Create GPU Instance Types"
   echo "============================"
 
-  # Create instance types for GPU spot nodes
-  # These allow ML jobs to be scheduled on GPU nodes with spot pricing
-  # Note: Only nodeSelector and resources are officially supported fields
-  # Tolerations must be configured at the extension level via workLoadToleration
-  kubectl apply -f - <<EOF
+  # Wait for InstanceType CRD to be available (extension needs time to install CRDs)
+  echo "Waiting for InstanceType CRD to be available..."
+  for i in {1..30}; do
+    if kubectl get crd instancetypes.amlarc.azureml.com &>/dev/null; then
+      echo "InstanceType CRD is available."
+      break
+    fi
+    if [[ $i -eq 30 ]]; then
+      echo "Warning: InstanceType CRD not available after 5 minutes. Skipping instance type creation."
+      echo "You can create instance types later and re-attach the compute target."
+      skip_instance_types="true"
+    else
+      echo "  Waiting for CRD... (${i}/30)"
+      sleep 10
+    fi
+  done
+
+  if [[ "${skip_instance_types}" != "true" ]]; then
+    # Create instance types for GPU spot nodes
+    # These allow ML jobs to be scheduled on GPU nodes with spot pricing
+    # Note: Only nodeSelector and resources are officially supported fields
+    # Tolerations must be configured at the extension level via workLoadToleration
+    kubectl apply -f - <<EOF
 apiVersion: amlarc.azureml.com/v1alpha1
 kind: InstanceTypeList
 items:
@@ -407,11 +392,81 @@ items:
           nvidia.com/gpu: 1
 EOF
 
-  echo "Instance types created:"
-  kubectl get instancetype 2>/dev/null || echo "(InstanceType CRD not yet available)"
+    echo "Instance types created:"
+    kubectl get instancetype 2>/dev/null || echo "(InstanceType CRD not yet available)"
+  fi
 else
   echo ""
   echo "Skipping instance type creation (--skip-instance-types)"
+fi
+
+# ============================================================
+# Step 3: Attach Cluster as Compute Target
+# ============================================================
+# Attach AFTER instance types are created so AzureML syncs them properly.
+
+if [[ "${skip_compute_attach}" != "true" ]]; then
+  if [[ -z "${ml_workspace_name}" ]] || [[ -z "${aks_id}" ]]; then
+    echo ""
+    echo "Error: ML workspace or AKS ID not found in Terraform outputs."
+    echo "Cannot proceed with compute attach."
+    exit 1
+  fi
+
+  echo ""
+  echo "============================"
+  echo "Step 3: Attach Compute Target"
+  echo "============================"
+  echo "Compute Name:  ${compute_name}"
+  echo "Namespace:     azureml"
+
+  # Check if compute target already exists
+  existing_compute=$(az ml compute show \
+    --name "${compute_name}" \
+    --resource-group "${resource_group}" \
+    --workspace-name "${ml_workspace_name}" \
+    --query "name" -o tsv 2>/dev/null || true)
+
+  if [[ -n "${existing_compute}" ]]; then
+    echo ""
+    echo "Compute target '${compute_name}' already exists."
+    echo "To sync new instance types, detach and re-attach the compute:"
+    echo "  az ml compute detach --name ${compute_name} --resource-group ${resource_group} --workspace-name ${ml_workspace_name} --yes"
+    echo "  Then re-run this script."
+  else
+    echo ""
+    echo "Attaching AKS cluster as compute target..."
+
+    # Use User Assigned Identity from Terraform if available
+    if [[ -n "${ml_identity_id}" ]]; then
+      echo "Identity: UserAssigned (${ml_identity_id})"
+      az ml compute attach \
+        --resource-group "${resource_group}" \
+        --workspace-name "${ml_workspace_name}" \
+        --type Kubernetes \
+        --name "${compute_name}" \
+        --resource-id "${aks_id}" \
+        --identity-type UserAssigned \
+        --user-assigned-identities "${ml_identity_id}" \
+        --namespace azureml
+    else
+      echo "Identity: SystemAssigned"
+      az ml compute attach \
+        --resource-group "${resource_group}" \
+        --workspace-name "${ml_workspace_name}" \
+        --type Kubernetes \
+        --name "${compute_name}" \
+        --resource-id "${aks_id}" \
+        --identity-type SystemAssigned \
+        --namespace azureml
+    fi
+
+    echo ""
+    echo "Compute target attached successfully."
+  fi
+else
+  echo ""
+  echo "Skipping compute attach (--skip-compute-attach)"
 fi
 
 # ============================================================
