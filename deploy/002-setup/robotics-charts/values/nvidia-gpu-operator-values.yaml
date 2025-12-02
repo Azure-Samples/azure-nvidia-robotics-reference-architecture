@@ -1,17 +1,43 @@
 # NVIDIA GPU Operator Helm values for Azure AKS
-# Disables components already managed by AKS GPU node pools
+# Configured for AKS with gpu_driver = "Install" (Azure-managed driver/toolkit)
 
-# Driver is managed by AKS GPU node pools
+# Operator settings - use containerd runtime with AKS-compatible handler name
+operator:
+  defaultRuntime: containerd
+  runtimeClass: nvidia-container-runtime
+
+# Common tolerations for spot GPU nodes
+# Applied to all GPU Operator components that need to run on GPU nodes
+daemonsets:
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+
+# Driver is managed by AKS GPU node pools (gpu_driver = "Install" in Terraform)
 driver:
   enabled: false
 
-# Toolkit is managed by AKS
+# Toolkit is managed by AKS - do NOT enable as it will crash containerd
 toolkit:
   enabled: false
 
-# Device plugin is managed by AKS GPU node pools
+# Device plugin - required to advertise GPU resources to kubelet
+# AKS gpu_driver="Install" does NOT include the device plugin
 devicePlugin:
-  enabled: false
+  enabled: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
 # Enable DCGM exporter for GPU metrics
 dcgmExporter:
@@ -38,6 +64,30 @@ gfd:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
+
+# Node Feature Discovery - required to detect GPU nodes
+node-feature-discovery:
+  worker:
+    tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Equal
+        value: ""
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        operator: Equal
+        value: ""
+        effect: NoSchedule
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      - key: kubernetes.azure.com/scalesetpriority
+        operator: Equal
+        value: spot
+        effect: NoSchedule
 
 # Node labeller for GPU detection
 nodeStatusExporter:
@@ -46,3 +96,11 @@ nodeStatusExporter:
 # Validator ensures everything is working
 validator:
   enabled: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule

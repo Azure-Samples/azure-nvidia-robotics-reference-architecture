@@ -2,6 +2,7 @@
  * # AKS Cluster Resources
  *
  * This file creates the Azure Kubernetes Service cluster for the SiL module including:
+ * - User Assigned Managed Identity (required for custom private DNS zone)
  * - AKS cluster with Azure CNI Overlay networking
  * - System node pool for core workloads
  * - GPU node pools via for_each (configurable)
@@ -12,6 +13,19 @@
  * Note: Observability resources are in observability.tf
  * Note: Role assignments are in role-assignments.tf
  */
+
+// ============================================================
+// AKS User Assigned Managed Identity
+// ============================================================
+// Required when using a custom private DNS zone. The identity must exist
+// and have DNS Zone Contributor role BEFORE the AKS cluster is created.
+
+resource "azurerm_user_assigned_identity" "aks" {
+  name                = "id-aks-${local.resource_name_suffix}"
+  location            = var.resource_group.location
+  resource_group_name = var.resource_group.name
+  tags                = local.tags
+}
 
 // ============================================================
 // AKS Cluster
@@ -26,6 +40,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   automatic_upgrade_channel         = "patch"
   sku_tier                          = "Standard"
   private_cluster_enabled           = var.aks_config.is_private_cluster
+  private_dns_zone_id               = local.pe_enabled ? var.private_dns_zones["aks"].id : null
   local_account_disabled            = true
   azure_policy_enabled              = true
   oidc_issuer_enabled               = true
@@ -55,7 +70,8 @@ resource "azurerm_kubernetes_cluster" "main" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aks.id]
   }
 
   network_profile {
@@ -91,6 +107,7 @@ resource "azurerm_kubernetes_cluster" "main" {
 
   depends_on = [
     azurerm_subnet_nat_gateway_association.aks,
+    azurerm_role_assignment.aks_dns_zone_contributor,
   ]
 }
 

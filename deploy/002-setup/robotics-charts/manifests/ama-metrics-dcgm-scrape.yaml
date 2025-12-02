@@ -1,0 +1,38 @@
+# Azure Monitor Prometheus scrape configuration for NVIDIA DCGM Exporter
+# This ConfigMap configures the Azure Monitor metrics agent to scrape GPU metrics
+# from the DCGM exporter deployed by the NVIDIA GPU Operator.
+#
+# Documentation: https://learn.microsoft.com/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ama-metrics-prometheus-config
+  namespace: kube-system
+data:
+  prometheus-config: |-
+    scrape_configs:
+      - job_name: nvidia-dcgm-exporter
+        scrape_interval: 15s
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - gpu-operator
+        relabel_configs:
+          # Keep only pods with app=nvidia-dcgm-exporter label
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: nvidia-dcgm-exporter
+          # Set the metrics endpoint address
+          - source_labels: [__meta_kubernetes_pod_ip]
+            replacement: $1:9400
+            target_label: __address__
+          # Add namespace label
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          # Add pod label
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          # Add node label from pod's node name
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node

@@ -52,6 +52,12 @@ module "vpn" {
   root_certificate_name        = var.root_certificate_name
   root_certificate_public_data = var.root_certificate_public_data
 
+  // P2S Azure AD configuration
+  aad_auth_config = var.aad_auth_config
+
+  // DNS Private Resolver for P2S clients
+  resolver_subnet_address_prefix = var.resolver_subnet_address_prefix
+
   // S2S VPN connections
   vpn_site_connections          = var.vpn_site_connections
   vpn_site_shared_keys          = var.vpn_site_shared_keys

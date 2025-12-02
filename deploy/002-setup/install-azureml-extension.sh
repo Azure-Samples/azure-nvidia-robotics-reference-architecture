@@ -19,7 +19,7 @@ set -euo pipefail
 #   --inference-router-ha     Enable inference router high availability
 #   --secure-connections      Require secure connections (disable insecure)
 #   --skip-volcano            Skip Volcano scheduler installation
-#   --skip-prom-op            Skip Prometheus Operator installation
+#   --enable-prom-op          Enable Prometheus Operator (conflicts with Azure Monitor)
 #   --skip-gpu-tolerations    Skip GPU spot node tolerations
 #   --skip-compute-attach     Skip attaching cluster as compute target
 #   --skip-instance-types     Skip creating GPU instance types
@@ -54,7 +54,8 @@ allow_insecure_connections="true"
 install_nvidia_device_plugin="false"
 install_dcgm_exporter="false"
 install_volcano="true"
-install_prom_op="true"
+# Prometheus Operator disabled by default - conflicts with Azure Monitor Prometheus
+install_prom_op="false"
 enable_gpu_spot_tolerations="true"
 skip_compute_attach="false"
 skip_instance_types="false"
@@ -72,7 +73,7 @@ OPTIONS:
   --inference-router-ha     Enable inference router high availability
   --secure-connections      Require secure connections (disable insecure)
   --skip-volcano            Skip Volcano scheduler installation
-  --skip-prom-op            Skip Prometheus Operator installation
+  --enable-prom-op          Enable Prometheus Operator (conflicts with Azure Monitor)
   --skip-gpu-tolerations    Skip GPU spot node tolerations
   --skip-compute-attach     Skip attaching cluster as compute target
   --skip-instance-types     Skip creating GPU instance types
@@ -119,8 +120,8 @@ while [[ $# -gt 0 ]]; do
       install_volcano="false"
       shift
       ;;
-    --skip-prom-op)
-      install_prom_op="false"
+    --enable-prom-op)
+      install_prom_op="true"
       shift
       ;;
     --skip-gpu-tolerations)
@@ -389,16 +390,17 @@ items:
           cpu: "2"
           memory: "8Gi"
 
-  # GPU instance type for spot nodes
+  # GPU instance type for spot nodes with NVIDIA GPU
   - metadata:
       name: gpuspot
     spec:
       nodeSelector:
+        accelerator: nvidia
         kubernetes.azure.com/scalesetpriority: spot
       resources:
         requests:
-          cpu: "2"
-          memory: "8Gi"
+          cpu: "4"
+          memory: "16Gi"
         limits:
           cpu: "8"
           memory: "32Gi"
@@ -455,7 +457,7 @@ if [[ -n "${ml_workspace_name}" ]]; then
 fi
 echo "Available instance types for training jobs:"
 echo "  - defaultinstancetype: CPU workloads (2 CPU, 8Gi memory)"
-echo "  - gpuspot: Single GPU on spot nodes (4 CPU, 16Gi memory, 1 GPU)"
+echo "  - gpuspot: GPU on spot nodes (4-8 CPU, 16-32Gi memory, 1 GPU)"
 echo ""
 echo "Example training job with GPU spot instance:"
 echo "  az ml job create --file job.yml"

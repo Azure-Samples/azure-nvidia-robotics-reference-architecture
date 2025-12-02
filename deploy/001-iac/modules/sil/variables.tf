@@ -9,6 +9,16 @@ variable "should_enable_private_endpoints" {
 }
 
 /*
+ * Cluster Admin Configuration
+ */
+
+variable "should_assign_cluster_admin" {
+  type        = bool
+  description = "Whether to assign Azure Kubernetes Cluster Admin Role to the current user"
+  default     = true
+}
+
+/*
  * AKS Networking Variables
  */
 

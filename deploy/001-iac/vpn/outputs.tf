@@ -18,6 +18,34 @@ output "gateway_subnet" {
 }
 
 /*
+ * DNS Private Resolver Outputs
+ */
+
+output "dns_resolver" {
+  description = "The Azure Private Resolver resource"
+  value       = module.vpn.private_resolver
+}
+
+output "resolver_subnet" {
+  description = "The subnet created for the Private Resolver"
+  value       = module.vpn.resolver_subnet
+}
+
+output "dns_server_ip" {
+  description = "The IP address to use as DNS server for VPN clients"
+  value       = module.vpn.dns_server_ip
+}
+
+/*
+ * Client Hosts File Helper
+ */
+
+output "aks_hosts_file_command" {
+  description = "Command to add AKS private endpoint to /etc/hosts for kubectl access over VPN"
+  value       = module.vpn.aks_hosts_file_command
+}
+
+/*
  * P2S Connection Info
  */
 

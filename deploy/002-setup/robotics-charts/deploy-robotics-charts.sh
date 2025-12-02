@@ -152,8 +152,18 @@ if [[ "${skip_gpu_operator}" != "true" ]]; then
     --wait \
     --timeout 10m
 
-  echo "Applying GPU PodMonitor..."
-  kubectl apply -f "${manifests_dir}/gpu-podmonitor.yaml"
+  # Configure metrics scraping based on available monitoring infrastructure
+  if kubectl get crd podmonitors.monitoring.coreos.com &>/dev/null; then
+    echo "Applying GPU PodMonitor (Prometheus Operator detected)..."
+    kubectl apply -f "${manifests_dir}/gpu-podmonitor.yaml"
+  elif kubectl get daemonset ama-metrics -n kube-system &>/dev/null; then
+    echo "Configuring Azure Monitor Prometheus to scrape DCGM metrics..."
+    kubectl apply -f "${manifests_dir}/ama-metrics-dcgm-scrape.yaml"
+    echo "  Metrics will be available in Azure Monitor Workspace after agent restart"
+  else
+    echo "No Prometheus scraping configured (neither Prometheus Operator nor Azure Monitor agent found)"
+    echo "  GPU metrics will still be available via direct pod access on port 9400"
+  fi
 else
   echo "Skipping GPU Operator installation (--skip-gpu-operator)"
 fi

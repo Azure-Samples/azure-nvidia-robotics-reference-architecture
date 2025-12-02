@@ -57,6 +57,24 @@ variable "root_certificate_public_data" {
 }
 
 /*
+ * P2S Azure AD Authentication - Optional
+ */
+
+variable "aad_auth_config" {
+  type = object({
+    enabled     = bool
+    tenant_id   = optional(string)
+    audience_id = optional(string, "c632b3df-fb67-4d84-bdcf-b95ad541b5c8")
+  })
+  description = "Azure AD authentication configuration for P2S VPN. tenant_id defaults to current Azure client tenant if not specified. Uses Microsoft-registered Azure VPN application by default. Requires OpenVPN protocol"
+  default = {
+    enabled     = false
+    tenant_id   = null
+    audience_id = "c632b3df-fb67-4d84-bdcf-b95ad541b5c8"
+  }
+}
+
+/*
  * Site-to-Site VPN Configuration - Optional
  */
 
@@ -94,5 +112,15 @@ variable "vpn_site_default_ipsec_policy" {
     sa_lifetime_seconds = optional(number)
   })
   description = "Default IPsec policy for all S2S connections"
+  default     = null
+}
+
+/*
+ * DNS Private Resolver Configuration
+ */
+
+variable "resolver_subnet_address_prefix" {
+  type        = string
+  description = "Address prefix for the Private Resolver subnet (e.g., '10.0.4.0/28'). Set to null to disable DNS resolver."
   default     = null
 }

@@ -5,8 +5,23 @@
  * Creates GatewaySubnet within the platform's virtual network.
  */
 
+data "azurerm_client_config" "current" {}
+
 locals {
   resource_name_suffix = "${var.resource_prefix}-${var.environment}-${var.instance}"
+
+  // Use provided tenant_id or fall back to current client config
+  aad_tenant_id = coalesce(var.aad_auth_config.tenant_id, data.azurerm_client_config.current.tenant_id)
+
+  // Determine authentication types based on configuration
+  has_certificate_auth = var.root_certificate_public_data != null
+  has_aad_auth         = var.aad_auth_config.enabled
+
+  // Build vpn_auth_types list based on enabled authentication methods
+  vpn_auth_types = compact([
+    local.has_aad_auth ? "AAD" : "",
+    local.has_certificate_auth ? "Certificate" : "",
+  ])
 
   // Site name slugs for resource naming (alphanumeric only)
   site_name_slugs = {
@@ -40,7 +55,6 @@ resource "azurerm_public_ip" "vpn_gateway" {
   resource_group_name = var.resource_group.name
   allocation_method   = "Static"
   sku                 = "Standard"
-  zones               = ["1"]
   tags                = local.tags
 }
 
@@ -70,12 +84,22 @@ resource "azurerm_virtual_network_gateway" "main" {
 
   // Point-to-Site VPN Configuration
   vpn_client_configuration {
-    address_space        = var.vpn_gateway_config.client_address_pool
-    vpn_client_protocols = ["OpenVPN", "IkeV2"]
+    address_space = var.vpn_gateway_config.client_address_pool
+
+    // OpenVPN always enabled; IKEv2 added when certificate auth is available
+    vpn_client_protocols = local.has_certificate_auth ? ["OpenVPN", "IkeV2"] : ["OpenVPN"]
+
+    // Specify auth types when using multiple methods or Azure AD
+    vpn_auth_types = length(local.vpn_auth_types) > 0 ? local.vpn_auth_types : null
+
+    // Azure AD authentication configuration
+    aad_tenant   = local.has_aad_auth ? "https://login.microsoftonline.com/${local.aad_tenant_id}" : null
+    aad_audience = local.has_aad_auth ? var.aad_auth_config.audience_id : null
+    aad_issuer   = local.has_aad_auth ? "https://sts.windows.net/${local.aad_tenant_id}/" : null
 
     // Certificate authentication
     dynamic "root_certificate" {
-      for_each = var.root_certificate_public_data != null ? [1] : []
+      for_each = local.has_certificate_auth ? [1] : []
       content {
         name             = var.root_certificate_name
         public_cert_data = var.root_certificate_public_data
@@ -158,5 +182,52 @@ resource "azurerm_virtual_network_gateway_connection" "sites" {
       condition     = contains(keys(var.vpn_site_shared_keys), each.value.shared_key_reference)
       error_message = "Missing shared key '${each.value.shared_key_reference}' in vpn_site_shared_keys for site '${each.key}'."
     }
+  }
+}
+
+// ============================================================
+// DNS Private Resolver (for P2S VPN clients)
+// ============================================================
+// Enables VPN clients to resolve Azure Private DNS zones.
+// Required for accessing private AKS clusters and other private endpoints.
+
+resource "azurerm_subnet" "resolver" {
+  count = var.resolver_subnet_address_prefix != null ? 1 : 0
+
+  name                 = "snet-resolver-${local.resource_name_suffix}"
+  resource_group_name  = var.resource_group.name
+  virtual_network_name = var.virtual_network.name
+  address_prefixes     = [var.resolver_subnet_address_prefix]
+
+  delegation {
+    name = "Microsoft.Network.dnsResolvers"
+    service_delegation {
+      name    = "Microsoft.Network/dnsResolvers"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
+}
+
+resource "azurerm_private_dns_resolver" "main" {
+  count = var.resolver_subnet_address_prefix != null ? 1 : 0
+
+  name                = "dnspr-${local.resource_name_suffix}"
+  resource_group_name = var.resource_group.name
+  location            = var.location
+  virtual_network_id  = var.virtual_network.id
+  tags                = local.tags
+}
+
+resource "azurerm_private_dns_resolver_inbound_endpoint" "main" {
+  count = var.resolver_subnet_address_prefix != null ? 1 : 0
+
+  name                    = "ipe-${local.resource_name_suffix}"
+  private_dns_resolver_id = azurerm_private_dns_resolver.main[0].id
+  location                = var.location
+  tags                    = local.tags
+
+  ip_configurations {
+    private_ip_allocation_method = "Dynamic"
+    subnet_id                    = azurerm_subnet.resolver[0].id
   }
 }
