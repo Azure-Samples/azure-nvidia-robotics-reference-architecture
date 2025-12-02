@@ -1,0 +1,70 @@
+# IsaacLab Validation Job Template
+#
+# This is a STRUCTURAL TEMPLATE used by submit-azureml-validation.sh.
+# Values below are defaults and may be overridden at submission time.
+#
+# The script is responsible for:
+# - Setting trained_model input (Azure ML model URI)
+# - Overriding task/framework if not in model metadata
+# - Setting evaluation parameters
+#
+# This file defines:
+# - The job structure and schema
+# - Input specifications with defaults
+# - Environment variable mappings
+# - Identity configuration
+#
+# To submit a validation job, use submit-azureml-validation.sh with appropriate flags.
+
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+type: command
+display_name: IsaacLab Policy Validation
+description: Validate any trained IsaacLab policy with automatic task/framework detection.
+experiment_name: isaaclab-validation
+identity:
+  type: managed_identity
+
+code: .
+environment: azureml:isaaclab-training-env:2.2.0
+compute: azureml:k8s-osmorobo-ts
+
+inputs:
+  trained_model:
+    type: custom_model
+    mode: ro_mount
+  task:
+    type: string
+    default: ""
+    description: Override task ID (empty = use model metadata)
+  framework:
+    type: string
+    default: ""
+    description: Override framework (empty = use model metadata or auto-detect)
+  eval_episodes:
+    type: integer
+    default: 100
+  num_envs:
+    type: integer
+    default: 64
+  success_threshold:
+    type: number
+    default: -1.0
+    description: Override threshold (negative = use model metadata or task default)
+
+command: >-
+  bash src/training/scripts/validate.sh
+  --model-path ${{inputs.trained_model}}
+  --task "${{inputs.task}}"
+  --framework "${{inputs.framework}}"
+  --eval-episodes ${{inputs.eval_episodes}}
+  --num-envs ${{inputs.num_envs}}
+  --success-threshold ${{inputs.success_threshold}}
+  --headless
+
+environment_variables:
+  PYTHON: /workspace/isaaclab/isaaclab.sh -p
+  ACCEPT_EULA: "Y"
+  PRIVACY_CONSENT: "Y"
+
+resources:
+  instance_type: gpuspot

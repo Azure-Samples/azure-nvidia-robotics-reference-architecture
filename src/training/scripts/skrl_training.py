@@ -243,6 +243,7 @@ def _register_checkpoint_model(
     checkpoint_uri: str,
     checkpoint_mode: str | None,
     task: str | None,
+    algorithm: str | None = None,
 ) -> None:
     """Register a checkpoint artifact as an Azure ML model when context is available.
 
@@ -252,6 +253,7 @@ def _register_checkpoint_model(
         checkpoint_uri: MLflow URI for the checkpoint artifact.
         checkpoint_mode: Checkpoint mode metadata tag.
         task: IsaacLab task identifier for tagging.
+        algorithm: RL algorithm (e.g., PPO, IPPO) for tagging.
     """
     if context is None:
         _LOGGER.info("Skipping checkpoint registration (no Azure ML context)")
@@ -264,9 +266,17 @@ def _register_checkpoint_model(
 
     tags = {
         "checkpoint_mode": checkpoint_mode or "from-scratch",
+        "framework": "skrl",
+        "validated": "false",
     }
     if task:
         tags["task"] = task
+    if algorithm:
+        tags["algorithm"] = algorithm
+
+    properties = {
+        "success_threshold": "0.7",
+    }
 
     try:
         model = Model(
@@ -275,6 +285,7 @@ def _register_checkpoint_model(
             type="custom_model",
             description="IsaacLab SKRL checkpoint artifact",
             tags=tags,
+            properties=properties,
         )
         context.client.models.create_or_update(model)
         _LOGGER.info("Registered checkpoint as Azure ML model: %s", model_name)
@@ -671,6 +682,7 @@ def _finalize_mlflow_run(state: MLflowRunState) -> None:
             checkpoint_uri=latest_checkpoint_uri,
             checkpoint_mode=state.args.checkpoint_mode,
             task=state.cli_args.task if state.cli_args else None,
+            algorithm=state.cli_args.algorithm if state.cli_args else None,
         )
 
     if state.owns_run:
