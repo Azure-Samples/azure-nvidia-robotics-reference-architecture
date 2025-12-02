@@ -90,7 +90,7 @@ module "platform" {
   should_use_current_user_key_vault_admin = var.should_use_current_user_key_vault_admin
   should_enable_purge_protection          = var.should_enable_purge_protection
 
-  // OSMO optional services
+  // OSMO services
   should_deploy_postgresql = var.should_deploy_postgresql
   should_deploy_redis      = var.should_deploy_redis
   postgresql_config = {
