@@ -18,9 +18,11 @@ import random
 import shutil
 import sys
 import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, NamedTuple, Sequence
+from typing import Any, Iterator, NamedTuple, Sequence
 
 from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
 from training.utils import AzureMLContext, set_env_defaults
@@ -512,87 +514,181 @@ def _apply_mlflow_logging(runner: Any, mlflow: Any | None) -> None:
     runner.agent._update = wrapper_func
 
 
-def _start_mlflow_run(
+@dataclass
+class MLflowRunState:
+    """Tracks MLflow run state for proper lifecycle management."""
+
+    mlflow: Any
+    log_interval: int
+    owns_run: bool = False
+    context: AzureMLContext | None = None
+    args: argparse.Namespace | None = None
+    cli_args: argparse.Namespace | None = None
+    log_dir: Path | None = None
+    resume_path: str | None = None
+    outcome: str = field(default="success", init=False)
+
+
+def _is_azureml_managed_run() -> bool:
+    """Check if Azure ML has set up a managed MLflow run via environment variable."""
+    return bool(os.environ.get("MLFLOW_RUN_ID"))
+
+
+@contextmanager
+def mlflow_run_context(
     mlflow: Any,
     *,
     context: AzureMLContext | None,
     args: argparse.Namespace,
     cli_args: argparse.Namespace,
     env_cfg: Any,
-    agent_dict: dict[str, Any],
     log_dir: Path,
     resume_path: str | None,
     random_seed: int,
     rollouts: int,
-) -> int:
-    """Bootstrap MLflow tracking and return the computed log interval."""
+) -> Iterator[MLflowRunState]:
+    """Context manager for MLflow run lifecycle.
 
+    Handles the case where Azure ML has already started a run (via MLFLOW_RUN_ID),
+    or starts a new run if needed. Ensures proper cleanup on exit.
+
+    When MLFLOW_RUN_ID is set by Azure ML, calling start_run() without arguments
+    will resume that run. We track this so we don't call end_run() - Azure ML
+    manages the run lifecycle.
+
+    Yields:
+        MLflowRunState with run configuration and log interval.
+    """
+    # Check if Azure ML is managing this run BEFORE any MLflow calls
+    is_azureml_managed = _is_azureml_managed_run()
+    env_run_id = os.environ.get("MLFLOW_RUN_ID")
+    env_experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME")
+    env_experiment_id = os.environ.get("MLFLOW_EXPERIMENT_ID")
+
+    # Log all relevant MLflow environment variables for debugging
+    mlflow_env_vars = {
+        k: v for k, v in os.environ.items()
+        if k.startswith(("MLFLOW_", "AZURE_"))
+    }
+    _LOGGER.debug("MLflow-related environment variables: %s", mlflow_env_vars)
+
+    # When Azure ML manages the run, we must set the experiment BEFORE any other MLflow calls
+    # Azure ML sets MLFLOW_EXPERIMENT_NAME and MLFLOW_RUN_ID - both must be respected
+    if is_azureml_managed:
+        if env_experiment_name:
+            _LOGGER.info("Setting Azure ML experiment: %s", env_experiment_name)
+            mlflow.set_experiment(experiment_name=env_experiment_name)
+        elif env_experiment_id:
+            _LOGGER.info("Setting Azure ML experiment by ID: %s", env_experiment_id)
+            mlflow.set_experiment(experiment_id=env_experiment_id)
+
+    # Enable autolog AFTER setting experiment to avoid conflicts
+    _LOGGER.debug("Enabling MLflow autolog (log_models=False)")
     mlflow.autolog(log_models=False)
-    mlflow.start_run(run_name=log_dir.name)
 
-    env_count = _resolve_env_count(env_cfg)
+    # Start or resume the MLflow run
+    try:
+        if is_azureml_managed:
+            _LOGGER.info("Azure ML managed run detected (MLFLOW_RUN_ID=%s)", env_run_id)
+            # For Azure ML managed runs, start_run() with the run_id from environment
+            # This resumes the run that Azure ML already created
+            _LOGGER.debug("Calling mlflow.start_run(run_id=%s) to resume Azure ML managed run", env_run_id)
+            mlflow.start_run(run_id=env_run_id)
+            active = mlflow.active_run()
+            _LOGGER.info("Resumed Azure ML managed run: %s", active.info.run_id if active else "unknown")
+            owns_run = False
+        else:
+            _LOGGER.debug("No Azure ML managed run, starting new run with name: %s", log_dir.name)
+            mlflow.start_run(run_name=log_dir.name)
+            _LOGGER.info("Started new MLflow run: %s", log_dir.name)
+            owns_run = True
+    except Exception as exc:
+        _LOGGER.error(
+            "Failed to start/resume MLflow run: %s (type=%s)",
+            exc,
+            type(exc).__name__,
+        )
+        _LOGGER.error("MLflow environment state: MLFLOW_RUN_ID=%s, MLFLOW_EXPERIMENT_NAME=%s",
+                      os.environ.get("MLFLOW_RUN_ID"),
+                      os.environ.get("MLFLOW_EXPERIMENT_NAME"))
+        _LOGGER.error("Active run before start_run: %s", mlflow.active_run())
+        raise
+
+    # Log parameters and tags
     log_interval = _parse_mlflow_log_interval(cli_args.mlflow_log_interval, rollouts)
-    mlflow.log_params(
-        {
-            "algorithm": cli_args.algorithm,
-            "ml_framework": cli_args.ml_framework,
-            "num_envs": env_count,
-            "distributed": cli_args.distributed,
-            "resume_checkpoint": bool(resume_path),
-            "seed": random_seed,
-            "mlflow_log_interval": log_interval,
-            "mlflow_log_interval_preset": cli_args.mlflow_log_interval,
-        }
+    mlflow.log_params({
+        "algorithm": cli_args.algorithm,
+        "ml_framework": cli_args.ml_framework,
+        "num_envs": _resolve_env_count(env_cfg),
+        "distributed": cli_args.distributed,
+        "resume_checkpoint": bool(resume_path),
+        "seed": random_seed,
+        "mlflow_log_interval": log_interval,
+    })
+
+    tags = {
+        "log_dir": str(log_dir),
+        "task": cli_args.task or "",
+        "entrypoint": "training/scripts/train.py",
+        "checkpoint_mode": args.checkpoint_mode,
+    }
+    if resume_path:
+        tags["checkpoint_resume"] = resume_path
+    if context:
+        tags["azureml_workspace"] = context.workspace_name
+    if args.checkpoint_uri:
+        tags["checkpoint_source_uri"] = args.checkpoint_uri
+    mlflow.set_tags(tags)
+
+    state = MLflowRunState(
+        mlflow=mlflow,
+        log_interval=log_interval,
+        owns_run=owns_run,
+        context=context,
+        args=args,
+        cli_args=cli_args,
+        log_dir=log_dir,
+        resume_path=resume_path,
     )
 
-    if resume_path:
-        mlflow.set_tag("checkpoint_resume", resume_path)
-    mlflow.set_tag("log_dir", str(log_dir))
-    mlflow.set_tag("task", cli_args.task or "")
-    mlflow.set_tag("entrypoint", "training/scripts/train.py")
-    if context:
-        mlflow.set_tag("azureml_workspace", context.workspace_name)
-    mlflow.set_tag("checkpoint_mode", args.checkpoint_mode)
-    if args.checkpoint_uri:
-        mlflow.set_tag("checkpoint_source_uri", args.checkpoint_uri)
-    return log_interval
+    try:
+        yield state
+    finally:
+        _finalize_mlflow_run(state)
 
 
-def _finalize_mlflow_run(
-    mlflow: Any,
-    *,
-    training_outcome: str,
-    log_dir: Path,
-    resume_path: str | None,
-    context: AzureMLContext | None,
-    args: argparse.Namespace,
-    cli_args: argparse.Namespace,
-) -> None:
-    """Log artifacts, register models, and close the MLflow run."""
+def _finalize_mlflow_run(state: MLflowRunState) -> None:
+    """Log artifacts, register models, and optionally close the MLflow run."""
+    mlflow = state.mlflow
+    mlflow.set_tag("training_outcome", state.outcome)
 
-    mlflow.set_tag("training_outcome", training_outcome)
-    latest_checkpoint_uri = _log_artifacts(mlflow, log_dir, resume_path)
-    if args.register_checkpoint and latest_checkpoint_uri:
+    latest_checkpoint_uri = _log_artifacts(mlflow, state.log_dir, state.resume_path)
+
+    if state.args and state.args.register_checkpoint and latest_checkpoint_uri:
         _register_checkpoint_model(
-            context=context,
-            model_name=args.register_checkpoint,
+            context=state.context,
+            model_name=state.args.register_checkpoint,
             checkpoint_uri=latest_checkpoint_uri,
-            checkpoint_mode=args.checkpoint_mode,
-            task=cli_args.task,
+            checkpoint_mode=state.args.checkpoint_mode,
+            task=state.cli_args.task if state.cli_args else None,
         )
-    mlflow.end_run()
+
+    if state.owns_run:
+        mlflow.end_run()
+        _LOGGER.debug("Ended MLflow run")
 
 
 def _execute_training_loop(runner: Any, descriptor: dict[str, Any]) -> dict[str, Any]:
-    """Run the SKRL training loop and attach elapsed seconds to the descriptor."""
-
+    """Run the SKRL training loop and record elapsed time."""
     start = time.perf_counter()
     try:
         runner.run()
     except Exception:
         descriptor["elapsed_seconds"] = round(time.perf_counter() - start, 2)
+        _LOGGER.exception("Training failed after %.2fs", descriptor["elapsed_seconds"])
         raise
     descriptor["elapsed_seconds"] = round(time.perf_counter() - start, 2)
+    _LOGGER.info("Training completed in %.2f seconds", descriptor["elapsed_seconds"])
     return descriptor
 
 
@@ -821,69 +917,10 @@ def _instantiate_environment(
 
 def _initialize_runner(env: Any, state: LaunchState, modules: TrainingModules) -> Any:
     """Instantiate the SKRL runner and apply optional checkpointing/logging."""
-
     runner = modules.runner_cls(env, state.agent_dict)
     _setup_agent_checkpoint(runner, state.resume_path)
     _apply_mlflow_logging(runner, modules.mlflow_module)
     return runner
-
-
-def _start_mlflow_if_needed(
-    modules: TrainingModules,
-    *,
-    context: AzureMLContext | None,
-    args: argparse.Namespace,
-    cli_args: argparse.Namespace,
-    env_cfg: Any,
-    agent_dict: dict[str, Any],
-    log_dir: Path,
-    resume_path: str | None,
-    random_seed: int,
-    rollouts: int,
-) -> tuple[int | None, bool]:
-    """Start an MLflow run when tracking is enabled on the context."""
-
-    if modules.mlflow_module is None:
-        return None, False
-    log_interval = _start_mlflow_run(
-        modules.mlflow_module,
-        context=context,
-        args=args,
-        cli_args=cli_args,
-        env_cfg=env_cfg,
-        agent_dict=agent_dict,
-        log_dir=log_dir,
-        resume_path=resume_path,
-        random_seed=random_seed,
-        rollouts=rollouts,
-    )
-    return log_interval, True
-
-
-def _finalize_mlflow_if_needed(
-    modules: TrainingModules,
-    *,
-    mlflow_active: bool,
-    training_outcome: str,
-    log_dir: Path,
-    resume_path: str | None,
-    context: AzureMLContext | None,
-    args: argparse.Namespace,
-    cli_args: argparse.Namespace,
-) -> None:
-    """Close MLflow run when it was previously started."""
-
-    if not (modules.mlflow_module and mlflow_active):
-        return
-    _finalize_mlflow_run(
-        modules.mlflow_module,
-        training_outcome=training_outcome,
-        log_dir=log_dir,
-        resume_path=resume_path,
-        context=context,
-        args=args,
-        cli_args=cli_args,
-    )
 
 
 def _run_hydra_training(
@@ -895,77 +932,75 @@ def _run_hydra_training(
     modules: TrainingModules,
 ) -> None:
     """Execute hydra-configured IsaacLab training launch."""
-
     if cli_args.seed == -1:
         cli_args.seed = random.randint(0, 10000)
 
     agent_entry = _get_agent_config_entry_point(cli_args)
+    _LOGGER.info("Starting training: task=%s, seed=%s", cli_args.task, cli_args.seed)
 
     @modules.hydra_task_config(cli_args.task, agent_entry)
     def _launch(env_cfg, agent_cfg):
-        env = None
-        training_outcome = "success"
         state = _prepare_launch_state(env_cfg, agent_cfg, cli_args, app_launcher, modules)
-        log_interval = None
-        mlflow_active = False
-        try:
-            env = _instantiate_environment(env_cfg, cli_args, modules, state.log_dir)
-            runner = _initialize_runner(env, state, modules)
-            log_interval, mlflow_active = _start_mlflow_if_needed(
-                modules,
-                context=context,
-                args=args,
-                cli_args=cli_args,
-                env_cfg=env_cfg,
-                agent_dict=state.agent_dict,
-                log_dir=state.log_dir,
-                resume_path=state.resume_path,
-                random_seed=state.random_seed,
-                rollouts=state.rollouts,
-            )
+        env = _instantiate_environment(env_cfg, cli_args, modules, state.log_dir)
 
-            run_descriptor = _build_run_descriptor(
-                cli_args,
-                state.log_dir,
-                state.resume_path,
-                state.agent_dict,
-                state.rollouts,
-                log_interval,
-            )
-            descriptor = dict(run_descriptor)
-            _LOGGER.info(
-                "Starting SKRL training: task=%s iterations=%s run_descriptor=%s",
-                cli_args.task,
-                cli_args.max_iterations,
-                run_descriptor,
-            )
-            try:
-                descriptor = _execute_training_loop(runner, descriptor)
-            except Exception:
-                training_outcome = "failed"
-                _LOGGER.exception("Training failed after %.2f seconds", descriptor.get("elapsed_seconds", 0))
-                raise
-            else:
-                if modules.mlflow_module:
-                    active_run = modules.mlflow_module.active_run()
-                    if active_run:
-                        descriptor["mlflow_run_id"] = active_run.info.run_id
-            _LOGGER.info("Finished SKRL training: %s", descriptor)
-        finally:
-            if env is not None:
-                env.close()
-            _finalize_mlflow_if_needed(
-                modules,
-                mlflow_active=mlflow_active,
-                training_outcome=training_outcome,
-                log_dir=state.log_dir,
-                resume_path=state.resume_path,
-                context=context,
+        try:
+            runner = _initialize_runner(env, state, modules)
+            _run_training_with_mlflow(
+                runner=runner,
+                state=state,
+                env_cfg=env_cfg,
                 args=args,
                 cli_args=cli_args,
+                context=context,
+                modules=modules,
             )
+        finally:
+            env.close()
 
     _launch()
+
+
+def _run_training_with_mlflow(
+    *,
+    runner: Any,
+    state: LaunchState,
+    env_cfg: Any,
+    args: argparse.Namespace,
+    cli_args: argparse.Namespace,
+    context: AzureMLContext | None,
+    modules: TrainingModules,
+) -> None:
+    """Execute training loop with optional MLflow tracking."""
+    if modules.mlflow_module is None:
+        # No MLflow - just run training
+        descriptor = _build_run_descriptor(cli_args, state.log_dir, state.resume_path, state.agent_dict, state.rollouts, None)
+        _execute_training_loop(runner, descriptor)
+        return
+
+    # With MLflow tracking
+    with mlflow_run_context(
+        modules.mlflow_module,
+        context=context,
+        args=args,
+        cli_args=cli_args,
+        env_cfg=env_cfg,
+        log_dir=state.log_dir,
+        resume_path=state.resume_path,
+        random_seed=state.random_seed,
+        rollouts=state.rollouts,
+    ) as mlflow_state:
+        descriptor = _build_run_descriptor(
+            cli_args, state.log_dir, state.resume_path, state.agent_dict, state.rollouts, mlflow_state.log_interval
+        )
+        try:
+            _execute_training_loop(runner, descriptor)
+            active_run = modules.mlflow_module.active_run()
+            if active_run:
+                descriptor["mlflow_run_id"] = active_run.info.run_id
+            _LOGGER.info("Training complete: %s", descriptor)
+        except Exception:
+            mlflow_state.outcome = "failed"
+            raise
 
 
 def run_training(
@@ -984,7 +1019,6 @@ def run_training(
     Raises:
         SystemExit: If IsaacLab dependencies are missing or task is unavailable.
     """
-    simulation_app = None
     try:
         from isaaclab.app import AppLauncher
     except ImportError as exc:
@@ -993,8 +1027,8 @@ def run_training(
     parser = _build_parser(AppLauncher)
     cli_args, unparsed_args = _prepare_cli_arguments(parser, args, hydra_args)
 
+    app_launcher, simulation_app = _initialize_simulation(AppLauncher, cli_args, unparsed_args)
     try:
-        app_launcher, simulation_app = _initialize_simulation(AppLauncher, cli_args, unparsed_args)
         modules = _load_training_modules(cli_args, context)
         _run_hydra_training(
             args=args,
