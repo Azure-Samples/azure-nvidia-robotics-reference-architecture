@@ -24,15 +24,27 @@
 		"*.lock",
 		"*.log",
 		".cspell.json",
-		".cspell-dictionary.txt",
 		"**/.mega-linter.yml",
-		"*megalinter_file_names_cspell.txt"
+		"*megalinter_file_names_cspell.txt",
+		"**/.terraform/**",
+		"**/.terraform.lock.hcl"
 	],
 	"dictionaryDefinitions": [
 		{
-			"name": "cspell-dictionary",
-			"path": ".cspell-dictionary.txt",
-			"addWords": true
+			"name": "azure-services",
+			"path": "./.cspell/azure-services.txt"
+		},
+		{
+			"name": "microsoft-sample-companies",
+			"path": "./.cspell/microsoft-sample-companies.txt"
+		},
+		{
+			"name": "industry-acronyms",
+			"path": "./.cspell/industry-acronyms.txt"
+		},
+		{
+			"name": "general-technical",
+			"path": "./.cspell/general-technical.txt"
 		}
 	],
 	"dictionaries": [
@@ -42,26 +54,24 @@
 		"companies",
 		"softwareTerms",
 		"misc",
-		"typescript",
-		"node",
-		"php",
-		"go",
 		"python",
 		"powershell",
-		"html",
-		"css",
-		"cpp",
-		"csharp",
-		"latex",
 		"bash",
 		"filetypes",
-		"npm",
-		"cspell-dictionary"
+		"k8s",
+		"docker",
+		"terraform",
+		"data-science",
+		"azure-services",
+		"microsoft-sample-companies",
+		"industry-acronyms",
+		"general-technical"
 	],
 	"caseSensitive": false,
 	"useGitignore": true,
 	"ignoreRegExpList": [
+		"/#.*/g",
 		"/^\\s*```[\\s\\S]*?^\\s*```/gm",
 		"/^authors?:.*(?:\\r?\\n\\s*-.*)*$/gmi"
-	],
+	]
 }
