@@ -160,6 +160,8 @@ module "sil" {
   // AzureML extension configuration
   azureml_config = {
     should_integrate_aks               = var.should_integrate_aks_cluster
+    should_install_extension           = var.should_integrate_aks_cluster
+    should_federate_ml_identity        = var.should_integrate_aks_cluster
     aks_cluster_purpose                = var.aks_cluster_purpose
     inference_router_service_type      = var.inference_router_service_type
     workload_tolerations               = var.workload_tolerations

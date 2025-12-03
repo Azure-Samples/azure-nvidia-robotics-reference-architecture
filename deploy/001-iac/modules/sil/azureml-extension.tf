@@ -87,10 +87,19 @@ resource "azapi_resource" "kubernetes_compute" {
   count = var.azureml_config.should_integrate_aks && var.azureml_config.should_install_extension ? 1 : 0
 
   type      = "Microsoft.MachineLearningServices/workspaces/computes@2024-10-01"
-  name      = "aks-ml${var.resource_prefix}${var.environment}${var.instance}"
+  name      = "k8s-${var.resource_prefix}${var.environment}${var.instance}"
   parent_id = var.azureml_workspace.id
 
   body = {
+    // Assign user-assigned managed identity for storage/ACR access
+    // This identity is used by the system to mount datastores and access ACR
+    // Ref: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-identity-based-service-authentication
+    identity = {
+      type = "UserAssigned"
+      userAssignedIdentities = {
+        (var.ml_workload_identity.id) = {}
+      }
+    }
     properties = {
       computeType = "Kubernetes"
       resourceId  = azurerm_kubernetes_cluster.main.id

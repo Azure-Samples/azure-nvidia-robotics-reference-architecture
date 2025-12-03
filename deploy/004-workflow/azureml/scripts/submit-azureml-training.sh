@@ -524,12 +524,27 @@ main() {
   fi
 
   log "AzureML job submitted: $job_name"
+  log "View in portal: https://ml.azure.com/runs/$job_name?wsid=/subscriptions/$subscription_id/resourceGroups/$resource_group/providers/Microsoft.MachineLearningServices/workspaces/$workspace_name"
   log "Download checkpoints via: az ml job download --name $job_name --output-name checkpoints"
 
   if [[ $stream_logs -ne 0 ]]; then
-    log "Streaming logs for job $job_name..."
-    az ml job stream --name "$job_name" --resource-group "$resource_group" --workspace-name "$workspace_name"
+    stream_job_logs "$job_name" "$resource_group" "$workspace_name"
   fi
+}
+
+stream_job_logs() {
+  local job_name="$1"
+  local resource_group="$2"
+  local workspace_name="$3"
+
+  log "Streaming job logs for $job_name"
+  log "Note: For Kubernetes compute, 'az ml job stream' shows status only, not training output."
+  log "To view training logs: az ml job download --name $job_name --all"
+  log "Then check: ./$job_name/user_logs/std_log.txt"
+
+  az ml job stream --name "$job_name" \
+    --resource-group "$resource_group" \
+    --workspace-name "$workspace_name" || true
 }
 
 main "$@"

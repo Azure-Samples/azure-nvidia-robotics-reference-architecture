@@ -97,3 +97,13 @@ resource "azurerm_monitor_data_collection_rule_association" "metrics" {
   target_resource_id      = azurerm_kubernetes_cluster.main.id
   data_collection_rule_id = azurerm_monitor_data_collection_rule.metrics.id
 }
+
+// ============================================================
+// Data Collection Endpoint Association
+// ============================================================
+
+// Required for Container Insights MSI authentication mode
+resource "azurerm_monitor_data_collection_rule_association" "dce" {
+  target_resource_id          = azurerm_kubernetes_cluster.main.id
+  data_collection_endpoint_id = var.data_collection_endpoint.id
+}
