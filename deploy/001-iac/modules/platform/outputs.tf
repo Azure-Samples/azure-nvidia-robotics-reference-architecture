@@ -141,11 +141,11 @@ output "storage_account_access" {
  */
 
 output "azureml_workspace" {
-  description = "ML workspace for AKS extension"
+  description = "ML workspace for AKS extension."
   value = {
-    id           = azurerm_machine_learning_workspace.main.id
-    name         = azurerm_machine_learning_workspace.main.name
-    workspace_id = azurerm_machine_learning_workspace.main.workspace_id
+    id           = azapi_resource.ml_workspace.id
+    name         = azapi_resource.ml_workspace.name
+    workspace_id = azapi_resource.ml_workspace.output.properties.workspaceId
   }
 }
 

@@ -9,30 +9,48 @@
  */
 
 // ============================================================
-// Azure Machine Learning Workspace
+// Azure Machine Learning Workspace (via azapi)
 // ============================================================
+// Using azapi_resource because azurerm does not expose systemDatastoresAuthMode.
+// This property is required when storage account has shared_access_key_enabled = false.
 
-resource "azurerm_machine_learning_workspace" "main" {
-  name                          = "mlw-${local.resource_name_suffix}"
-  location                      = var.resource_group.location
-  resource_group_name           = var.resource_group.name
-  key_vault_id                  = azurerm_key_vault.main.id
-  storage_account_id            = azurerm_storage_account.main.id
-  container_registry_id         = azurerm_container_registry.main.id
-  application_insights_id       = azurerm_application_insights.main.id
-  public_network_access_enabled = var.should_enable_public_network_access
-  image_build_compute_name      = null
-  sku_name                      = "Basic"
-  v1_legacy_mode_enabled        = false
-  tags                          = local.tags
+resource "azapi_resource" "ml_workspace" {
+  type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01"
+  name      = "mlw-${local.resource_name_suffix}"
+  location  = var.resource_group.location
+  parent_id = var.resource_group.id
+  tags      = local.tags
 
-  managed_network {
-    isolation_mode = var.should_enable_private_endpoints ? "AllowOnlyApprovedOutbound" : "Disabled"
-  }
+  // Disable schema validation because azapi provider schema doesn't include
+  // systemDatastoresAuthMode property, but it's valid per Microsoft ARM docs.
+  schema_validation_enabled = false
 
   identity {
     type = "SystemAssigned"
   }
+
+  body = {
+    sku = {
+      name = "Basic"
+      tier = "Basic"
+    }
+    kind = "Default"
+    properties = {
+      friendlyName             = "mlw-${local.resource_name_suffix}"
+      keyVault                 = azurerm_key_vault.main.id
+      storageAccount           = azurerm_storage_account.main.id
+      containerRegistry        = azurerm_container_registry.main.id
+      applicationInsights      = azurerm_application_insights.main.id
+      publicNetworkAccess      = var.should_enable_public_network_access ? "Enabled" : "Disabled"
+      v1LegacyMode             = false
+      systemDatastoresAuthMode = var.should_enable_storage_shared_access_key ? "accessKey" : "identity"
+      managedNetwork = {
+        isolationMode = var.should_enable_private_endpoints ? "AllowOnlyApprovedOutbound" : "Disabled"
+      }
+    }
+  }
+
+  response_export_values = ["properties.workspaceId", "identity.principalId"]
 }
 
 // ============================================================
@@ -50,7 +68,7 @@ resource "azurerm_private_endpoint" "azureml_api" {
 
   private_service_connection {
     name                           = "psc-ml-api-${local.resource_name_suffix}"
-    private_connection_resource_id = azurerm_machine_learning_workspace.main.id
+    private_connection_resource_id = azapi_resource.ml_workspace.id
     subresource_names              = ["amlworkspace"]
     is_manual_connection           = false
   }
