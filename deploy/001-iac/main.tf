@@ -79,9 +79,10 @@ module "platform" {
 
   // Networking configuration
   virtual_network_config = {
-    address_space              = var.virtual_network_config.address_space
-    subnet_address_prefix_main = var.virtual_network_config.subnet_address_prefix
-    subnet_address_prefix_pe   = var.virtual_network_config.subnet_address_prefix_pe
+    address_space                  = var.virtual_network_config.address_space
+    subnet_address_prefix_main     = var.virtual_network_config.subnet_address_prefix
+    subnet_address_prefix_pe       = var.virtual_network_config.subnet_address_prefix_pe
+    subnet_address_prefix_resolver = var.virtual_network_config.subnet_address_prefix_resolver
   }
 
   // Feature flags

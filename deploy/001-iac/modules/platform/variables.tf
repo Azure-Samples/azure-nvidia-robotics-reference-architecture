@@ -14,15 +14,17 @@ variable "current_user_oid" {
 
 variable "virtual_network_config" {
   type = object({
-    address_space              = string
-    subnet_address_prefix_main = string
-    subnet_address_prefix_pe   = optional(string)
+    address_space                  = string
+    subnet_address_prefix_main     = string
+    subnet_address_prefix_pe       = optional(string)
+    subnet_address_prefix_resolver = optional(string)
   })
-  description = "Virtual network address configuration including address space and subnet prefixes. PE subnet prefix is only required when should_enable_private_endpoints is true"
+  description = "Virtual network address configuration including address space and subnet prefixes. PE and resolver subnet prefixes are only used when should_enable_private_endpoints is true"
   default = {
-    address_space              = "10.0.0.0/16"
-    subnet_address_prefix_main = "10.0.1.0/24"
-    subnet_address_prefix_pe   = "10.0.2.0/24"
+    address_space                  = "10.0.0.0/16"
+    subnet_address_prefix_main     = "10.0.1.0/24"
+    subnet_address_prefix_pe       = "10.0.2.0/24"
+    subnet_address_prefix_resolver = null
   }
 }
 

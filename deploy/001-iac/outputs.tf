@@ -113,6 +113,20 @@ output "subnets" {
 }
 
 // ============================================================
+// DNS Private Resolver Outputs
+// ============================================================
+
+output "private_dns_resolver" {
+  description = "Private DNS Resolver for resolving private DNS zones from VPN clients or on-premises networks."
+  value       = module.platform.private_dns_resolver
+}
+
+output "dns_server_ip" {
+  description = "The IP address to use as DNS server for VPN clients or on-premises DNS forwarding."
+  value       = module.platform.dns_server_ip
+}
+
+// ============================================================
 // Compute Resources Outputs
 // ============================================================
 

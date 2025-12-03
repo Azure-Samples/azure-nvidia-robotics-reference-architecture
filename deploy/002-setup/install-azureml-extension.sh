@@ -401,7 +401,94 @@ else
 fi
 
 # ============================================================
-# Step 3: Attach Cluster as Compute Target
+# Step 3: Create Federated Identity Credentials
+# ============================================================
+# Federated Identity Credentials (FICs) enable the ML workload identity to
+# authenticate as Kubernetes service accounts in the azureml namespace.
+# Required for workload identity-based access to storage, ACR, and Key Vault.
+#
+# When should_integrate_aks_cluster=true in Terraform, these are created by
+# the SiL module. When false (script-based deployment), we create them here.
+
+if [[ "${skip_compute_attach}" != "true" ]] && [[ -n "${ml_identity_id}" ]]; then
+  echo ""
+  echo "============================"
+  echo "Step 3: Create Federated Identity Credentials"
+  echo "============================"
+
+  # Extract identity name from the full resource ID
+  # Format: /subscriptions/.../resourceGroups/.../providers/Microsoft.ManagedIdentity/userAssignedIdentities/<name>
+  ml_identity_name="${ml_identity_id##*/}"
+
+  # Get AKS OIDC issuer URL
+  oidc_issuer=$(az aks show \
+    --resource-group "${resource_group}" \
+    --name "${aks_name}" \
+    --query "oidcIssuerProfile.issuerUrl" -o tsv)
+
+  if [[ -z "${oidc_issuer}" ]]; then
+    echo "Error: Could not retrieve OIDC issuer URL from AKS cluster" >&2
+    echo "Ensure OIDC issuer is enabled on the cluster." >&2
+    exit 1
+  fi
+
+  echo "Identity Name:  ${ml_identity_name}"
+  echo "OIDC Issuer:    ${oidc_issuer}"
+
+  # Create FIC for default service account in azureml namespace
+  # This is used by the AzureML extension for system operations
+  existing_fic_default=$(az identity federated-credential show \
+    --identity-name "${ml_identity_name}" \
+    --resource-group "${resource_group}" \
+    --name "aml-default-fic" \
+    --query "name" -o tsv 2>/dev/null || true)
+
+  if [[ -z "${existing_fic_default}" ]]; then
+    echo "Creating federated credential for azureml:default service account..."
+    az identity federated-credential create \
+      --identity-name "${ml_identity_name}" \
+      --resource-group "${resource_group}" \
+      --name "aml-default-fic" \
+      --issuer "${oidc_issuer}" \
+      --subject "system:serviceaccount:azureml:default" \
+      --audiences "api://AzureADTokenExchange"
+  else
+    echo "Federated credential 'aml-default-fic' already exists."
+  fi
+
+  # Create FIC for training service account in azureml namespace
+  # This is used by training jobs to access datastores and ACR
+  existing_fic_training=$(az identity federated-credential show \
+    --identity-name "${ml_identity_name}" \
+    --resource-group "${resource_group}" \
+    --name "aml-training-fic" \
+    --query "name" -o tsv 2>/dev/null || true)
+
+  if [[ -z "${existing_fic_training}" ]]; then
+    echo "Creating federated credential for azureml:training service account..."
+    az identity federated-credential create \
+      --identity-name "${ml_identity_name}" \
+      --resource-group "${resource_group}" \
+      --name "aml-training-fic" \
+      --issuer "${oidc_issuer}" \
+      --subject "system:serviceaccount:azureml:training" \
+      --audiences "api://AzureADTokenExchange"
+  else
+    echo "Federated credential 'aml-training-fic' already exists."
+  fi
+
+  echo "Federated identity credentials configured."
+else
+  if [[ -z "${ml_identity_id}" ]]; then
+    echo ""
+    echo "Warning: ML identity not found in Terraform outputs."
+    echo "Federated identity credentials will not be created."
+    echo "Compute attach will use SystemAssigned identity instead."
+  fi
+fi
+
+# ============================================================
+# Step 4: Attach Cluster as Compute Target
 # ============================================================
 # Attach AFTER instance types are created so AzureML syncs them properly.
 
@@ -415,7 +502,7 @@ if [[ "${skip_compute_attach}" != "true" ]]; then
 
   echo ""
   echo "============================"
-  echo "Step 3: Attach Compute Target"
+  echo "Step 4: Attach Compute Target"
   echo "============================"
   echo "Compute Name:  ${compute_name}"
   echo "Namespace:     azureml"

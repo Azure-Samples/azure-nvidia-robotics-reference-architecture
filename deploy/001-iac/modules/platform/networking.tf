@@ -91,3 +91,65 @@ resource "azurerm_subnet_nat_gateway_association" "main" {
   subnet_id      = azurerm_subnet.main.id
   nat_gateway_id = azurerm_nat_gateway.main.id
 }
+
+// ============================================================
+// DNS Private Resolver
+// ============================================================
+// Enables clients to resolve Azure Private DNS zones.
+// Required for accessing private AKS clusters and other private endpoints
+// from VPN clients or on-premises networks.
+
+resource "azurerm_subnet" "resolver" {
+  count = local.pe_enabled && var.virtual_network_config.subnet_address_prefix_resolver != null ? 1 : 0
+
+  name                 = "snet-resolver-${local.resource_name_suffix}"
+  resource_group_name  = var.resource_group.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = [var.virtual_network_config.subnet_address_prefix_resolver]
+
+  delegation {
+    name = "Microsoft.Network.dnsResolvers"
+    service_delegation {
+      name    = "Microsoft.Network/dnsResolvers"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
+}
+
+resource "azurerm_private_dns_resolver" "main" {
+  count = length(azurerm_subnet.resolver)
+
+  name                = "dnspr-${local.resource_name_suffix}"
+  resource_group_name = var.resource_group.name
+  location            = var.resource_group.location
+  virtual_network_id  = azurerm_virtual_network.main.id
+  tags                = local.tags
+}
+
+resource "azurerm_private_dns_resolver_inbound_endpoint" "main" {
+  count = length(azurerm_subnet.resolver)
+
+  name                    = "ipe-${local.resource_name_suffix}"
+  private_dns_resolver_id = azurerm_private_dns_resolver.main[0].id
+  location                = var.resource_group.location
+  tags                    = local.tags
+
+  ip_configurations {
+    private_ip_allocation_method = "Dynamic"
+    subnet_id                    = azurerm_subnet.resolver[0].id
+  }
+}
+
+// ============================================================
+// VNet DNS Configuration
+// ============================================================
+// Configures the virtual network to use the Private Resolver for DNS.
+// This enables VPN clients and on-premises networks to automatically
+// resolve private endpoints.
+
+resource "azurerm_virtual_network_dns_servers" "main" {
+  count = length(azurerm_private_dns_resolver_inbound_endpoint.main)
+
+  virtual_network_id = azurerm_virtual_network.main.id
+  dns_servers        = [azurerm_private_dns_resolver_inbound_endpoint.main[0].ip_configurations[0].private_ip_address]
+}

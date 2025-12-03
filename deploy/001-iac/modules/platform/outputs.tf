@@ -46,6 +46,23 @@ output "nat_gateway" {
 }
 
 /*
+ * DNS Private Resolver Outputs
+ */
+
+output "private_dns_resolver" {
+  description = "Private DNS Resolver for resolving private DNS zones. Null when private endpoints are disabled or resolver subnet not configured"
+  value = try({
+    id   = azurerm_private_dns_resolver.main[0].id
+    name = azurerm_private_dns_resolver.main[0].name
+  }, null)
+}
+
+output "dns_server_ip" {
+  description = "The IP address to use as DNS server for VPN clients or on-premises DNS forwarding. Null when resolver not configured"
+  value       = try(azurerm_private_dns_resolver_inbound_endpoint.main[0].ip_configurations[0].private_ip_address, null)
+}
+
+/*
  * Observability Outputs
  */
 

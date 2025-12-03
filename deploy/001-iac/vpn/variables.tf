@@ -147,13 +147,3 @@ variable "vpn_site_default_ipsec_policy" {
   description = "Default IPsec policy for all S2S connections"
   default     = null
 }
-
-/*
- * DNS Private Resolver Configuration
- */
-
-variable "resolver_subnet_address_prefix" {
-  type        = string
-  description = "Address prefix for the Private Resolver subnet (e.g., '10.0.4.0/28'). Set to null to disable DNS resolver."
-  default     = null
-}
