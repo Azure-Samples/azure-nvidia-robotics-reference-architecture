@@ -231,3 +231,16 @@ resource "azurerm_private_dns_resolver_inbound_endpoint" "main" {
     subnet_id                    = azurerm_subnet.resolver[0].id
   }
 }
+
+// ============================================================
+// VNet DNS Configuration
+// ============================================================
+// Configures the virtual network to use the Private Resolver for DNS.
+// This enables VPN clients to automatically resolve private endpoints.
+
+resource "azurerm_virtual_network_dns_servers" "main" {
+  count = var.resolver_subnet_address_prefix != null ? 1 : 0
+
+  virtual_network_id = var.virtual_network.id
+  dns_servers        = [azurerm_private_dns_resolver_inbound_endpoint.main[0].ip_configurations[0].private_ip_address]
+}
