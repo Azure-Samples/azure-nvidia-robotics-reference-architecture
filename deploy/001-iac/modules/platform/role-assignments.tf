@@ -47,6 +47,15 @@ resource "azurerm_role_assignment" "ml_rg_contributor" {
 // Storage Account Role Assignments
 // ============================================================
 
+// Grant current user Storage Blob Data Contributor (for downloading job artifacts locally)
+resource "azurerm_role_assignment" "user_storage_blob" {
+  count = var.current_user_oid != null ? 1 : 0
+
+  scope                = azurerm_storage_account.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = var.current_user_oid
+}
+
 // Grant ML identity Storage Blob Data Contributor role
 resource "azurerm_role_assignment" "ml_storage_blob" {
   scope                = azurerm_storage_account.main.id

@@ -301,8 +301,20 @@ def _register_final_model(
     model_path: str,
     model_name: str,
     tags: dict[str, str],
+    properties: Optional[dict[str, str]] = None,
 ) -> bool:
-    """Register a trained model in Azure ML if dependencies are available."""
+    """Register a trained model in Azure ML if dependencies are available.
+
+    Args:
+        context: Azure ML context with client.
+        model_path: Path to model file or directory.
+        model_name: Name for registered model.
+        tags: Model tags (task, framework, etc.).
+        properties: Model properties (success_threshold, etc.).
+
+    Returns:
+        True if registration succeeded, False otherwise.
+    """
     if context is None:
         return False
 
@@ -319,6 +331,7 @@ def _register_final_model(
             type="custom_model",
             description="RSL-RL checkpoint registered via Azure ML",
             tags=tags,
+            properties=properties or {},
         )
         context.client.models.create_or_update(model)
         print(f"[INFO] Registered final model '{model_name}' with Azure ML")
@@ -702,8 +715,14 @@ def main(
                     model_name=f"rsl_rl_model_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
                     tags={
                         "task": args_cli.task or "",
+                        "framework": "rsl_rl",
+                        "algorithm": "PPO",
                         "experiment": agent_cfg.experiment_name,
                         "entrypoint": "scripts/rsl_rl/train.py",
+                        "validated": "false",
+                    },
+                    properties={
+                        "success_threshold": "0.7",
                     },
                 )
 

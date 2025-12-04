@@ -3,10 +3,17 @@
 # This is a STRUCTURAL TEMPLATE used by submit-azureml-validation.sh.
 # Values below are defaults and may be overridden at submission time.
 #
-# The script is responsible for:
+# The submission script is responsible for:
 # - Setting trained_model input (Azure ML model URI)
-# - Overriding task/framework if not in model metadata
-# - Setting evaluation parameters
+# - Fetching task/framework/threshold from Azure ML model tags
+# - Setting evaluation parameters via --set inputs.*
+#
+# Model metadata flow:
+# 1. Training registers model with tags: {task, framework, algorithm, validated}
+# 2. Training registers model with properties: {success_threshold}
+# 3. Submission script fetches tags/properties via `az ml model show`
+# 4. Values are passed to job via inputs (task, framework, success_threshold)
+# 5. policy_evaluation.py reads values from CLI args (not files)
 #
 # This file defines:
 # - The job structure and schema

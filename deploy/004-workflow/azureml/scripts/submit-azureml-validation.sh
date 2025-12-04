@@ -258,6 +258,7 @@ main() {
 
   require_command az
   require_command rsync
+  require_command jq
   ensure_ml_extension
 
   # Validate required arguments
@@ -290,7 +291,34 @@ main() {
   local model_uri="azureml:${model_name}:${model_version}"
 
   # ============================================================================
-  # Phase 1: Package training code and register environment
+  # Phase 1: Fetch model metadata from Azure ML tags
+  # ============================================================================
+
+  log "Fetching model metadata from Azure ML"
+  local model_json
+  model_json=$(az ml model show \
+    --name "${model_name}" \
+    --version "${model_version}" \
+    --resource-group "${AZURE_RESOURCE_GROUP}" \
+    --workspace-name "${AZUREML_WORKSPACE_NAME}" \
+    -o json 2>/dev/null || echo "{}")
+
+  # Extract metadata from model tags/properties if not provided via CLI
+  if [[ -z "${task}" ]]; then
+    task=$(echo "${model_json}" | jq -r '.tags.task // "auto"')
+    log "  Task from model tags: ${task}"
+  fi
+  if [[ -z "${framework}" ]]; then
+    framework=$(echo "${model_json}" | jq -r '.tags.framework // "auto"')
+    log "  Framework from model tags: ${framework}"
+  fi
+  if [[ -z "${threshold}" ]]; then
+    threshold=$(echo "${model_json}" | jq -r '.properties.success_threshold // "-1.0"')
+    log "  Threshold from model properties: ${threshold}"
+  fi
+
+  # ============================================================================
+  # Phase 2: Package training code and register environment
   # ============================================================================
 
   local training_src="$repo_root/src/training"
@@ -309,15 +337,15 @@ main() {
   log "Environment: ${environment_name}:${environment_version} ($image)"
 
   # ============================================================================
-  # Phase 2: Build Azure ML job submission command
+  # Phase 3: Build Azure ML job submission command
   # ============================================================================
 
   log "Submitting validation job"
   log "  Model: ${model_uri}"
-  log "  Task: ${task:-'(from metadata)'}"
-  log "  Framework: ${framework:-'(from metadata)'}"
+  log "  Task: ${task}"
+  log "  Framework: ${framework}"
   log "  Episodes: ${episodes}"
-  log "  Threshold: ${threshold:-'(from metadata)'}"
+  log "  Threshold: ${threshold}"
 
   local az_args=(
     az ml job create
@@ -368,7 +396,7 @@ main() {
   az_args+=(--query "name" -o "tsv")
 
   # ============================================================================
-  # Phase 3: Submit the job and report results
+  # Phase 4: Submit the job and report results
   # ============================================================================
 
   log "Submitting job..."
