@@ -1,0 +1,66 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Spell checking using cspell
+  spell-check:
+    name: Spell Check
+    uses: ./.github/workflows/spell-check.yml
+    permissions:
+      contents: read
+
+  # Markdown linting using markdownlint-cli2
+  markdown-lint:
+    name: Markdown Lint
+    uses: ./.github/workflows/markdown-lint.yml
+    permissions:
+      contents: read
+
+  # Markdown table formatting check
+  table-format:
+    name: Table Format
+    uses: ./.github/workflows/table-format.yml
+    permissions:
+      contents: read
+
+  # PowerShell script analysis
+  psscriptanalyzer:
+    name: PSScriptAnalyzer
+    uses: ./.github/workflows/ps-script-analyzer.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
+  # Link language locale check
+  link-lang-check:
+    name: Link Language Check
+    uses: ./.github/workflows/link-lang-check.yml
+    permissions:
+      contents: read
+
+  # Markdown link validation
+  markdown-link-check:
+    name: Markdown Link Check
+    uses: ./.github/workflows/markdown-link-check.yml
+    permissions:
+      contents: read
+
+  # Dependency review for security vulnerabilities
+  dependency-review:
+    name: Dependency Review
+    uses: ./.github/workflows/dependency-review.yml
+    permissions:
+      contents: read
