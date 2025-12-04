@@ -37,13 +37,7 @@ jobs:
       - name: Run Link Language Check
         shell: pwsh
         run: |
-          $params = @{}
-
-          if ('${{ inputs.soft-fail }}' -eq 'true') {
-            $params['SoftFail'] = $true
-          }
-
-          & scripts/linting/Invoke-LinkLanguageCheck.ps1 @params
+          & scripts/linting/Invoke-LinkLanguageCheck.ps1
         continue-on-error: ${{ inputs.soft-fail }}
 
       - name: Upload link language check results
@@ -58,7 +52,7 @@ jobs:
         if: ${{ !inputs.soft-fail }}
         shell: pwsh
         run: |
-          if ($env:LINK_LANG_CHECK_FAILED -eq 'true') {
+          if ($env:LINK_LANG_FAILED -eq 'true') {
             Write-Host "Link language check failed and soft-fail is false. Failing the job."
             exit 1
           }

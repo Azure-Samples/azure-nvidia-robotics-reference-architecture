@@ -11,7 +11,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   # Spell checking using cspell
@@ -64,3 +64,4 @@ jobs:
     uses: ./.github/workflows/dependency-review.yml
     permissions:
       contents: read
+      pull-requests: write

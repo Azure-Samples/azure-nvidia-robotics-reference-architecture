@@ -2,7 +2,7 @@ name: CodeQL Security Analysis
 
 on:
   schedule:
-    # Weekly scan: Sundays at 4 AM UTC
+    # Weekly scan: Sundays at 04:00 UTC
     - cron: '0 4 * * 0'
   workflow_call:
 
