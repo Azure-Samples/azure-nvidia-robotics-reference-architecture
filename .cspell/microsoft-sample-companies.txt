@@ -25,7 +25,7 @@ mycontext
 myacr
 yourcustomstorageacct
 yourdomain
-Northwind
+northwind
 myorg
 myorga
 myorgb

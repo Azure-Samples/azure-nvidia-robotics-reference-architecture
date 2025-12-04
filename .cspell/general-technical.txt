@@ -328,7 +328,6 @@ contosoads
 coprocessing
 correlated
 correlations
-cosmosdb
 cpps
 crc
 crossfilter
