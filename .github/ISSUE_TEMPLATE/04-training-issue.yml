@@ -1,0 +1,96 @@
+name: 🤖 Training Issue
+description: Report issues with RL training scripts or workflows
+title: "[Training]: "
+labels: ["training", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Training Issue
+        For Isaac Lab, SKRL, RSL-RL, or MLflow training issues.
+
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Training Framework
+      options:
+        - SKRL
+        - RSL-RL
+        - Custom/Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      options:
+        - Training script error
+        - Environment/task issue
+        - Checkpoint loading/saving
+        - MLflow tracking
+        - Performance/GPU memory
+        - Isaac Sim/Lab compatibility
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      placeholder: "3.11.x"
+    validations:
+      required: false
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU Model
+      placeholder: "NVIDIA RTX 4090 / A100 40GB"
+    validations:
+      required: false
+
+  - type: input
+    id: isaac-version
+    attributes:
+      label: Isaac Sim/Lab Version
+      placeholder: "Isaac Lab 2.2.0 / Isaac Sim 5.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: Describe the training issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Training Configuration
+      description: Paste relevant training config or command
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Error Traceback
+      description: Paste the Python error traceback
+      render: python
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have verified my environment matches [requirements.txt](requirements.txt)
+          required: true
+        - label: I have tested with a minimal configuration
+          required: false
