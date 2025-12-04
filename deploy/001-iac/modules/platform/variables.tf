@@ -24,7 +24,7 @@ variable "virtual_network_config" {
     address_space                  = "10.0.0.0/16"
     subnet_address_prefix_main     = "10.0.1.0/24"
     subnet_address_prefix_pe       = "10.0.2.0/24"
-    subnet_address_prefix_resolver = null
+    subnet_address_prefix_resolver = "10.0.9.0/28"
   }
 }
 

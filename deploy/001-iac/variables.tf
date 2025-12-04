@@ -143,14 +143,14 @@ variable "virtual_network_config" {
     address_space                  = string
     subnet_address_prefix          = string
     subnet_address_prefix_pe       = optional(string, "10.0.2.0/24")
-    subnet_address_prefix_resolver = optional(string)
+    subnet_address_prefix_resolver = optional(string, "10.0.9.0/28")
   })
   description = "Configuration for the virtual network including address space and subnet prefixes. PE subnet prefix is required when private endpoints are enabled. Resolver subnet enables DNS resolution for VPN clients and on-premises networks"
   default = {
     address_space                  = "10.0.0.0/16"
     subnet_address_prefix          = "10.0.1.0/24"
     subnet_address_prefix_pe       = "10.0.2.0/24"
-    subnet_address_prefix_resolver = null
+    subnet_address_prefix_resolver = "10.0.9.0/28"
   }
   validation {
     condition     = can(cidrhost(var.virtual_network_config.address_space, 0)) && can(cidrhost(var.virtual_network_config.subnet_address_prefix, 0))

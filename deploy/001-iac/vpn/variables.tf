@@ -96,14 +96,12 @@ variable "root_certificate_public_data" {
 variable "aad_auth_config" {
   type = object({
     enabled     = bool
-    tenant_id   = optional(string)
+    tenant_id   = optional(string, null)
     audience_id = optional(string, "c632b3df-fb67-4d84-bdcf-b95ad541b5c8")
   })
   description = "Azure AD authentication configuration for P2S VPN. tenant_id defaults to current Azure client tenant if not specified. Uses Microsoft-registered Azure VPN application by default. Requires OpenVPN protocol"
   default = {
-    enabled     = false
-    tenant_id   = null
-    audience_id = "c632b3df-fb67-4d84-bdcf-b95ad541b5c8"
+    enabled = true
   }
 }
 
