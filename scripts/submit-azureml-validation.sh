@@ -96,35 +96,8 @@ ensure_ml_extension() {
 
 derive_model_name_from_task() {
   local task="$1"
-  # Convert IsaacLab task to model name:
-  # Isaac-Velocity-Rough-Anymal-C-v0 -> anymal-c-velocity-rough
-  # Isaac-Reach-Franka-v0 -> franka-reach
-  local name="$task"
-  # Remove Isaac- prefix and version suffix
-  name="${name#Isaac-}"
-  name="$(printf '%s' "$name" | sed -E 's/-v[0-9]+$//')"
-  # Convert to lowercase
-  name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
-  # Reorder: move robot name (last segment(s) before version) to front
-  # e.g., velocity-rough-anymal-c -> anymal-c-velocity-rough
-  local parts robot_part task_parts
-  IFS='-' read -ra parts <<< "$name"
-  if [[ ${#parts[@]} -ge 3 ]]; then
-    local last_idx=$((${#parts[@]} - 1))
-    local second_last_idx=$((${#parts[@]} - 2))
-    # If last segment is short (1-2 chars like "c" in "anymal-c"), it's a two-part robot name
-    if [[ ${#parts[$last_idx]} -le 2 ]]; then
-      # Two-part robot name like "anymal-c"
-      robot_part="${parts[$second_last_idx]}-${parts[$last_idx]}"
-      task_parts="$(IFS='-'; echo "${parts[*]:0:$second_last_idx}")"
-    else
-      # Single-part robot name like "franka" or "spot"
-      robot_part="${parts[$last_idx]}"
-      task_parts="$(IFS='-'; echo "${parts[*]:0:$last_idx}")"
-    fi
-    name="${robot_part}-${task_parts}"
-  fi
-  printf '%s' "$name"
+  # Convert task to model name: lowercase, replace non-alphanumeric with hyphens
+  printf '%s' "$task" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
 }
 
 prepare_training_payload() {
