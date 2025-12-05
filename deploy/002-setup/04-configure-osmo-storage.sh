@@ -2,7 +2,7 @@
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-terraform_dir="${script_dir}/../../001-iac"
+terraform_dir="${script_dir}/../001-iac"
 container_name="osmo"
 auth_mode="login"
 config_preview=false
@@ -18,7 +18,7 @@ help="Usage: configure-osmo-storage.sh [OPTIONS]
 Creates the blob container backing OSMO workflow data.
 
 OPTIONS:
-  --terraform-dir PATH      Path to terraform deployment directory (default: ../../001-iac)
+  --terraform-dir PATH      Path to terraform deployment directory (default: ../001-iac)
   --container-name NAME     Blob container name to ensure (default: osmo)
   --auth-mode MODE          Authentication mode for az storage commands: login|key (default: login)
   --template PATH           Workflow config template to render (default: ./config/workflow-config-example.json)

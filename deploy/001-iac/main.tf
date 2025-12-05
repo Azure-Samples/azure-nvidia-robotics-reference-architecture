@@ -89,6 +89,7 @@ module "platform" {
   should_enable_private_endpoint          = var.should_enable_private_endpoint
   should_enable_public_network_access     = var.should_enable_public_network_access
   should_add_current_user_key_vault_admin = var.should_add_current_user_key_vault_admin
+  should_add_current_user_storage_blob    = var.should_add_current_user_storage_blob
   should_enable_purge_protection          = var.should_enable_purge_protection
 
   // OSMO services

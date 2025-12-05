@@ -31,14 +31,14 @@ read_terraform_outputs "${REPO_ROOT}/deploy/001-iac" 2>/dev/null || true
 
 usage() {
   cat <<'EOF'
-Usage: submit-azureml-validation.sh --model-name NAME --model-version VERSION [options]
+Usage: submit-azureml-validation.sh [options]
 
 Packages src/training/ into a staging folder, ensures the IsaacLab container
 image is registered as an environment, and submits the validation command job.
 
-Required:
-  --model-name NAME             Azure ML registered model name
-  --model-version VERSION       Model version (or "latest")
+Model options:
+  --model-name NAME             Azure ML registered model name (default: derived from task)
+  --model-version VERSION       Model version (default: latest)
 
 AzureML asset options:
   --environment-name NAME       AzureML environment name (default: isaaclab-training-env)
@@ -58,7 +58,7 @@ Validation options:
 Azure context overrides:
   --job-file PATH               Path to validation job YAML (default: workflows/azureml/validate.yaml)
   --compute TARGET              Compute target override (e.g., azureml:k8s-compute)
-  --instance-type TYPE          Instance type for Kubernetes compute (e.g., gpuspot)
+  --instance-type TYPE          Instance type for Kubernetes compute (default: gpuspot)
   --experiment-name NAME        Azure ML experiment name override
   --job-name NAME               Azure ML job name override
   --stream                      Stream job logs after submission
@@ -92,6 +92,39 @@ ensure_ml_extension() {
     return
   fi
   fail "Azure ML CLI extension not installed. Run: az extension add --name ml"
+}
+
+derive_model_name_from_task() {
+  local task="$1"
+  # Convert IsaacLab task to model name:
+  # Isaac-Velocity-Rough-Anymal-C-v0 -> anymal-c-velocity-rough
+  # Isaac-Reach-Franka-v0 -> franka-reach
+  local name="$task"
+  # Remove Isaac- prefix and version suffix
+  name="${name#Isaac-}"
+  name="$(printf '%s' "$name" | sed -E 's/-v[0-9]+$//')"
+  # Convert to lowercase
+  name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+  # Reorder: move robot name (last segment(s) before version) to front
+  # e.g., velocity-rough-anymal-c -> anymal-c-velocity-rough
+  local parts robot_part task_parts
+  IFS='-' read -ra parts <<< "$name"
+  if [[ ${#parts[@]} -ge 3 ]]; then
+    local last_idx=$((${#parts[@]} - 1))
+    local second_last_idx=$((${#parts[@]} - 2))
+    # If last segment is short (1-2 chars like "c" in "anymal-c"), it's a two-part robot name
+    if [[ ${#parts[$last_idx]} -le 2 ]]; then
+      # Two-part robot name like "anymal-c"
+      robot_part="${parts[$second_last_idx]}-${parts[$last_idx]}"
+      task_parts="$(IFS='-'; echo "${parts[*]:0:$second_last_idx}")"
+    else
+      # Single-part robot name like "franka" or "spot"
+      robot_part="${parts[$last_idx]}"
+      task_parts="$(IFS='-'; echo "${parts[*]:0:$last_idx}")"
+    fi
+    name="${robot_part}-${task_parts}"
+  fi
+  printf '%s' "$name"
 }
 
 prepare_training_payload() {
@@ -146,12 +179,12 @@ main() {
   local image="nvcr.io/nvidia/isaac-lab:2.2.0"
   local staging_dir="${STAGING_DIR:-$SCRIPT_DIR/.tmp}"
 
-  # Required arguments
+  # Model options (model_name derived from task if not provided)
   local model_name=""
-  local model_version=""
+  local model_version="latest"
 
-  # Validation options
-  local task=""
+  # Validation options (task used for model name derivation if model_name not set)
+  local task="${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}"
   local framework=""
   local episodes=100
   local num_envs=64
@@ -166,7 +199,7 @@ main() {
   # Azure context
   local job_file="${REPO_ROOT}/workflows/azureml/validate.yaml"
   local compute="${AZUREML_COMPUTE:-$(get_compute_target)}"
-  local instance_type=""
+  local instance_type="gpuspot"
   local experiment_name=""
   local job_name_override=""
   local stream_logs=false
@@ -277,13 +310,10 @@ main() {
   require_command jq
   ensure_ml_extension
 
-  # Validate required arguments
+  # Derive model_name from task if not explicitly provided
   if [[ -z "${model_name}" ]]; then
-    fail "--model-name is required"
-  fi
-
-  if [[ -z "${model_version}" ]]; then
-    fail "--model-version is required (use 'latest' for most recent)"
+    model_name="$(derive_model_name_from_task "${task}")"
+    log "Auto-derived model name: ${model_name}"
   fi
 
   if [[ -z "${resource_group}" ]]; then

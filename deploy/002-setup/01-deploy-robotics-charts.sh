@@ -11,7 +11,7 @@ set -euo pipefail
 #   ./deploy-robotics-charts.sh [OPTIONS]
 #
 # Options:
-#   --terraform-dir PATH    Path to terraform directory (default: ../../001-iac)
+#   --terraform-dir PATH    Path to terraform directory (default: ../001-iac)
 #   --skip-gpu-operator     Skip NVIDIA GPU Operator installation
 #   --skip-kai-scheduler    Skip KAI Scheduler installation
 #   --help                  Show this help message
@@ -28,7 +28,7 @@ set -euo pipefail
 #######################################
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-terraform_dir="${script_dir}/../../001-iac"
+terraform_dir="${script_dir}/../001-iac"
 values_dir="${script_dir}/values"
 manifests_dir="${script_dir}/manifests"
 
@@ -40,7 +40,7 @@ help="Usage: deploy-robotics-charts.sh [OPTIONS]
 Installs NVIDIA GPU Operator and KAI Scheduler on AKS cluster.
 
 OPTIONS:
-  --terraform-dir PATH    Path to terraform directory (default: ../../001-iac)
+  --terraform-dir PATH    Path to terraform directory (default: ../001-iac)
   --skip-gpu-operator     Skip NVIDIA GPU Operator installation
   --skip-kai-scheduler    Skip KAI Scheduler installation
   --help                  Show this help message

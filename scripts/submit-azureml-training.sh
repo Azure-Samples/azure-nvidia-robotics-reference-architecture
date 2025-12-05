@@ -49,7 +49,8 @@ Workflow parity options:
   -i, --image IMAGE             Container image override for environment registration
   -c, --checkpoint-uri URI      MLflow checkpoint artifact URI to resume or warm-start from
   -M, --checkpoint-mode MODE    Checkpoint mode (from-scratch, warm-start, resume, fresh)
-  -r, --register-checkpoint ID  Azure ML model name for checkpoint registration
+  -r, --register-checkpoint ID  Azure ML model name for checkpoint registration (default: derived from task)
+      --skip-register-checkpoint  Skip automatic model registration
       --headless                Force headless rendering (default)
       --gui                     Disable headless flag
   -s, --run-smoke-test          Run the smoke test locally before submitting and enable job flag
@@ -63,7 +64,7 @@ Azure context overrides:
       --mlflow-http-timeout N   MLflow HTTP timeout seconds (default: env or 60)
       --experiment-name NAME    Azure ML experiment name override
       --compute TARGET          Compute target override for the job YAML
-      --instance-type NAME      Azure ML compute instance type for resources.instance_type
+      --instance-type NAME      Azure ML compute instance type for resources.instance_type (default: gpuspot)
       --job-name NAME           Azure ML job name override
       --display-name NAME       Azure ML job display name override
       --stream                  Stream logs after job submission
@@ -99,6 +100,39 @@ ensure_ml_extension() {
     return
   fi
   fail "Azure ML CLI extension not installed. Run: az extension add --name ml"
+}
+
+derive_model_name_from_task() {
+  local task="$1"
+  # Convert IsaacLab task to model name:
+  # Isaac-Velocity-Rough-Anymal-C-v0 -> anymal-c-velocity-rough
+  # Isaac-Reach-Franka-v0 -> franka-reach
+  local name="$task"
+  # Remove Isaac- prefix and version suffix
+  name="${name#Isaac-}"
+  name="$(printf '%s' "$name" | sed -E 's/-v[0-9]+$//')"
+  # Convert to lowercase
+  name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+  # Reorder: move robot name (last segment(s) before version) to front
+  # e.g., velocity-rough-anymal-c -> anymal-c-velocity-rough
+  local parts robot_part task_parts
+  IFS='-' read -ra parts <<< "$name"
+  if [[ ${#parts[@]} -ge 3 ]]; then
+    local last_idx=$((${#parts[@]} - 1))
+    local second_last_idx=$((${#parts[@]} - 2))
+    # If last segment is short (1-2 chars like "c" in "anymal-c"), it's a two-part robot name
+    if [[ ${#parts[$last_idx]} -le 2 ]]; then
+      # Two-part robot name like "anymal-c"
+      robot_part="${parts[$second_last_idx]}-${parts[$last_idx]}"
+      task_parts="$(IFS='-'; echo "${parts[*]:0:$second_last_idx}")"
+    else
+      # Single-part robot name like "franka" or "spot"
+      robot_part="${parts[$last_idx]}"
+      task_parts="$(IFS='-'; echo "${parts[*]:0:$last_idx}")"
+    fi
+    name="${robot_part}-${task_parts}"
+  fi
+  printf '%s' "$name"
 }
 
 normalize_checkpoint_mode() {
@@ -218,6 +252,7 @@ main() {
   local checkpoint_uri_value="${CHECKPOINT_URI:-}"
   local checkpoint_mode_value="${CHECKPOINT_MODE:-from-scratch}"
   local register_checkpoint_value="${REGISTER_CHECKPOINT:-}"
+  local skip_register_checkpoint=0
   local run_smoke_test_value="${RUN_AZURE_SMOKE_TEST:-0}"
   local headless="true"
 
@@ -230,7 +265,7 @@ main() {
 
   local experiment_override=""
   local compute_target="${AZUREML_COMPUTE:-$(get_compute_target)}"
-  local instance_type=""
+  local instance_type="gpuspot"
   local job_name_override=""
   local display_name_override=""
   local stream_logs=0
@@ -285,6 +320,10 @@ main() {
       -r|--register-checkpoint)
         register_checkpoint_value="$2"
         shift 2
+        ;;
+      --skip-register-checkpoint)
+        skip_register_checkpoint=1
+        shift
         ;;
       -s|--run-smoke-test)
         run_smoke_test_value="1"
@@ -378,6 +417,12 @@ main() {
   checkpoint_mode_value="$(normalize_checkpoint_mode "$checkpoint_mode_value")"
   run_smoke_test_value="$(normalize_boolean_flag "$run_smoke_test_value")"
 
+  # Derive default model name from task if registration not skipped and no explicit name provided
+  if [[ $skip_register_checkpoint -eq 0 ]] && [[ -z "$register_checkpoint_value" ]]; then
+    register_checkpoint_value="$(derive_model_name_from_task "$task_value")"
+    log "Auto-derived model name: $register_checkpoint_value"
+  fi
+
   # ============================================================================
   # Phase 1: Package training code and register environment
   # ============================================================================
@@ -464,7 +509,7 @@ main() {
     az_args+=(--set "inputs.checkpoint_uri=$checkpoint_uri_value")
   fi
 
-  if [[ -n "$register_checkpoint_value" ]]; then
+  if [[ $skip_register_checkpoint -eq 0 ]] && [[ -n "$register_checkpoint_value" ]]; then
     cmd_args="$cmd_args --register-checkpoint \${{inputs.register_checkpoint}}"
     az_args+=(--set "inputs.register_checkpoint=$register_checkpoint_value")
   fi

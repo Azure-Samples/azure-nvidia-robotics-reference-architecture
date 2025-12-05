@@ -49,7 +49,7 @@ resource "azurerm_role_assignment" "ml_rg_contributor" {
 
 // Grant current user Storage Blob Data Contributor (for downloading job artifacts locally)
 resource "azurerm_role_assignment" "user_storage_blob" {
-  count = var.current_user_oid != null ? 1 : 0
+  count = var.should_add_current_user_storage_blob ? 1 : 0
 
   scope                = azurerm_storage_account.main.id
   role_definition_name = "Storage Blob Data Contributor"

@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ngc_token=""
-terraform_dir="${script_dir}/../../001-iac"
+terraform_dir="${script_dir}/../001-iac"
 values_dir="${script_dir}/values"
 namespace="osmo-control-plane"
 chart_version="1.0.0"
@@ -18,7 +18,7 @@ REQUIRED:
   --ngc-token TOKEN         NGC API token for pulling OSMO images
 
 OPTIONS:
-  --terraform-dir PATH      Path to terraform directory (default: ../../001-iac)
+  --terraform-dir PATH      Path to terraform directory (default: ../001-iac)
   --values-dir PATH         Path to values directory (default: ./values)
   --namespace NAME          Target Kubernetes namespace (default: osmo-control-plane)
   --config-preview          Print configuration details and exit before deployment
