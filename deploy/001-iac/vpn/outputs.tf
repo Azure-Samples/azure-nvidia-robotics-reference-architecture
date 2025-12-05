@@ -1,3 +1,9 @@
+/**
+ * # VPN Deployment Outputs
+ *
+ * Outputs from standalone VPN gateway deployment.
+ */
+
 /*
  * VPN Gateway Outputs
  */

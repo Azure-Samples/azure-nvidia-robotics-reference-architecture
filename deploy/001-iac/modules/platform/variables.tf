@@ -1,3 +1,10 @@
+/**
+ * # Platform Module Variables
+ *
+ * Module-specific variables for platform infrastructure including networking,
+ * observability, security, and Azure ML workspace configuration.
+ */
+
 /*
  * Current User Configuration
  */
@@ -19,7 +26,7 @@ variable "virtual_network_config" {
     subnet_address_prefix_pe       = optional(string)
     subnet_address_prefix_resolver = optional(string)
   })
-  description = "Virtual network address configuration including address space and subnet prefixes. PE and resolver subnet prefixes are only used when should_enable_private_endpoints is true"
+  description = "Virtual network address configuration including address space and subnet prefixes. PE and resolver subnet prefixes are only used when should_enable_private_endpoint is true"
   default = {
     address_space                  = "10.0.0.0/16"
     subnet_address_prefix_main     = "10.0.1.0/24"
@@ -32,7 +39,7 @@ variable "virtual_network_config" {
  * Private Endpoint Variables
  */
 
-variable "should_enable_private_endpoints" {
+variable "should_enable_private_endpoint" {
   type        = bool
   description = "Whether to enable private endpoints for all services"
   default     = true
@@ -48,9 +55,9 @@ variable "should_enable_public_network_access" {
  * Security Variables
  */
 
-variable "should_use_current_user_key_vault_admin" {
+variable "should_add_current_user_key_vault_admin" {
   type        = bool
-  description = "Whether to grant current user Key Vault Secrets Officer role"
+  description = "Whether to add the current user as Key Vault Secrets Officer"
   default     = true
 }
 

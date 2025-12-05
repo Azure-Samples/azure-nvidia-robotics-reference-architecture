@@ -18,7 +18,7 @@ data "azurerm_client_config" "current" {}
 
 locals {
   resource_name_suffix = "${var.resource_prefix}-${var.environment}-${var.instance}"
-  pe_enabled           = var.should_enable_private_endpoints
+  pe_enabled           = var.should_enable_private_endpoint
 
   // Core DNS zones required for all services (11 zones)
   // Note: storage_blob is SHARED between Storage Account and AMPLS

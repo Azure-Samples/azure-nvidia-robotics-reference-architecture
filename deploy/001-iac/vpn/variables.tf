@@ -1,3 +1,9 @@
+/**
+ * # VPN Deployment Variables
+ *
+ * Input variables for standalone VPN gateway deployment.
+ */
+
 /*
  * Core Variables - Required
  */

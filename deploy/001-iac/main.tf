@@ -15,7 +15,7 @@ locals {
 }
 
 resource "msgraph_resource_action" "current_user" {
-  count = var.should_use_current_user_key_vault_admin ? 1 : 0
+  count = var.should_add_current_user_key_vault_admin ? 1 : 0
 
   method       = "GET"
   resource_url = "me"
@@ -86,9 +86,9 @@ module "platform" {
   }
 
   // Feature flags
-  should_enable_private_endpoints         = var.should_enable_private_endpoints
+  should_enable_private_endpoint          = var.should_enable_private_endpoint
   should_enable_public_network_access     = var.should_enable_public_network_access
-  should_use_current_user_key_vault_admin = var.should_use_current_user_key_vault_admin
+  should_add_current_user_key_vault_admin = var.should_add_current_user_key_vault_admin
   should_enable_purge_protection          = var.should_enable_purge_protection
 
   // OSMO services
@@ -153,7 +153,7 @@ module "sil" {
     enable_auto_scaling = var.enable_auto_scaling
     min_count           = var.min_count
     max_count           = var.max_count
-    is_private_cluster  = var.should_enable_private_endpoints
+    is_private_cluster  = var.should_enable_private_endpoint
   }
 
   node_pools = var.node_pools
@@ -170,5 +170,5 @@ module "sil" {
   }
 
   // Feature flags
-  should_enable_private_endpoints = var.should_enable_private_endpoints
+  should_enable_private_endpoint = var.should_enable_private_endpoint
 }

@@ -1,3 +1,9 @@
+/**
+ * # DNS Deployment Outputs
+ *
+ * Outputs from standalone OSMO private DNS zone deployment.
+ */
+
 /*
  * OSMO Private DNS Outputs
  */

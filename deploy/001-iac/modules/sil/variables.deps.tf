@@ -1,3 +1,9 @@
+/**
+ * # Dependency Variables
+ *
+ * Variables for resources provided by the Platform module as typed object dependencies.
+ */
+
 /*
  * Dependencies from Platform Module
  */

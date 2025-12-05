@@ -1,3 +1,9 @@
+/**
+ * # Core Variables
+ *
+ * Core variables shared across all modules: environment, resource_prefix, location, instance.
+ */
+
 /*
  * Core Variables
  * Standard variables consistent across all modules

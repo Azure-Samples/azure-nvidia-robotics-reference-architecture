@@ -15,7 +15,7 @@ locals {
   resource_name_suffix = "${var.resource_prefix}-${var.environment}-${var.instance}"
 
   // Private endpoint configuration
-  pe_enabled = var.should_enable_private_endpoints
+  pe_enabled = var.should_enable_private_endpoint
 
   // Combined resource tags
   tags = merge(var.tags, {

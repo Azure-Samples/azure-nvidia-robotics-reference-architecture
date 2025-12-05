@@ -45,7 +45,7 @@ resource "azapi_resource" "ml_workspace" {
       v1LegacyMode             = false
       systemDatastoresAuthMode = var.should_enable_storage_shared_access_key ? "accessKey" : "identity"
       managedNetwork = {
-        isolationMode = var.should_enable_private_endpoints ? "AllowOnlyApprovedOutbound" : "Disabled"
+        isolationMode = var.should_enable_private_endpoint ? "AllowOnlyApprovedOutbound" : "Disabled"
       }
     }
   }

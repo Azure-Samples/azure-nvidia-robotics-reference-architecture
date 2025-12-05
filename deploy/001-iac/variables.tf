@@ -1,3 +1,10 @@
+/**
+ * # Robotics Blueprint Variables
+ *
+ * Input variables for robotics infrastructure deployment.
+ * Variables are organized by functional grouping with required variables first.
+ */
+
 /*
  * Core Variables - Required
  */
@@ -37,9 +44,9 @@ variable "should_create_resource_group" {
   default     = true
 }
 
-variable "should_use_current_user_key_vault_admin" {
+variable "should_add_current_user_key_vault_admin" {
   type        = bool
-  description = "Whether to give the current user the Key Vault Secrets Officer Role"
+  description = "Whether to add the current user as Key Vault Secrets Officer"
   default     = true
 }
 
@@ -313,7 +320,7 @@ variable "cluster_integration_instance_types" {
  * Private Endpoints Configuration - Optional
  */
 
-variable "should_enable_private_endpoints" {
+variable "should_enable_private_endpoint" {
   type        = bool
   description = "Whether to enable private endpoints across resources for secure connectivity"
   default     = true

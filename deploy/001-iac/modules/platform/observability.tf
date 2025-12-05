@@ -18,7 +18,7 @@
 // ============================================================
 
 resource "azurerm_log_analytics_workspace" "main" {
-  name                       = "law-${local.resource_name_suffix}"
+  name                       = "log-${local.resource_name_suffix}"
   location                   = var.resource_group.location
   resource_group_name        = var.resource_group.name
   sku                        = "PerGB2018"
@@ -111,7 +111,7 @@ resource "azurerm_monitor_private_link_scope" "main" {
 resource "azurerm_monitor_private_link_scoped_service" "law" {
   count = local.pe_enabled ? 1 : 0
 
-  name                = "law-link"
+  name                = "log-link"
   resource_group_name = var.resource_group.name
   scope_name          = azurerm_monitor_private_link_scope.main[0].name
   linked_resource_id  = azurerm_log_analytics_workspace.main.id

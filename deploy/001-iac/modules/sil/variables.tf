@@ -1,3 +1,10 @@
+/**
+ * # SiL Module Variables
+ *
+ * Module-specific variables for Software-in-the-Loop (SiL) infrastructure
+ * including AKS cluster, Azure ML extension, and container insights configuration.
+ */
+
 /*
  * Current User Configuration
  */
@@ -12,7 +19,7 @@ variable "current_user_oid" {
  * Private Endpoint Variables
  */
 
-variable "should_enable_private_endpoints" {
+variable "should_enable_private_endpoint" {
   type        = bool
   description = "Whether to enable private endpoints for AKS cluster"
   default     = true

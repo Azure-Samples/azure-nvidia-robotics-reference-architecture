@@ -1,3 +1,9 @@
+/**
+ * # VPN Module Variables
+ *
+ * Module-specific variables for VPN gateway and point-to-site configuration.
+ */
+
 /*
  * VPN Gateway Configuration - Required
  */
