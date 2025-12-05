@@ -148,7 +148,7 @@ if [[ "${skip_gpu_operator}" != "true" ]]; then
     --create-namespace \
     --version 24.9.1 \
     --disable-openapi-validation \
-    -f "${values_dir}/nvidia-gpu-operator-values.yaml" \
+    -f "${values_dir}/nvidia-gpu-operator.yaml" \
     --wait \
     --timeout 10m
 
@@ -182,7 +182,7 @@ if [[ "${skip_kai_scheduler}" != "true" ]]; then
   helm upgrade --install kai-scheduler kai-scheduler-v0.5.5.tgz \
     --namespace kai-scheduler \
     --create-namespace \
-    --values "${values_dir}/kai-scheduler-values.yaml" \
+    --values "${values_dir}/kai-scheduler.yaml" \
     --wait \
     --timeout 5m
 

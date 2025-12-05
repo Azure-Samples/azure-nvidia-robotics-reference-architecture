@@ -3,7 +3,7 @@
 # Azure ML Validation Job Submission Script
 #
 # This script packages training code, ensures the container environment exists,
-# and submits an Azure ML validation job using isaaclab-validate.yaml as a template.
+# and submits an Azure ML validation job using validate.yaml as a template.
 #
 # Key responsibilities:
 # 1. Package src/training/ directory into a staging area
@@ -12,7 +12,7 @@
 # 4. Override the YAML template with actual runtime values
 # 5. Submit the job to Azure ML
 #
-# The YAML template (isaaclab-validate.yaml) provides structure only.
+# The YAML template (workflows/azureml/validate.yaml) provides structure only.
 # This script provides all actual values via --set flags.
 #
 # Usage:
@@ -21,6 +21,13 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || dirname "$SCRIPT_DIR")
+
+# Source shared library for Terraform outputs
+source "${SCRIPT_DIR}/lib/terraform-outputs.sh"
+
+# Attempt to read Terraform outputs (non-fatal if missing)
+read_terraform_outputs "${REPO_ROOT}/deploy/001-iac" 2>/dev/null || true
 
 usage() {
   cat <<'EOF'
@@ -49,7 +56,7 @@ Validation options:
   --gui                         Disable headless mode
 
 Azure context overrides:
-  --job-file PATH               Path to validation job YAML (default: isaaclab-validate.yaml)
+  --job-file PATH               Path to validation job YAML (default: workflows/azureml/validate.yaml)
   --compute TARGET              Compute target override (e.g., azureml:k8s-compute)
   --instance-type TYPE          Instance type for Kubernetes compute (e.g., gpuspot)
   --experiment-name NAME        Azure ML experiment name override
@@ -60,6 +67,8 @@ Azure context overrides:
 Environment requirements:
   AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, and AZUREML_WORKSPACE_NAME must be set.
   Azure CLI ml extension must be installed.
+
+  Values are resolved in order: CLI arguments > Environment variables > Terraform outputs
 EOF
 }
 
@@ -76,15 +85,6 @@ require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     fail "Command not found: $1"
   fi
-}
-
-resolve_repo_root() {
-  local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null || true)
-  if [[ -z "$root" ]]; then
-    fail "Run inside the repository working tree"
-  fi
-  printf '%s\n' "$root"
 }
 
 ensure_ml_extension() {
@@ -126,6 +126,8 @@ EOF
 
 stream_job_logs() {
   local job_name="$1"
+  local resource_group="$2"
+  local workspace_name="$3"
 
   log "Streaming job logs for ${job_name}"
   log "Note: For Kubernetes compute, 'az ml job stream' shows status only, not training output."
@@ -133,14 +135,11 @@ stream_job_logs() {
   log "Then check: ./${job_name}/user_logs/std_log.txt"
 
   az ml job stream --name "${job_name}" \
-    --resource-group "${AZURE_RESOURCE_GROUP}" \
-    --workspace-name "${AZUREML_WORKSPACE_NAME}" || true
+    --resource-group "${resource_group}" \
+    --workspace-name "${workspace_name}" || true
 }
 
 main() {
-  local repo_root
-  repo_root=$(resolve_repo_root)
-
   # AzureML asset options
   local environment_name="isaaclab-training-env"
   local environment_version="2.2.0"
@@ -159,9 +158,14 @@ main() {
   local threshold=""
   local headless="true"
 
+  # Three-tier value resolution: CLI > ENV > Terraform
+  local subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
+  local resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
+  local workspace_name="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
+
   # Azure context
-  local job_file="${SCRIPT_DIR}/../jobs/isaaclab-validate.yaml"
-  local compute=""
+  local job_file="${REPO_ROOT}/workflows/azureml/validate.yaml"
+  local compute="${AZUREML_COMPUTE:-$(get_compute_target)}"
   local instance_type=""
   local experiment_name=""
   local job_name_override=""
@@ -246,6 +250,18 @@ main() {
         stream_logs=true
         shift
         ;;
+      --subscription-id)
+        subscription_id="$2"
+        shift 2
+        ;;
+      --resource-group)
+        resource_group="$2"
+        shift 2
+        ;;
+      --workspace-name)
+        workspace_name="$2"
+        shift 2
+        ;;
       -h | --help)
         usage
         exit 0
@@ -270,6 +286,14 @@ main() {
     fail "--model-version is required (use 'latest' for most recent)"
   fi
 
+  if [[ -z "${resource_group}" ]]; then
+    fail "Resource group is required (set AZURE_RESOURCE_GROUP or use --resource-group)"
+  fi
+
+  if [[ -z "${workspace_name}" ]]; then
+    fail "Workspace name is required (set AZUREML_WORKSPACE_NAME or use --workspace-name)"
+  fi
+
   if [[ ! -f "${job_file}" ]]; then
     fail "Job file not found: ${job_file}"
   fi
@@ -279,8 +303,8 @@ main() {
     log "Resolving latest version for model: ${model_name}"
     model_version=$(az ml model list \
       --name "${model_name}" \
-      --resource-group "${AZURE_RESOURCE_GROUP}" \
-      --workspace-name "${AZUREML_WORKSPACE_NAME}" \
+      --resource-group "${resource_group}" \
+      --workspace-name "${workspace_name}" \
       --query "[0].version" -o tsv 2>/dev/null || echo "")
     if [[ -z "${model_version}" ]]; then
       fail "Could not find model: ${model_name}"
@@ -299,8 +323,8 @@ main() {
   model_json=$(az ml model show \
     --name "${model_name}" \
     --version "${model_version}" \
-    --resource-group "${AZURE_RESOURCE_GROUP}" \
-    --workspace-name "${AZUREML_WORKSPACE_NAME}" \
+    --resource-group "${resource_group}" \
+    --workspace-name "${workspace_name}" \
     -o json 2>/dev/null || echo "{}")
 
   # Extract metadata from model tags/properties if not provided via CLI
@@ -321,7 +345,7 @@ main() {
   # Phase 2: Package training code and register environment
   # ============================================================================
 
-  local training_src="$repo_root/src/training"
+  local training_src="$REPO_ROOT/src/training"
   local code_payload="$staging_dir/code"
   local env_file="$staging_dir/environment.yaml"
   mkdir -p "$staging_dir"
@@ -331,7 +355,7 @@ main() {
 
   log "Registering AzureML assets"
   register_environment "$environment_name" "$environment_version" "$image" "$env_file" \
-    "$AZURE_RESOURCE_GROUP" "$AZUREML_WORKSPACE_NAME"
+    "$resource_group" "$workspace_name"
 
   log "Using local code path: $code_payload"
   log "Environment: ${environment_name}:${environment_version} ($image)"
@@ -349,8 +373,8 @@ main() {
 
   local az_args=(
     az ml job create
-    --resource-group "${AZURE_RESOURCE_GROUP}"
-    --workspace-name "${AZUREML_WORKSPACE_NAME}"
+    --resource-group "${resource_group}"
+    --workspace-name "${workspace_name}"
     --file "${job_file}"
   )
 
@@ -375,8 +399,7 @@ main() {
   cmd_args="$cmd_args --framework \${{inputs.framework}}"
   cmd_args="$cmd_args --success-threshold \${{inputs.success_threshold}}"
 
-  # Set input values - use "auto" sentinel for task/framework when not specified
-  # The validate.sh script will handle "auto" by detecting from model metadata
+  # Set input values
   az_args+=(--set "inputs.task=${task:-auto}")
   az_args+=(--set "inputs.framework=${framework:-auto}")
   az_args+=(--set "inputs.success_threshold=${threshold:--1.0}")
@@ -410,11 +433,11 @@ main() {
   fi
 
   log "Job submitted: ${job_name_result}"
-  log "View in portal: https://ml.azure.com/runs/${job_name_result}?wsid=/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/${AZUREML_WORKSPACE_NAME}"
+  log "View in portal: https://ml.azure.com/runs/${job_name_result}?wsid=/subscriptions/${subscription_id}/resourceGroups/${resource_group}/providers/Microsoft.MachineLearningServices/workspaces/${workspace_name}"
 
   # Stream logs if requested
   if [[ "${stream_logs}" == "true" ]]; then
-    stream_job_logs "${job_name_result}"
+    stream_job_logs "${job_name_result}" "${resource_group}" "${workspace_name}"
   fi
 }
 

@@ -3,7 +3,7 @@
 # Azure ML Training Job Submission Script
 #
 # This script packages training code, registers the container environment,
-# and submits an Azure ML command job using isaaclab-train.yaml as a template.
+# and submits an Azure ML command job using train.yaml as a template.
 #
 # Key responsibilities:
 # 1. Package src/training/ directory into a staging area
@@ -12,12 +12,19 @@
 # 4. Override the YAML template with actual runtime values
 # 5. Submit the job to Azure ML
 #
-# The YAML template (isaaclab-train.yaml) provides structure only.
+# The YAML template (workflows/azureml/train.yaml) provides structure only.
 # This script provides all actual values via --set flags.
 #
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || dirname "$SCRIPT_DIR")
+
+# Source shared library for Terraform outputs
+source "${SCRIPT_DIR}/lib/terraform-outputs.sh"
+
+# Attempt to read Terraform outputs (non-fatal if missing)
+read_terraform_outputs "${REPO_ROOT}/deploy/001-iac" 2>/dev/null || true
 
 usage() {
   cat <<'EOF'
@@ -31,11 +38,11 @@ AzureML asset options:
   --environment-name NAME       AzureML environment name (default: isaaclab-training-env)
   --environment-version VER     Environment version (default: 2.2.0)
   --image IMAGE                 Container image reference (default: nvcr.io/nvidia/isaac-lab:2.2.0)
-  --staging-dir PATH            Directory for intermediate packaging (default: deploy/004-workflow/azureml/scripts/.tmp)
+  --staging-dir PATH            Directory for intermediate packaging (default: scripts/.tmp)
   --assets-only                 Prepare assets without submitting the job.
 
 Workflow parity options:
-  -w, --job-file PATH           Path to command job YAML (default: deploy/004-workflow/azureml/jobs/isaaclab-train.yaml)
+  -w, --job-file PATH           Path to command job YAML (default: workflows/azureml/train.yaml)
   -t, --task NAME               IsaacLab task override (default env TASK or Isaac-Velocity-Rough-Anymal-C-v0)
   -n, --num-envs COUNT          Number of environments override (default env NUM_ENVS or 2048)
   -m, --max-iterations N        Maximum iteration override (empty to unset)
@@ -49,9 +56,9 @@ Workflow parity options:
       --mode MODE               Execution mode forwarded to launch.py (default: train)
 
 Azure context overrides:
-      --subscription-id ID      Azure subscription ID for job inputs (default: $AZURE_SUBSCRIPTION_ID)
-      --resource-group NAME     Azure resource group for job inputs (default: $AZURE_RESOURCE_GROUP)
-      --workspace-name NAME     Azure ML workspace for job inputs (default: $AZUREML_WORKSPACE_NAME)
+      --subscription-id ID      Azure subscription ID for job inputs (default: from Terraform or $AZURE_SUBSCRIPTION_ID)
+      --resource-group NAME     Azure resource group for job inputs (default: from Terraform or $AZURE_RESOURCE_GROUP)
+      --workspace-name NAME     Azure ML workspace for job inputs (default: from Terraform or $AZUREML_WORKSPACE_NAME)
       --mlflow-token-retries N  MLflow token refresh retries (default: env or 3)
       --mlflow-http-timeout N   MLflow HTTP timeout seconds (default: env or 60)
       --experiment-name NAME    Azure ML experiment name override
@@ -67,6 +74,8 @@ General:
 Environment requirements:
   AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, and AZUREML_WORKSPACE_NAME must be
   configured for az ml operations. Azure CLI ml extension is required.
+
+  Values are resolved in order: CLI arguments > Environment variables > Terraform outputs
 EOF
 }
 
@@ -83,15 +92,6 @@ require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     fail "Command not found: $1"
   fi
-}
-
-resolve_repo_root() {
-  local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null || true)
-  if [[ -z "$root" ]]; then
-    fail "Run inside the repository working tree"
-  fi
-  printf '%s\n' "$root"
 }
 
 ensure_ml_extension() {
@@ -204,16 +204,13 @@ EOF
 }
 
 main() {
-  local repo_root
-  repo_root=$(resolve_repo_root)
-
   local environment_name="isaaclab-training-env"
   local environment_version="2.2.0"
   local image="nvcr.io/nvidia/isaac-lab:2.2.0"
   local staging_dir="${STAGING_DIR:-$SCRIPT_DIR/.tmp}"
   local assets_only=0
 
-  local job_file="$repo_root/deploy/004-workflow/azureml/jobs/isaaclab-train.yaml"
+  local job_file="$REPO_ROOT/workflows/azureml/train.yaml"
   local mode="train"
   local task_value="${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}"
   local num_envs_value="${NUM_ENVS:-2048}"
@@ -224,14 +221,15 @@ main() {
   local run_smoke_test_value="${RUN_AZURE_SMOKE_TEST:-0}"
   local headless="true"
 
-  local subscription_id="${AZURE_SUBSCRIPTION_ID:-}"
-  local resource_group="${AZURE_RESOURCE_GROUP:-}"
-  local workspace_name="${AZUREML_WORKSPACE_NAME:-}"
+  # Three-tier value resolution: CLI > ENV > Terraform
+  local subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
+  local resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
+  local workspace_name="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
   local mlflow_token_retries="${MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES:-3}"
   local mlflow_http_timeout="${MLFLOW_HTTP_REQUEST_TIMEOUT:-60}"
 
   local experiment_override=""
-  local compute_target=""
+  local compute_target="${AZUREML_COMPUTE:-$(get_compute_target)}"
   local instance_type=""
   local job_name_override=""
   local display_name_override=""
@@ -384,7 +382,7 @@ main() {
   # Phase 1: Package training code and register environment
   # ============================================================================
 
-  local training_src="$repo_root/src/training"
+  local training_src="$REPO_ROOT/src/training"
   local code_payload="$staging_dir/code"
   local env_file="$staging_dir/environment.yaml"
   mkdir -p "$staging_dir"
@@ -414,14 +412,10 @@ main() {
   fi
 
   if [[ "$run_smoke_test_value" == "true" ]]; then
-    run_local_smoke_test "$repo_root"
+    run_local_smoke_test "$REPO_ROOT"
   fi
 
   # ============================================================================
-  # Phase 3: Build Azure ML job submission command
-  # ============================================================================
-
-# ============================================================================
   # Phase 3: Build Azure ML job submission command
   # ============================================================================
 
@@ -448,11 +442,8 @@ main() {
   fi
 
   # Build the training command dynamically based on provided parameters
-  # The command uses ${{inputs.X}} notation to reference job inputs
   local cmd_args="--mode \${{inputs.mode}} --checkpoint-mode \${{inputs.checkpoint_mode}}"
 
-  # Add optional training parameters (only if provided)
-  # Each parameter requires both the command argument AND the input value to be set
   if [[ -n "$task_value" ]]; then
     cmd_args="$cmd_args --task \${{inputs.task}}"
     az_args+=(--set "inputs.task=$task_value")
@@ -485,8 +476,7 @@ main() {
   # Override the command from the template with our constructed command
   az_args+=(--set "command=bash src/training/scripts/train.sh $cmd_args")
 
-  # Set all required input values (these are always provided)
-  # These are referenced in environment_variables section of the YAML
+  # Set all required input values
   az_args+=(--set "inputs.mode=$mode")
   az_args+=(--set "inputs.checkpoint_mode=$checkpoint_mode_value")
   az_args+=(--set "inputs.headless=$headless")
@@ -497,7 +487,7 @@ main() {
   az_args+=(--set "inputs.mlflow_token_refresh_retries=$mlflow_token_retries")
   az_args+=(--set "inputs.mlflow_http_request_timeout=$mlflow_http_timeout")
 
-  # Set environment variables directly (AzureML ${{inputs.X}} syntax doesn't work for env vars)
+  # Set environment variables directly
   az_args+=(--set "environment_variables.AZURE_SUBSCRIPTION_ID=$subscription_id")
   az_args+=(--set "environment_variables.AZURE_RESOURCE_GROUP=$resource_group")
   az_args+=(--set "environment_variables.AZUREML_WORKSPACE_NAME=$workspace_name")

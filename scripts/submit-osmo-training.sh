@@ -1,9 +1,24 @@
 #!/usr/bin/env bash
+#
+# OSMO Training Workflow Submission Script
+#
+# Packages src/training/, encodes the archive, and submits an OSMO workflow
+# using workflows/osmo/train.yaml as a template.
+#
 set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || dirname "$SCRIPT_DIR")
+
+# Source shared library for Terraform outputs
+source "${SCRIPT_DIR}/lib/terraform-outputs.sh"
+
+# Attempt to read Terraform outputs (non-fatal if missing)
+read_terraform_outputs "${REPO_ROOT}/deploy/001-iac" 2>/dev/null || true
 
 usage() {
   cat <<'EOF'
-Usage: submit-training.sh [options] [-- osmo-submit-flags]
+Usage: submit-osmo-training.sh [options] [-- osmo-submit-flags]
 
 Packages src/training/, encodes the archive, and submits the inline workflow.
 
@@ -19,13 +34,23 @@ Options:
   -r, --register-checkpoint NAME  Azure ML model name to register the final checkpoint under.
       --sleep-after-unpack VALUE  Provide a non-empty value to sleep post-unpack (ex. 7200 to sleep 2 hours).
   -s, --run-smoke-test    Enable the Azure connectivity smoke test before training.
+
+Azure context overrides (resolved from Terraform outputs if not provided):
+      --azure-subscription-id ID    Azure subscription ID
+      --azure-resource-group NAME   Azure resource group
+      --azure-workspace-name NAME   Azure ML workspace name
+
+General:
   -h, --help              Show this help message and exit.
 
 Environment overrides:
   TASK, NUM_ENVS, MAX_ITERATIONS, IMAGE, PAYLOAD_ROOT, RUN_AZURE_SMOKE_TEST
   CHECKPOINT_URI, CHECKPOINT_MODE, REGISTER_CHECKPOINT, SLEEP_AFTER_UNPACK
+  AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZUREML_WORKSPACE_NAME
 
 Additional arguments after -- are forwarded to osmo workflow submit.
+
+Values are resolved in order: CLI arguments > Environment variables > Terraform outputs
 EOF
 }
 
@@ -44,14 +69,8 @@ if ! command -v base64 >/dev/null 2>&1; then
   exit 1
 fi
 
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
-if [[ -z "${REPO_ROOT}" ]]; then
-  echo "Run inside the repository working tree" >&2
-  exit 1
-fi
-
-WORKFLOW_TEMPLATE=${WORKFLOW_TEMPLATE:-"$REPO_ROOT/deploy/004-workflow/osmo/templates/isaaclab-inline.yaml"}
-TMP_DIR=${TMP_DIR:-"$REPO_ROOT/deploy/004-workflow/osmo/.tmp"}
+WORKFLOW_TEMPLATE=${WORKFLOW_TEMPLATE:-"$REPO_ROOT/workflows/osmo/train.yaml"}
+TMP_DIR=${TMP_DIR:-"$SCRIPT_DIR/.tmp"}
 ARCHIVE_PATH=${ARCHIVE_PATH:-"$TMP_DIR/osmo-training.zip"}
 B64_PATH=${B64_PATH:-"$TMP_DIR/osmo-training.b64"}
 TASK_VALUE=${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}
@@ -64,6 +83,11 @@ CHECKPOINT_URI_VALUE=${CHECKPOINT_URI:-}
 CHECKPOINT_MODE_VALUE=${CHECKPOINT_MODE:-from-scratch}
 REGISTER_CHECKPOINT_VALUE=${REGISTER_CHECKPOINT:-}
 SLEEP_AFTER_UNPACK_VALUE=${SLEEP_AFTER_UNPACK:-}
+
+# Three-tier value resolution: CLI > ENV > Terraform
+AZURE_SUBSCRIPTION_ID_VALUE="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
+AZURE_RESOURCE_GROUP_VALUE="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
+AZURE_WORKSPACE_NAME_VALUE="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
 
 normalize_checkpoint_mode() {
   local mode="$1"
@@ -132,6 +156,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --sleep-after-unpack)
       SLEEP_AFTER_UNPACK_VALUE="$2"
+      shift 2
+      ;;
+    --azure-subscription-id)
+      AZURE_SUBSCRIPTION_ID_VALUE="$2"
+      shift 2
+      ;;
+    --azure-resource-group)
+      AZURE_RESOURCE_GROUP_VALUE="$2"
+      shift 2
+      ;;
+    --azure-workspace-name)
+      AZURE_WORKSPACE_NAME_VALUE="$2"
       shift 2
       ;;
     -h|--help)
@@ -205,6 +241,17 @@ submit_args=(
   "sleep_after_unpack=$SLEEP_AFTER_UNPACK_VALUE"
 )
 
+# Add Azure context from Terraform outputs
+if [[ -n "$AZURE_SUBSCRIPTION_ID_VALUE" ]]; then
+  submit_args+=("azure_subscription_id=$AZURE_SUBSCRIPTION_ID_VALUE")
+fi
+if [[ -n "$AZURE_RESOURCE_GROUP_VALUE" ]]; then
+  submit_args+=("azure_resource_group=$AZURE_RESOURCE_GROUP_VALUE")
+fi
+if [[ -n "$AZURE_WORKSPACE_NAME_VALUE" ]]; then
+  submit_args+=("azure_workspace_name=$AZURE_WORKSPACE_NAME_VALUE")
+fi
+
 if [[ -n "$MAX_ITERATIONS_VALUE" ]]; then
   submit_args+=("max_iterations=$MAX_ITERATIONS_VALUE")
 else
@@ -222,4 +269,3 @@ if ! osmo "${submit_args[@]}"; then
 fi
 
 echo "Workflow submitted successfully"
-
