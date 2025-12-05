@@ -31,7 +31,8 @@ Options:
   -p, --payload-root DIR  Runtime extraction root override.
   -c, --checkpoint-uri URI  MLflow checkpoint artifact URI to resume or warm-start from.
   -M, --checkpoint-mode MODE  Checkpoint mode (from-scratch, warm-start, resume, fresh).
-  -r, --register-checkpoint NAME  Azure ML model name to register the final checkpoint under.
+  -r, --register-checkpoint NAME  Azure ML model name to register the final checkpoint under (default: derived from task).
+      --skip-register-checkpoint  Skip automatic model registration.
       --sleep-after-unpack VALUE  Provide a non-empty value to sleep post-unpack (ex. 7200 to sleep 2 hours).
   -s, --run-smoke-test    Enable the Azure connectivity smoke test before training.
 
@@ -111,6 +112,14 @@ normalize_checkpoint_mode() {
   esac
 }
 
+derive_model_name_from_task() {
+  local task="$1"
+  # Convert task to model name: lowercase, replace non-alphanumeric with hyphens
+  printf '%s' "$task" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
+}
+
+SKIP_REGISTER_CHECKPOINT=0
+
 forward_args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -150,6 +159,10 @@ while [[ $# -gt 0 ]]; do
       REGISTER_CHECKPOINT_VALUE="$2"
       shift 2
       ;;
+    --skip-register-checkpoint)
+      SKIP_REGISTER_CHECKPOINT=1
+      shift
+      ;;
     -s|--run-smoke-test)
       RUN_AZURE_SMOKE_TEST_VALUE="1"
       shift
@@ -187,6 +200,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 CHECKPOINT_MODE_VALUE=$(normalize_checkpoint_mode "$CHECKPOINT_MODE_VALUE")
+
+# Derive default model name from task if registration not skipped and no explicit name provided
+if [[ $SKIP_REGISTER_CHECKPOINT -eq 0 ]] && [[ -z "$REGISTER_CHECKPOINT_VALUE" ]]; then
+  REGISTER_CHECKPOINT_VALUE=$(derive_model_name_from_task "$TASK_VALUE")
+  echo "Auto-derived model name: $REGISTER_CHECKPOINT_VALUE"
+fi
+
+# Clear register_checkpoint if skipped
+if [[ $SKIP_REGISTER_CHECKPOINT -eq 1 ]]; then
+  REGISTER_CHECKPOINT_VALUE=""
+fi
 
 if [[ ! -f "$WORKFLOW_TEMPLATE" ]]; then
   echo "Workflow template not found: $WORKFLOW_TEMPLATE" >&2
