@@ -71,6 +71,26 @@ resource "azurerm_role_assignment" "ml_storage_file" {
 }
 
 // ============================================================
+// OSMO Identity Role Assignments
+// ============================================================
+
+// Grant OSMO identity Storage Blob Data Contributor for workflow data access
+resource "azurerm_role_assignment" "osmo_storage_blob_contributor" {
+  count                = var.should_enable_osmo_identity ? 1 : 0
+  scope                = azurerm_storage_account.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.osmo[0].principal_id
+}
+
+// Grant OSMO identity AcrPull role for pulling container images
+resource "azurerm_role_assignment" "osmo_acr_pull" {
+  count                = var.should_enable_osmo_identity ? 1 : 0
+  scope                = azurerm_container_registry.main.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.osmo[0].principal_id
+}
+
+// ============================================================
 // Container Registry Role Assignments
 // ============================================================
 

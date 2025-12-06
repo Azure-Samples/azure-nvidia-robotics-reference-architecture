@@ -138,6 +138,26 @@ variable "redis_clustering_policy" {
 }
 
 /*
+ * OSMO Workload Identity Configuration
+ */
+
+variable "osmo_config" {
+  description = "OSMO configuration including workload identity settings"
+  type = object({
+    should_enable_identity   = bool
+    should_federate_identity = bool
+    control_plane_namespace  = string
+    operator_namespace       = string
+  })
+  default = {
+    should_enable_identity   = true
+    should_federate_identity = true
+    control_plane_namespace  = "osmo-control-plane"
+    operator_namespace       = "osmo-operator"
+  }
+}
+
+/*
  * Resource Name Overrides - Optional
  */
 

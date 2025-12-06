@@ -172,3 +172,32 @@ variable "azureml_config" {
     cluster_integration_instance_types = null
   }
 }
+
+/*
+ * OSMO Workload Identity Variables
+ */
+
+variable "osmo_workload_identity" {
+  description = "OSMO workload identity from platform module for federated credential creation"
+  type = object({
+    id           = string
+    principal_id = string
+    client_id    = string
+    tenant_id    = string
+  })
+  default = null
+}
+
+variable "osmo_config" {
+  description = "OSMO configuration for federated identity credentials"
+  type = object({
+    should_federate_identity = bool
+    control_plane_namespace  = string
+    operator_namespace       = string
+  })
+  default = {
+    should_federate_identity = false
+    control_plane_namespace  = "osmo-control-plane"
+    operator_namespace       = "osmo-operator"
+  }
+}

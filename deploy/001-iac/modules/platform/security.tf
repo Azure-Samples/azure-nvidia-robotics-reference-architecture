@@ -43,6 +43,18 @@ resource "azurerm_user_assigned_identity" "ml" {
 }
 
 // ============================================================
+// User Assigned Managed Identity for OSMO Workloads
+// ============================================================
+
+resource "azurerm_user_assigned_identity" "osmo" {
+  count               = var.should_enable_osmo_identity ? 1 : 0
+  name                = "id-osmo-${local.resource_name_suffix}"
+  location            = var.resource_group.location
+  resource_group_name = var.resource_group.name
+  tags                = local.tags
+}
+
+// ============================================================
 // Key Vault Private Endpoint
 // ============================================================
 

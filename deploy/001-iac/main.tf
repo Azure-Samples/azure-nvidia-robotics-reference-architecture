@@ -106,6 +106,9 @@ module "platform" {
     sku_name          = var.redis_sku_name
     clustering_policy = var.redis_clustering_policy
   }
+
+  // OSMO workload identity
+  should_enable_osmo_identity = var.osmo_config.should_enable_identity
 }
 
 // ============================================================
@@ -168,6 +171,14 @@ module "sil" {
     inference_router_service_type      = var.inference_router_service_type
     workload_tolerations               = var.workload_tolerations
     cluster_integration_instance_types = var.cluster_integration_instance_types
+  }
+
+  // OSMO workload identity
+  osmo_workload_identity = module.platform.osmo_workload_identity
+  osmo_config = {
+    should_federate_identity = var.osmo_config.should_federate_identity
+    control_plane_namespace  = var.osmo_config.control_plane_namespace
+    operator_namespace       = var.osmo_config.operator_namespace
   }
 
   // Feature flags

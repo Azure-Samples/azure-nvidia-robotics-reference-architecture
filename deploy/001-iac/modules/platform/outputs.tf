@@ -223,3 +223,13 @@ output "redis_secret_name" {
   description = "Key Vault secret name containing Redis primary access key"
   value       = try(azurerm_key_vault_secret.redis_primary_key[0].name, null)
 }
+
+output "osmo_workload_identity" {
+  description = "OSMO workload identity for federated credentials"
+  value = var.should_enable_osmo_identity ? {
+    id           = azurerm_user_assigned_identity.osmo[0].id
+    principal_id = azurerm_user_assigned_identity.osmo[0].principal_id
+    client_id    = azurerm_user_assigned_identity.osmo[0].client_id
+    tenant_id    = azurerm_user_assigned_identity.osmo[0].tenant_id
+  } : null
+}

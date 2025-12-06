@@ -173,3 +173,8 @@ output "redis" {
   description = "Azure Redis Cache object."
   value       = module.platform.redis
 }
+
+output "osmo_workload_identity" {
+  description = "OSMO workload identity for deployment scripts"
+  value       = module.platform.osmo_workload_identity
+}

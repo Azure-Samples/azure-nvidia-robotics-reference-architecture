@@ -124,6 +124,16 @@ variable "redis_config" {
 }
 
 /*
+ * OSMO Variables - Workload Identity
+ */
+
+variable "should_enable_osmo_identity" {
+  type        = bool
+  description = "Whether to create a managed identity for OSMO workload identity authentication"
+  default     = true
+}
+
+/*
  * Storage Variables
  */
 
