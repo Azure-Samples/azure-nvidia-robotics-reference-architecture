@@ -115,12 +115,13 @@ variable "azureml_config" {
     should_federate_ml_identity = optional(bool, true)
 
     // Training and inference settings
-    enable_training               = optional(bool, true)
-    enable_inference              = optional(bool, true)
-    inference_router_service_type = optional(string, "LoadBalancer")
-    inference_router_ha           = optional(bool, false)
-    allow_insecure_connections    = optional(bool, true)
-    cluster_purpose               = optional(string, "DevTest")
+    enable_training                  = optional(bool, true)
+    enable_inference                 = optional(bool, true)
+    inference_router_service_type    = optional(string, "LoadBalancer")
+    internal_load_balancer_provider  = optional(string, "azure")
+    inference_router_ha              = optional(bool, false)
+    allow_insecure_connections       = optional(bool, true)
+    cluster_purpose                  = optional(string, "DevTest")
 
     // Component installation toggles
     // Set to true: Extension installs and manages the component
@@ -152,15 +153,16 @@ variable "azureml_config" {
   })
   description = "Azure Machine Learning AKS extension configuration including training, inference, and component settings"
   default = {
-    should_integrate_aks          = true
-    should_install_extension      = true
-    should_federate_ml_identity   = true
-    enable_training               = true
-    enable_inference              = true
-    inference_router_service_type = "LoadBalancer"
-    inference_router_ha           = false
-    allow_insecure_connections    = true
-    cluster_purpose               = "DevTest"
+    should_integrate_aks             = true
+    should_install_extension         = true
+    should_federate_ml_identity      = true
+    enable_training                  = true
+    enable_inference                 = true
+    inference_router_service_type    = "LoadBalancer"
+    internal_load_balancer_provider  = "azure"
+    inference_router_ha              = false
+    allow_insecure_connections       = true
+    cluster_purpose                  = "DevTest"
     install_nvidia_device_plugin  = false
     install_dcgm_exporter         = false
     install_volcano               = true

@@ -12,6 +12,8 @@ apply_osmo_update=false
 access_key_id="osmo-control-plane-storage"
 acr_login_server_override=""
 ngc_token=""
+osmo_auth_mode="workload-identity"
+osmo_identity_client_id=""
 
 help="Usage: configure-osmo-storage.sh [OPTIONS]
 
@@ -27,6 +29,8 @@ OPTIONS:
   --access-key-id VALUE     Override access key identifier in rendered config (default: osmo-control-plane-storage)
   --acr-login-server HOST   Override ACR login server if multiple are present
   --ngc-token TOKEN         NGC API token used for backend image pulls (required)
+  --osmo-auth-mode MODE     OSMO storage credential mode: key|workload-identity (default: workload-identity)
+  --osmo-identity-client-id Client ID of OSMO managed identity (default: from terraform osmo_workload_identity output)
   --config-preview          Print resolved configuration and exit
   --help                    Show this help message
 "
@@ -65,6 +69,14 @@ while [[ $# -gt 0 ]]; do
     ngc_token="$2"
     shift 2
     ;;
+  --osmo-auth-mode)
+    osmo_auth_mode="$2"
+    shift 2
+    ;;
+  --osmo-identity-client-id)
+    osmo_identity_client_id="$2"
+    shift 2
+    ;;
   --apply-osmo)
     apply_osmo_update=true
     shift
@@ -90,6 +102,14 @@ case "$auth_mode" in
 login|key) ;;
 *)
   echo "Error: --auth-mode must be either 'login' or 'key'" >&2
+  exit 1
+  ;;
+esac
+
+case "$osmo_auth_mode" in
+key|workload-identity) ;;
+*)
+  echo "Error: --osmo-auth-mode must be 'key' or 'workload-identity'" >&2
   exit 1
   ;;
 esac
@@ -154,6 +174,14 @@ resource_group_name=$(echo "$tf_output" | jq -r '.resource_group.value.name // e
 primary_blob_endpoint=$(echo "$tf_output" | jq -r '.storage_account.value.primary_blob_endpoint // empty')
 location=$(echo "$tf_output" | jq -r '.resource_group.value.location // empty')
 
+if [[ "$osmo_auth_mode" == "workload-identity" && -z "$osmo_identity_client_id" ]]; then
+  osmo_identity_client_id=$(echo "$tf_output" | jq -r '.osmo_workload_identity.value.client_id // empty')
+  if [[ -z "$osmo_identity_client_id" ]]; then
+    echo "Error: --osmo-identity-client-id not provided and osmo_workload_identity output not found in terraform state" >&2
+    exit 1
+  fi
+fi
+
 if [[ -z "$storage_account_name" || -z "$storage_account_id" ]]; then
   echo "Error: storage_account output not found or incomplete" >&2
   exit 1
@@ -182,15 +210,19 @@ workflow_data_endpoint="${azure_container_base}/workflows/data"
 workflow_log_endpoint="${azure_container_base}/workflows/logs"
 workflow_app_endpoint="${azure_container_base}/apps"
 
-account_key=$(az storage account keys list \
-  --resource-group "$resource_group_name" \
-  --account-name "$storage_account_name" \
-  --query '[0].value' \
-  --output tsv)
+if [[ "$osmo_auth_mode" == "key" ]]; then
+  account_key=$(az storage account keys list \
+    --resource-group "$resource_group_name" \
+    --account-name "$storage_account_name" \
+    --query '[0].value' \
+    --output tsv)
 
-if [[ -z "$account_key" ]]; then
-  echo "Error: Unable to retrieve storage account key" >&2
-  exit 1
+  if [[ -z "$account_key" ]]; then
+    echo "Error: Unable to retrieve storage account key" >&2
+    exit 1
+  fi
+else
+  account_key=""
 fi
 
 if [[ "$config_preview" == "true" ]]; then
@@ -214,6 +246,8 @@ if [[ "$config_preview" == "true" ]]; then
   printf 'ngc_token(sha1)=%s\n' "$(printf '%s' "$ngc_token" | shasum | awk '{print $1}')"
   printf 'template_file=%s\n' "$template_file"
   printf 'output_file=%s\n' "$output_file"
+  printf 'osmo_auth_mode=%s\n' "$osmo_auth_mode"
+  printf 'osmo_identity_client_id=%s\n' "$osmo_identity_client_id"
   exit 0
 fi
 
@@ -252,32 +286,60 @@ else
   fi
 fi
 
-rendered_config=$(jq \
-  --arg accessKeyId "$access_key_id" \
-  --arg storageAccessKey "$account_key" \
-  --arg workflowBaseUrl "$workflow_base_url" \
-  --arg workflowDataEndpoint "$workflow_data_endpoint" \
-  --arg workflowLogEndpoint "$workflow_log_endpoint" \
-  --arg workflowAppEndpoint "$workflow_app_endpoint" \
-  --arg region "$location" \
-  --arg acr "$acr_login_server" \
-  --arg ngcToken "$ngc_token" \
-  '(.workflow_data.credential.access_key_id = $accessKeyId)
-   | (.workflow_data.credential.access_key = $storageAccessKey)
-   | (.workflow_data.credential.endpoint = $workflowDataEndpoint)
-   | (.workflow_data.credential.region = $region)
-   | (.workflow_data.base_url = $workflowBaseUrl)
-   | (.workflow_log.credential.access_key_id = $accessKeyId)
-   | (.workflow_log.credential.access_key = $storageAccessKey)
-   | (.workflow_log.credential.endpoint = $workflowLogEndpoint)
-   | (.workflow_log.credential.region = $region)
-   | (.workflow_app.credential.access_key_id = $accessKeyId)
-   | (.workflow_app.credential.access_key = $storageAccessKey)
-   | (.workflow_app.credential.endpoint = $workflowAppEndpoint)
-   | (.workflow_app.credential.region = $region)
-   | (.credential_config.disable_registry_validation[1] = $acr)
-   | (.backend_images.credential.auth = $ngcToken)
-  ' "$template_file")
+if [[ "$osmo_auth_mode" == "key" ]]; then
+  rendered_config=$(jq \
+    --arg accessKeyId "$access_key_id" \
+    --arg storageAccessKey "$account_key" \
+    --arg workflowBaseUrl "$workflow_base_url" \
+    --arg workflowDataEndpoint "$workflow_data_endpoint" \
+    --arg workflowLogEndpoint "$workflow_log_endpoint" \
+    --arg workflowAppEndpoint "$workflow_app_endpoint" \
+    --arg region "$location" \
+    --arg acr "$acr_login_server" \
+    --arg ngcToken "$ngc_token" \
+    '(.workflow_data.credential.access_key_id = $accessKeyId)
+     | (.workflow_data.credential.access_key = $storageAccessKey)
+     | (.workflow_data.credential.endpoint = $workflowDataEndpoint)
+     | (.workflow_data.credential.region = $region)
+     | (.workflow_data.base_url = $workflowBaseUrl)
+     | (.workflow_log.credential.access_key_id = $accessKeyId)
+     | (.workflow_log.credential.access_key = $storageAccessKey)
+     | (.workflow_log.credential.endpoint = $workflowLogEndpoint)
+     | (.workflow_log.credential.region = $region)
+     | (.workflow_app.credential.access_key_id = $accessKeyId)
+     | (.workflow_app.credential.access_key = $storageAccessKey)
+     | (.workflow_app.credential.endpoint = $workflowAppEndpoint)
+     | (.workflow_app.credential.region = $region)
+     | (.credential_config.disable_registry_validation[1] = $acr)
+     | (.backend_images.credential.auth = $ngcToken)
+    ' "$template_file")
+else
+  rendered_config=$(jq \
+    --arg accessKeyId "$access_key_id" \
+    --arg workflowBaseUrl "$workflow_base_url" \
+    --arg workflowDataEndpoint "$workflow_data_endpoint" \
+    --arg workflowLogEndpoint "$workflow_log_endpoint" \
+    --arg workflowAppEndpoint "$workflow_app_endpoint" \
+    --arg region "$location" \
+    --arg acr "$acr_login_server" \
+    --arg ngcToken "$ngc_token" \
+    '(.workflow_data.credential.access_key_id = $accessKeyId)
+     | (.workflow_data.credential.endpoint = $workflowDataEndpoint)
+     | (.workflow_data.credential.region = $region)
+     | (.workflow_data.base_url = $workflowBaseUrl)
+     | del(.workflow_data.credential.access_key)
+     | (.workflow_log.credential.access_key_id = $accessKeyId)
+     | (.workflow_log.credential.endpoint = $workflowLogEndpoint)
+     | (.workflow_log.credential.region = $region)
+     | del(.workflow_log.credential.access_key)
+     | (.workflow_app.credential.access_key_id = $accessKeyId)
+     | (.workflow_app.credential.endpoint = $workflowAppEndpoint)
+     | (.workflow_app.credential.region = $region)
+     | del(.workflow_app.credential.access_key)
+     | (.credential_config.disable_registry_validation[1] = $acr)
+     | (.backend_images.credential.auth = $ngcToken)
+    ' "$template_file")
+fi
 
 if [[ -z "$rendered_config" ]]; then
   echo "Error: Failed to render workflow configuration" >&2
@@ -296,6 +358,10 @@ printf 'Container name: %s\n' "$container_name"
 printf 'Azure container base: %s\n' "$azure_container_base"
 printf 'Workflow config: %s\n' "$output_file"
 printf 'ACR login server: %s\n' "$acr_login_server"
+printf 'OSMO auth mode: %s\n' "$osmo_auth_mode"
+if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
+  printf 'Identity client ID: %s\n' "$osmo_identity_client_id"
+fi
 
 echo "Workflow configuration rendered successfully."
 

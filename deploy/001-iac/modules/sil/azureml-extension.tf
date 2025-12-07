@@ -30,31 +30,36 @@ locals {
 
   // Base configuration settings for AzureML extension
   // Reference: edge-ai/src/000-cloud/080-azureml/terraform/modules/inference-cluster-integration/main.tf
-  azureml_base_config = {
-    // Required documented settings
-    "enableTraining"             = tostring(var.azureml_config.enable_training)
-    "enableInference"            = tostring(var.azureml_config.enable_inference)
-    "inferenceRouterServiceType" = var.azureml_config.inference_router_service_type
-    "allowInsecureConnections"   = tostring(var.azureml_config.allow_insecure_connections)
-    "inferenceRouterHA"          = tostring(var.azureml_config.inference_router_ha)
-    "clusterPurpose"             = var.azureml_config.cluster_purpose
+  azureml_base_config = merge(
+    {
+      // Required documented settings
+      "enableTraining"             = tostring(var.azureml_config.enable_training)
+      "enableInference"            = tostring(var.azureml_config.enable_inference)
+      "inferenceRouterServiceType" = var.azureml_config.inference_router_service_type
+      "allowInsecureConnections"   = tostring(var.azureml_config.allow_insecure_connections)
+      "inferenceRouterHA"          = tostring(var.azureml_config.inference_router_ha)
+      "clusterPurpose"             = var.azureml_config.cluster_purpose
 
-    // Component installation toggles
-    "installNvidiaDevicePlugin" = tostring(var.azureml_config.install_nvidia_device_plugin)
-    "installDcgmExporter"       = tostring(var.azureml_config.install_dcgm_exporter)
-    "installVolcano"            = tostring(var.azureml_config.install_volcano)
-    "installPromOp"             = tostring(var.azureml_config.install_prom_op)
+      // Component installation toggles
+      "installNvidiaDevicePlugin" = tostring(var.azureml_config.install_nvidia_device_plugin)
+      "installDcgmExporter"       = tostring(var.azureml_config.install_dcgm_exporter)
+      "installVolcano"            = tostring(var.azureml_config.install_volcano)
+      "installPromOp"             = tostring(var.azureml_config.install_prom_op)
 
-    // Undocumented but required (per edge-ai testing)
-    // Comment from edge-ai: "AzureML Extension breaks without setting these..."
-    "clusterName" = azurerm_kubernetes_cluster.main.name
-    "domain"      = "${var.location}.cloudapp.azure.com"
-    "location"    = var.location
+      // Undocumented but required (per edge-ai testing)
+      "clusterName" = azurerm_kubernetes_cluster.main.name
+      "domain"      = "${var.location}.cloudapp.azure.com"
+      "location"    = var.location
 
-    // AKS-specific settings (disable Arc-only features)
-    "servicebus.enabled"  = "false"
-    "relayserver.enabled" = "false"
-  }
+      // AKS-specific settings (disable Arc-only features)
+      "servicebus.enabled"  = "false"
+      "relayserver.enabled" = "false"
+    },
+    // Internal load balancer for private clusters (AKS only)
+    var.azureml_config.internal_load_balancer_provider != null ? {
+      "internalLoadBalancerProvider" = var.azureml_config.internal_load_balancer_provider
+    } : {}
+  )
 }
 
 // ============================================================

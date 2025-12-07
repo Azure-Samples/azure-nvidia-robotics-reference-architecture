@@ -100,15 +100,15 @@ resource "azurerm_postgresql_flexible_server" "main" {
 }
 
 // ============================================================
-// PostgreSQL Configuration - TimescaleDB Extension
+// PostgreSQL Configuration - Required Extensions
 // ============================================================
 
-resource "azurerm_postgresql_flexible_server_configuration" "timescaledb" {
+resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   count = var.should_deploy_postgresql ? 1 : 0
 
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.main[0].id
-  value     = "TIMESCALEDB"
+  value     = "HSTORE,UUID-OSSP,PG_STAT_STATEMENTS"
 }
 
 // ============================================================

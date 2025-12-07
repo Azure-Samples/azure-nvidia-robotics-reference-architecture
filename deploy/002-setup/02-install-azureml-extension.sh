@@ -16,6 +16,7 @@ set -euo pipefail
 #   --extension-name NAME     Extension name (default: azureml-<cluster_name>)
 #   --compute-name NAME       Compute target name (default: aks-<cluster_name>)
 #   --cluster-purpose PURPOSE Cluster purpose: DevTest or FastProd (default: DevTest)
+#   --internal-load-balancer  Use internal LoadBalancer for inference router (private IP)
 #   --inference-router-ha     Enable inference router high availability
 #   --secure-connections      Require secure connections (disable insecure)
 #   --skip-volcano            Skip Volcano scheduler installation
@@ -49,6 +50,7 @@ cluster_purpose="DevTest"
 enable_training="true"
 enable_inference="true"
 inference_router_service_type="LoadBalancer"
+internal_load_balancer_provider="azure"
 inference_router_ha="false"
 allow_insecure_connections="true"
 install_nvidia_device_plugin="false"
@@ -70,6 +72,7 @@ OPTIONS:
   --extension-name NAME     Extension name (default: azureml-<cluster_name>)
   --compute-name NAME       Compute target name (default: aks-<cluster_name>)
   --cluster-purpose PURPOSE Cluster purpose: DevTest or FastProd (default: DevTest)
+  --internal-load-balancer  Use internal LoadBalancer for inference router (private IP)
   --inference-router-ha     Enable inference router high availability
   --secure-connections      Require secure connections (disable insecure)
   --skip-volcano            Skip Volcano scheduler installation
@@ -107,6 +110,10 @@ while [[ $# -gt 0 ]]; do
     --cluster-purpose)
       cluster_purpose="$2"
       shift 2
+      ;;
+    --internal-load-balancer)
+      internal_load_balancer_provider="azure"
+      shift
       ;;
     --inference-router-ha)
       inference_router_ha="true"
@@ -252,6 +259,7 @@ echo "Configuration:"
 echo "  Enable Training:             ${enable_training}"
 echo "  Enable Inference:            ${enable_inference}"
 echo "  Inference Router Type:       ${inference_router_service_type}"
+echo "  Internal Load Balancer:      ${internal_load_balancer_provider:-disabled}"
 echo "  Inference Router HA:         ${inference_router_ha}"
 echo "  Allow Insecure Connections:  ${allow_insecure_connections}"
 echo "  Cluster Purpose:             ${cluster_purpose}"
@@ -272,6 +280,12 @@ config_args=(
   "servicebus.enabled=false"
   "relayserver.enabled=false"
 )
+
+# Add internal load balancer provider if specified (AKS only)
+if [[ -n "${internal_load_balancer_provider}" ]]; then
+  echo "Enabling internal LoadBalancer (private IP)..."
+  config_args+=("internalLoadBalancerProvider=${internal_load_balancer_provider}")
+fi
 
 # Add GPU spot tolerations if enabled
 if [[ "${enable_gpu_spot_tolerations}" == "true" ]]; then

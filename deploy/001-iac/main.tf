@@ -169,6 +169,7 @@ module "sil" {
     should_federate_ml_identity        = var.should_integrate_aks_cluster
     aks_cluster_purpose                = var.aks_cluster_purpose
     inference_router_service_type      = var.inference_router_service_type
+    internal_load_balancer_provider    = "azure"
     workload_tolerations               = var.workload_tolerations
     cluster_integration_instance_types = var.cluster_integration_instance_types
   }
