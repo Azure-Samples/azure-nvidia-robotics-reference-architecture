@@ -122,7 +122,7 @@ variable "should_deploy_redis" {
 
 variable "redis_sku_name" {
   type        = string
-  description = "SKU name for Azure Managed Redis cache"
+  description = "SKU name for Azure Managed Redis cache. Format: {Tier}_{Size} (e.g., Balanced_B10, Memory_M20, Compute_X10)"
   default     = "Balanced_B10"
 }
 

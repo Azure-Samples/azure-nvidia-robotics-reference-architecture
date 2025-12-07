@@ -26,14 +26,15 @@ services:
     user: "pgadmin"
 
   # Redis cache configuration
-  # NOTE: Azure Cache for Redis Premium (v6.x) is incompatible with OSMO which requires Redis 7.0+
-  # Enable in-cluster Redis deployment for compatibility
+  # Azure Managed Redis provides Redis 7.4+ natively - fully compatible with OSMO
+  # Default: enabled=false uses Azure Managed Redis from terraform (recommended)
+  # Set enabled=true only for local testing without Azure Redis
   redis:
-    enabled: true  # Deploy Redis in-cluster for Redis 7.0+ compatibility
+    enabled: false  # DEFAULT: Use Azure Managed Redis from terraform (Redis 7.4+)
 
-    # External Redis settings (used when enabled: false)
-    # serviceName: "<replace-me>.redis.cache.windows.net"
-    # port: 6380
+    # External Redis settings (configured automatically via helm --set from terraform outputs)
+    # serviceName: "<your-redis>.redis.azure.net"
+    # port: 10000
 
   # Main API service configuration
   service:

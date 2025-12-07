@@ -41,7 +41,7 @@ OPTIONS:
   --mek-config-file PATH    Use existing MEK config file instead of generating (for key recovery/rotation)
   --skip-mek                Skip MEK configuration entirely (use if already applied)
   --force-mek               Force MEK replacement even if one already exists (use with caution)
-  --use-incluster-redis     Deploy in-cluster Redis instead of Azure Cache for Redis (Redis 7.0+ required)
+  --use-incluster-redis     Deploy in-cluster Redis instead of Azure Managed Redis (optional, for testing)
   --config-preview          Print configuration details and exit before deployment
   --help                    Show this help message
 
@@ -51,8 +51,8 @@ MEK (Master Encryption Key):
   securely - if lost, encrypted database data cannot be recovered.
 
 REDIS:
-  OSMO requires Redis 7.0+ for EXPIRE NX commands. Azure Cache for Redis Premium (v6.x)
-  is incompatible. Use --use-incluster-redis to deploy a Redis 7.x pod in-cluster.
+  OSMO requires Redis 7.0+ for Redis Streams commands. Azure Managed Redis provides
+  Redis 7.4 natively. Use --use-incluster-redis only for testing without Azure Redis.
   Ensure services.redis.enabled=true in osmo-control-plane.yaml when using this option.
 
 EXAMPLES:
@@ -65,7 +65,7 @@ EXAMPLES:
   # Deploy with ACR and specific versions
   ./deploy-osmo-control-plane.sh --use-acr --chart-version 1.0.0 --image-version v2025.12.05
 
-  # Deploy with in-cluster Redis (Azure Redis 6.x is incompatible)
+  # Deploy with in-cluster Redis (optional, for testing without Azure Managed Redis)
   ./deploy-osmo-control-plane.sh --use-acr --use-incluster-redis
 
   # Deploy with existing MEK config (disaster recovery)
