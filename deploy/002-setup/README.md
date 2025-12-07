@@ -140,6 +140,22 @@ For NVIDIA OSMO orchestrated workloads:
 ../scripts/submit-osmo-training.sh
 ```
 
+### OSMO Service URL Auto-Detection
+
+The backend operator script automatically detects the OSMO service URL:
+
+1. **Primary**: Uses `azureml-ingress-nginx-internal-lb` LoadBalancer IP (deployed by control plane script)
+2. **Fallback**: Uses `azureml-ingress-nginx-controller` ClusterIP for internal routing
+
+Override with `--service-url URL` if needed:
+
+```bash
+# Use internal nginx controller directly
+./03-deploy-osmo-backend.sh --service-url http://azureml-ingress-nginx-controller.azureml.svc.cluster.local
+```
+
+> **Note**: The `azureml-fe` LoadBalancer is reserved for AzureML inference endpoints and should not be used for OSMO.
+
 ## Optional Scripts
 
 Scripts in `optional/` are not required for standard deployments:

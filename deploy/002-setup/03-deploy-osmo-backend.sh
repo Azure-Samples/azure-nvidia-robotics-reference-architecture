@@ -160,14 +160,23 @@ values_dir=$(dirname "$values_file")
 # Auto-detect service URL from internal load balancer if not provided
 if [[ -z "$service_url" ]]; then
   echo "Auto-detecting OSMO service URL from azureml-ingress-nginx-internal-lb..."
+
+  # Try azureml-ingress-nginx-internal-lb LoadBalancer (deployed by 02-deploy-osmo-control-plane.sh)
   lb_ip=$(kubectl get svc azureml-ingress-nginx-internal-lb -n azureml -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   if [[ -n "$lb_ip" ]]; then
     service_url="http://${lb_ip}"
     echo "Detected service URL: ${service_url}"
   else
-    echo "Error: --service-url not provided and unable to detect from azureml-ingress-nginx-internal-lb service" >&2
-    echo "Ensure the AzureML extension is deployed or provide --service-url manually" >&2
-    exit 1
+    # Fallback to azureml-ingress-nginx-controller ClusterIP (internal routing)
+    cluster_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
+    if [[ -n "$cluster_ip" && "$cluster_ip" != "None" ]]; then
+      service_url="http://${cluster_ip}"
+      echo "Detected service URL from azureml-ingress-nginx-controller ClusterIP: ${service_url}"
+    else
+      echo "Error: --service-url not provided and unable to detect from azureml-ingress-nginx-internal-lb or controller" >&2
+      echo "Ensure 02-deploy-osmo-control-plane.sh has been run or provide --service-url manually" >&2
+      exit 1
+    fi
   fi
 fi
 

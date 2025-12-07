@@ -41,11 +41,11 @@ services:
         nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "32k"
         nginx.ingress.kubernetes.io/large-client-header-buffers: "4 16k"
 
-    # Resource allocation
+    # Resource allocation - reduced for constrained system node pools
     resources:
       requests:
-        cpu: "500m"
-        memory: "512Mi"
+        cpu: "50m"
+        memory: "128Mi"
       limits:
         memory: "512Mi"
 

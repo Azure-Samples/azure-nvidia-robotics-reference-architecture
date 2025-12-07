@@ -26,12 +26,14 @@ services:
     user: "pgadmin"
 
   # Redis cache configuration
+  # NOTE: Azure Cache for Redis Premium (v6.x) is incompatible with OSMO which requires Redis 7.0+
+  # Enable in-cluster Redis deployment for compatibility
   redis:
-    enabled: false  # Set to false when using external Redis
+    enabled: true  # Deploy Redis in-cluster for Redis 7.0+ compatibility
 
-    # Settings still in use internal to osmo
-    serviceName: "<replace-me>.westus3.redis.azure.net"
-    port: 10000
+    # External Redis settings (used when enabled: false)
+    # serviceName: "<replace-me>.redis.cache.windows.net"
+    # port: 6380
 
   # Main API service configuration
   service:
@@ -49,16 +51,16 @@ services:
       ingressClass: azureml-nginx  # e.g. alb, nginx
       sslEnabled: false  # Set to true if managing SSL at the ingress level
       annotations:
-        # when using nginx ingress, add the following annotations to handle large OAuth2 response headers from identity providers
         nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
         nginx.ingress.kubernetes.io/proxy-buffers: "8 16k"
         nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "32k"
         nginx.ingress.kubernetes.io/large-client-header-buffers: "4 16k"
-    # Resource allocation
+
+    # Resource allocation - reduced for constrained system node pools
     resources:
       requests:
-        cpu: "1"
-        memory: "1Gi"
+        cpu: "100m"
+        memory: "256Mi"
       limits:
         memory: "1Gi"
 
@@ -69,8 +71,8 @@ services:
       maxReplicas: 3
     resources:
       requests:
-        cpu: "500m"
-        memory: "400Mi"
+        cpu: "100m"
+        memory: "256Mi"
       limits:
         memory: "800Mi"
 
@@ -81,8 +83,8 @@ services:
       maxReplicas: 3
     resources:
       requests:
-        cpu: "200m"
-        memory: "256Mi"
+        cpu: "50m"
+        memory: "128Mi"
       limits:
         memory: "512Mi"
 
@@ -93,8 +95,8 @@ services:
       maxReplicas: 1
     resources:
       requests:
-        cpu: "100m"
-        memory: "128Mi"
+        cpu: "50m"
+        memory: "64Mi"
       limits:
         memory: "256Mi"
 
@@ -103,8 +105,8 @@ services:
     replicas: 1
     resources:
       requests:
-        cpu: "200m"
-        memory: "512Mi"
+        cpu: "50m"
+        memory: "128Mi"
       limits:
         memory: "512Mi"
 

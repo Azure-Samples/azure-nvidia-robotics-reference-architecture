@@ -17,6 +17,7 @@ mek_config_file=""
 skip_mek=false
 force_mek=false
 mek_configmap_name="mek-config"
+use_incluster_redis=false
 
 help="Usage: deploy-osmo-control-plane.sh [OPTIONS]
 
@@ -40,6 +41,7 @@ OPTIONS:
   --mek-config-file PATH    Use existing MEK config file instead of generating (for key recovery/rotation)
   --skip-mek                Skip MEK configuration entirely (use if already applied)
   --force-mek               Force MEK replacement even if one already exists (use with caution)
+  --use-incluster-redis     Deploy in-cluster Redis instead of Azure Cache for Redis (Redis 7.0+ required)
   --config-preview          Print configuration details and exit before deployment
   --help                    Show this help message
 
@@ -47,6 +49,11 @@ MEK (Master Encryption Key):
   OSMO uses MEK to encrypt sensitive data (credentials, secrets) stored in PostgreSQL.
   By default, a new MEK is generated and applied. For production, back up the MEK
   securely - if lost, encrypted database data cannot be recovered.
+
+REDIS:
+  OSMO requires Redis 7.0+ for EXPIRE NX commands. Azure Cache for Redis Premium (v6.x)
+  is incompatible. Use --use-incluster-redis to deploy a Redis 7.x pod in-cluster.
+  Ensure services.redis.enabled=true in osmo-control-plane.yaml when using this option.
 
 EXAMPLES:
   # Deploy with NGC (default)
@@ -57,6 +64,9 @@ EXAMPLES:
 
   # Deploy with ACR and specific versions
   ./deploy-osmo-control-plane.sh --use-acr --chart-version 1.0.0 --image-version v2025.12.05
+
+  # Deploy with in-cluster Redis (Azure Redis 6.x is incompatible)
+  ./deploy-osmo-control-plane.sh --use-acr --use-incluster-redis
 
   # Deploy with existing MEK config (disaster recovery)
   ./deploy-osmo-control-plane.sh --use-acr --mek-config-file ./backup/mek-config.yaml
@@ -122,6 +132,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --force-mek)
     force_mek=true
+    shift
+    ;;
+  --use-incluster-redis)
+    use_incluster_redis=true
     shift
     ;;
   --help)
@@ -221,15 +235,24 @@ if [[ -z "${keyvault_name}" ]]; then
   exit 1
 fi
 
-if [[ -z "${pg_fqdn}" ]] || [[ -z "${redis_hostname}" ]]; then
-  echo "Error: PostgreSQL or Redis not deployed. Ensure should_deploy_postgresql and should_deploy_redis are true." >&2
+if [[ -z "${pg_fqdn}" ]]; then
+  echo "Error: PostgreSQL not deployed. Ensure should_deploy_postgresql is true." >&2
+  exit 1
+fi
+
+if [[ "${use_incluster_redis}" == "false" && -z "${redis_hostname}" ]]; then
+  echo "Error: Redis not deployed. Use --use-incluster-redis or ensure should_deploy_redis is true." >&2
   exit 1
 fi
 
 echo "  AKS Cluster: ${aks_name}"
 echo "  Resource Group: ${resource_group}"
 echo "  PostgreSQL: ${pg_fqdn}"
-echo "  Redis: ${redis_hostname}:${redis_port}"
+if [[ "${use_incluster_redis}" == "true" ]]; then
+  echo "  Redis: in-cluster (OSMO-managed Redis 7.x pod)"
+else
+  echo "  Redis: ${redis_hostname}:${redis_port}"
+fi
 echo "  Key Vault: ${keyvault_name}"
 
 echo "Retrieving PostgreSQL password from Key Vault ${keyvault_name}..."
@@ -239,12 +262,15 @@ postgres_password=$(az keyvault secret show \
   --query value \
   --output tsv)
 
-echo "Retrieving Redis access key from Key Vault ${keyvault_name}..."
-redis_key=$(az keyvault secret show \
-  --vault-name "${keyvault_name}" \
-  --name "redis-primary-key" \
-  --query value \
-  --output tsv)
+redis_key=""
+if [[ "${use_incluster_redis}" == "false" ]]; then
+  echo "Retrieving Redis access key from Key Vault ${keyvault_name}..."
+  redis_key=$(az keyvault secret show \
+    --vault-name "${keyvault_name}" \
+    --name "redis-primary-key" \
+    --query value \
+    --output tsv)
+fi
 
 if [[ "${config_preview}" == "true" ]]; then
   echo
@@ -265,10 +291,11 @@ if [[ "${config_preview}" == "true" ]]; then
   printf 'postgres_user=%s\n' "${pg_user}"
   printf 'postgres_server_name=%s\n' "${postgres_server_name}"
   printf 'postgres_password=%s\n' "${postgres_password}"
+  printf 'use_incluster_redis=%s\n' "${use_incluster_redis}"
   printf 'redis_hostname=%s\n' "${redis_hostname}"
   printf 'redis_port=%s\n' "${redis_port}"
   printf 'redis_cluster=%s\n' "${redis_cluster}"
-  printf 'redis_key=%s\n' "${redis_key}"
+  printf 'redis_key=%s\n' "${redis_key:+(set)}"
   printf 'keyvault_name=%s\n' "${keyvault_name}"
   printf 'postgres_secret_name=%s\n' "${postgres_secret_name}"
   printf 'redis_secret_name=%s\n' "${redis_secret_name}"
@@ -375,11 +402,15 @@ kubectl create secret generic "${postgres_secret_name}" \
   --from-literal=db-password="${postgres_password}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-echo "Creating ${redis_secret_name}..."
-kubectl create secret generic "${redis_secret_name}" \
-  --namespace="${namespace}" \
-  --from-literal=redis-password="${redis_key}" \
-  --dry-run=client -o yaml | kubectl apply -f -
+if [[ "${use_incluster_redis}" == "false" ]]; then
+  echo "Creating ${redis_secret_name}..."
+  kubectl create secret generic "${redis_secret_name}" \
+    --namespace="${namespace}" \
+    --from-literal=redis-password="${redis_key}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "Skipping ${redis_secret_name} creation (using in-cluster Redis)..."
+fi
 
 if [[ -f "${ingress_manifest}" ]]; then
   echo "Applying internal load balancer ingress..."
@@ -403,10 +434,15 @@ helm_service_args=(
   -f "${service_values}"
   --set "services.postgres.serviceName=${pg_fqdn}"
   --set "services.postgres.user=${pg_user}"
-  --set "services.redis.serviceName=${redis_hostname}"
-  --set "services.redis.port=${redis_port}"
   --set-string "global.osmoImageTag=${image_version}"
 )
+
+if [[ "${use_incluster_redis}" == "false" ]]; then
+  helm_service_args+=(
+    --set "services.redis.serviceName=${redis_hostname}"
+    --set "services.redis.port=${redis_port}"
+  )
+fi
 
 if [[ "${use_acr}" == "true" ]]; then
   helm_service_args+=(
@@ -495,6 +531,17 @@ else
   echo "No ingress resources found in namespace ${namespace}"
 fi
 
+osmo_access_url=""
+internal_lb_ip=$(kubectl get svc azureml-ingress-nginx-internal-lb -n azureml -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+if [[ -n "${internal_lb_ip}" ]]; then
+  osmo_access_url="http://${internal_lb_ip}"
+else
+  nginx_controller_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
+  if [[ -n "${nginx_controller_ip}" && "${nginx_controller_ip}" != "None" ]]; then
+    osmo_access_url="http://${nginx_controller_ip} (ClusterIP - internal only)"
+  fi
+fi
+
 echo
 echo "============================"
 echo "OSMO Control Plane Deployment Summary"
@@ -511,8 +558,14 @@ else
   echo "Chart Source:     osmo (NGC)"
 fi
 echo "PostgreSQL Host:  ${pg_fqdn}"
-echo "Redis Host:       ${redis_hostname}:${redis_port}"
-if [[ "${use_acr}" == "true" ]]; then
+if [[ "${use_incluster_redis}" == "true" ]]; then
+  echo "Redis Mode:       in-cluster (OSMO-managed Redis 7.x pod)"
+else
+  echo "Redis Host:       ${redis_hostname}:${redis_port}"
+fi
+if [[ "${use_incluster_redis}" == "true" ]]; then
+  echo "K8s Secrets:      ${postgres_secret_name}"
+elif [[ "${use_acr}" == "true" ]]; then
   echo "K8s Secrets:      ${postgres_secret_name}, ${redis_secret_name}"
 else
   echo "K8s Secrets:      nvcr-secret, ${postgres_secret_name}, ${redis_secret_name}"
@@ -523,10 +576,16 @@ echo "Auth Mode:        ${osmo_auth_mode}"
 if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
   echo "Identity Client:  ${osmo_identity_client_id}"
 fi
+if [[ -n "${osmo_access_url}" ]]; then
+  echo "OSMO Access URL:  ${osmo_access_url}"
+fi
 echo
 echo "Next Steps:"
 echo "  kubectl get pods -n ${namespace}"
 echo "  kubectl logs -n ${namespace} -l app=osmo-service --tail=50"
 echo "  kubectl get svc -n ${namespace}"
+if [[ -n "${osmo_access_url}" ]]; then
+  echo "  # Backend operator will use: ${osmo_access_url}"
+fi
 echo
 echo "Deployment completed successfully!"

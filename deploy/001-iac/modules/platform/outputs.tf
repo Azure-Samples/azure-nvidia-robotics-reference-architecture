@@ -210,12 +210,12 @@ output "postgresql_secret_name" {
 }
 
 output "redis" {
-  description = "Azure Redis Cache for OSMO (if deployed)"
+  description = "Azure Managed Redis for OSMO (if deployed)."
   value = try({
-    id       = azurerm_redis_cache.main[0].id
-    hostname = azurerm_redis_cache.main[0].hostname
-    name     = azurerm_redis_cache.main[0].name
-    port     = azurerm_redis_cache.main[0].ssl_port
+    id       = azurerm_managed_redis.main[0].id
+    hostname = azurerm_managed_redis.main[0].hostname
+    name     = azurerm_managed_redis.main[0].name
+    port     = azurerm_managed_redis.main[0].default_database[0].port
   }, null)
 }
 

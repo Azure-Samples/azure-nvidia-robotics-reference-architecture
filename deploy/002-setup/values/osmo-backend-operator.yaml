@@ -8,18 +8,22 @@ global:
   accountTokenSecret: "osmo-operator-token"
   loginMethod: "token"
 
+  # Node selector to prefer system pool nodes (non-GPU)
+  nodeSelector:
+    kubernetes.io/os: linux
+
   services:
     backendListener:
       resources:
         requests:
-          cpu: "1"
-          memory: "1Gi"
+          cpu: "100m"
+          memory: "256Mi"
         limits:
           memory: "1Gi"
     backendWorker:
       resources:
         requests:
-          cpu: "1"
-          memory: "1Gi"
+          cpu: "100m"
+          memory: "256Mi"
         limits:
           memory: "1Gi"

@@ -10,23 +10,25 @@
 // Azure Managed Redis
 // ============================================================
 
-resource "azurerm_redis_cache" "main" {
+resource "azurerm_managed_redis" "main" {
   count = var.should_deploy_redis ? 1 : 0
 
-  name                          = "redis-${local.resource_name_suffix}"
-  location                      = var.resource_group.location
-  resource_group_name           = var.resource_group.name
-  capacity                      = 1
-  family                        = "P"
-  sku_name                      = "Premium"
-  non_ssl_port_enabled          = false
-  minimum_tls_version           = "1.2"
-  public_network_access_enabled = var.should_enable_public_network_access
-  tags                          = local.tags
+  name                = "redis-${local.resource_name_suffix}"
+  location            = var.resource_group.location
+  resource_group_name = var.resource_group.name
+  sku_name            = var.redis_config.sku_name
 
-  redis_configuration {
-    maxmemory_policy = "volatile-lru"
+  high_availability_enabled = true
+
+  default_database {
+    clustering_policy                  = var.redis_config.clustering_policy
+    access_keys_authentication_enabled = true
+    client_protocol                    = "Encrypted"
+    eviction_policy                    = "VolatileLRU"
   }
+
+  public_network_access = var.should_enable_public_network_access ? "Enabled" : "Disabled"
+  tags                  = local.tags
 }
 
 // ============================================================
@@ -37,7 +39,7 @@ resource "azurerm_key_vault_secret" "redis_primary_key" {
   count = var.should_deploy_redis ? 1 : 0
 
   name         = "redis-primary-key"
-  value        = azurerm_redis_cache.main[0].primary_access_key
+  value        = azurerm_managed_redis.main[0].default_database[0].primary_access_key
   key_vault_id = azurerm_key_vault.main.id
   tags         = local.tags
 
@@ -59,8 +61,8 @@ resource "azurerm_private_endpoint" "redis" {
 
   private_service_connection {
     name                           = "psc-redis-${local.resource_name_suffix}"
-    private_connection_resource_id = azurerm_redis_cache.main[0].id
-    subresource_names              = ["redisCache"]
+    private_connection_resource_id = azurerm_managed_redis.main[0].id
+    subresource_names              = ["redisEnterprise"]
     is_manual_connection           = false
   }
 
