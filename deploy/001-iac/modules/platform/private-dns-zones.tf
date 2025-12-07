@@ -58,7 +58,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgresql" {
 resource "azurerm_private_dns_zone" "redis" {
   count = var.should_deploy_redis && local.pe_enabled ? 1 : 0
 
-  name                = "privatelink.redis.cache.windows.net"
+  name                = "privatelink.redis.azure.net"
   resource_group_name = var.resource_group.name
   tags                = local.tags
 }
