@@ -37,6 +37,11 @@ locals {
       namespace = var.osmo_config.operator_namespace
       sa_name   = "osmo-operator-backend-worker"
     }
+    // Workflow namespace ServiceAccount for training jobs
+    "osmo-workflow" = {
+      namespace = var.osmo_config.workflows_namespace
+      sa_name   = "osmo-workflow"
+    }
   } : {}
 }
 

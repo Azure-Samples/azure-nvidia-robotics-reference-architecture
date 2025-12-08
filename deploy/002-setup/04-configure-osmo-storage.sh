@@ -16,6 +16,9 @@ acr_login_server_override=""
 ngc_token=""
 osmo_auth_mode="workload-identity"
 osmo_identity_client_id=""
+workflows_namespace="osmo-workflows"
+skip_workflow_sa=false
+pod_template_file="${script_dir}/config/pod-template-config-example.json"
 
 help="Usage: configure-osmo-storage.sh [OPTIONS]
 
@@ -23,6 +26,9 @@ Creates the blob container backing OSMO workflow data and configures
 workflow storage credentials. By default, NGC credentials are required
 for backend image pulls. Use --use-acr to pull images from Azure Container
 Registry instead, which removes the NGC token requirement.
+
+When using workload identity mode, also creates the workflow ServiceAccount
+with the appropriate annotation and updates the POD_TEMPLATE config.
 
 OPTIONS:
   --terraform-dir PATH      Path to terraform deployment directory (default: ../001-iac)
@@ -38,6 +44,9 @@ OPTIONS:
   --ngc-token TOKEN         NGC API token for backend image pulls (required when not using --use-acr)
   --osmo-auth-mode MODE     OSMO storage credential mode: key|workload-identity (default: workload-identity)
   --osmo-identity-client-id Client ID of OSMO managed identity (default: from terraform osmo_workload_identity output)
+  --workflows-namespace NS  Kubernetes namespace for workflow pods (default: osmo-workflows)
+  --skip-workflow-sa        Skip creating workflow ServiceAccount (workload-identity mode only)
+  --pod-template-file PATH  Pod template config file (default: ./config/pod-template-config-example.json)
   --config-preview          Print resolved configuration and exit
   --help                    Show this help message
 "
@@ -93,6 +102,18 @@ while [[ $# -gt 0 ]]; do
     osmo_identity_client_id="$2"
     shift 2
     ;;
+  --workflows-namespace)
+    workflows_namespace="$2"
+    shift 2
+    ;;
+  --skip-workflow-sa)
+    skip_workflow_sa=true
+    shift
+    ;;
+  --pod-template-file)
+    pod_template_file="$2"
+    shift 2
+    ;;
   --skip-osmo-update)
     skip_osmo_update=true
     shift
@@ -135,7 +156,7 @@ if [[ -z "$container_name" ]]; then
   exit 1
 fi
 
-required_tools=(terraform az jq)
+required_tools=(terraform az jq kubectl envsubst)
 missing_tools=()
 for tool in "${required_tools[@]}"; do
   if ! command -v "$tool" &>/dev/null; then
@@ -272,6 +293,9 @@ if [[ "$config_preview" == "true" ]]; then
   printf 'output_file=%s\n' "$output_file"
   printf 'osmo_auth_mode=%s\n' "$osmo_auth_mode"
   printf 'osmo_identity_client_id=%s\n' "$osmo_identity_client_id"
+  printf 'workflows_namespace=%s\n' "$workflows_namespace"
+  printf 'skip_workflow_sa=%s\n' "$skip_workflow_sa"
+  printf 'pod_template_file=%s\n' "$pod_template_file"
   exit 0
 fi
 
@@ -394,4 +418,37 @@ else
   echo "Applying workflow configuration via osmo CLI..."
   osmo config update WORKFLOW --file "$output_file" --description "Workflow storage configuration"
   echo "osmo workflow configuration updated."
+fi
+
+# Configure workload identity for workflow pods
+if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
+  if [[ "$skip_workflow_sa" == "true" ]]; then
+    echo "Skipping workflow ServiceAccount creation (--skip-workflow-sa specified)."
+  else
+    echo "Configuring workload identity for workflow namespace..."
+
+    if ! kubectl get namespace "$workflows_namespace" &>/dev/null; then
+      echo "Creating namespace '$workflows_namespace'..."
+      kubectl create namespace "$workflows_namespace"
+    fi
+
+    echo "Creating workflow ServiceAccount with workload identity annotation..."
+    WORKFLOWS_NAMESPACE="$workflows_namespace" \
+    OSMO_IDENTITY_CLIENT_ID="$osmo_identity_client_id" \
+      envsubst < "${script_dir}/manifests/osmo-workflow-sa.yaml" | kubectl apply -f -
+
+    printf 'Workflows namespace: %s\n' "$workflows_namespace"
+    echo "Workflow ServiceAccount created."
+  fi
+
+  if [[ "$skip_osmo_update" == "false" ]]; then
+    if [[ ! -f "$pod_template_file" ]]; then
+      echo "Error: Pod template file not found: $pod_template_file" >&2
+      exit 1
+    fi
+
+    echo "Applying POD_TEMPLATE configuration via osmo CLI..."
+    osmo config update POD_TEMPLATE --file "$pod_template_file" --description "Pod template with workload identity"
+    echo "osmo POD_TEMPLATE configuration updated."
+  fi
 fi
