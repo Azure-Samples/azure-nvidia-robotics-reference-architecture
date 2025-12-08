@@ -90,6 +90,15 @@ resource "azurerm_role_assignment" "osmo_acr_pull" {
   principal_id         = azurerm_user_assigned_identity.osmo[0].principal_id
 }
 
+// Grant OSMO identity AzureML Data Scientist role for MLflow experiment logging
+// Provides workspace read access and ability to submit/manage experiments and runs
+resource "azurerm_role_assignment" "osmo_ml_data_scientist" {
+  count                = var.should_enable_osmo_identity ? 1 : 0
+  scope                = azapi_resource.ml_workspace.id
+  role_definition_name = "AzureML Data Scientist"
+  principal_id         = azurerm_user_assigned_identity.osmo[0].principal_id
+}
+
 // ============================================================
 // Container Registry Role Assignments
 // ============================================================

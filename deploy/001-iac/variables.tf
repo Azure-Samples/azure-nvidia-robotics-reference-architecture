@@ -148,12 +148,14 @@ variable "osmo_config" {
     should_federate_identity = bool
     control_plane_namespace  = string
     operator_namespace       = string
+    workflows_namespace      = string
   })
   default = {
     should_enable_identity   = true
     should_federate_identity = true
     control_plane_namespace  = "osmo-control-plane"
     operator_namespace       = "osmo-operator"
+    workflows_namespace      = "osmo-workflows"
   }
 }
 

@@ -180,6 +180,7 @@ module "sil" {
     should_federate_identity = var.osmo_config.should_federate_identity
     control_plane_namespace  = var.osmo_config.control_plane_namespace
     operator_namespace       = var.osmo_config.operator_namespace
+    workflows_namespace      = var.osmo_config.workflows_namespace
   }
 
   // Feature flags
