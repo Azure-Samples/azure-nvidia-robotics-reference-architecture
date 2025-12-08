@@ -443,14 +443,14 @@ set +x
 
 printf '%s\n' "$scheduler_payload" >"$scheduler_tmp"
 
+echo "Updating pod template configuration..."
+osmo config update POD_TEMPLATE --file "$pod_template_output" --description "Pod template configuration"
+
 echo "Updating backend configuration..."
-osmo config update BACKEND "$backend_name" --file "$scheduler_tmp"
+osmo config update BACKEND "$backend_name" --file "$scheduler_tmp" --description "Backend ${backend_name} configuration"
 
 echo "Updating pool configuration..."
-osmo config update POOL --file "$default_pool_output"
-
-echo "Updating pod template configuration..."
-osmo config update POD_TEMPLATE --file "$pod_template_output"
+osmo config update POOL "$backend_name" --file "$default_pool_output" --description "Pool ${backend_name} configuration"
 
 echo "Setting default pool profile to ${backend_name}..."
 osmo profile set pool "$backend_name"

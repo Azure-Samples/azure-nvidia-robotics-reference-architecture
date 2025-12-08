@@ -116,10 +116,10 @@ variable "redis_config" {
     sku_name          = string
     clustering_policy = string
   })
-  description = "Redis configuration for OSMO including SKU and clustering policy"
+  description = "Redis configuration for OSMO including SKU and clustering policy. EnterpriseCluster recommended for clients that don't support Redis Cluster MOVED redirects"
   default = {
     sku_name          = "Balanced_B10"
-    clustering_policy = "OSSCluster"
+    clustering_policy = "EnterpriseCluster"
   }
 }
 

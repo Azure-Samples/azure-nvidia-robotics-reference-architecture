@@ -128,8 +128,8 @@ variable "redis_sku_name" {
 
 variable "redis_clustering_policy" {
   type        = string
-  description = "Clustering policy for Redis cache (OSSCluster or EnterpriseCluster)"
-  default     = "OSSCluster"
+  description = "Clustering policy for Redis cache (OSSCluster or EnterpriseCluster). EnterpriseCluster recommended for clients that don't support Redis Cluster MOVED redirects"
+  default     = "EnterpriseCluster"
 
   validation {
     condition     = contains(["OSSCluster", "EnterpriseCluster"], var.redis_clustering_policy)
