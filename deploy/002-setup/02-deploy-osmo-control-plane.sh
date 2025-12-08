@@ -18,6 +18,10 @@ skip_mek=false
 force_mek=false
 mek_configmap_name="mek-config"
 use_incluster_redis=false
+config_dir="${script_dir}/config"
+service_config_template="${config_dir}/service-config-example.json"
+service_config_output="${config_dir}/out/service-config.json"
+skip_service_config=false
 
 help="Usage: deploy-osmo-control-plane.sh [OPTIONS]
 
@@ -42,6 +46,7 @@ OPTIONS:
   --skip-mek                Skip MEK configuration entirely (use if already applied)
   --force-mek               Force MEK replacement even if one already exists (use with caution)
   --use-incluster-redis     Deploy in-cluster Redis instead of Azure Managed Redis (optional, for testing)
+  --skip-service-config     Skip configuring service_base_url (use if already configured)
   --config-preview          Print configuration details and exit before deployment
   --help                    Show this help message
 
@@ -136,6 +141,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --use-incluster-redis)
     use_incluster_redis=true
+    shift
+    ;;
+  --skip-service-config)
+    skip_service_config=true
     shift
     ;;
   --help)
@@ -309,6 +318,9 @@ if [[ "${config_preview}" == "true" ]]; then
   printf 'force_mek=%s\n' "${force_mek}"
   printf 'mek_config_file=%s\n' "${mek_config_file}"
   printf 'mek_configmap_name=%s\n' "${mek_configmap_name}"
+  printf 'skip_service_config=%s\n' "${skip_service_config}"
+  printf 'service_config_template=%s\n' "${service_config_template}"
+  printf 'service_config_output=%s\n' "${service_config_output}"
   exit 0
 fi
 
@@ -517,6 +529,60 @@ else
 fi
 set +x
 
+# Configure service_base_url for UI URL generation
+if [[ "${skip_service_config}" == "false" ]]; then
+  echo
+  echo "============================"
+  echo "Configuring OSMO Service"
+  echo "============================"
+
+  echo "Waiting for osmo-service deployment to be available..."
+  kubectl wait --for=condition=available deployment/osmo-service -n "${namespace}" --timeout=120s
+
+  # Determine the service base URL from internal load balancer
+  service_base_url=""
+  internal_lb_ip=$(kubectl get svc azureml-ingress-nginx-internal-lb -n azureml \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+
+  if [[ -n "${internal_lb_ip}" ]]; then
+    service_base_url="http://${internal_lb_ip}"
+  else
+    # Fallback to ClusterIP if internal LB not available
+    cluster_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml \
+      -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
+    if [[ -n "${cluster_ip}" && "${cluster_ip}" != "None" ]]; then
+      service_base_url="http://${cluster_ip}"
+    fi
+  fi
+
+  if [[ -n "${service_base_url}" ]]; then
+    if [[ ! -f "${service_config_template}" ]]; then
+      echo "Error: Service config template not found: ${service_config_template}" >&2
+      exit 1
+    fi
+
+    # Ensure output directory exists
+    mkdir -p "$(dirname "${service_config_output}")"
+
+    # Render service config using jq
+    echo "Rendering service configuration..."
+    jq --arg serviceBaseUrl "${service_base_url}" \
+      '.service_base_url = $serviceBaseUrl' \
+      "${service_config_template}" > "${service_config_output}"
+
+    echo "Applying service configuration via osmo CLI..."
+    echo "  service_base_url: ${service_base_url}"
+    osmo config update SERVICE --file "${service_config_output}" --description "Set service base URL for UI"
+    echo "Service configuration applied successfully."
+  else
+    echo "Warning: Could not determine service base URL from internal load balancer." >&2
+    echo "  The OSMO UI may show errors when viewing workflow logs/spec." >&2
+    echo "  Manually configure with: osmo config update SERVICE --file <config.json>" >&2
+  fi
+else
+  echo "Skipping service configuration (--skip-service-config specified)."
+fi
+
 echo
 echo "============================"
 echo "Deployment Verification"
@@ -578,6 +644,9 @@ if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
 fi
 if [[ -n "${osmo_access_url}" ]]; then
   echo "OSMO Access URL:  ${osmo_access_url}"
+fi
+if [[ "${skip_service_config}" == "false" && -f "${service_config_output}" ]]; then
+  echo "Service Config:   ${service_config_output}"
 fi
 echo
 echo "Next Steps:"

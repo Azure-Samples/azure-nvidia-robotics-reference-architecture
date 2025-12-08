@@ -4,11 +4,11 @@
  * Links Kubernetes ServiceAccounts to the OSMO managed identity,
  * enabling workload identity authentication for Azure Blob Storage.
  *
- * ServiceAccounts federated:
- * - osmo-service (control plane namespace)
- * - osmo-router (control plane namespace)
- * - osmo-backend-listener (operator namespace)
- * - osmo-backend-worker (operator namespace)
+ * ServiceAccounts federated (names match Helm chart naming conventions):
+ * - service-osmo (control plane namespace) - osmo service chart
+ * - router (control plane namespace) - osmo router chart
+ * - osmo-operator-backend-listener (operator namespace) - backend-operator chart
+ * - osmo-operator-backend-worker (operator namespace) - backend-operator chart
  */
 
 // ============================================================
@@ -17,24 +17,25 @@
 
 locals {
   // Build map of ServiceAccounts requiring federated credentials
+  // SA names match the actual names created by OSMO Helm charts
   osmo_federated_credentials = var.osmo_workload_identity != null && var.osmo_config.should_federate_identity ? {
-    // Control plane namespace ServiceAccounts
+    // Control plane namespace ServiceAccounts (created by osmo service/router charts)
     "osmo-service" = {
       namespace = var.osmo_config.control_plane_namespace
-      sa_name   = "osmo-service"
+      sa_name   = "service-osmo"
     }
     "osmo-router" = {
       namespace = var.osmo_config.control_plane_namespace
-      sa_name   = "osmo-router"
+      sa_name   = "router"
     }
-    // Operator namespace ServiceAccounts
+    // Operator namespace ServiceAccounts (created by backend-operator chart)
     "osmo-backend-listener" = {
       namespace = var.osmo_config.operator_namespace
-      sa_name   = "osmo-backend-listener"
+      sa_name   = "osmo-operator-backend-listener"
     }
     "osmo-backend-worker" = {
       namespace = var.osmo_config.operator_namespace
-      sa_name   = "osmo-backend-worker"
+      sa_name   = "osmo-operator-backend-worker"
     }
   } : {}
 }
