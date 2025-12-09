@@ -1,0 +1,20 @@
+# PodMonitor for DCGM Exporter metrics collection
+# Scraped by Azure Monitor Prometheus or Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: kube-system
+  labels:
+    app: nvidia-dcgm-exporter
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - gpu-operator

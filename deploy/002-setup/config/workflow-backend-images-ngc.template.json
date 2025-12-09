@@ -1,0 +1,9 @@
+{
+  "backend_images": {
+    "credential": {
+      "registry": "nvcr.io",
+      "username": "$$oauthtoken",
+      "auth": "${NGC_TOKEN}"
+    }
+  }
+}

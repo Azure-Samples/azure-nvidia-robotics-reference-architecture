@@ -1,125 +1,188 @@
-# 🤖 Azure Robotics Reference Architecture with NVIDIA OSMO
+# 🤖 Azure NVIDIA Robotics Reference Architecture
 
-This reference architecture provides a production-ready framework for orchestrating robotics and AI workloads on [Microsoft Azure](https://azure.microsoft.com/) using NVIDIA technologies such as [Isaac Lab](https://developer.nvidia.com/isaac/lab), [Isaac Sim](https://developer.nvidia.com/isaac/sim), and [OSMO](https://developer.nvidia.com/osmo). It demonstrates end-to-end reinforcement learning workflows, scalable training pipelines, and deployment processes with Azure-native authentication, storage, and ML services.
+Production-ready framework for orchestrating robotics and AI workloads on [Azure](https://azure.microsoft.com/) using [NVIDIA Isaac Lab](https://developer.nvidia.com/isaac/lab), [Isaac Sim](https://developer.nvidia.com/isaac/sim), and [OSMO](https://developer.nvidia.com/osmo).
 
-## 🚀 Key Features
+## 🚀 Features
 
-OSMO handles workflow orchestration and job scheduling while Azure provides elastic GPU compute, persistent checkpointing, MLflow experiment tracking, and enterprise grade security.
+- **Infrastructure as Code** – [Terraform modules](deploy/001-iac/) for reproducible deployments
+- **Dual Orchestration** – [AzureML jobs](workflows/azureml/) and [NVIDIA OSMO workflows](workflows/osmo/) both available
+- **Workload Identity** – Key-less authentication via Azure AD federation ([setup](deploy/002-setup/README.md#scenario-2-workload-identity--ngc-production))
+- **Private Networking** – Azure services secured on a private VNet with [private endpoints](deploy/001-iac/variables.tf) and private links; optional [VPN gateway](deploy/001-iac/vpn/) for secure remote access; public access configurable when needed
+- **MLflow Integration** – Experiment tracking with Azure ML ([details](docs/mlflow-integration.md))
+- **GPU Scheduling** – [KAI Scheduler](deploy/002-setup/values/kai-scheduler.yaml) for efficient GPU utilization
+- **Auto-scaling** – Pay-per-use GPU compute on AKS Spot nodes
 
-- **Infrastructure as Code** - Terraform modules referencing [microsoft/edge-ai](https://github.com/microsoft/edge-ai) components for reproducible deployments
-- **Containerized Workflows** - Docker-based Isaac Lab training with NVIDIA GPU support
-- **CI/CD Integration** - Automated deployment pipelines with GitHub Actions
-- **MLflow Integration** - Automatic experiment tracking and model versioning
-    - Automatic metric logging from SKRL agents to Azure ML
-    - Comprehensive tracking of episode statistics, losses, optimization metrics, and timing data
-    - Configurable logging intervals and metric filtering
-    - See [MLflow Integration Guide](docs/mlflow-integration.md) for details
-- **Scalable Compute** - Auto-scaling GPU nodes based on workload demands
-- **Cost Optimization** - Pay-per-use compute with automatic scaling
-- **Enterprise Security** - Entra ID integration
-- **Global Deployment** - Multi-region support for worldwide teams
+## 🏗️ Architecture
 
-## 🗼 Architecture Overview
+The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA GPU Operator and KAI Scheduler. Training workloads can be submitted via OSMO workflows (control plane and backend operator) and AzureML jobs (ML extension). Both platforms share common infrastructure: Azure Storage for checkpoints and data, Key Vault for secrets, and Azure Container Registry for container images. OSMO additionally uses PostgreSQL for workflow state and Redis for caching.
 
-This reference architecture integrates:
-- **NVIDIA OSMO** - Workflow orchestration and job scheduling
-- **Azure Machine Learning** - Experiment tracking and model management
-- **Azure Kubernetes Service** - Software in the Loop (SIL) training
-- **Azure Arc for Kubernetes** - Software in the Loop (SIL) and Hardware in the Loop (HIL) training
-- **Azure Storage** - Persistent data and checkpoint storage
-- **Azure Key Vault** - Secure credential management
-- **Azure Monitor** - Comprehensive logging and metrics
+**Core Components**:
 
-**INSERT ARCHITECTURE DIAGRAM HERE**
+- **AKS Cluster** – Hosts GPU workloads with Spot node pools for cost optimization
+- **NVIDIA GPU Operator** – Manages GPU drivers and device plugins
+- **KAI Scheduler** – GPU-aware scheduling for training jobs
+- **AzureML Extension** – Enables Azure ML job submission to Kubernetes
+- **OSMO Control Plane** – Workflow orchestration (service, router, web-ui)
+- **OSMO Backend Operator** – Executes workflows on the cluster
 
 ## 🌍 Real World Examples
 
-**OSMO orchestration** on Azure enables production-scale robotics training across industries. Some examples include:
+OSMO orchestration on Azure enables production-scale robotics training across industries:
 
-- **Warehouse AMRs** - Train navigation policies with 1000+ parallel environments on auto-scaling AKS GPU nodes, checkpoint to Azure Storage, track experiments in Azure ML
-- **Manufacturing Arms** - Develop manipulation strategies with physics-accurate simulation, leveraging Azure's global regions for distributed teams and pay-per-use GPU compute
-- **Legged Robots** - Optimize locomotion policies with MLflow experiment tracking for sim-to-real transfer
-- **Collaborative Robots** - Create safe interaction policies with Azure Monitor logging and metrics, enabling compliance auditing and performance diagnostics at scale
+- **Warehouse AMRs** – Train navigation policies with 1000+ parallel environments on auto-scaling GPU nodes, checkpoint to Azure Storage, track experiments in Azure ML
+- **Manufacturing Arms** – Develop manipulation strategies with physics-accurate simulation, leveraging pay-per-use GPU compute and global Azure regions
+- **Legged Robots** – Optimize locomotion policies with MLflow experiment tracking for sim-to-real transfer
+- **Collaborative Robots** – Create safe interaction policies with Azure Monitor logging for compliance auditing
 
-See [OSMO workflow examples](deploy/004-workflow/osmo/) for job configuration templates.
-
-## 🧑🏽‍💻 Prerequisites and Requirements
+## 📋 Prerequisites
 
 ### Required Tools
 
-- [pyenv](https://github.com/pyenv/pyenv)
-- Python 3.11 (required by Isaac Sim 5.X)
-- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) (v2.50+)
-- [Terraform](https://www.terraform.io/downloads) (v1.5+)
-- [NVIDIA OSMO CLI](https://developer.nvidia.com/osmo) (latest)
-- [Docker](https://docs.docker.com/get-docker/) with NVIDIA Container Toolkit
+| Tool | Version | Installation |
+|------|---------|--------------|
+| [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) | 2.50+ | `brew install azure-cli` |
+| [Terraform](https://www.terraform.io/downloads) | 1.5+ | `brew install terraform` |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | 1.28+ | `brew install kubectl` |
+| [Helm](https://helm.sh/docs/intro/install/) | 3.x | `brew install helm` |
+| [jq](https://stedolan.github.io/jq/) | latest | `brew install jq` |
+| [OSMO CLI](https://developer.nvidia.com/osmo) | latest | See NVIDIA docs |
 
 ### Azure Requirements
-- Azure subscription with contributor access
-- Sufficient quota for GPU VMs (Standard_NC6s_v3 or higher)
-- Azure Machine Learning workspace (or permissions to create one)
+
+- Azure subscription with **Contributor** access
+- GPU VM quota for your target region (e.g., `Standard_NV36ads_A10_v5`)
+- Permissions to create: Resource Groups, AKS, Storage, Key Vault, AzureML Workspace
 
 ### NVIDIA Requirements
-- NVIDIA Developer account with OSMO access
-- NGC API key for container registry access
 
-## 🏃‍➡️ Quick Start
+- [NVIDIA Developer](https://developer.nvidia.com/) account with OSMO access
+- [NGC API Key](https://ngc.nvidia.com/setup/api-key) for container registry access
+
+## 🏃 Quick Start
+
+### 1. Deploy Infrastructure
 
 ```bash
-./setup-dev.sh
+# Login to Azure CLI (required for Terraform and cluster configuration)
+source deploy/000-prerequisites/az-sub-init.sh # --tenant <tenant-id>  (Optionally) Specify tenant
+
+cd deploy/001-iac
+cp terraform.tfvars.example terraform.tfvars  # Edit with your values
+terraform init && terraform apply
+
+# Optional: Deploy VPN for secure access to private resources
+cd vpn
+terraform init && terraform apply
+# Download VPN client config from Azure Portal > Virtual Network Gateway > Point-to-site configuration
 ```
 
-The setup script installs Python 3.11 via pyenv, creates a virtual environment at `.venv/`, and installs training dependencies.
+### 2. Configure Cluster
 
-### VS Code Configuration
+```bash
+cd ../002-setup
 
-The workspace is configured with `python.analysis.extraPaths` pointing to `src/`, enabling imports like:
+# Get cluster credentials (resource group and cluster name from terraform output)
+az aks get-credentials --resource-group <rg> --name <aks>
 
-```python
-from training.utils import AzureMLContext, bootstrap_azure_ml
+# Deploy GPU infrastructure
+./01-deploy-robotics-charts.sh
+
+# Deploy AzureML extension
+./02-deploy-azureml-extension.sh
+
+# Deploy OSMO (requires NGC token)
+export NGC_API_KEY="your-token"
+./03-deploy-osmo-control-plane.sh --ngc-token "$NGC_API_KEY"
+./04-deploy-osmo-backend.sh --ngc-token "$NGC_API_KEY"
 ```
 
-Select the `.venv/bin/python` interpreter in VS Code for IntelliSense support
+### 3. Submit Workloads
 
-## 🧱 Repository Structure
+**OSMO Training** – Submits to NVIDIA OSMO orchestrator:
+
+```bash
+# Quick training run (100 iterations for testing)
+./scripts/submit-osmo-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0 --max-iterations 100
+
+# Full training with custom environments
+./scripts/submit-osmo-training.sh --task Isaac-Velocity-Rough-Anymal-D-v0 --num-envs 4096
+
+# Resume from checkpoint
+./scripts/submit-osmo-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0 \
+  --checkpoint-uri "runs:/<run-id>/checkpoints" --checkpoint-mode resume
+```
+
+**AzureML Training** – Submits to Azure Machine Learning:
+
+```bash
+# Quick training run
+./scripts/submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0 --max-iterations 100
+
+# Full training with log streaming
+./scripts/submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-D-v0 --num-envs 4096 --stream
+
+# Resume training from registered model
+./scripts/submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0 \
+  --checkpoint-uri "azureml://models/isaac-velocity-rough-anymal-c-v0/versions/1" \
+  --checkpoint-mode resume
+```
+
+**AzureML Validation** – Validates a trained model:
+
+```bash
+# Validate latest model version (model name derived from task)
+./scripts/submit-azureml-validation.sh --task Isaac-Velocity-Rough-Anymal-C-v0
+
+# Validate specific model version with custom episodes
+./scripts/submit-azureml-validation.sh --model-name isaac-velocity-rough-anymal-c-v0 \
+  --model-version 2 --eval-episodes 200
+
+# Validate with streaming logs
+./scripts/submit-azureml-validation.sh --model-name my-policy --stream
+```
+
+> **Tip**: Run `./scripts/submit-*-training.sh --help` for all available options.
+
+## 🔐 Deployment Scenarios
+
+| Scenario | Storage Auth | Registry | Use Case |
+|----------|--------------|----------|----------|
+| Access Keys + NGC | Keys | nvcr.io | Development |
+| Workload Identity + NGC | Federated | nvcr.io | Production |
+| Workload Identity + ACR | Federated | Private ACR | Air-gapped |
+
+See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
+
+## 📁 Repository Structure
 
 ```text
 .
 ├── deploy/
-│   ├── 000-prerequisites/              # Prerequisites validation and setup
-│   ├── 001-iac/                        # Infrastructure as Code deployment
-│   ├── 002-setup/                      # Post-infrastructure setup
-│   ├── 003-data/                       # Data preparation and upload
-│   └── 004-workflow/                   # Training workflow execution
-│       ├── job-templates/              # Job configuration templates
-│       └── osmo/                       # OSMO inline workflow submission (see osmo/README.md)
-├── src/
-│   ├── terraform/                      # Infrastructure as Code
-│   │   └── modules/                    # Reusable Terraform modules
-│   └── training/                       # Training code and tasks
-│       ├── common/                     # Shared utilities
-│       ├── scripts/                    # Framework-specific training scripts configured for Azure services
-│       │   ├── rsl_rl/                 # RSL_RL training scripts
-│       │   ├── skrl/                   # SKRL training scripts
-│       └── tasks/                      # Placeholder for Isaac Lab training tasks
+│   ├── 000-prerequisites/    # Validation scripts
+│   ├── 001-iac/              # Terraform infrastructure
+│   └── 002-setup/            # Cluster configuration scripts
+├── scripts/
+│   ├── submit-azureml-*.sh   # AzureML job submission
+│   └── submit-osmo-*.sh      # OSMO workflow submission
+├── workflows/
+│   ├── azureml/              # AzureML job templates
+│   └── osmo/                 # OSMO workflow templates
+├── src/training/             # Training code
+└── docs/                     # Additional documentation
 ```
+
+## 📖 Documentation
+
+- [002-setup README](deploy/002-setup/README.md) – Cluster setup and deployment scenarios
+- [Workflows README](workflows/README.md) – Job and workflow templates
+- [MLflow Integration](docs/mlflow-integration.md) – Experiment tracking setup
 
 ## 🪪 License
 
-This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
-
-## 🤝 Support
-
-For issues and questions:
-
-* Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
+MIT License. See [LICENSE.md](LICENSE.md).
 
 ## 🙏 Acknowledgments
 
-This reference architecture builds upon:
-
-* [microsoft/edge-ai](https://github.com/microsoft/edge-ai) - Edge AI infrastructure components
-* [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) - RL task framework
-* [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) - Physics simulation
-* [NVIDIA OSMO](https://developer.nvidia.com/osmo) - Workflow orchestration
-* [NVIDIA OSMO GitHub](https://github.com/NVIDIA/OSMO) - Workflow orchestration
+- [microsoft/edge-ai](https://github.com/microsoft/edge-ai) – Infrastructure components
+- [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) – RL framework
+- [NVIDIA OSMO](https://github.com/NVIDIA/OSMO) – Workflow orchestration

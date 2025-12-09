@@ -1,0 +1,26 @@
+# Azure Workload Identity configuration for OSMO backend operator
+# Use with: helm upgrade -f osmo-backend-operator.yaml -f osmo-backend-operator-identity.yaml ...
+#
+# Requires:
+# - AKS cluster with OIDC issuer and workload identity enabled
+# - Managed identity with federated credentials for OSMO ServiceAccounts
+# - Storage Blob Data Contributor role assigned to the managed identity
+#
+# The client-id annotation is set dynamically via --set during helm upgrade.
+# Pod labels enable the AKS workload identity mutating webhook to inject
+# projected service account tokens and Azure environment variables.
+
+serviceAccount:
+  annotations:
+    # Client ID set via --set "serviceAccount.annotations.azure\.workload\.identity/client-id=..."
+    azure.workload.identity/client-id: ""
+
+global:
+  services:
+    backendListener:
+      extraPodLabels:
+        azure.workload.identity/use: "true"
+
+    backendWorker:
+      extraPodLabels:
+        azure.workload.identity/use: "true"

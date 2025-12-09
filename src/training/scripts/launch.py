@@ -29,7 +29,10 @@ def _optional_int(value_str: str | None) -> int | None:
 
 
 def _optional_str(value_str: str | None) -> str | None:
-    return None if value_str in (None, "") else value_str
+    """Convert empty, 'none', or None to None for optional string arguments."""
+    if value_str is None or value_str == "" or value_str.lower() == "none":
+        return None
+    return value_str
 
 
 def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, list[str]]:

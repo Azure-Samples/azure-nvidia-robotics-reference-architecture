@@ -144,11 +144,18 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
 
 
 def _build_credential() -> DefaultAzureCredential:
+    managed_identity_client_id = os.environ.get("AZURE_CLIENT_ID")
+    default_identity_client_id = os.environ.get("DEFAULT_IDENTITY_CLIENT_ID")
+
+    if not managed_identity_client_id and default_identity_client_id:
+        managed_identity_client_id = default_identity_client_id
+        os.environ.setdefault("AZURE_CLIENT_ID", default_identity_client_id)
+
     # Check if we should exclude managed identity (for local dev on Azure VMs)
     exclude_managed_identity = os.environ.get("AZURE_EXCLUDE_MANAGED_IDENTITY", "false").lower() == "true"
 
     return DefaultAzureCredential(
-        managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"),
+        managed_identity_client_id=managed_identity_client_id,
         authority=os.environ.get("AZURE_AUTHORITY_HOST"),
         exclude_managed_identity_credential=exclude_managed_identity,
     )

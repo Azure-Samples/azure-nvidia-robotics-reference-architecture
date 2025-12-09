@@ -3,123 +3,186 @@
  *
  * Deploys robotics infrastructure with NVIDIA GPU support, KAI Scheduler,
  * and optional Azure Machine Learning integration.
+ *
+ * Architecture:
+ * - Platform Module: Shared services (networking, security, observability, ACR, storage, ML workspace)
+ * - SiL Module: AKS cluster with GPU node pools and ML extension integration
  */
+
+locals {
+  resource_group_name = coalesce(var.resource_group_name, "rg-${var.resource_prefix}-${var.environment}-${var.instance}")
+  current_user_oid    = try(msgraph_resource_action.current_user[0].output.oid, null)
+}
+
+resource "msgraph_resource_action" "current_user" {
+  count = var.should_add_current_user_key_vault_admin ? 1 : 0
+
+  method       = "GET"
+  resource_url = "me"
+
+  response_export_values = {
+    oid = "id"
+  }
+}
 
 resource "azurerm_resource_group" "this" {
   count    = var.should_create_resource_group ? 1 : 0
-  name     = coalesce(var.resource_group_name, "rg-${var.resource_prefix}-${var.environment}-${var.instance}")
+  name     = local.resource_group_name
   location = var.location
 }
 
-module "robotics" {
-  source = "git::https://ai-at-the-edge-flagship-accelerator@dev.azure.com/ai-at-the-edge-flagship-accelerator/edge-ai/_git/edge-ai//blueprints/modules/robotics/terraform?ref=c43d1f622c869a8e5a2723b3df41e227c7430f5f"
+// Defer resource group data source to support build systems without plan-time permissions
+resource "terraform_data" "defer_resource_group" {
+  count = var.should_create_resource_group ? 0 : 1
+  input = {
+    name = local.resource_group_name
+  }
+}
+
+data "azurerm_resource_group" "existing" {
+  count = var.should_create_resource_group ? 0 : 1
+  name  = terraform_data.defer_resource_group[0].output.name
+}
+
+locals {
+  // Resolve resource group to either created or existing
+  resource_group = var.should_create_resource_group ? {
+    id       = azurerm_resource_group.this[0].id
+    name     = azurerm_resource_group.this[0].name
+    location = azurerm_resource_group.this[0].location
+    } : {
+    id       = data.azurerm_resource_group.existing[0].id
+    name     = data.azurerm_resource_group.existing[0].name
+    location = data.azurerm_resource_group.existing[0].location
+  }
+}
+
+// ============================================================
+// Platform Module - Shared Services
+// ============================================================
+
+module "platform" {
+  source = "./modules/platform"
 
   depends_on = [azurerm_resource_group.this]
 
-  /**
-   * Core Variables
-   */
-
+  // Core variables
   environment     = var.environment
-  location        = var.location
   resource_prefix = var.resource_prefix
+  location        = var.location
   instance        = var.instance
+  tags            = {}
+  resource_group  = local.resource_group
 
-  /**
-   * Control Plane
-   */
+  // Current user OID for role assignments (from Microsoft Graph)
+  current_user_oid = local.current_user_oid
 
-  should_create_networking        = true
-  should_create_acr               = true
-  should_create_aks_cluster       = true
-  should_create_security_identity = true
-  should_create_observability     = true
-  should_create_storage           = true
+  // Networking configuration
+  virtual_network_config = {
+    address_space                  = var.virtual_network_config.address_space
+    subnet_address_prefix_main     = var.virtual_network_config.subnet_address_prefix
+    subnet_address_prefix_pe       = var.virtual_network_config.subnet_address_prefix_pe
+    subnet_address_prefix_resolver = var.virtual_network_config.subnet_address_prefix_resolver
+  }
 
-  // Resource Group configuration
-  resource_group_name = var.resource_group_name
+  // Feature flags
+  should_enable_private_endpoint          = var.should_enable_private_endpoint
+  should_enable_public_network_access     = var.should_enable_public_network_access
+  should_add_current_user_key_vault_admin = var.should_add_current_user_key_vault_admin
+  should_add_current_user_storage_blob    = var.should_add_current_user_storage_blob
+  should_enable_purge_protection          = var.should_enable_purge_protection
 
-  // Key Vault configuration
-  should_use_current_user_key_vault_admin = var.should_use_current_user_key_vault_admin
+  // OSMO services
+  should_deploy_postgresql = var.should_deploy_postgresql
+  should_deploy_redis      = var.should_deploy_redis
+  postgresql_config = {
+    sku_name        = var.postgresql_sku_name
+    storage_mb      = var.postgresql_storage_mb
+    version         = var.postgresql_version
+    subnet_prefixes = var.postgresql_subnet_address_prefixes
+    databases       = var.postgresql_databases
+  }
+  redis_config = {
+    sku_name          = var.redis_sku_name
+    clustering_policy = var.redis_clustering_policy
+  }
 
-  // PostgreSQL configuration
-  should_deploy_postgresql                         = var.should_deploy_postgresql
-  postgresql_sku_name                              = var.postgresql_sku_name
-  postgresql_storage_mb                            = var.postgresql_storage_mb
-  postgresql_version                               = var.postgresql_version
-  postgresql_subnet_address_prefixes               = var.postgresql_subnet_address_prefixes
-  postgresql_databases                             = var.postgresql_databases
-  postgresql_delegated_subnet_id                   = var.postgresql_delegated_subnet_id
-  postgresql_should_generate_admin_password        = true
-  postgresql_should_store_credentials_in_key_vault = true
-  postgresql_should_enable_extensions              = true
-  postgresql_should_enable_geo_redundant_backup    = false
+  // OSMO workload identity
+  should_enable_osmo_identity = var.osmo_config.should_enable_identity
+}
 
-  // Azure Managed Redis configuration
-  should_deploy_redis                      = var.should_deploy_redis
-  redis_sku_name                           = var.redis_sku_name
-  redis_clustering_policy                  = var.redis_clustering_policy
-  redis_access_keys_authentication_enabled = var.redis_access_keys_authentication_enabled
-  redis_should_enable_high_availability    = false
+// ============================================================
+// SiL Module - AKS + AzureML Extension
+// ============================================================
 
-  // Network configuration
-  should_enable_private_endpoints     = var.should_enable_private_endpoints
-  should_enable_public_network_access = var.should_enable_public_network_access
-  should_enable_vpn_gateway           = var.should_enable_vpn_gateway
-  virtual_network_name                = var.virtual_network_name
-  virtual_network_config              = var.virtual_network_config
-  vpn_site_connections                = var.vpn_site_connections
-  vpn_site_default_ipsec_policy       = var.vpn_site_default_ipsec_policy
-  vpn_site_shared_keys                = var.vpn_site_shared_keys
+module "sil" {
+  source = "./modules/sil"
 
-  /**
-   * Software-in-the-Loop (SiL) (Re-using cluster for Control Plane)
-   */
+  depends_on = [module.platform]
 
-  // Azure Kubernetes Service configuration
-  aks_cluster_name                = var.aks_cluster_name
-  subnet_address_prefixes_aks     = var.subnet_address_prefixes_aks
-  subnet_address_prefixes_aks_pod = var.subnet_address_prefixes_aks_pod
-  enable_auto_scaling             = var.enable_auto_scaling
-  node_vm_size                    = var.node_vm_size
-  node_count                      = var.node_count
-  min_count                       = var.min_count
-  max_count                       = var.max_count
-  node_pools                      = var.node_pools
-  should_install_robotics_charts  = var.should_install_robotics_charts
-  should_install_azureml_charts   = var.should_install_azureml_charts
+  // Core variables
+  environment     = var.environment
+  resource_prefix = var.resource_prefix
+  location        = var.location
+  instance        = var.instance
+  tags            = {}
+  resource_group  = local.resource_group
 
-  // AzureML configuration
-  should_integrate_aks_cluster          = var.should_integrate_aks_cluster
-  should_create_ml_workload_identity    = true
-  should_create_compute_cluster         = false
-  should_install_nvidia_device_plugin   = false
-  should_install_dcgm_exporter          = false
-  should_install_volcano                = false
-  azureml_workspace_name                = var.azureml_workspace_name
-  aks_cluster_purpose                   = var.aks_cluster_purpose
-  inference_router_service_type         = var.inference_router_service_type
-  should_enable_managed_outbound_access = var.should_enable_managed_outbound_access
+  // Current user OID for cluster admin role assignments (from Microsoft Graph)
+  current_user_oid = local.current_user_oid
 
-  // Workload scheduling configuration
-  workload_tolerations               = var.workload_tolerations
-  cluster_integration_instance_types = var.cluster_integration_instance_types
+  // Dependencies from platform module (passed as typed objects)
+  virtual_network          = module.platform.virtual_network
+  subnets                  = module.platform.subnets
+  network_security_group   = module.platform.network_security_group
+  nat_gateway              = module.platform.nat_gateway
+  log_analytics_workspace  = module.platform.log_analytics_workspace
+  monitor_workspace        = module.platform.monitor_workspace
+  data_collection_endpoint = module.platform.data_collection_endpoint
+  container_registry       = module.platform.container_registry
+  azureml_workspace        = module.platform.azureml_workspace
+  ml_workload_identity     = module.platform.ml_workload_identity
+  private_dns_zones        = module.platform.private_dns_zones
 
-  // VM host configuration
-  should_create_vm_host               = var.should_create_vm_host
-  vm_host_count                       = var.vm_host_count
-  vm_sku_size                         = var.vm_sku_size
-  vm_priority                         = var.vm_priority
-  vm_eviction_policy                  = var.vm_eviction_policy
-  vm_max_bid_price                    = var.vm_max_bid_price
-  should_assign_current_user_vm_admin = var.should_assign_current_user_vm_admin
-  should_use_vm_password_auth         = var.should_use_vm_password_auth
-  should_create_vm_ssh_key            = var.should_create_vm_ssh_key
+  // AKS subnet configuration - uses module defaults when null
+  aks_subnet_config = {
+    subnet_address_prefix_aks     = try(var.subnet_address_prefixes_aks[0], null)
+    subnet_address_prefix_aks_pod = try(var.subnet_address_prefixes_aks_pod[0], null)
+  }
 
-  /**
-   * Hardware-in-the-Loop (HiL)
-   */
+  // AKS configuration
+  aks_config = {
+    node_vm_size        = var.node_vm_size
+    node_count          = var.node_count
+    enable_auto_scaling = var.enable_auto_scaling
+    min_count           = var.min_count
+    max_count           = var.max_count
+    is_private_cluster  = var.should_enable_private_endpoint
+  }
 
-  // AzureML configuration - Edge
-  should_deploy_edge_extension = var.should_deploy_edge_extension
+  node_pools = var.node_pools
+
+  // AzureML extension configuration
+  azureml_config = {
+    should_integrate_aks               = var.should_integrate_aks_cluster
+    should_install_extension           = var.should_integrate_aks_cluster
+    should_federate_ml_identity        = var.should_integrate_aks_cluster
+    aks_cluster_purpose                = var.aks_cluster_purpose
+    inference_router_service_type      = var.inference_router_service_type
+    internal_load_balancer_provider    = "azure"
+    workload_tolerations               = var.workload_tolerations
+    cluster_integration_instance_types = var.cluster_integration_instance_types
+  }
+
+  // OSMO workload identity
+  osmo_workload_identity = module.platform.osmo_workload_identity
+  osmo_config = {
+    should_federate_identity = var.osmo_config.should_federate_identity
+    control_plane_namespace  = var.osmo_config.control_plane_namespace
+    operator_namespace       = var.osmo_config.operator_namespace
+    workflows_namespace      = var.osmo_config.workflows_namespace
+  }
+
+  // Feature flags
+  should_enable_private_endpoint = var.should_enable_private_endpoint
 }

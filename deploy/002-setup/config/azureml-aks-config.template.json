@@ -1,0 +1,22 @@
+{
+  "enableTraining": "true",
+  "enableInference": "true",
+  "inferenceRouterServiceType": "LoadBalancer",
+  "inferenceRouterHA": "${INFERENCE_ROUTER_HA}",
+  "allowInsecureConnections": "${ALLOW_INSECURE_CONNECTIONS}",
+  "internalLoadBalancerProvider": "azure",
+  "clusterPurpose": "${CLUSTER_PURPOSE}",
+  "installNvidiaDevicePlugin": "false",
+  "installDcgmExporter": "false",
+  "installVolcano": "${INSTALL_VOLCANO}",
+  "installPromOp": "${INSTALL_PROM_OP}",
+  "servicebus.enabled": "false",
+  "relayserver.enabled": "false",
+  "workLoadToleration[0].key": "nvidia.com/gpu",
+  "workLoadToleration[0].operator": "Exists",
+  "workLoadToleration[0].effect": "NoSchedule",
+  "workLoadToleration[1].key": "kubernetes.azure.com/scalesetpriority",
+  "workLoadToleration[1].operator": "Equal",
+  "workLoadToleration[1].value": "spot",
+  "workLoadToleration[1].effect": "NoSchedule"
+}

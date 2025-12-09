@@ -1,0 +1,27 @@
+# KAI Scheduler for NVIDIA OSMO GPU scheduling
+# https://github.com/NVIDIA/KAI-Scheduler
+
+# Tolerations to run on GPU nodes
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: kubernetes.azure.com/scalesetpriority
+    operator: Equal
+    value: spot
+    effect: NoSchedule
+
+# Resource requests/limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Scheduler replicas
+replicaCount: 1
+
+# Priority class for scheduler pods
+priorityClassName: system-cluster-critical
