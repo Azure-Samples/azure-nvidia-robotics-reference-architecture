@@ -1,161 +1,124 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Deploy Volcano Scheduler to AKS cluster for advanced ML job scheduling
+set -o errexit -o nounset -o pipefail
 
-#######################################
-# AzureML Charts Deployment Script
-#
-# Installs Volcano scheduler for advanced ML job scheduling.
-# Optional component - only needed for complex batch scheduling.
-#
-# Usage:
-#   ./deploy-azureml-charts.sh [OPTIONS]
-#
-# Options:
-#   --terraform-dir PATH    Path to terraform directory (default: ../../001-iac)
-#   --help                  Show this help message
-#
-# Examples:
-#   # Deploy Volcano scheduler
-#   ./deploy-azureml-charts.sh
-#
-#   # Deploy with custom terraform directory
-#   ./deploy-azureml-charts.sh --terraform-dir /path/to/terraform
-#######################################
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../defaults.conf
+source "$SCRIPT_DIR/../defaults.conf"
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-terraform_dir="${script_dir}/../../001-iac"
-values_dir="${script_dir}/values"
+VALUES_DIR="$SCRIPT_DIR/values"
 
-help="Usage: deploy-azureml-charts.sh [OPTIONS]
+# Volcano-specific defaults
+VOLCANO_VERSION="${VOLCANO_VERSION:-1.12.2}"
+HELM_REPO_VOLCANO="${HELM_REPO_VOLCANO:-https://volcano-sh.github.io/helm-charts}"
 
-Installs Volcano scheduler for advanced ML job scheduling.
+show_help() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Deploy Volcano Scheduler to an AKS cluster for advanced ML job scheduling.
+Optional component - only needed for complex batch scheduling scenarios.
 
 OPTIONS:
-  --terraform-dir PATH    Path to terraform directory (default: ../../001-iac)
-  --help                  Show this help message
+    -h, --help                 Show this help message
+    -t, --tf-dir DIR           Terraform directory (default: $DEFAULT_TF_DIR)
+    --volcano-version VERSION  Volcano version (default: $VOLCANO_VERSION)
+    --config-preview           Print configuration and exit
 
 EXAMPLES:
-  # Deploy Volcano scheduler
-  ./deploy-azureml-charts.sh
+    $(basename "$0")
+    $(basename "$0") --volcano-version 1.12.2
+    $(basename "$0") -t /path/to/terraform
+EOF
+}
 
-  # Deploy with custom terraform directory
-  ./deploy-azureml-charts.sh --terraform-dir /path/to/terraform
-"
+# Defaults
+tf_dir="$SCRIPT_DIR/../$DEFAULT_TF_DIR"
+volcano_version="$VOLCANO_VERSION"
+config_preview=false
 
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --terraform-dir)
-      terraform_dir="$2"
-      shift 2
-      ;;
-    --help)
-      echo "${help}"
-      exit 0
-      ;;
-    *)
-      echo "${help}"
-      echo
-      echo "Unknown option: $1"
-      exit 1
-      ;;
+  case "$1" in
+    -h|--help)           show_help; exit 0 ;;
+    -t|--tf-dir)         tf_dir="$2"; shift 2 ;;
+    --volcano-version)   volcano_version="$2"; shift 2 ;;
+    --config-preview)    config_preview=true; shift ;;
+    *)                   fatal "Unknown option: $1" ;;
   esac
 done
 
-echo "Checking prerequisites..."
-required_tools=(terraform az kubectl helm jq)
-missing_tools=()
-for tool in "${required_tools[@]}"; do
-  if ! command -v "${tool}" &>/dev/null; then
-    missing_tools+=("${tool}")
-  fi
-done
+require_tools az terraform kubectl helm jq
 
-if [[ ${#missing_tools[@]} -gt 0 ]]; then
-  echo "Error: Missing required tools: ${missing_tools[*]}" >&2
-  exit 1
+#------------------------------------------------------------------------------
+# Gather Configuration
+#------------------------------------------------------------------------------
+
+info "Reading terraform outputs from $tf_dir..."
+tf_output=$(read_terraform_outputs "$tf_dir")
+
+cluster=$(tf_require "$tf_output" "aks_cluster.value.name" "AKS cluster name")
+rg=$(tf_require "$tf_output" "resource_group.value.name" "Resource group")
+
+if [[ "$config_preview" == "true" ]]; then
+  section "Configuration Preview"
+  print_kv "Cluster" "$cluster"
+  print_kv "Resource Group" "$rg"
+  print_kv "Volcano Scheduler" "$volcano_version"
+  print_kv "Namespace" "$NS_AZUREML"
+  exit 0
 fi
 
-if [[ ! -d "${terraform_dir}" ]]; then
-  echo "Error: Terraform directory not found: ${terraform_dir}" >&2
-  exit 1
-fi
+#------------------------------------------------------------------------------
+# Validate Required Files
+#------------------------------------------------------------------------------
 
-if [[ ! -f "${terraform_dir}/terraform.tfstate" ]]; then
-  echo "Error: terraform.tfstate not found in ${terraform_dir}" >&2
-  exit 1
-fi
+volcano_values="$VALUES_DIR/volcano-sh-values.yaml"
+[[ -f "$volcano_values" ]] || fatal "Volcano values not found: $volcano_values"
 
-echo "Reading Terraform outputs from ${terraform_dir}..."
-if ! tf_output=$(cd "${terraform_dir}" && terraform output -json); then
-  echo "Error: Unable to read terraform outputs" >&2
-  exit 1
-fi
+#------------------------------------------------------------------------------
+# Connect and Prepare Cluster
+#------------------------------------------------------------------------------
+section "Connect and Prepare Cluster"
 
-aks_name=$(echo "${tf_output}" | jq -r '.aks_cluster.value.name // empty')
-resource_group=$(echo "${tf_output}" | jq -r '.resource_group.value.name // empty')
+connect_aks "$rg" "$cluster"
 
-if [[ -z "${aks_name}" ]] || [[ -z "${resource_group}" ]]; then
-  echo "Error: Could not read AKS cluster info from Terraform outputs" >&2
-  exit 1
-fi
+ensure_namespace "$NS_AZUREML"
+kubectl create serviceaccount azureml-workload -n "$NS_AZUREML" --dry-run=client -o yaml | kubectl apply -f -
 
-echo "  AKS Cluster: ${aks_name}"
-echo "  Resource Group: ${resource_group}"
+#------------------------------------------------------------------------------
+# Install Volcano Scheduler
+#------------------------------------------------------------------------------
+section "Install Volcano Scheduler $volcano_version"
 
-echo "Connecting to AKS cluster..."
-az aks get-credentials \
-  --resource-group "${resource_group}" \
-  --name "${aks_name}" \
-  --overwrite-existing
-kubectl cluster-info &>/dev/null
-
-echo "Creating azureml namespace..."
-kubectl create namespace azureml --dry-run=client -o yaml | kubectl apply -f -
-kubectl create serviceaccount azureml-workload -n azureml --dry-run=client -o yaml | kubectl apply -f -
-
-echo "Adding Volcano Helm repository..."
-helm repo add volcano-sh https://volcano-sh.github.io/helm-charts 2>/dev/null || true
+helm repo add volcano-sh "$HELM_REPO_VOLCANO" 2>/dev/null || true
 helm repo update >/dev/null
 
-# ============================================================
-# Install Volcano Scheduler
-# ============================================================
-
-echo ""
-echo "Installing Volcano Scheduler..."
 helm upgrade --install volcano volcano-sh/volcano \
-  --namespace azureml \
-  --version 1.12.2 \
-  -f "${values_dir}/volcano-sh-values.yaml" \
-  --wait \
-  --timeout 5m
+  --namespace "$NS_AZUREML" \
+  --version "$volcano_version" \
+  -f "$volcano_values" \
+  --wait --timeout "$TIMEOUT_DEPLOY"
 
-# ============================================================
+info "Volcano Scheduler installed successfully"
+
+#------------------------------------------------------------------------------
+# Deployment Verification
+#------------------------------------------------------------------------------
+section "Deployment Verification"
+
+kubectl get pods -n "$NS_AZUREML" -o wide
+
+#------------------------------------------------------------------------------
 # Summary
-# ============================================================
+#------------------------------------------------------------------------------
+section "Deployment Summary"
+print_kv "Cluster" "$cluster"
+print_kv "Resource Group" "$rg"
+print_kv "Volcano Scheduler" "$volcano_version"
+print_kv "Namespace" "$NS_AZUREML"
+echo
+helm list -n "$NS_AZUREML" | grep -E "volcano" || true
 
-echo ""
-echo "============================"
-echo "Deployment Verification"
-echo "============================"
-
-kubectl get pods -n azureml -o wide
-
-echo ""
-echo "============================"
-echo "AzureML Charts Deployment Summary"
-echo "============================"
-echo "AKS Cluster:       ${aks_name}"
-echo "Resource Group:    ${resource_group}"
-echo ""
-echo "Installed charts:"
-helm list -n azureml || true
-echo ""
-echo "Namespace created:"
-echo "  - azureml (ML workloads and Volcano)"
-echo ""
-echo "Next Steps:"
-echo "  kubectl get pods -n azureml      - Check Volcano pods"
-echo "  kubectl get queues -n azureml    - List Volcano queues (if created)"
-echo ""
-echo "Deployment completed successfully!"
+info "Volcano Scheduler deployment complete"
