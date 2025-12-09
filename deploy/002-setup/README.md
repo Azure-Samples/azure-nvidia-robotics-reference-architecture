@@ -1,174 +1,219 @@
----
-title: Setup Scripts
-description: Kubernetes cluster setup scripts for robotics workloads with AzureML and OSMO
-author: Edge AI Team
-ms.date: 2025-12-04
-ms.topic: hub-page
----
+# 002-setup
 
-# Setup Scripts
-
-This directory contains scripts for configuring the AKS cluster after Terraform deployment. Scripts are numbered to indicate execution order.
-
-## Quick Start Decision Tree
-
-```text
-Start: Infrastructure deployed via 001-iac?
-       │
-       ├── No ──► Run: cd ../001-iac && terraform apply
-       │
-       └── Yes
-            │
-            ▼
-       Run: ./01-deploy-robotics-charts.sh
-       (Installs GPU Operator, KAI Scheduler)
-            │
-            ▼
-       Choose Platform:
-            │
-            ├── AzureML ──► Run: ./02-deploy-azureml-extension.sh
-            │               └── Submit jobs via scripts/submit-azureml-*.sh
-            │
-            └── OSMO ──► Run: ./03-deploy-osmo-control-plane.sh
-                         │
-                         ▼
-                    Run: ./04-deploy-osmo-backend.sh
-                         │
-                         ▼
-                    Run: ./05-configure-osmo.sh
-                         │
-                         └── Submit jobs via scripts/submit-osmo-training.sh
-```
-
-## Script Execution Order
-
-| # | Script | Purpose | Required |
-|---|--------|---------|----------|
-| 01 | `01-deploy-robotics-charts.sh` | GPU Operator, KAI Scheduler | Always |
-| 02 | `02-deploy-azureml-extension.sh` | AzureML K8s extension | AzureML path |
-| 03 | `03-deploy-osmo-control-plane.sh` | OSMO control plane | OSMO path |
-| 04 | `04-deploy-osmo-backend.sh` | OSMO backend operator | OSMO path |
-| 05 | `05-configure-osmo.sh` | OSMO storage and workflow configuration | OSMO path |
-
-## Directory Structure
-
-```text
-002-setup/
-├── README.md                          # This file
-├── 01-deploy-robotics-charts.sh       # GPU Operator, KAI Scheduler
-├── 02-deploy-azureml-extension.sh     # AzureML path
-├── 03-deploy-osmo-control-plane.sh    # OSMO path
-├── 04-deploy-osmo-backend.sh          # OSMO backend
-├── 05-configure-osmo.sh               # OSMO storage and workflow config
-├── cleanup/                           # Uninstall scripts
-│   └── uninstall-azureml-extension.sh
-├── config/                            # OSMO configuration templates
-│   ├── default-pool-config-example.json
-│   ├── pod-template-config-example.json
-│   ├── scheduler-config-example.json
-│   ├── service-config-example.json
-│   ├── workflow-config-example.json
-│   └── out/                           # Generated config outputs
-├── manifests/                         # Kubernetes manifests
-│   ├── ama-metrics-dcgm-scrape.yaml
-│   ├── gpu-instance-type.yaml
-│   ├── gpu-podmonitor.yaml
-│   ├── internal-lb-ingress.yaml
-│   └── osmo-workflow-sa.yaml
-├── optional/                          # Optional/utility scripts
-│   ├── deploy-volcano-scheduler.sh
-│   ├── uninstall-robotics-charts.sh
-│   ├── uninstall-volcano-scheduler.sh
-│   └── validate-gpu-metrics.sh
-└── values/                            # Helm values files
-    ├── kai-scheduler.yaml
-    ├── nvidia-gpu-operator.yaml
-    ├── osmo-backend-operator.yaml
-    ├── osmo-backend-operator-identity.yaml
-    ├── osmo-control-plane.yaml
-    ├── osmo-control-plane-identity.yaml
-    ├── osmo-router.yaml
-    ├── osmo-router-identity.yaml
-    ├── osmo-ui.yaml
-    └── volcano.yaml
-```
+AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 
 ## Prerequisites
 
-Before running any setup script:
+- Terraform infrastructure deployed (`cd ../001-iac && terraform apply`)
+- Azure CLI authenticated (`az login`)
+- kubectl, Helm 3.x, jq installed
+- OSMO CLI (`osmo`) for backend deployment
 
-1. **Terraform deployed**: `cd ../001-iac && terraform apply`
-2. **kubectl configured**: `az aks get-credentials --resource-group <rg> --name <aks>`
-3. **Helm installed**: Version 3.x required
-4. **Azure CLI authenticated**: `az login`
+## Quick Start
+
+```bash
+# Connect to cluster (values from terraform output)
+az aks get-credentials --resource-group <rg> --name <aks>
+
+# Deploy GPU infrastructure (required for all paths)
+./01-deploy-robotics-charts.sh
+
+# Choose your path:
+# - AzureML: ./02-deploy-azureml-extension.sh
+# - OSMO:    ./03-deploy-osmo-control-plane.sh && ./04-deploy-osmo-backend.sh
+```
+
+## Deployment Scenarios
+
+Three authentication and registry configurations are supported. Choose based on your security requirements.
+
+### Scenario 1: Access Keys + NGC (Development)
+
+Simplest setup using storage account keys and NVIDIA NGC registry.
+
+```bash
+# terraform.tfvars
+osmo_config = {
+  should_enable_identity   = false
+  should_federate_identity = false
+  control_plane_namespace  = "osmo-control-plane"
+  operator_namespace       = "osmo-operator"
+  workflows_namespace      = "osmo-workflows"
+}
+```
+
+```bash
+export NGC_API_KEY="your-ngc-token"
+
+./01-deploy-robotics-charts.sh
+./02-deploy-azureml-extension.sh
+./03-deploy-osmo-control-plane.sh --ngc-token "$NGC_API_KEY" --use-access-keys
+./04-deploy-osmo-backend.sh --ngc-token "$NGC_API_KEY" --use-access-keys
+```
+
+### Scenario 2: Workload Identity + NGC (Production)
+
+Secure, key-less authentication via Azure Workload Identity.
+
+```bash
+# terraform.tfvars
+osmo_config = {
+  should_enable_identity   = true
+  should_federate_identity = true
+  control_plane_namespace  = "osmo-control-plane"
+  operator_namespace       = "osmo-operator"
+  workflows_namespace      = "osmo-workflows"
+}
+```
+
+```bash
+export NGC_API_KEY="your-ngc-token"
+
+./01-deploy-robotics-charts.sh
+./02-deploy-azureml-extension.sh
+./03-deploy-osmo-control-plane.sh --ngc-token "$NGC_API_KEY"
+./04-deploy-osmo-backend.sh --ngc-token "$NGC_API_KEY"
+```
+
+Scripts auto-detect the OSMO managed identity from Terraform outputs and configure ServiceAccount annotations.
+
+### Scenario 3: Workload Identity + Private ACR (Air-Gapped)
+
+Enterprise deployment using private Azure Container Registry.
+
+**Pre-requisite**: Import images to ACR before deployment.
+
+```bash
+# Get ACR name and import images
+cd ../001-iac
+ACR_NAME=$(terraform output -json container_registry | jq -r '.value.name')
+az acr login --name "$ACR_NAME"
+
+# Set versions (check NGC for latest: https://catalog.ngc.nvidia.com/orgs/nvidia/teams/osmo)
+OSMO_VERSION="${OSMO_VERSION:-6.0.0}"
+CHART_VERSION="${CHART_VERSION:-1.0.0}"
+
+OSMO_IMAGES=(
+  service router web-ui worker logger agent
+  backend-listener backend-worker client
+  delayed-job-monitor init-container
+)
+for img in "${OSMO_IMAGES[@]}"; do
+  az acr import --name "$ACR_NAME" \
+    --source "nvcr.io/nvidia/osmo/${img}:${OSMO_VERSION}" \
+    --image "osmo/${img}:${OSMO_VERSION}" \
+    --username '$oauthtoken' --password "$NGC_API_KEY"
+done
+
+# Import Helm charts
+helm registry login nvcr.io --username '$oauthtoken' --password "$NGC_API_KEY"
+for chart in osmo router ui backend-operator; do
+  helm pull "oci://nvcr.io/nvidia/osmo/${chart}" --version "$CHART_VERSION"
+  helm push "${chart}-${CHART_VERSION}.tgz" "oci://${ACR_NAME}.azurecr.io/helm"
+  rm "${chart}-${CHART_VERSION}.tgz"
+done
+```
+
+```bash
+cd ../002-setup
+./01-deploy-robotics-charts.sh
+./02-deploy-azureml-extension.sh
+./03-deploy-osmo-control-plane.sh --use-acr
+./04-deploy-osmo-backend.sh --use-acr
+```
+
+## Scenario Comparison
+
+| | Access Keys + NGC | Workload Identity + NGC | Workload Identity + ACR |
+|---|:---:|:---:|:---:|
+| Storage Auth | Access Keys | Workload Identity | Workload Identity |
+| Registry | NGC | NGC | Private ACR |
+| NGC Token | Required | Required | Import only |
+| Security | Development | Production | Enterprise |
+| Air-Gap | ✗ | ✗ | ✓ |
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `01-deploy-robotics-charts.sh` | GPU Operator, KAI Scheduler |
+| `02-deploy-azureml-extension.sh` | AzureML K8s extension, compute attach |
+| `03-deploy-osmo-control-plane.sh` | OSMO service, router, web-ui |
+| `04-deploy-osmo-backend.sh` | Backend operator, workflow storage |
+
+## Script Flags
+
+| Flag | Description |
+|------|-------------|
+| `--ngc-token TOKEN` | NGC API token (required unless `--use-acr`) |
+| `--use-access-keys` | Storage account keys instead of workload identity |
+| `--use-acr` | Pull from Terraform-deployed ACR |
+| `--acr-name NAME` | Specify alternate ACR |
+| `--config-preview` | Print config and exit |
 
 ## Configuration
 
-All scripts automatically read configuration from Terraform outputs in `../001-iac/`. Override any value using environment variables:
+Scripts read from Terraform outputs in `../001-iac/`. Override with environment variables:
 
 | Variable | Description |
 |----------|-------------|
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `AZURE_RESOURCE_GROUP` | Resource group name |
-| `AKS_CLUSTER_NAME` | AKS cluster name |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription |
+| `AZURE_RESOURCE_GROUP` | Resource group |
+| `AKS_CLUSTER_NAME` | Cluster name |
 
-## AzureML Path
-
-For Azure Machine Learning workloads:
+## Verification
 
 ```bash
-# Step 1: Deploy GPU infrastructure
-./01-deploy-robotics-charts.sh
+# Check pods
+kubectl get pods -n gpu-operator
+kubectl get pods -n azureml
+kubectl get pods -n osmo-control-plane
+kubectl get pods -n osmo-operator
 
-# Step 2: Install AzureML extension
-./02-deploy-azureml-extension.sh
+# OSMO connectivity
+osmo info
+osmo backend list
 
-# Submit training jobs
-../scripts/submit-azureml-training.sh
+# Workload identity (if enabled)
+kubectl get sa -n osmo-control-plane osmo-service -o yaml | grep azure.workload.identity
 ```
 
-## OSMO Path
-
-For NVIDIA OSMO orchestrated workloads:
+## Troubleshooting
 
 ```bash
-# Step 1: Deploy GPU infrastructure
-./01-deploy-robotics-charts.sh
+# Workload identity
+az identity federated-credential list --identity-name osmo-identity --resource-group <rg>
+az aks show -g <rg> -n <aks> --query oidcIssuerProfile.issuerUrl
 
-# Step 2: Deploy OSMO control plane
-./03-deploy-osmo-control-plane.sh
+# ACR pull
+az aks check-acr --name <aks> --resource-group <rg> --acr <acr>
+az acr repository show-tags --name <acr> --repository osmo/osmo-service
 
-# Step 3: Deploy backend operator
-./04-deploy-osmo-backend.sh
-
-# Step 4: Configure storage and workflows
-./05-configure-osmo.sh
-
-# Submit training workflows
-../scripts/submit-osmo-training.sh
+# Storage access
+kubectl get secret postgres-secret -n osmo-control-plane
+kubectl describe sa osmo-service -n osmo-control-plane
 ```
 
-### OSMO Service URL Auto-Detection
+## Directory Structure
 
-The backend operator script automatically detects the OSMO service URL:
-
-1. **Primary**: Uses `azureml-ingress-nginx-internal-lb` LoadBalancer IP (deployed by control plane script)
-2. **Fallback**: Uses `azureml-ingress-nginx-controller` ClusterIP for internal routing
-
-Override with `--service-url URL` if needed:
-
-```bash
-# Use internal nginx controller directly
-./04-deploy-osmo-backend.sh --service-url http://azureml-ingress-nginx-controller.azureml.svc.cluster.local
 ```
-
-> **Note**: The `azureml-fe` LoadBalancer is reserved for AzureML inference endpoints and should not be used for OSMO.
+002-setup/
+├── 01-deploy-robotics-charts.sh
+├── 02-deploy-azureml-extension.sh
+├── 03-deploy-osmo-control-plane.sh
+├── 04-deploy-osmo-backend.sh
+├── cleanup/                    # Uninstall scripts
+├── config/                     # OSMO configuration templates
+├── lib/                        # Shared functions
+├── manifests/                  # Kubernetes manifests
+├── optional/                   # Volcano scheduler, validation
+└── values/                     # Helm values files
+```
 
 ## Optional Scripts
 
-Scripts in `optional/` are not required for standard deployments:
-
-* `deploy-volcano-scheduler.sh` - Volcano scheduler (alternative to KAI)
-* `uninstall-volcano-scheduler.sh` - Remove Volcano scheduler
-* `uninstall-robotics-charts.sh` - Remove GPU Operator and KAI
-* `validate-gpu-metrics.sh` - Verify GPU metrics collection
+| Script | Purpose |
+|--------|---------|
+| `optional/deploy-volcano-scheduler.sh` | Volcano (alternative to KAI) |
+| `optional/validate-gpu-metrics.sh` | GPU metrics verification |
+| `cleanup/uninstall-azureml-extension.sh` | Remove AzureML extension |
