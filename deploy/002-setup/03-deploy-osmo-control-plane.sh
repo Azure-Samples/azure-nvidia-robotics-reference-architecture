@@ -1,660 +1,308 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Deploy OSMO Control Plane components (service, router, web-ui)
+set -o errexit -o nounset -o pipefail
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ngc_token=""
-terraform_dir="${script_dir}/../001-iac"
-values_dir="${script_dir}/values"
-namespace="osmo-control-plane"
-chart_version="1.0.0"
-image_version="6.0.0"
-use_acr=false
-acr_name=""
-config_preview=false
-osmo_auth_mode="workload-identity"
-osmo_identity_client_id=""
-mek_config_file=""
-skip_mek=false
-force_mek=false
-mek_configmap_name="mek-config"
-use_incluster_redis=false
-config_dir="${script_dir}/config"
-service_config_template="${config_dir}/service-config-example.json"
-service_config_output="${config_dir}/out/service-config.json"
-skip_service_config=false
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=defaults.conf
+source "$SCRIPT_DIR/defaults.conf"
 
-help="Usage: deploy-osmo-control-plane.sh [OPTIONS]
+VALUES_DIR="$SCRIPT_DIR/values"
+CONFIG_DIR="$SCRIPT_DIR/config"
 
-Deploys OSMO Control Plane components to Azure Kubernetes Service.
-By default, images and helm charts are pulled from NVIDIA NGC.
-Use --use-acr or --acr-name to pull from Azure Container Registry instead.
+show_help() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
 
-REQUIRED (when using NGC):
-  --ngc-token TOKEN         NGC API token for pulling OSMO images
+Deploy OSMO Control Plane components to AKS.
+
+REGISTRY OPTIONS (one required):
+    --ngc-token TOKEN       NGC API token (required for NGC registry)
+    --use-acr               Pull from ACR deployed by 001-iac
+    --acr-name NAME         Pull from specified ACR
 
 OPTIONS:
-  --terraform-dir PATH      Path to terraform directory (default: ../001-iac)
-  --values-dir PATH         Path to values directory (default: ./values)
-  --namespace NAME          Target Kubernetes namespace (default: osmo-control-plane)
-  --chart-version VERSION   Helm chart version (default: 1.0.0)
-  --image-version TAG       OSMO image tag (default: 6.0.0)
-  --use-acr                 Pull images/charts from ACR deployed by 001-iac (auto-detects ACR name)
-  --acr-name NAME           Pull images/charts from specified ACR (implies --use-acr)
-  --osmo-auth-mode MODE     OSMO storage authentication mode: key|workload-identity (default: workload-identity)
-  --osmo-identity-client-id Client ID of OSMO managed identity (default: from terraform osmo_workload_identity output)
-  --mek-config-file PATH    Use existing MEK config file instead of generating (for key recovery/rotation)
-  --skip-mek                Skip MEK configuration entirely (use if already applied)
-  --force-mek               Force MEK replacement even if one already exists (use with caution)
-  --use-incluster-redis     Deploy in-cluster Redis instead of Azure Managed Redis (optional, for testing)
-  --skip-service-config     Skip configuring service_base_url (use if already configured)
-  --config-preview          Print configuration details and exit before deployment
-  --help                    Show this help message
-
-MEK (Master Encryption Key):
-  OSMO uses MEK to encrypt sensitive data (credentials, secrets) stored in PostgreSQL.
-  By default, a new MEK is generated and applied. For production, back up the MEK
-  securely - if lost, encrypted database data cannot be recovered.
-
-REDIS:
-  OSMO requires Redis 7.0+ for Redis Streams commands. Azure Managed Redis provides
-  Redis 7.4 natively. Use --use-incluster-redis only for testing without Azure Redis.
-  Ensure services.redis.enabled=true in osmo-control-plane.yaml when using this option.
+    -h, --help              Show this help message
+    -t, --tf-dir DIR        Terraform directory (default: $DEFAULT_TF_DIR)
+    --chart-version VER     Helm chart version (default: $OSMO_CHART_VERSION)
+    --image-version TAG     OSMO image tag (default: $OSMO_IMAGE_VERSION)
+    --use-access-keys       Use storage access keys instead of workload identity
+    --skip-mek              Skip MEK configuration
+    --force-mek             Replace existing MEK (data loss warning)
+    --mek-config-file PATH  Use existing MEK config file
+    --use-incluster-redis   Use in-cluster Redis instead of Azure Managed Redis
+    --skip-service-config   Skip service_base_url configuration
+    --config-preview        Print configuration and exit
 
 EXAMPLES:
-  # Deploy with NGC (default)
-  ./deploy-osmo-control-plane.sh --ngc-token YOUR_NGC_TOKEN
+    $(basename "$0") --ngc-token YOUR_TOKEN
+    $(basename "$0") --use-acr
+    $(basename "$0") --use-acr --use-access-keys
+EOF
+}
 
-  # Deploy with ACR from terraform
-  ./deploy-osmo-control-plane.sh --use-acr
-
-  # Deploy with ACR and specific versions
-  ./deploy-osmo-control-plane.sh --use-acr --chart-version 1.0.0 --image-version v2025.12.05
-
-  # Deploy with in-cluster Redis (optional, for testing without Azure Managed Redis)
-  ./deploy-osmo-control-plane.sh --use-acr --use-incluster-redis
-
-  # Deploy with existing MEK config (disaster recovery)
-  ./deploy-osmo-control-plane.sh --use-acr --mek-config-file ./backup/mek-config.yaml
-
-  # Deploy without MEK (already applied separately)
-  ./deploy-osmo-control-plane.sh --use-acr --skip-mek
-"
+tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
+ngc_token=""
+use_acr=false
+acr_name=""
+chart_version="$OSMO_CHART_VERSION"
+image_version="$OSMO_IMAGE_VERSION"
+use_access_keys=false
+osmo_identity_client_id=""
+skip_mek=false
+force_mek=false
+mek_config_file=""
+use_incluster_redis=false
+skip_service_config=false
+config_preview=false
 
 while [[ $# -gt 0 ]]; do
-  case $1 in
-  --ngc-token)
-    ngc_token="$2"
-    shift 2
-    ;;
-  --terraform-dir)
-    terraform_dir="$2"
-    shift 2
-    ;;
-  --values-dir)
-    values_dir="$2"
-    shift 2
-    ;;
-  --namespace)
-    namespace="$2"
-    shift 2
-    ;;
-  --chart-version)
-    chart_version="$2"
-    shift 2
-    ;;
-  --image-version)
-    image_version="$2"
-    shift 2
-    ;;
-  --use-acr)
-    use_acr=true
-    shift
-    ;;
-  --acr-name)
-    acr_name="$2"
-    use_acr=true
-    shift 2
-    ;;
-  --config-preview)
-    config_preview=true
-    shift
-    ;;
-  --osmo-auth-mode)
-    osmo_auth_mode="$2"
-    shift 2
-    ;;
-  --osmo-identity-client-id)
-    osmo_identity_client_id="$2"
-    shift 2
-    ;;
-  --mek-config-file)
-    mek_config_file="$2"
-    shift 2
-    ;;
-  --skip-mek)
-    skip_mek=true
-    shift
-    ;;
-  --force-mek)
-    force_mek=true
-    shift
-    ;;
-  --use-incluster-redis)
-    use_incluster_redis=true
-    shift
-    ;;
-  --skip-service-config)
-    skip_service_config=true
-    shift
-    ;;
-  --help)
-    echo "${help}"
-    exit 0
-    ;;
-  *)
-    echo "${help}"
-    echo
-    echo "Unknown option: $1"
-    exit 1
-    ;;
+  case "$1" in
+    -h|--help)            show_help; exit 0 ;;
+    -t|--tf-dir)          tf_dir="$2"; shift 2 ;;
+    --ngc-token)          ngc_token="$2"; shift 2 ;;
+    --use-acr)            use_acr=true; shift ;;
+    --acr-name)           acr_name="$2"; use_acr=true; shift 2 ;;
+    --chart-version)      chart_version="$2"; shift 2 ;;
+    --image-version)      image_version="$2"; shift 2 ;;
+    --use-access-keys)    use_access_keys=true; shift ;;
+    --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
+    --skip-mek)           skip_mek=true; shift ;;
+    --force-mek)          force_mek=true; shift ;;
+    --mek-config-file)    mek_config_file="$2"; shift 2 ;;
+    --use-incluster-redis) use_incluster_redis=true; shift ;;
+    --skip-service-config) skip_service_config=true; shift ;;
+    --config-preview)     config_preview=true; shift ;;
+    *)                    fatal "Unknown option: $1" ;;
   esac
 done
 
-if [[ "${use_acr}" == "false" && -z "${ngc_token}" ]]; then
-  echo "Error: --ngc-token is required when not using ACR"
-  echo
-  echo "${help}"
-  exit 1
+[[ "$use_acr" == "false" && -z "$ngc_token" ]] && fatal "--ngc-token required when not using ACR"
+
+require_tools az terraform kubectl helm jq base64 openssl
+
+info "Reading terraform outputs from $tf_dir..."
+tf_output=$(read_terraform_outputs "$tf_dir")
+cluster=$(tf_require "$tf_output" "aks_cluster.value.name" "AKS cluster name")
+rg=$(tf_require "$tf_output" "resource_group.value.name" "Resource group")
+pg_fqdn=$(tf_require "$tf_output" "postgresql_connection_info.value.fqdn" "PostgreSQL FQDN")
+pg_user=$(tf_require "$tf_output" "postgresql_connection_info.value.admin_username" "PostgreSQL user")
+keyvault=$(tf_require "$tf_output" "key_vault_name.value" "Key Vault name")
+redis_hostname=$(tf_get "$tf_output" "managed_redis_connection_info.value.hostname")
+redis_port=$(tf_get "$tf_output" "managed_redis_connection_info.value.port" "6380")
+
+[[ "$use_acr" == "true" && -z "$acr_name" ]] && acr_name=$(detect_acr_name "$tf_output")
+
+if [[ "$use_access_keys" == "false" && -z "$osmo_identity_client_id" ]]; then
+  osmo_identity_client_id=$(detect_osmo_identity "$tf_output")
 fi
 
-case "$osmo_auth_mode" in
-key|workload-identity) ;;
-*)
-  echo "Error: --osmo-auth-mode must be 'key' or 'workload-identity'" >&2
-  exit 1
-  ;;
-esac
+[[ "$use_incluster_redis" == "false" && -z "$redis_hostname" ]] && \
+  fatal "Redis not deployed. Use --use-incluster-redis or ensure should_deploy_redis is true."
 
-required_tools=(terraform az kubectl helm jq base64 openssl)
-missing_tools=()
-for tool in "${required_tools[@]}"; do
-  if ! command -v "${tool}" &>/dev/null; then
-    missing_tools+=("${tool}")
-  fi
-done
-
-if [[ ${#missing_tools[@]} -gt 0 ]]; then
-  echo "Error: Missing required tools: ${missing_tools[*]}" >&2
-  exit 1
-fi
-
-if [[ ! -d "${terraform_dir}" ]]; then
-  echo "Error: Terraform directory not found: ${terraform_dir}" >&2
-  exit 1
-fi
-
-if [[ ! -f "${terraform_dir}/terraform.tfstate" ]]; then
-  echo "Error: terraform.tfstate not found in ${terraform_dir}" >&2
-  exit 1
-fi
-
-echo "Extracting terraform outputs from ${terraform_dir}..."
-if ! tf_output=$(cd "${terraform_dir}" && terraform output -json); then
-  echo "Error: Unable to read terraform outputs" >&2
-  exit 1
-fi
-
-aks_name=$(echo "${tf_output}" | jq -r '.aks_cluster.value.name')
-resource_group=$(echo "${tf_output}" | jq -r '.resource_group.value.name')
-pg_fqdn=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.fqdn // empty')
-pg_user=$(echo "${tf_output}" | jq -r '.postgresql_connection_info.value.admin_username // empty')
-redis_hostname=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.hostname // empty')
-redis_port=$(echo "${tf_output}" | jq -r '.managed_redis_connection_info.value.port // empty')
-keyvault_name=$(echo "${tf_output}" | jq -r '.key_vault_name.value // empty')
-
-if [[ "${use_acr}" == "true" && -z "${acr_name}" ]]; then
-  acr_name=$(echo "${tf_output}" | jq -r '.container_registry.value.name // empty')
-  if [[ -z "${acr_name}" ]]; then
-    echo "Error: --use-acr specified but container_registry output not found in terraform state" >&2
-    exit 1
-  fi
-fi
-
-if [[ "$osmo_auth_mode" == "workload-identity" && -z "$osmo_identity_client_id" ]]; then
-  osmo_identity_client_id=$(echo "${tf_output}" | jq -r '.osmo_workload_identity.value.client_id // empty')
-  if [[ -z "$osmo_identity_client_id" ]]; then
-    echo "Error: --osmo-identity-client-id not provided and osmo_workload_identity output not found in terraform state" >&2
-    exit 1
-  fi
-fi
-
-postgres_server_name=${pg_fqdn%%.*}
-redis_cluster=${redis_hostname%%.*}
-postgres_secret_name="db-secret"
-redis_secret_name="redis-secret"
-ingress_manifest="${script_dir}/manifests/internal-lb-ingress.yaml"
-service_values="${values_dir}/osmo-control-plane.yaml"
-router_values="${values_dir}/osmo-router.yaml"
-ui_values="${values_dir}/osmo-ui.yaml"
-service_identity_values="${values_dir}/osmo-control-plane-identity.yaml"
-router_identity_values="${values_dir}/osmo-router-identity.yaml"
-
-if [[ -z "${keyvault_name}" ]]; then
-  echo "Error: key_vault_name output not found in terraform state" >&2
-  exit 1
-fi
-
-if [[ -z "${pg_fqdn}" ]]; then
-  echo "Error: PostgreSQL not deployed. Ensure should_deploy_postgresql is true." >&2
-  exit 1
-fi
-
-if [[ "${use_incluster_redis}" == "false" && -z "${redis_hostname}" ]]; then
-  echo "Error: Redis not deployed. Use --use-incluster-redis or ensure should_deploy_redis is true." >&2
-  exit 1
-fi
-
-echo "  AKS Cluster: ${aks_name}"
-echo "  Resource Group: ${resource_group}"
-echo "  PostgreSQL: ${pg_fqdn}"
-if [[ "${use_incluster_redis}" == "true" ]]; then
-  echo "  Redis: in-cluster (OSMO-managed Redis 7.x pod)"
-else
-  echo "  Redis: ${redis_hostname}:${redis_port}"
-fi
-echo "  Key Vault: ${keyvault_name}"
-
-echo "Retrieving PostgreSQL password from Key Vault ${keyvault_name}..."
-postgres_password=$(az keyvault secret show \
-  --vault-name "${keyvault_name}" \
-  --name "psql-admin-password" \
-  --query value \
-  --output tsv)
-
-redis_key=""
-if [[ "${use_incluster_redis}" == "false" ]]; then
-  echo "Retrieving Redis access key from Key Vault ${keyvault_name}..."
-  redis_key=$(az keyvault secret show \
-    --vault-name "${keyvault_name}" \
-    --name "redis-primary-key" \
-    --query value \
-    --output tsv)
-fi
-
-if [[ "${config_preview}" == "true" ]]; then
-  echo
-  echo "Configuration preview"
-  echo "---------------------"
-  printf 'script_dir=%s\n' "${script_dir}"
-  printf 'terraform_dir=%s\n' "${terraform_dir}"
-  printf 'values_dir=%s\n' "${values_dir}"
-  printf 'namespace=%s\n' "${namespace}"
-  printf 'chart_version=%s\n' "${chart_version}"
-  printf 'image_version=%s\n' "${image_version}"
-  printf 'use_acr=%s\n' "${use_acr}"
-  printf 'acr_name=%s\n' "${acr_name}"
-  printf 'ngc_token=%s\n' "${ngc_token:+(set)}"
-  printf 'aks_name=%s\n' "${aks_name}"
-  printf 'resource_group=%s\n' "${resource_group}"
-  printf 'postgres_fqdn=%s\n' "${pg_fqdn}"
-  printf 'postgres_user=%s\n' "${pg_user}"
-  printf 'postgres_server_name=%s\n' "${postgres_server_name}"
-  printf 'postgres_password=%s\n' "${postgres_password}"
-  printf 'use_incluster_redis=%s\n' "${use_incluster_redis}"
-  printf 'redis_hostname=%s\n' "${redis_hostname}"
-  printf 'redis_port=%s\n' "${redis_port}"
-  printf 'redis_cluster=%s\n' "${redis_cluster}"
-  printf 'redis_key=%s\n' "${redis_key:+(set)}"
-  printf 'keyvault_name=%s\n' "${keyvault_name}"
-  printf 'postgres_secret_name=%s\n' "${postgres_secret_name}"
-  printf 'redis_secret_name=%s\n' "${redis_secret_name}"
-  printf 'service_values=%s\n' "${service_values}"
-  printf 'router_values=%s\n' "${router_values}"
-  printf 'ui_values=%s\n' "${ui_values}"
-  printf 'ingress_manifest=%s\n' "${ingress_manifest}"
-  printf 'osmo_auth_mode=%s\n' "${osmo_auth_mode}"
-  printf 'osmo_identity_client_id=%s\n' "${osmo_identity_client_id}"
-  printf 'skip_mek=%s\n' "${skip_mek}"
-  printf 'force_mek=%s\n' "${force_mek}"
-  printf 'mek_config_file=%s\n' "${mek_config_file}"
-  printf 'mek_configmap_name=%s\n' "${mek_configmap_name}"
-  printf 'skip_service_config=%s\n' "${skip_service_config}"
-  printf 'service_config_template=%s\n' "${service_config_template}"
-  printf 'service_config_output=%s\n' "${service_config_output}"
+if [[ "$config_preview" == "true" ]]; then
+  section "Configuration Preview"
+  print_kv "Cluster" "$cluster"
+  print_kv "Resource Group" "$rg"
+  print_kv "PostgreSQL" "$pg_fqdn"
+  print_kv "Redis" "$([[ $use_incluster_redis == true ]] && echo 'in-cluster' || echo "$redis_hostname:$redis_port")"
+  print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_name" || echo 'NGC')"
+  print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
+  print_kv "Chart Version" "$chart_version"
+  print_kv "Image Version" "$image_version"
   exit 0
 fi
 
-echo "Acquiring AKS credentials..."
-az aks get-credentials \
-  --resource-group "${resource_group}" \
-  --name "${aks_name}" \
-  --overwrite-existing
-kubectl cluster-info &>/dev/null
+connect_aks "$rg" "$cluster"
+ensure_namespace "$NS_OSMO_CONTROL_PLANE"
 
-echo "Ensuring namespace ${namespace} exists..."
-kubectl create namespace "${namespace}" --dry-run=client -o yaml | kubectl apply -f -
+info "Retrieving PostgreSQL password from Key Vault..."
+pg_password=$(az keyvault secret show --vault-name "$keyvault" --name "psql-admin-password" --query value -o tsv)
+
+redis_key=""
+if [[ "$use_incluster_redis" == "false" ]]; then
+  info "Retrieving Redis access key from Key Vault..."
+  redis_key=$(az keyvault secret show --vault-name "$keyvault" --name "redis-primary-key" --query value -o tsv)
+fi
 
 generate_mek_config() {
-  local random_key jwk_json encoded_jwk
-  random_key="$(openssl rand -base64 32 | tr -d '\n')"
-  jwk_json="{\"k\":\"${random_key}\",\"kid\":\"key1\",\"kty\":\"oct\"}"
-  encoded_jwk="$(echo -n "${jwk_json}" | base64 | tr -d '\n')"
-
+  local key jwk encoded
+  key="$(openssl rand -base64 32 | tr -d '\n')"
+  jwk="{\"k\":\"${key}\",\"kid\":\"key1\",\"kty\":\"oct\"}"
+  encoded="$(echo -n "$jwk" | base64 | tr -d '\n')"
   cat <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ${mek_configmap_name}
+  name: $SECRET_MEK
 data:
   mek.yaml: |
     currentMek: key1
     meks:
-      key1: ${encoded_jwk}
+      key1: ${encoded}
 EOF
 }
 
-if [[ "${skip_mek}" == "false" ]]; then
+if [[ "$skip_mek" == "false" ]]; then
+  section "Configure MEK"
   mek_exists=false
-  if kubectl get configmap "${mek_configmap_name}" -n "${namespace}" &>/dev/null; then
-    mek_exists=true
-  fi
+  kubectl get configmap "$SECRET_MEK" -n "$NS_OSMO_CONTROL_PLANE" &>/dev/null && mek_exists=true
 
-  if [[ "${mek_exists}" == "true" && "${force_mek}" == "false" ]]; then
-    echo "MEK ConfigMap '${mek_configmap_name}' already exists in namespace ${namespace}; skipping."
-    echo "  Use --force-mek to replace the existing MEK (data loss warning)."
-  elif [[ -n "${mek_config_file}" ]]; then
-    if [[ ! -f "${mek_config_file}" ]]; then
-      echo "Error: MEK config file not found: ${mek_config_file}" >&2
-      exit 1
-    fi
-    if [[ "${mek_exists}" == "true" ]]; then
-      echo "Warning: Replacing existing MEK ConfigMap with ${mek_config_file}..." >&2
-    else
-      echo "Applying MEK ConfigMap from ${mek_config_file}..."
-    fi
-    kubectl apply -f "${mek_config_file}" -n "${namespace}"
+  if [[ "$mek_exists" == "true" && "$force_mek" == "false" ]]; then
+    info "MEK ConfigMap already exists; skipping (use --force-mek to replace)"
+  elif [[ -n "$mek_config_file" ]]; then
+    [[ -f "$mek_config_file" ]] || fatal "MEK config file not found: $mek_config_file"
+    info "Applying MEK from $mek_config_file..."
+    kubectl apply -f "$mek_config_file" -n "$NS_OSMO_CONTROL_PLANE"
   else
-    if [[ "${mek_exists}" == "true" ]]; then
-      echo "Warning: Replacing existing MEK ConfigMap with newly generated key..." >&2
-      echo "  Existing encrypted data will become unrecoverable!" >&2
-    fi
-    echo "Generating and applying MEK ConfigMap..."
-    generate_mek_config | kubectl apply -n "${namespace}" -f -
-    echo "Warning: MEK generated dynamically. Back up the ConfigMap for production use:" >&2
-    echo "  kubectl get configmap ${mek_configmap_name} -n ${namespace} -o yaml > mek-backup.yaml" >&2
+    [[ "$mek_exists" == "true" ]] && warn "Replacing existing MEK - encrypted data will be unrecoverable!"
+    info "Generating and applying MEK ConfigMap..."
+    generate_mek_config | kubectl apply -n "$NS_OSMO_CONTROL_PLANE" -f -
+    warn "Back up MEK for production: kubectl get configmap $SECRET_MEK -n $NS_OSMO_CONTROL_PLANE -o yaml > mek-backup.yaml"
   fi
-else
-  echo "Skipping MEK configuration (--skip-mek specified)."
 fi
 
-if [[ "${use_acr}" == "true" ]]; then
-  echo "Logging into Azure Container Registry ${acr_name}..."
-  az acr login --name "${acr_name}"
-else
-  echo "Adding NVIDIA NGC Helm repository..."
-  # shellcheck disable=SC2016
-  helm repo add osmo https://helm.ngc.nvidia.com/nvidia/osmo \
-    --username='$oauthtoken' \
-    --password="${ngc_token}" 2>/dev/null || true
-  helm repo update >/dev/null
+section "Configure Registry and Secrets"
 
-  echo "Creating nvcr-secret image pull secret..."
-  # shellcheck disable=SC2016
-  kubectl create secret docker-registry nvcr-secret \
-    --namespace="${namespace}" \
-    --docker-server=nvcr.io \
-    --docker-username='$oauthtoken' \
-    --docker-password="${ngc_token}" \
-    --dry-run=client -o yaml | kubectl apply -f -
+if [[ "$use_acr" == "true" ]]; then
+  login_acr "$acr_name"
+else
+  setup_ngc_repo "$ngc_token"
+  create_ngc_secret "$NS_OSMO_CONTROL_PLANE" "$ngc_token"
 fi
 
-echo "Creating ${postgres_secret_name}..."
-kubectl create secret generic "${postgres_secret_name}" \
-  --namespace="${namespace}" \
-  --from-literal=db-password="${postgres_password}" \
+info "Creating database secret..."
+kubectl create secret generic "$SECRET_POSTGRES" \
+  --namespace="$NS_OSMO_CONTROL_PLANE" \
+  --from-literal=db-password="$pg_password" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-if [[ "${use_incluster_redis}" == "false" ]]; then
-  echo "Creating ${redis_secret_name}..."
-  kubectl create secret generic "${redis_secret_name}" \
-    --namespace="${namespace}" \
-    --from-literal=redis-password="${redis_key}" \
+if [[ "$use_incluster_redis" == "false" ]]; then
+  info "Creating Redis secret..."
+  kubectl create secret generic "$SECRET_REDIS" \
+    --namespace="$NS_OSMO_CONTROL_PLANE" \
+    --from-literal=redis-password="$redis_key" \
     --dry-run=client -o yaml | kubectl apply -f -
-else
-  echo "Skipping ${redis_secret_name} creation (using in-cluster Redis)..."
 fi
 
-if [[ -f "${ingress_manifest}" ]]; then
-  echo "Applying internal load balancer ingress..."
-  kubectl apply -f "${ingress_manifest}"
-else
-  echo "Warning: ${ingress_manifest} not found; skipping ingress apply" >&2
-fi
+ingress_manifest="$SCRIPT_DIR/manifests/internal-lb-ingress.yaml"
+[[ -f "$ingress_manifest" ]] && kubectl apply -f "$ingress_manifest"
 
-for values_file in "${service_values}" "${router_values}" "${ui_values}"; do
-  if [[ ! -f "${values_file}" ]]; then
-    echo "Error: Values file not found: ${values_file}" >&2
-    exit 1
-  fi
+service_values="$VALUES_DIR/osmo-control-plane.yaml"
+router_values="$VALUES_DIR/osmo-router.yaml"
+ui_values="$VALUES_DIR/osmo-ui.yaml"
+service_identity_values="$VALUES_DIR/osmo-control-plane-identity.yaml"
+router_identity_values="$VALUES_DIR/osmo-router-identity.yaml"
+
+for f in "$service_values" "$router_values" "$ui_values"; do
+  [[ -f "$f" ]] || fatal "Values file not found: $f"
 done
 
-echo "Deploying osmo/service chart..."
-set -x
-helm_service_args=(
-  --version "${chart_version}"
-  --namespace "${namespace}"
-  -f "${service_values}"
-  --set "services.postgres.serviceName=${pg_fqdn}"
-  --set "services.postgres.user=${pg_user}"
-  --set-string "global.osmoImageTag=${image_version}"
+section "Deploy OSMO Charts"
+
+build_helm_args() {
+  local chart="$1"
+  local args=(
+    --version "$chart_version"
+    --namespace "$NS_OSMO_CONTROL_PLANE"
+    --set-string "global.osmoImageTag=$image_version"
+  )
+  if [[ "$use_acr" == "true" ]]; then
+    args+=(
+      --set "global.osmoImageLocation=${acr_name}.azurecr.io/osmo"
+      --set "global.imagePullSecret="
+    )
+  fi
+  echo "${args[@]}"
+}
+
+info "Deploying osmo/service..."
+helm_args=($(build_helm_args service))
+helm_args+=(
+  -f "$service_values"
+  --set "services.postgres.serviceName=$pg_fqdn"
+  --set "services.postgres.user=$pg_user"
 )
-
-if [[ "${use_incluster_redis}" == "false" ]]; then
-  helm_service_args+=(
-    --set "services.redis.serviceName=${redis_hostname}"
-    --set "services.redis.port=${redis_port}"
-  )
-fi
-
-if [[ "${use_acr}" == "true" ]]; then
-  helm_service_args+=(
-    --set "global.osmoImageLocation=${acr_name}.azurecr.io/osmo"
-    --set "global.imagePullSecret="
-  )
-fi
-
-if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
-  helm_service_args+=(
-    -f "${service_identity_values}"
-    --set "serviceAccount.annotations.azure\.workload\.identity/client-id=${osmo_identity_client_id}"
-  )
-fi
-
-if [[ "${use_acr}" == "true" ]]; then
-  helm upgrade -i service "oci://${acr_name}.azurecr.io/helm/osmo" "${helm_service_args[@]}" --wait --timeout 10m
-else
-  helm upgrade -i service osmo/service "${helm_service_args[@]}" --wait --timeout 10m
-fi
-set +x
-
-echo "Deploying osmo/router chart..."
-set -x
-helm_router_args=(
-  --version "${chart_version}"
-  --namespace "${namespace}"
-  -f "${router_values}"
-  --set "services.postgres.serviceName=${pg_fqdn}"
-  --set "services.postgres.user=${pg_user}"
-  --set-string "global.osmoImageTag=${image_version}"
+[[ "$use_incluster_redis" == "false" ]] && helm_args+=(
+  --set "services.redis.serviceName=$redis_hostname"
+  --set "services.redis.port=$redis_port"
 )
-
-if [[ "${use_acr}" == "true" ]]; then
-  helm_router_args+=(
-    --set "global.osmoImageLocation=${acr_name}.azurecr.io/osmo"
-    --set "global.imagePullSecret="
+if [[ "$use_access_keys" == "false" ]]; then
+  helm_args+=(
+    -f "$service_identity_values"
+    --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id"
   )
 fi
 
-if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
-  helm_router_args+=(
-    -f "${router_identity_values}"
-    --set "serviceAccount.annotations.azure\.workload\.identity/client-id=${osmo_identity_client_id}"
-  )
-fi
-
-if [[ "${use_acr}" == "true" ]]; then
-  helm upgrade -i router "oci://${acr_name}.azurecr.io/helm/router" "${helm_router_args[@]}" --wait --timeout 5m
+if [[ "$use_acr" == "true" ]]; then
+  helm upgrade -i service "oci://${acr_name}.azurecr.io/helm/osmo" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 else
-  helm upgrade -i router osmo/router "${helm_router_args[@]}" --wait --timeout 5m
+  helm upgrade -i service osmo/service "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 fi
-set +x
 
-echo "Deploying osmo/web-ui chart..."
-set -x
-helm_ui_args=(
-  --version "${chart_version}"
-  --namespace "${namespace}"
-  -f "${ui_values}"
-  --set-string "global.osmoImageTag=${image_version}"
+info "Deploying osmo/router..."
+helm_args=($(build_helm_args router))
+helm_args+=(
+  -f "$router_values"
+  --set "services.postgres.serviceName=$pg_fqdn"
+  --set "services.postgres.user=$pg_user"
 )
-
-if [[ "${use_acr}" == "true" ]]; then
-  helm_ui_args+=(
-    --set "global.osmoImageLocation=${acr_name}.azurecr.io/osmo"
-    --set "global.imagePullSecret="
+if [[ "$use_access_keys" == "false" ]]; then
+  helm_args+=(
+    -f "$router_identity_values"
+    --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id"
   )
-  helm upgrade -i ui "oci://${acr_name}.azurecr.io/helm/ui" "${helm_ui_args[@]}" --wait --timeout 5m
-else
-  helm upgrade -i ui osmo/web-ui "${helm_ui_args[@]}" --wait --timeout 5m
 fi
-set +x
 
-# Configure service_base_url for UI URL generation
-if [[ "${skip_service_config}" == "false" ]]; then
-  echo
-  echo "============================"
-  echo "Configuring OSMO Service"
-  echo "============================"
+if [[ "$use_acr" == "true" ]]; then
+  helm upgrade -i router "oci://${acr_name}.azurecr.io/helm/router" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+else
+  helm upgrade -i router osmo/router "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+fi
 
-  echo "Waiting for osmo-service deployment to be available..."
-  kubectl wait --for=condition=available deployment/osmo-service -n "${namespace}" --timeout=120s
+info "Deploying osmo/web-ui..."
+helm_args=($(build_helm_args ui))
+helm_args+=(-f "$ui_values")
 
-  # Determine the service base URL from internal load balancer
-  service_base_url=""
-  internal_lb_ip=$(kubectl get svc azureml-ingress-nginx-internal-lb -n azureml \
-    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+if [[ "$use_acr" == "true" ]]; then
+  helm upgrade -i ui "oci://${acr_name}.azurecr.io/helm/ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+else
+  helm upgrade -i ui osmo/web-ui "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+fi
 
-  if [[ -n "${internal_lb_ip}" ]]; then
-    service_base_url="http://${internal_lb_ip}"
+if [[ "$skip_service_config" == "false" ]]; then
+  section "Configure OSMO Service"
+
+  kubectl wait --for=condition=available deployment/osmo-service -n "$NS_OSMO_CONTROL_PLANE" --timeout=120s
+
+  service_url=$(detect_service_url)
+  if [[ -n "$service_url" ]]; then
+    service_config_template="$CONFIG_DIR/service-config-example.json"
+    service_config_output="$CONFIG_DIR/out/service-config.json"
+
+    [[ -f "$service_config_template" ]] || fatal "Service config template not found: $service_config_template"
+    mkdir -p "$(dirname "$service_config_output")"
+
+    jq --arg url "$service_url" '.service_base_url = $url' "$service_config_template" > "$service_config_output"
+    info "Applying service configuration (service_base_url: $service_url)..."
+    osmo config update SERVICE --file "$service_config_output" --description "Set service base URL for UI"
   else
-    # Fallback to ClusterIP if internal LB not available
-    cluster_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml \
-      -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
-    if [[ -n "${cluster_ip}" && "${cluster_ip}" != "None" ]]; then
-      service_base_url="http://${cluster_ip}"
-    fi
-  fi
-
-  if [[ -n "${service_base_url}" ]]; then
-    if [[ ! -f "${service_config_template}" ]]; then
-      echo "Error: Service config template not found: ${service_config_template}" >&2
-      exit 1
-    fi
-
-    # Ensure output directory exists
-    mkdir -p "$(dirname "${service_config_output}")"
-
-    # Render service config using jq
-    echo "Rendering service configuration..."
-    jq --arg serviceBaseUrl "${service_base_url}" \
-      '.service_base_url = $serviceBaseUrl' \
-      "${service_config_template}" > "${service_config_output}"
-
-    echo "Applying service configuration via osmo CLI..."
-    echo "  service_base_url: ${service_base_url}"
-    osmo config update SERVICE --file "${service_config_output}" --description "Set service base URL for UI"
-    echo "Service configuration applied successfully."
-  else
-    echo "Warning: Could not determine service base URL from internal load balancer." >&2
-    echo "  The OSMO UI may show errors when viewing workflow logs/spec." >&2
-    echo "  Manually configure with: osmo config update SERVICE --file <config.json>" >&2
-  fi
-else
-  echo "Skipping service configuration (--skip-service-config specified)."
-fi
-
-echo
-echo "============================"
-echo "Deployment Verification"
-echo "============================"
-
-kubectl get pods -n "${namespace}" -o wide
-kubectl get svc -n "${namespace}"
-helm list -n "${namespace}"
-if kubectl get ingress -n "${namespace}" >/dev/null 2>&1; then
-  kubectl get ingress -n "${namespace}"
-else
-  echo "No ingress resources found in namespace ${namespace}"
-fi
-
-osmo_access_url=""
-internal_lb_ip=$(kubectl get svc azureml-ingress-nginx-internal-lb -n azureml -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
-if [[ -n "${internal_lb_ip}" ]]; then
-  osmo_access_url="http://${internal_lb_ip}"
-else
-  nginx_controller_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
-  if [[ -n "${nginx_controller_ip}" && "${nginx_controller_ip}" != "None" ]]; then
-    osmo_access_url="http://${nginx_controller_ip} (ClusterIP - internal only)"
+    warn "Could not determine service base URL - OSMO UI may show errors"
   fi
 fi
 
+section "Deployment Summary"
+print_kv "Namespace" "$NS_OSMO_CONTROL_PLANE"
+print_kv "Chart Version" "$chart_version"
+print_kv "Image Version" "$image_version"
+print_kv "Registry" "$([[ $use_acr == true ]] && echo "${acr_name}.azurecr.io" || echo 'nvcr.io/nvidia/osmo')"
+print_kv "PostgreSQL" "$pg_fqdn"
+print_kv "Redis" "$([[ $use_incluster_redis == true ]] && echo 'in-cluster' || echo "$redis_hostname:$redis_port")"
+print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
 echo
-echo "============================"
-echo "OSMO Control Plane Deployment Summary"
-echo "============================"
-echo "Namespace:        ${namespace}"
-echo "Helm Charts:      service, router, ui"
-echo "Chart Version:    ${chart_version}"
-echo "Image Version:    ${image_version}"
-if [[ "${use_acr}" == "true" ]]; then
-  echo "Image Registry:   ${acr_name}.azurecr.io/osmo"
-  echo "Chart Source:     oci://${acr_name}.azurecr.io/helm/{osmo,router,ui}"
-else
-  echo "Image Registry:   nvcr.io/nvidia/osmo"
-  echo "Chart Source:     osmo (NGC)"
-fi
-echo "PostgreSQL Host:  ${pg_fqdn}"
-if [[ "${use_incluster_redis}" == "true" ]]; then
-  echo "Redis Mode:       in-cluster (OSMO-managed Redis 7.x pod)"
-else
-  echo "Redis Host:       ${redis_hostname}:${redis_port}"
-fi
-if [[ "${use_incluster_redis}" == "true" ]]; then
-  echo "K8s Secrets:      ${postgres_secret_name}"
-elif [[ "${use_acr}" == "true" ]]; then
-  echo "K8s Secrets:      ${postgres_secret_name}, ${redis_secret_name}"
-else
-  echo "K8s Secrets:      nvcr-secret, ${postgres_secret_name}, ${redis_secret_name}"
-fi
-echo "Values Files:     ${values_dir}"
-echo "MEK ConfigMap:    ${mek_configmap_name}"
-echo "Auth Mode:        ${osmo_auth_mode}"
-if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
-  echo "Identity Client:  ${osmo_identity_client_id}"
-fi
-if [[ -n "${osmo_access_url}" ]]; then
-  echo "OSMO Access URL:  ${osmo_access_url}"
-fi
-if [[ "${skip_service_config}" == "false" && -f "${service_config_output}" ]]; then
-  echo "Service Config:   ${service_config_output}"
-fi
+kubectl get pods -n "$NS_OSMO_CONTROL_PLANE" --no-headers | head -5
 echo
-echo "Next Steps:"
-echo "  kubectl get pods -n ${namespace}"
-echo "  kubectl logs -n ${namespace} -l app=osmo-service --tail=50"
-echo "  kubectl get svc -n ${namespace}"
-if [[ -n "${osmo_access_url}" ]]; then
-  echo "  # Backend operator will use: ${osmo_access_url}"
-fi
-echo
-echo "Deployment completed successfully!"
+helm list -n "$NS_OSMO_CONTROL_PLANE"
+
+info "OSMO Control Plane deployment complete"

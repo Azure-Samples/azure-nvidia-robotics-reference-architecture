@@ -1,454 +1,181 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Configure OSMO workflow storage and workload identity
+set -o errexit -o nounset -o pipefail
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-terraform_dir="${script_dir}/../001-iac"
-container_name="osmo"
-auth_mode="login"
-config_preview=false
-template_file="${script_dir}/config/workflow-config-example.json"
-output_file="${script_dir}/config/out/workflow-config.json"
-skip_osmo_update=false
-access_key_id="osmo-control-plane-storage"
-use_acr=false
-acr_name=""
-acr_login_server_override=""
-ngc_token=""
-osmo_auth_mode="workload-identity"
-osmo_identity_client_id=""
-workflows_namespace="osmo-workflows"
-skip_workflow_sa=false
-pod_template_file="${script_dir}/config/pod-template-config-example.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=defaults.conf
+source "$SCRIPT_DIR/defaults.conf"
 
-help="Usage: 05-configure-osmo.sh [OPTIONS]
+CONFIG_DIR="$SCRIPT_DIR/config"
 
-Creates the blob container backing OSMO workflow data and configures
-workflow storage credentials. By default, NGC credentials are required
-for backend image pulls. Use --use-acr to pull images from Azure Container
-Registry instead, which removes the NGC token requirement.
+show_help() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
 
-When using workload identity mode, also creates the workflow ServiceAccount
-with the appropriate annotation and updates the POD_TEMPLATE config.
+Create blob container for OSMO workflow data and configure storage credentials.
 
 OPTIONS:
-  --terraform-dir PATH      Path to terraform deployment directory (default: ../001-iac)
-  --container-name NAME     Blob container name to ensure (default: osmo)
-  --auth-mode MODE          Authentication mode for az storage commands: login|key (default: login)
-  --template PATH           Workflow config template to render (default: ./config/workflow-config-example.json)
-  --output-file PATH        Output path for rendered workflow config (default: ./config/out/workflow-config.json)
-  --skip-osmo-update        Skip running 'osmo config update WORKFLOW' after rendering
-  --access-key-id VALUE     Override access key identifier in rendered config (default: osmo-control-plane-storage)
-  --use-acr                 Use ACR for backend images instead of NGC (auto-detects ACR from terraform)
-  --acr-name NAME           Specify ACR name explicitly (implies --use-acr)
-  --acr-login-server HOST   Override ACR login server if multiple are present
-  --ngc-token TOKEN         NGC API token for backend image pulls (required when not using --use-acr)
-  --osmo-auth-mode MODE     OSMO storage credential mode: key|workload-identity (default: workload-identity)
-  --osmo-identity-client-id Client ID of OSMO managed identity (default: from terraform osmo_workload_identity output)
-  --workflows-namespace NS  Kubernetes namespace for workflow pods (default: osmo-workflows)
-  --skip-workflow-sa        Skip creating workflow ServiceAccount (workload-identity mode only)
-  --pod-template-file PATH  Pod template config file (default: ./config/pod-template-config-example.json)
-  --config-preview          Print resolved configuration and exit
-  --help                    Show this help message
-"
+    -h, --help              Show this help message
+    -t, --tf-dir DIR        Terraform directory (default: $DEFAULT_TF_DIR)
+    --container-name NAME   Blob container name (default: osmo)
+    --use-acr               Use ACR for backend images (auto-detect from terraform)
+    --acr-name NAME         Specify ACR name explicitly
+    --ngc-token TOKEN       NGC API token (required when not using --use-acr)
+    --use-access-keys       Use storage access keys instead of workload identity
+    --skip-osmo-update      Skip running osmo config update
+    --skip-workflow-sa      Skip creating workflow ServiceAccount
+    --config-preview        Print configuration and exit
+
+EXAMPLES:
+    $(basename "$0") --use-acr
+    $(basename "$0") --ngc-token YOUR_TOKEN
+    $(basename "$0") --use-acr --use-access-keys
+EOF
+}
+
+tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
+container_name="osmo"
+use_acr=false
+acr_name=""
+ngc_token=""
+use_access_keys=false
+osmo_identity_client_id=""
+skip_osmo_update=false
+skip_workflow_sa=false
+config_preview=false
+output_file="$CONFIG_DIR/out/workflow-config.json"
+pod_template_file="$CONFIG_DIR/pod-template-config-example.json"
+access_key_id="osmo-control-plane-storage"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --terraform-dir)
-    terraform_dir="$2"
-    shift 2
-    ;;
-  --container-name)
-    container_name="$2"
-    shift 2
-    ;;
-  --auth-mode)
-    auth_mode="$2"
-    shift 2
-    ;;
-  --template)
-    template_file="$2"
-    shift 2
-    ;;
-  --output-file)
-    output_file="$2"
-    shift 2
-    ;;
-  --access-key-id)
-    access_key_id="$2"
-    shift 2
-    ;;
-  --use-acr)
-    use_acr=true
-    shift
-    ;;
-  --acr-name)
-    acr_name="$2"
-    use_acr=true
-    shift 2
-    ;;
-  --acr-login-server)
-    acr_login_server_override="$2"
-    shift 2
-    ;;
-  --ngc-token)
-    ngc_token="$2"
-    shift 2
-    ;;
-  --osmo-auth-mode)
-    osmo_auth_mode="$2"
-    shift 2
-    ;;
-  --osmo-identity-client-id)
-    osmo_identity_client_id="$2"
-    shift 2
-    ;;
-  --workflows-namespace)
-    workflows_namespace="$2"
-    shift 2
-    ;;
-  --skip-workflow-sa)
-    skip_workflow_sa=true
-    shift
-    ;;
-  --pod-template-file)
-    pod_template_file="$2"
-    shift 2
-    ;;
-  --skip-osmo-update)
-    skip_osmo_update=true
-    shift
-    ;;
-  --config-preview)
-    config_preview=true
-    shift
-    ;;
-  --help)
-    echo "$help"
-    exit 0
-    ;;
-  *)
-    echo "$help"
-    echo
-    echo "Unknown option: $1"
-    exit 1
-    ;;
+    -h|--help)            show_help; exit 0 ;;
+    -t|--tf-dir)          tf_dir="$2"; shift 2 ;;
+    --container-name)     container_name="$2"; shift 2 ;;
+    --use-acr)            use_acr=true; shift ;;
+    --acr-name)           acr_name="$2"; use_acr=true; shift 2 ;;
+    --ngc-token)          ngc_token="$2"; shift 2 ;;
+    --use-access-keys)    use_access_keys=true; shift ;;
+    --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
+    --skip-osmo-update)   skip_osmo_update=true; shift ;;
+    --skip-workflow-sa)   skip_workflow_sa=true; shift ;;
+    --config-preview)     config_preview=true; shift ;;
+    --output-file)        output_file="$2"; shift 2 ;;
+    *)                    fatal "Unknown option: $1" ;;
   esac
 done
 
-case "$auth_mode" in
-login|key) ;;
-*)
-  echo "Error: --auth-mode must be either 'login' or 'key'" >&2
-  exit 1
-  ;;
-esac
+[[ "$use_acr" == "false" && -z "$ngc_token" ]] && fatal "--ngc-token required when not using --use-acr"
 
-case "$osmo_auth_mode" in
-key|workload-identity) ;;
-*)
-  echo "Error: --osmo-auth-mode must be 'key' or 'workload-identity'" >&2
-  exit 1
-  ;;
-esac
+require_tools terraform az kubectl envsubst
 
-if [[ -z "$container_name" ]]; then
-  echo "Error: --container-name cannot be empty" >&2
-  exit 1
+az account show &>/dev/null || fatal "Azure CLI not logged in; run 'az login'"
+
+info "Reading terraform outputs from $tf_dir..."
+tf_output=$(read_terraform_outputs "$tf_dir")
+storage_name=$(tf_require "$tf_output" "storage_account.value.name" "Storage account name")
+rg=$(tf_require "$tf_output" "resource_group.value.name" "Resource group")
+location=$(tf_require "$tf_output" "resource_group.value.location" "Location")
+
+[[ "$use_acr" == "true" && -z "$acr_name" ]] && acr_name=$(detect_acr_name "$tf_output")
+
+if [[ "$use_access_keys" == "false" && -z "$osmo_identity_client_id" ]]; then
+  osmo_identity_client_id=$(detect_osmo_identity "$tf_output")
 fi
 
-required_tools=(terraform az jq kubectl envsubst)
-missing_tools=()
-for tool in "${required_tools[@]}"; do
-  if ! command -v "$tool" &>/dev/null; then
-    missing_tools+=("$tool")
-  fi
-done
-
-if [[ ${#missing_tools[@]} -gt 0 ]]; then
-  echo "Error: Missing required tools: ${missing_tools[*]}" >&2
-  exit 1
-fi
-
-if [[ ! -d "$terraform_dir" ]]; then
-  echo "Error: Terraform directory not found: $terraform_dir" >&2
-  exit 1
-fi
-
-if [[ ! -f "${terraform_dir}/terraform.tfstate" ]]; then
-  echo "Error: terraform.tfstate not found in $terraform_dir" >&2
-  exit 1
-fi
-
-if [[ ! -f "$template_file" ]]; then
-  echo "Error: Template not found: $template_file" >&2
-  exit 1
-fi
-
-if [[ -z "$access_key_id" ]]; then
-  echo "Error: --access-key-id cannot be empty" >&2
-  exit 1
-fi
-
-if ! az account show >/dev/null 2>&1; then
-  echo "Error: Azure CLI is not logged in; run 'az login'" >&2
-  exit 1
-fi
-
-if [[ "$use_acr" == "false" && -z "$ngc_token" ]]; then
-  echo "Error: --ngc-token is required when not using --use-acr" >&2
-  exit 1
-fi
-
-echo "Extracting terraform outputs from $terraform_dir..."
-if ! tf_output=$(cd "$terraform_dir" && terraform output -json); then
-  echo "Error: Unable to read terraform outputs" >&2
-  exit 1
-fi
-
-storage_account_name=$(echo "$tf_output" | jq -r '.storage_account.value.name // empty')
-storage_account_id=$(echo "$tf_output" | jq -r '.storage_account.value.id // empty')
-resource_group_name=$(echo "$tf_output" | jq -r '.resource_group.value.name // empty')
-location=$(echo "$tf_output" | jq -r '.resource_group.value.location // empty')
-
-if [[ "$use_acr" == "true" && -z "$acr_name" ]]; then
-  acr_name=$(echo "$tf_output" | jq -r '.container_registry.value.name // empty')
-  if [[ -z "$acr_name" ]]; then
-    echo "Error: --use-acr specified but container_registry output not found in terraform state" >&2
-    exit 1
-  fi
-fi
-
-if [[ "$osmo_auth_mode" == "workload-identity" && -z "$osmo_identity_client_id" ]]; then
-  osmo_identity_client_id=$(echo "$tf_output" | jq -r '.osmo_workload_identity.value.client_id // empty')
-  if [[ -z "$osmo_identity_client_id" ]]; then
-    echo "Error: --osmo-identity-client-id not provided and osmo_workload_identity output not found in terraform state" >&2
-    exit 1
-  fi
-fi
-
-if [[ -z "$storage_account_name" || -z "$storage_account_id" ]]; then
-  echo "Error: storage_account output not found or incomplete" >&2
-  exit 1
-fi
-
-if [[ -z "$resource_group_name" ]]; then
-  echo "Error: resource_group output not found" >&2
-  exit 1
-fi
-
-if [[ -z "$location" ]]; then
-  echo "Error: resource group location not available from terraform outputs" >&2
-  exit 1
-fi
-
-# Construct blob endpoint from storage account name (standard Azure blob URL format)
-account_fqdn="${storage_account_name}.blob.core.windows.net"
+# Compute endpoints
+account_fqdn="${storage_name}.blob.core.windows.net"
 workflow_base_url="https://${account_fqdn}:443/${container_name}"
-azure_container_base="azure://${storage_account_name}/${container_name}"
-workflow_data_endpoint="${azure_container_base}/workflows/data"
-workflow_log_endpoint="${azure_container_base}/workflows/logs"
-workflow_app_endpoint="${azure_container_base}/apps"
+azure_container="azure://${storage_name}/${container_name}"
+workflow_data="${azure_container}/workflows/data"
+workflow_log="${azure_container}/workflows/logs"
+workflow_app="${azure_container}/apps"
+acr_login_server="${acr_name}.azurecr.io"
 
-if [[ "$osmo_auth_mode" == "key" ]]; then
-  account_key=$(az storage account keys list \
-    --resource-group "$resource_group_name" \
-    --account-name "$storage_account_name" \
-    --query '[0].value' \
-    --output tsv)
-
-  if [[ -z "$account_key" ]]; then
-    echo "Error: Unable to retrieve storage account key" >&2
-    exit 1
-  fi
-else
-  account_key=""
+account_key=""
+if [[ "$use_access_keys" == "true" ]]; then
+  account_key=$(az storage account keys list --resource-group "$rg" --account-name "$storage_name" --query '[0].value' -o tsv)
+  [[ -z "$account_key" ]] && fatal "Unable to retrieve storage account key"
 fi
 
 if [[ "$config_preview" == "true" ]]; then
-  echo
-  echo "Configuration preview"
-  echo "---------------------"
-  printf 'script_dir=%s\n' "$script_dir"
-  printf 'terraform_dir=%s\n' "$terraform_dir"
-  printf 'container_name=%s\n' "$container_name"
-  printf 'auth_mode=%s\n' "$auth_mode"
-  printf 'storage_account_name=%s\n' "$storage_account_name"
-  printf 'resource_group_name=%s\n' "$resource_group_name"
-  printf 'account_fqdn=%s\n' "$account_fqdn"
-  printf 'location=%s\n' "$location"
-  printf 'workflow_base_url=%s\n' "$workflow_base_url"
-  printf 'azure_container_base=%s\n' "$azure_container_base"
-  printf 'workflow_data_endpoint=%s\n' "$workflow_data_endpoint"
-  printf 'workflow_log_endpoint=%s\n' "$workflow_log_endpoint"
-  printf 'workflow_app_endpoint=%s\n' "$workflow_app_endpoint"
-  printf 'account_key(sha1)=%s\n' "$(printf '%s' "$account_key" | shasum | awk '{print $1}')"
-  printf 'use_acr=%s\n' "$use_acr"
-  printf 'acr_name=%s\n' "$acr_name"
-  if [[ -n "$ngc_token" ]]; then
-    printf 'ngc_token(sha1)=%s\n' "$(printf '%s' "$ngc_token" | shasum | awk '{print $1}')"
-  else
-    printf 'ngc_token=(not set, using ACR)\n'
-  fi
-  printf 'template_file=%s\n' "$template_file"
-  printf 'output_file=%s\n' "$output_file"
-  printf 'osmo_auth_mode=%s\n' "$osmo_auth_mode"
-  printf 'osmo_identity_client_id=%s\n' "$osmo_identity_client_id"
-  printf 'workflows_namespace=%s\n' "$workflows_namespace"
-  printf 'skip_workflow_sa=%s\n' "$skip_workflow_sa"
-  printf 'pod_template_file=%s\n' "$pod_template_file"
+  section "Configuration Preview"
+  print_kv "Storage Account" "$storage_name"
+  print_kv "Container" "$container_name"
+  print_kv "Workflow Base URL" "$workflow_base_url"
+  print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'NGC')"
+  print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
   exit 0
 fi
 
-echo "Ensuring blob container '$container_name' exists in $storage_account_name..."
+section "Configure Blob Container"
 
-container_args=(--account-name "$storage_account_name" --name "$container_name")
-if [[ "$auth_mode" == "login" ]]; then
-  container_args+=(--auth-mode login)
+if az storage container show --account-name "$storage_name" --name "$container_name" --auth-mode login &>/dev/null; then
+  info "Container '$container_name' already exists"
 else
-  container_args+=(--account-key "$account_key")
+  info "Creating container '$container_name'..."
+  az storage container create --account-name "$storage_name" --name "$container_name" --auth-mode login --public-access off >/dev/null
 fi
 
-if az storage container show "${container_args[@]}" >/dev/null 2>&1; then
-  echo "Container '$container_name' already exists."
-else
-  echo "Creating container '$container_name'..."
-  az storage container create "${container_args[@]}" --public-access off >/dev/null
-  echo "Container '$container_name' created."
-fi
+section "Render Workflow Configuration"
 
-acr_login_server=""
-if [[ -n "$acr_login_server_override" ]]; then
-  acr_login_server="$acr_login_server_override"
-elif [[ -n "$acr_name" ]]; then
-  acr_login_server="${acr_name}.azurecr.io"
-else
-  mapfile -t acr_servers < <(az acr list \
-    --resource-group "$resource_group_name" \
-    --query '[].loginServer' \
-    --output tsv)
-  if [[ ${#acr_servers[@]} -eq 0 ]]; then
-    echo "Error: No Azure Container Registry instances found in resource group ${resource_group_name}" >&2
-    exit 1
-  fi
-  acr_login_server="${acr_servers[0]}"
-  if [[ ${#acr_servers[@]} -gt 1 ]]; then
-    echo "Warning: Multiple container registries detected; using ${acr_login_server}. Override with --acr-login-server if needed." >&2
-  fi
-fi
+# Select template based on auth mode and image source
+auth_mode="workload-identity"
+[[ "$use_access_keys" == "true" ]] && auth_mode="access-keys"
+image_source="ngc"
+[[ "$use_acr" == "true" ]] && image_source="acr"
+template_file="$CONFIG_DIR/workflow-config-${auth_mode}-${image_source}.template.json"
 
-# Render workflow configuration using jq with conditional transformations
-rendered_config=$(jq \
-  --arg accessKeyId "$access_key_id" \
-  --arg storageAccessKey "$account_key" \
-  --arg workflowBaseUrl "$workflow_base_url" \
-  --arg workflowDataEndpoint "$workflow_data_endpoint" \
-  --arg workflowLogEndpoint "$workflow_log_endpoint" \
-  --arg workflowAppEndpoint "$workflow_app_endpoint" \
-  --arg region "$location" \
-  --arg acr "$acr_login_server" \
-  --arg ngcToken "$ngc_token" \
-  --argjson useStorageKey "$([[ "$osmo_auth_mode" == "key" ]] && echo true || echo false)" \
-  --argjson useAcr "$([[ "$use_acr" == "true" ]] && echo true || echo false)" \
-  '
-  # Common credential settings for all storage endpoints
-  .workflow_data.credential.access_key_id = $accessKeyId
-  | .workflow_data.credential.endpoint = $workflowDataEndpoint
-  | .workflow_data.credential.region = $region
-  | .workflow_data.base_url = $workflowBaseUrl
-  | .workflow_log.credential.access_key_id = $accessKeyId
-  | .workflow_log.credential.endpoint = $workflowLogEndpoint
-  | .workflow_log.credential.region = $region
-  | .workflow_app.credential.access_key_id = $accessKeyId
-  | .workflow_app.credential.endpoint = $workflowAppEndpoint
-  | .workflow_app.credential.region = $region
-  | .credential_config.disable_registry_validation = ["ghcr.io", $acr]
+[[ -f "$template_file" ]] || fatal "Template not found: $template_file"
+info "Using template: $(basename "$template_file")"
 
-  # Storage access key: set if using key auth, delete if using workload identity
-  | if $useStorageKey then
-      .workflow_data.credential.access_key = $storageAccessKey
-      | .workflow_log.credential.access_key = $storageAccessKey
-      | .workflow_app.credential.access_key = $storageAccessKey
-    else
-      del(.workflow_data.credential.access_key)
-      | del(.workflow_log.credential.access_key)
-      | del(.workflow_app.credential.access_key)
-    end
+mkdir -p "$(dirname "$output_file")"
 
-  # Backend images: delete if using ACR, set NGC token otherwise
-  | if $useAcr then
-      del(.backend_images)
-    else
-      .backend_images.credential.auth = $ngcToken
-    end
-  ' "$template_file")
+# Export variables for envsubst
+export STORAGE_ACCESS_KEY_ID="$access_key_id"
+export STORAGE_ACCESS_KEY="$account_key"
+export WORKFLOW_BASE_URL="$workflow_base_url"
+export WORKFLOW_DATA_ENDPOINT="$workflow_data"
+export WORKFLOW_LOG_ENDPOINT="$workflow_log"
+export WORKFLOW_APP_ENDPOINT="$workflow_app"
+export AZURE_REGION="$location"
+export ACR_LOGIN_SERVER="$acr_login_server"
+export NGC_TOKEN="$ngc_token"
 
-if [[ -z "$rendered_config" ]]; then
-  echo "Error: Failed to render workflow configuration" >&2
-  exit 1
-fi
+envsubst < "$template_file" > "$output_file"
+info "Workflow config written to $output_file"
 
-output_dir=$(dirname "$output_file")
-mkdir -p "$output_dir"
-
-printf '%s\n' "$rendered_config" > "$output_file"
-
-echo
-printf 'Storage account: %s\n' "$storage_account_name"
-printf 'Resource group: %s\n' "$resource_group_name"
-printf 'Container name: %s\n' "$container_name"
-printf 'Azure container base: %s\n' "$azure_container_base"
-printf 'Workflow config: %s\n' "$output_file"
-printf 'ACR login server: %s\n' "$acr_login_server"
-printf 'Use ACR for backend images: %s\n' "$use_acr"
-printf 'OSMO auth mode: %s\n' "$osmo_auth_mode"
-if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
-  printf 'Identity client ID: %s\n' "$osmo_identity_client_id"
-fi
-
-echo "Workflow configuration rendered successfully."
-
-if [[ "$skip_osmo_update" == "true" ]]; then
-  echo "Skipping osmo config update (--skip-osmo-update specified)."
-else
-  if ! command -v osmo &>/dev/null; then
-    echo "Error: osmo CLI not found; install it with --skip-osmo-update to skip" >&2
-    exit 1
-  fi
-
-  echo "Applying workflow configuration via osmo CLI..."
+if [[ "$skip_osmo_update" == "false" ]]; then
+  require_tools osmo
+  info "Applying workflow configuration via osmo CLI..."
   osmo config update WORKFLOW --file "$output_file" --description "Workflow storage configuration"
-  echo "osmo workflow configuration updated."
 fi
 
-# Configure workload identity for workflow pods
-if [[ "$osmo_auth_mode" == "workload-identity" ]]; then
-  if [[ "$skip_workflow_sa" == "true" ]]; then
-    echo "Skipping workflow ServiceAccount creation (--skip-workflow-sa specified)."
-  else
-    echo "Configuring workload identity for workflow namespace..."
+if [[ "$use_access_keys" == "false" ]]; then
+  if [[ "$skip_workflow_sa" == "false" ]]; then
+    section "Configure Workload Identity"
 
-    if ! kubectl get namespace "$workflows_namespace" &>/dev/null; then
-      echo "Creating namespace '$workflows_namespace'..."
-      kubectl create namespace "$workflows_namespace"
-    fi
+    ensure_namespace "$NS_OSMO_WORKFLOWS"
 
-    echo "Creating workflow ServiceAccount with workload identity annotation..."
-    WORKFLOWS_NAMESPACE="$workflows_namespace" \
+    info "Creating workflow ServiceAccount..."
+    WORKFLOWS_NAMESPACE="$NS_OSMO_WORKFLOWS" \
     OSMO_IDENTITY_CLIENT_ID="$osmo_identity_client_id" \
-      envsubst < "${script_dir}/manifests/osmo-workflow-sa.yaml" | kubectl apply -f -
-
-    printf 'Workflows namespace: %s\n' "$workflows_namespace"
-    echo "Workflow ServiceAccount created."
+      envsubst < "$SCRIPT_DIR/manifests/osmo-workflow-sa.yaml" | kubectl apply -f -
   fi
 
-  if [[ "$skip_osmo_update" == "false" ]]; then
-    if [[ ! -f "$pod_template_file" ]]; then
-      echo "Error: Pod template file not found: $pod_template_file" >&2
-      exit 1
-    fi
-
-    echo "Applying POD_TEMPLATE configuration via osmo CLI..."
+  if [[ "$skip_osmo_update" == "false" && -f "$pod_template_file" ]]; then
+    info "Applying POD_TEMPLATE configuration..."
     osmo config update POD_TEMPLATE --file "$pod_template_file" --description "Pod template with workload identity"
-    echo "osmo POD_TEMPLATE configuration updated."
   fi
 fi
+
+section "Configuration Summary"
+print_kv "Storage Account" "$storage_name"
+print_kv "Container" "$container_name"
+print_kv "Workflow Config" "$output_file"
+print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'NGC')"
+print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
+
+info "OSMO workflow configuration complete"

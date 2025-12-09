@@ -1,226 +1,119 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Deploy NVIDIA GPU Operator and KAI Scheduler to AKS cluster
+set -o errexit -o nounset -o pipefail
 
-#######################################
-# Robotics Charts Deployment Script
-#
-# Installs NVIDIA GPU Operator and KAI Scheduler on AKS cluster.
-# Reads Terraform outputs for cluster connection.
-#
-# Usage:
-#   ./deploy-robotics-charts.sh [OPTIONS]
-#
-# Options:
-#   --terraform-dir PATH    Path to terraform directory (default: ../001-iac)
-#   --skip-gpu-operator     Skip NVIDIA GPU Operator installation
-#   --skip-kai-scheduler    Skip KAI Scheduler installation
-#   --help                  Show this help message
-#
-# Examples:
-#   # Deploy all robotics charts
-#   ./deploy-robotics-charts.sh
-#
-#   # Deploy with custom terraform directory
-#   ./deploy-robotics-charts.sh --terraform-dir /path/to/terraform
-#
-#   # Skip GPU Operator (already installed)
-#   ./deploy-robotics-charts.sh --skip-gpu-operator
-#######################################
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=defaults.conf
+source "$SCRIPT_DIR/defaults.conf"
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-terraform_dir="${script_dir}/../001-iac"
-values_dir="${script_dir}/values"
-manifests_dir="${script_dir}/manifests"
+VALUES_DIR="$SCRIPT_DIR/values"
+MANIFESTS_DIR="$SCRIPT_DIR/manifests"
 
-skip_gpu_operator=false
-skip_kai_scheduler=false
+show_help() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
 
-help="Usage: deploy-robotics-charts.sh [OPTIONS]
-
-Installs NVIDIA GPU Operator and KAI Scheduler on AKS cluster.
+Deploy NVIDIA GPU Operator and KAI Scheduler to an AKS cluster.
 
 OPTIONS:
-  --terraform-dir PATH    Path to terraform directory (default: ../001-iac)
-  --skip-gpu-operator     Skip NVIDIA GPU Operator installation
-  --skip-kai-scheduler    Skip KAI Scheduler installation
-  --help                  Show this help message
+    -h, --help               Show this help message
+    -t, --tf-dir DIR         Terraform directory (default: $DEFAULT_TF_DIR)
+    --gpu-version VERSION    GPU Operator version (default: $GPU_OPERATOR_VERSION)
+    --kai-version VERSION    KAI Scheduler version (default: $KAI_SCHEDULER_VERSION)
+    --skip-gpu-operator      Skip GPU Operator installation
+    --skip-kai-scheduler     Skip KAI Scheduler installation
 
 EXAMPLES:
-  # Deploy all robotics charts
-  ./deploy-robotics-charts.sh
+    $(basename "$0")
+    $(basename "$0") --tf-dir ../001-iac --gpu-version v24.9.1
+EOF
+}
 
-  # Deploy with custom terraform directory
-  ./deploy-robotics-charts.sh --terraform-dir /path/to/terraform
-"
+tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
+gpu_version="$GPU_OPERATOR_VERSION"
+kai_version="$KAI_SCHEDULER_VERSION"
+skip_gpu=false
+skip_kai=false
 
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --terraform-dir)
-      terraform_dir="$2"
-      shift 2
-      ;;
-    --skip-gpu-operator)
-      skip_gpu_operator=true
-      shift
-      ;;
-    --skip-kai-scheduler)
-      skip_kai_scheduler=true
-      shift
-      ;;
-    --help)
-      echo "${help}"
-      exit 0
-      ;;
-    *)
-      echo "${help}"
-      echo
-      echo "Unknown option: $1"
-      exit 1
-      ;;
+  case "$1" in
+    -h|--help)            show_help; exit 0 ;;
+    -t|--tf-dir)          tf_dir="$2"; shift 2 ;;
+    --gpu-version)        gpu_version="$2"; shift 2 ;;
+    --kai-version)        kai_version="$2"; shift 2 ;;
+    --skip-gpu-operator)  skip_gpu=true; shift ;;
+    --skip-kai-scheduler) skip_kai=true; shift ;;
+    *)                    fatal "Unknown option: $1" ;;
   esac
 done
 
-echo "Checking prerequisites..."
-required_tools=(terraform az kubectl helm jq)
-missing_tools=()
-for tool in "${required_tools[@]}"; do
-  if ! command -v "${tool}" &>/dev/null; then
-    missing_tools+=("${tool}")
-  fi
-done
+require_tools az terraform kubectl helm jq
 
-if [[ ${#missing_tools[@]} -gt 0 ]]; then
-  echo "Error: Missing required tools: ${missing_tools[*]}" >&2
-  exit 1
-fi
+info "Reading terraform outputs from $tf_dir..."
+tf_output=$(read_terraform_outputs "$tf_dir")
+cluster=$(tf_require "$tf_output" "aks_cluster.value.name" "AKS cluster name")
+rg=$(tf_require "$tf_output" "resource_group.value.name" "Resource group")
 
-if [[ ! -d "${terraform_dir}" ]]; then
-  echo "Error: Terraform directory not found: ${terraform_dir}" >&2
-  exit 1
-fi
+connect_aks "$rg" "$cluster"
 
-if [[ ! -f "${terraform_dir}/terraform.tfstate" ]]; then
-  echo "Error: terraform.tfstate not found in ${terraform_dir}" >&2
-  exit 1
-fi
+info "Preparing namespaces..."
+ensure_namespace "$NS_OSMO"
+kubectl create serviceaccount osmo-workload -n "$NS_OSMO" --dry-run=client -o yaml | kubectl apply -f -
 
-echo "Reading Terraform outputs from ${terraform_dir}..."
-if ! tf_output=$(cd "${terraform_dir}" && terraform output -json); then
-  echo "Error: Unable to read terraform outputs" >&2
-  exit 1
-fi
+if [[ "$skip_gpu" == "false" ]]; then
+  section "Installing GPU Operator $gpu_version"
 
-aks_name=$(echo "${tf_output}" | jq -r '.aks_cluster.value.name // empty')
-resource_group=$(echo "${tf_output}" | jq -r '.resource_group.value.name // empty')
+  helm repo add nvidia "$HELM_REPO_GPU_OPERATOR" 2>/dev/null || true
+  helm repo update >/dev/null
 
-if [[ -z "${aks_name}" ]] || [[ -z "${resource_group}" ]]; then
-  echo "Error: Could not read AKS cluster info from Terraform outputs" >&2
-  exit 1
-fi
-
-echo "  AKS Cluster: ${aks_name}"
-echo "  Resource Group: ${resource_group}"
-
-echo "Connecting to AKS cluster..."
-az aks get-credentials \
-  --resource-group "${resource_group}" \
-  --name "${aks_name}" \
-  --overwrite-existing
-kubectl cluster-info &>/dev/null
-
-echo "Creating osmo namespace..."
-kubectl create namespace osmo --dry-run=client -o yaml | kubectl apply -f -
-kubectl create serviceaccount osmo-workload -n osmo --dry-run=client -o yaml | kubectl apply -f -
-
-echo "Adding Helm repositories..."
-helm repo add nvidia https://helm.ngc.nvidia.com/nvidia 2>/dev/null || true
-helm repo update >/dev/null
-
-# ============================================================
-# Install GPU Operator
-# ============================================================
-
-if [[ "${skip_gpu_operator}" != "true" ]]; then
-  echo ""
-  echo "Installing NVIDIA GPU Operator..."
   helm upgrade --install gpu-operator nvidia/gpu-operator \
-    --namespace gpu-operator \
+    --namespace "$NS_GPU_OPERATOR" \
     --create-namespace \
-    --version 24.9.1 \
+    --version "${gpu_version#v}" \
     --disable-openapi-validation \
-    -f "${values_dir}/nvidia-gpu-operator.yaml" \
-    --wait \
-    --timeout 10m
+    -f "$VALUES_DIR/nvidia-gpu-operator.yaml" \
+    --wait --timeout "$TIMEOUT_DEPLOY"
 
-  # Configure metrics scraping based on available monitoring infrastructure
   if kubectl get crd podmonitors.monitoring.coreos.com &>/dev/null; then
-    echo "Applying GPU PodMonitor (Prometheus Operator detected)..."
-    kubectl apply -f "${manifests_dir}/gpu-podmonitor.yaml"
+    info "Applying GPU PodMonitor (Prometheus Operator detected)..."
+    kubectl apply -f "$MANIFESTS_DIR/gpu-podmonitor.yaml"
   elif kubectl get daemonset ama-metrics -n kube-system &>/dev/null; then
-    echo "Configuring Azure Monitor Prometheus to scrape DCGM metrics..."
-    kubectl apply -f "${manifests_dir}/ama-metrics-dcgm-scrape.yaml"
-    echo "  Metrics will be available in Azure Monitor Workspace after agent restart"
+    info "Configuring Azure Monitor Prometheus to scrape DCGM metrics..."
+    kubectl apply -f "$MANIFESTS_DIR/ama-metrics-dcgm-scrape.yaml"
   else
-    echo "No Prometheus scraping configured (neither Prometheus Operator nor Azure Monitor agent found)"
-    echo "  GPU metrics will still be available via direct pod access on port 9400"
+    warn "No Prometheus scraping configured - GPU metrics available via direct pod access on port 9400"
   fi
+
+  info "GPU Operator installed successfully"
 else
-  echo "Skipping GPU Operator installation (--skip-gpu-operator)"
+  info "Skipping GPU Operator (--skip-gpu-operator)"
 fi
 
-# ============================================================
-# Install KAI Scheduler
-# ============================================================
+if [[ "$skip_kai" == "false" ]]; then
+  section "Installing KAI Scheduler $kai_version"
 
-if [[ "${skip_kai_scheduler}" != "true" ]]; then
-  echo ""
-  echo "Installing KAI Scheduler..."
+  helm fetch oci://ghcr.io/nvidia/kai-scheduler/kai-scheduler --version "$kai_version"
+  trap 'rm -f kai-scheduler-*.tgz' EXIT
 
-  # Fetch from OCI registry
-  helm fetch oci://ghcr.io/nvidia/kai-scheduler/kai-scheduler --version v0.5.5
-
-  helm upgrade --install kai-scheduler kai-scheduler-v0.5.5.tgz \
-    --namespace kai-scheduler \
+  helm upgrade --install kai-scheduler "kai-scheduler-${kai_version}.tgz" \
+    --namespace "$NS_KAI_SCHEDULER" \
     --create-namespace \
-    --values "${values_dir}/kai-scheduler.yaml" \
-    --wait \
-    --timeout 5m
+    --values "$VALUES_DIR/kai-scheduler.yaml" \
+    --wait --timeout "$TIMEOUT_DEPLOY"
 
-  # Cleanup fetched chart
-  rm -f kai-scheduler-v0.5.5.tgz
+  info "KAI Scheduler installed successfully"
 else
-  echo "Skipping KAI Scheduler installation (--skip-kai-scheduler)"
+  info "Skipping KAI Scheduler (--skip-kai-scheduler)"
 fi
 
-# ============================================================
-# Summary
-# ============================================================
-
-echo ""
-echo "============================"
-echo "Deployment Verification"
-echo "============================"
-
-kubectl get pods -n gpu-operator -o wide 2>/dev/null || echo "(gpu-operator namespace not found)"
-kubectl get pods -n kai-scheduler -o wide 2>/dev/null || echo "(kai-scheduler namespace not found)"
-
-echo ""
-echo "============================"
-echo "Robotics Charts Deployment Summary"
-echo "============================"
-echo "AKS Cluster:       ${aks_name}"
-echo "Resource Group:    ${resource_group}"
-echo ""
-echo "Installed charts:"
+section "Deployment Summary"
+print_kv "Cluster" "$cluster"
+print_kv "Resource Group" "$rg"
+print_kv "GPU Operator" "$([[ $skip_gpu == true ]] && echo 'Skipped' || echo "$gpu_version")"
+print_kv "KAI Scheduler" "$([[ $skip_kai == true ]] && echo 'Skipped' || echo "$kai_version")"
+echo
 helm list -A | grep -E "gpu-operator|kai-scheduler" || true
-echo ""
-echo "Namespaces created:"
-echo "  - osmo (workload namespace)"
-echo "  - gpu-operator (GPU Operator)"
-echo "  - kai-scheduler (KAI Scheduler)"
-echo ""
-echo "Next Steps:"
-echo "  ./validate-gpu-metrics.sh    - Verify GPU metrics are available"
-echo "  kubectl get pods -n osmo     - Check workload namespace"
-echo ""
-echo "Deployment completed successfully!"
+
+info "Robotics charts deployment complete"
