@@ -46,7 +46,6 @@ skip_osmo_update=false
 skip_workflow_sa=false
 config_preview=false
 output_file="$CONFIG_DIR/out/workflow-config.json"
-pod_template_file="$CONFIG_DIR/pod-template-config-example.json"
 access_key_id="osmo-control-plane-storage"
 
 while [[ $# -gt 0 ]]; do
@@ -121,12 +120,12 @@ fi
 
 section "Render Workflow Configuration"
 
-# Select template based on auth mode and image source
+# Select template based on auth mode
 auth_mode="workload-identity"
 [[ "$use_access_keys" == "true" ]] && auth_mode="access-keys"
-image_source="ngc"
-[[ "$use_acr" == "true" ]] && image_source="acr"
-template_file="$CONFIG_DIR/workflow-config-${auth_mode}-${image_source}.template.json"
+template_file="$CONFIG_DIR/workflow-config-${auth_mode}.template.json"
+ngc_template_file="$CONFIG_DIR/workflow-backend-images-ngc.template.json"
+ngc_output_file="$CONFIG_DIR/out/workflow-backend-images.json"
 
 [[ -f "$template_file" ]] || fatal "Template not found: $template_file"
 info "Using template: $(basename "$template_file")"
@@ -149,26 +148,26 @@ info "Workflow config written to $output_file"
 
 if [[ "$skip_osmo_update" == "false" ]]; then
   require_tools osmo
-  info "Applying workflow configuration via osmo CLI..."
+  info "Applying workflow storage configuration..."
   osmo config update WORKFLOW --file "$output_file" --description "Workflow storage configuration"
+
+  # Apply NGC backend images config if not using ACR
+  if [[ "$use_acr" == "false" ]]; then
+    envsubst < "$ngc_template_file" > "$ngc_output_file"
+    info "Applying NGC backend images configuration..."
+    osmo config update WORKFLOW --file "$ngc_output_file" --description "NGC backend images"
+  fi
 fi
 
-if [[ "$use_access_keys" == "false" ]]; then
-  if [[ "$skip_workflow_sa" == "false" ]]; then
-    section "Configure Workload Identity"
+if [[ "$use_access_keys" == "false" && "$skip_workflow_sa" == "false" ]]; then
+  section "Configure Workload Identity"
 
-    ensure_namespace "$NS_OSMO_WORKFLOWS"
+  ensure_namespace "$NS_OSMO_WORKFLOWS"
 
-    info "Creating workflow ServiceAccount..."
-    WORKFLOWS_NAMESPACE="$NS_OSMO_WORKFLOWS" \
-    OSMO_IDENTITY_CLIENT_ID="$osmo_identity_client_id" \
-      envsubst < "$SCRIPT_DIR/manifests/osmo-workflow-sa.yaml" | kubectl apply -f -
-  fi
-
-  if [[ "$skip_osmo_update" == "false" && -f "$pod_template_file" ]]; then
-    info "Applying POD_TEMPLATE configuration..."
-    osmo config update POD_TEMPLATE --file "$pod_template_file" --description "Pod template with workload identity"
-  fi
+  info "Creating workflow ServiceAccount..."
+  WORKFLOWS_NAMESPACE="$NS_OSMO_WORKFLOWS" \
+  OSMO_IDENTITY_CLIENT_ID="$osmo_identity_client_id" \
+    envsubst < "$SCRIPT_DIR/manifests/osmo-workflow-sa.yaml" | kubectl apply -f -
 fi
 
 section "Configuration Summary"

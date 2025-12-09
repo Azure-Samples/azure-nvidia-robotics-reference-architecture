@@ -1,7 +1,7 @@
 {
   "name": "default",
-  "k8s_namespace": "osmo-workflows",
-  "router_address": "wss://osmo-service.osmo-control-plane.svc.cluster.local:80",
+  "k8s_namespace": "${K8S_NAMESPACE}",
+  "router_address": "wss://osmo-service.${CONTROL_PLANE_NAMESPACE}.svc.cluster.local:80",
   "node_conditions": {
     "prefix": "",
     "ignore_node_conditions": [],

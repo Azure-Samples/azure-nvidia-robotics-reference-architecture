@@ -123,20 +123,19 @@ fi
 # Config file paths
 values_file="$VALUES_DIR/osmo-backend-operator.yaml"
 identity_values="$VALUES_DIR/osmo-backend-operator-identity.yaml"
-scheduler_example="$CONFIG_DIR/scheduler-config-example.json"
-pod_template_example="$CONFIG_DIR/pod-template-config-example.json"
-default_pool_example="$CONFIG_DIR/default-pool-config-example.json"
+scheduler_template="$CONFIG_DIR/scheduler-config.template.json"
+pod_template_file="$CONFIG_DIR/pod-template-config.template.json"
+default_pool_template="$CONFIG_DIR/default-pool-config.template.json"
 pod_template_output="$CONFIG_DIR/out/pod-template-config.json"
 default_pool_output="$CONFIG_DIR/out/default-pool-config.json"
-scheduler_tmp="/tmp/scheduler_settings.json"
+scheduler_output="$CONFIG_DIR/out/scheduler-config.json"
 account_secret="osmo-operator-token"
 
-for f in "$values_file" "$scheduler_example" "$pod_template_example" "$default_pool_example"; do
+for f in "$values_file" "$scheduler_template" "$pod_template_file" "$default_pool_template"; do
   [[ -f "$f" ]] || fatal "Required file not found: $f"
 done
 
 mkdir -p "$CONFIG_DIR/out"
-trap 'rm -f "$scheduler_tmp"' EXIT
 
 section "Prepare Namespaces and Token"
 
@@ -169,11 +168,13 @@ fi
 
 section "Render Pool Configuration"
 
-cp "$pod_template_example" "$pod_template_output"
+export GPU_INSTANCE_TYPE
+export WORKFLOW_SERVICE_ACCOUNT
+envsubst < "$pod_template_file" > "$pod_template_output"
 
-jq --arg backend "$backend_name" --arg desc "$backend_description" '
-  .name = $backend | .backend = $backend | .description = $desc
-' "$default_pool_example" > "$default_pool_output"
+export BACKEND_NAME="$backend_name"
+export BACKEND_DESCRIPTION="$backend_description"
+envsubst < "$default_pool_template" > "$default_pool_output"
 
 section "Deploy Backend Operator"
 
@@ -222,13 +223,15 @@ fi
 
 section "Configure OSMO Backend"
 
-cp "$scheduler_example" "$scheduler_tmp"
+export K8S_NAMESPACE="$NS_OSMO_WORKFLOWS"
+export CONTROL_PLANE_NAMESPACE="$NS_OSMO_CONTROL_PLANE"
+envsubst < "$scheduler_template" > "$scheduler_output"
 
 info "Updating pod template configuration..."
 osmo config update POD_TEMPLATE --file "$pod_template_output" --description "Pod template configuration"
 
 info "Updating backend configuration..."
-osmo config update BACKEND "$backend_name" --file "$scheduler_tmp" --description "Backend $backend_name configuration"
+osmo config update BACKEND "$backend_name" --file "$scheduler_output" --description "Backend $backend_name configuration"
 
 info "Updating pool configuration..."
 osmo config update POOL "$backend_name" --file "$default_pool_output" --description "Pool $backend_name configuration"

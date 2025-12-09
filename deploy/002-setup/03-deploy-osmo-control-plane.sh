@@ -278,13 +278,14 @@ if [[ "$skip_service_config" == "false" ]]; then
 
   service_url=$(detect_service_url)
   if [[ -n "$service_url" ]]; then
-    service_config_template="$CONFIG_DIR/service-config-example.json"
+    service_config_template="$CONFIG_DIR/service-config.template.json"
     service_config_output="$CONFIG_DIR/out/service-config.json"
 
     [[ -f "$service_config_template" ]] || fatal "Service config template not found: $service_config_template"
     mkdir -p "$(dirname "$service_config_output")"
 
-    jq --arg url "$service_url" '.service_base_url = $url' "$service_config_template" > "$service_config_output"
+    export SERVICE_BASE_URL="$service_url"
+    envsubst < "$service_config_template" > "$service_config_output"
     info "Applying service configuration (service_base_url: $service_url)..."
     osmo config update SERVICE --file "$service_config_output" --description "Set service base URL for UI"
   else

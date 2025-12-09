@@ -15,7 +15,7 @@
                 }
             ],
             "nodeSelector": {
-                "node.kubernetes.io/instance-type": "Standard_NV36ads_A10_v5"
+                "node.kubernetes.io/instance-type": "${GPU_INSTANCE_TYPE}"
             }
         }
     },
@@ -26,7 +26,7 @@
             }
         },
         "spec": {
-            "serviceAccountName": "osmo-workflow"
+            "serviceAccountName": "${WORKFLOW_SERVICE_ACCOUNT}"
         }
     },
     "default_amd64": {

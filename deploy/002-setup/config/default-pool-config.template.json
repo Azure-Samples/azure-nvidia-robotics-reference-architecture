@@ -1,6 +1,6 @@
 {
-    "name": "__BACKEND_NAME__",
-    "backend": "__BACKEND_NAME__",
+    "name": "${BACKEND_NAME}",
+    "backend": "${BACKEND_NAME}",
     "default_platform": "a10_platform",
     "platforms": {
         "a10_platform": {
@@ -19,7 +19,7 @@
     "resources": {
         "gpu": null
     },
-    "description": "__BACKEND_DESCRIPTION__",
+    "description": "${BACKEND_DESCRIPTION}",
     "enable_maintenance": false,
     "common_pod_template": [
         "default_user",
