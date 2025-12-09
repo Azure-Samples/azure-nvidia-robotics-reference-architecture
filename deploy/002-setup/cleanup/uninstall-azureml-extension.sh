@@ -1,400 +1,223 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Uninstall AzureML extension from AKS cluster and clean up resources
+set -o errexit -o nounset -o pipefail
 
-#######################################
-# AzureML Extension Uninstall Script
-#
-# Removes Azure Machine Learning extension from AKS cluster,
-# detaches the compute target from the workspace, and cleans up
-# federated identity credentials.
-#
-# Usage:
-#   ./uninstall-azureml-extension.sh [OPTIONS]
-#
-# Options:
-#   --terraform-dir PATH      Path to terraform directory (default: ../../001-iac)
-#   --extension-name NAME     Extension name (default: azureml-<cluster_name>)
-#   --compute-name NAME       Compute target name (default: k8s-<cluster_suffix>)
-#   --skip-compute-detach     Skip detaching compute target
-#   --skip-fic-delete         Skip deleting federated identity credentials
-#   --skip-k8s-cleanup        Skip cleaning up K8s resources
-#   --force                   Force deletion of extension
-#   --help                    Show this help message
-#
-# Examples:
-#   # Uninstall with defaults
-#   ./uninstall-azureml-extension.sh
-#
-#   # Uninstall with custom terraform directory
-#   ./uninstall-azureml-extension.sh --terraform-dir /path/to/terraform
-#
-#   # Force deletion when extension is stuck
-#   ./uninstall-azureml-extension.sh --force
-#######################################
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "$SCRIPT_DIR/../lib/common.sh"
+# shellcheck source=../defaults.conf
+source "$SCRIPT_DIR/../defaults.conf"
 
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-terraform_dir="${script_dir}/../../001-iac"
+show_help() {
+  cat << EOF
+Usage: $(basename "$0") [OPTIONS]
 
-extension_name=""
-compute_name=""
-skip_compute_detach="false"
-skip_fic_delete="false"
-skip_k8s_cleanup="false"
-force_delete="false"
-
-help="Usage: uninstall-azureml-extension.sh [OPTIONS]
-
-Removes Azure Machine Learning extension from AKS cluster,
-detaches the compute target, and cleans up federated identity credentials.
+Uninstall Azure Machine Learning extension from AKS cluster,
+detach compute target, and clean up federated identity credentials.
 
 OPTIONS:
-  --terraform-dir PATH      Path to terraform directory (default: ../../001-iac)
-  --extension-name NAME     Extension name (default: azureml-<cluster_name>)
-  --compute-name NAME       Compute target name (default: k8s-<cluster_suffix>)
-  --skip-compute-detach     Skip detaching compute target
-  --skip-fic-delete         Skip deleting federated identity credentials
-  --skip-k8s-cleanup        Skip cleaning up K8s resources
-  --force                   Force deletion of extension
-  --help                    Show this help message
+    -h, --help              Show this help message
+    -t, --tf-dir DIR        Terraform directory (default: $DEFAULT_TF_DIR)
+    --extension-name NAME   Extension name (default: azureml-<cluster>)
+    --compute-name NAME     Compute target name (default: k8s-<suffix>)
+    --skip-compute-detach   Skip detaching compute target
+    --skip-fic-delete       Skip deleting federated identity credentials
+    --skip-k8s-cleanup      Skip cleaning up K8s resources
+    --force                 Force deletion of extension
+    --config-preview        Print configuration and exit
 
 EXAMPLES:
-  # Uninstall with defaults
-  ./uninstall-azureml-extension.sh
+    $(basename "$0")
+    $(basename "$0") --force
+    $(basename "$0") --skip-k8s-cleanup
+EOF
+}
 
-  # Force deletion when extension is stuck
-  ./uninstall-azureml-extension.sh --force
-"
+# Defaults
+tf_dir="$SCRIPT_DIR/../$DEFAULT_TF_DIR"
+extension_name=""
+compute_name=""
+skip_compute_detach=false
+skip_fic_delete=false
+skip_k8s_cleanup=false
+force_delete=false
+config_preview=false
 
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --terraform-dir)
-      terraform_dir="$2"
-      shift 2
-      ;;
-    --extension-name)
-      extension_name="$2"
-      shift 2
-      ;;
-    --compute-name)
-      compute_name="$2"
-      shift 2
-      ;;
-    --skip-compute-detach)
-      skip_compute_detach="true"
-      shift
-      ;;
-    --skip-fic-delete)
-      skip_fic_delete="true"
-      shift
-      ;;
-    --skip-k8s-cleanup)
-      skip_k8s_cleanup="true"
-      shift
-      ;;
-    --force)
-      force_delete="true"
-      shift
-      ;;
-    --help)
-      echo "${help}"
-      exit 0
-      ;;
-    *)
-      echo "${help}"
-      echo
-      echo "Unknown option: $1"
-      exit 1
-      ;;
+  case "$1" in
+    -h|--help)            show_help; exit 0 ;;
+    -t|--tf-dir)          tf_dir="$2"; shift 2 ;;
+    --extension-name)     extension_name="$2"; shift 2 ;;
+    --compute-name)       compute_name="$2"; shift 2 ;;
+    --skip-compute-detach) skip_compute_detach=true; shift ;;
+    --skip-fic-delete)    skip_fic_delete=true; shift ;;
+    --skip-k8s-cleanup)   skip_k8s_cleanup=true; shift ;;
+    --force)              force_delete=true; shift ;;
+    --config-preview)     config_preview=true; shift ;;
+    *)                    fatal "Unknown option: $1" ;;
   esac
 done
 
-# ============================================================
-# Prerequisites Check
-# ============================================================
+require_tools az terraform kubectl jq
 
-echo "Checking prerequisites..."
-required_tools=(terraform az kubectl jq)
-missing_tools=()
-for tool in "${required_tools[@]}"; do
-  if ! command -v "${tool}" &>/dev/null; then
-    missing_tools+=("${tool}")
-  fi
-done
+#------------------------------------------------------------------------------
+# Gather Configuration
+#------------------------------------------------------------------------------
 
-if [[ ${#missing_tools[@]} -gt 0 ]]; then
-  echo "Error: Missing required tools: ${missing_tools[*]}" >&2
-  exit 1
+info "Reading terraform outputs from $tf_dir..."
+tf_output=$(read_terraform_outputs "$tf_dir")
+
+cluster=$(tf_require "$tf_output" "aks_cluster.value.name" "AKS cluster name")
+rg=$(tf_require "$tf_output" "resource_group.value.name" "Resource group")
+ml_workspace=$(tf_get "$tf_output" "azureml_workspace.value.name")
+ml_identity_id=$(tf_get "$tf_output" "ml_workload_identity.value.id")
+
+# Set defaults based on cluster name
+[[ -z "$extension_name" ]] && extension_name="azureml-$cluster"
+[[ -z "$compute_name" ]] && compute_name="k8s-${cluster#aks-}"
+[[ -n "$ml_identity_id" ]] && ml_identity_name="${ml_identity_id##*/}"
+
+if [[ "$config_preview" == "true" ]]; then
+  section "Configuration Preview"
+  print_kv "Cluster" "$cluster"
+  print_kv "Resource Group" "$rg"
+  print_kv "Extension Name" "$extension_name"
+  print_kv "Compute Name" "$compute_name"
+  print_kv "ML Workspace" "${ml_workspace:-<not configured>}"
+  print_kv "ML Identity" "${ml_identity_name:-<not configured>}"
+  print_kv "Force Delete" "$force_delete"
+  exit 0
 fi
 
-if [[ ! -d "${terraform_dir}" ]]; then
-  echo "Error: Terraform directory not found: ${terraform_dir}" >&2
-  exit 1
-fi
+#------------------------------------------------------------------------------
+# Connect to Cluster
+#------------------------------------------------------------------------------
+section "Connect to Cluster"
 
-if [[ ! -f "${terraform_dir}/terraform.tfstate" ]]; then
-  echo "Error: terraform.tfstate not found in ${terraform_dir}" >&2
-  exit 1
-fi
+connect_aks "$rg" "$cluster"
 
-# ============================================================
-# Read Terraform Outputs
-# ============================================================
+#------------------------------------------------------------------------------
+# Detach Compute Target
+#------------------------------------------------------------------------------
 
-echo "Reading Terraform outputs from ${terraform_dir}..."
-if ! tf_output=$(cd "${terraform_dir}" && terraform output -json); then
-  echo "Error: Unable to read terraform outputs" >&2
-  exit 1
-fi
+if [[ "$skip_compute_detach" == "false" ]]; then
+  section "Detach Compute Target"
 
-aks_name=$(echo "${tf_output}" | jq -r '.aks_cluster.value.name // empty')
-resource_group=$(echo "${tf_output}" | jq -r '.resource_group.value.name // empty')
-ml_workspace_name=$(echo "${tf_output}" | jq -r '.azureml_workspace.value.name // empty')
-ml_identity_id=$(echo "${tf_output}" | jq -r '.ml_workload_identity.value.id // empty')
-
-if [[ -z "${aks_name}" ]] || [[ -z "${resource_group}" ]]; then
-  echo "Error: Could not read AKS cluster info from Terraform outputs" >&2
-  exit 1
-fi
-
-# Set default names if not provided (must match install script logic)
-if [[ -z "${extension_name}" ]]; then
-  extension_name="azureml-${aks_name}"
-fi
-
-if [[ -z "${compute_name}" ]]; then
-  compute_suffix="${aks_name#aks-}"
-  compute_suffix="${compute_suffix:0:12}"
-  compute_name="k8s-${compute_suffix}"
-fi
-
-echo "  AKS Cluster:     ${aks_name}"
-echo "  Resource Group:  ${resource_group}"
-echo "  Extension Name:  ${extension_name}"
-echo "  Compute Name:    ${compute_name}"
-if [[ -n "${ml_workspace_name}" ]]; then
-  echo "  ML Workspace:    ${ml_workspace_name}"
-fi
-if [[ -n "${ml_identity_id}" ]]; then
-  echo "  ML Identity:     ${ml_identity_id}"
-fi
-
-# ============================================================
-# Connect to AKS Cluster
-# ============================================================
-
-echo "Connecting to AKS cluster..."
-az aks get-credentials \
-  --resource-group "${resource_group}" \
-  --name "${aks_name}" \
-  --overwrite-existing
-kubectl cluster-info &>/dev/null
-
-# ============================================================
-# Step 1: Detach Compute Target
-# ============================================================
-
-if [[ "${skip_compute_detach}" != "true" ]]; then
-  echo ""
-  echo "============================"
-  echo "Step 1: Detach Compute Target"
-  echo "============================"
-
-  if [[ -z "${ml_workspace_name}" ]]; then
-    echo "ML workspace not found in Terraform outputs, skipping compute detach..."
+  if [[ -z "$ml_workspace" ]]; then
+    info "ML workspace not found in terraform outputs, skipping..."
+  elif az ml compute show --name "$compute_name" -g "$rg" -w "$ml_workspace" &>/dev/null; then
+    info "Detaching compute target '$compute_name'..."
+    az ml compute detach --name "$compute_name" -g "$rg" -w "$ml_workspace" --yes
   else
-    existing_compute=$(az ml compute show \
-        --name "${compute_name}" \
-        --resource-group "${resource_group}" \
-        --workspace-name "${ml_workspace_name}" \
-        --query "name" -o tsv 2>/dev/null || true)
-
-    if [[ -n "${existing_compute}" ]]; then
-      echo "Detaching compute target '${compute_name}'..."
-      az ml compute detach \
-        --name "${compute_name}" \
-        --resource-group "${resource_group}" \
-        --workspace-name "${ml_workspace_name}" \
-        --yes
-      echo "Compute target detached."
-    else
-      echo "Compute target '${compute_name}' not found, skipping..."
-    fi
+    info "Compute target '$compute_name' not found, skipping..."
   fi
 else
-  echo ""
-  echo "Skipping compute detach (--skip-compute-detach)"
+  info "Skipping compute detach (--skip-compute-detach)"
 fi
 
-# ============================================================
-# Step 2: Delete Federated Identity Credentials
-# ============================================================
+#------------------------------------------------------------------------------
+# Delete Federated Identity Credentials
+#------------------------------------------------------------------------------
 
-if [[ "${skip_fic_delete}" != "true" ]]; then
-  echo ""
-  echo "============================"
-  echo "Step 2: Delete Federated Identity Credentials"
-  echo "============================"
+if [[ "$skip_fic_delete" == "false" ]]; then
+  section "Delete Federated Identity Credentials"
 
-  if [[ -z "${ml_identity_id}" ]]; then
-    echo "ML identity not found in Terraform outputs, skipping FIC deletion..."
+  if [[ -z "$ml_identity_id" ]]; then
+    info "ML identity not found in terraform outputs, skipping..."
   else
-    ml_identity_name="${ml_identity_id##*/}"
-    echo "Identity Name: ${ml_identity_name}"
-
     for fic_name in "aml-default-fic" "aml-training-fic"; do
-      existing_fic=$(az identity federated-credential show \
-          --identity-name "${ml_identity_name}" \
-          --resource-group "${resource_group}" \
-          --name "${fic_name}" \
-          --query "name" -o tsv 2>/dev/null || true)
-
-      if [[ -n "${existing_fic}" ]]; then
-        echo "Deleting federated credential '${fic_name}'..."
+      if az identity federated-credential show --identity-name "$ml_identity_name" \
+          --resource-group "$rg" --name "$fic_name" &>/dev/null; then
+        info "Deleting federated credential '$fic_name'..."
         az identity federated-credential delete \
-          --identity-name "${ml_identity_name}" \
-          --resource-group "${resource_group}" \
-          --name "${fic_name}" \
+          --identity-name "$ml_identity_name" \
+          --resource-group "$rg" \
+          --name "$fic_name" \
           --yes
       else
-        echo "Federated credential '${fic_name}' not found, skipping..."
+        info "Federated credential '$fic_name' not found, skipping..."
       fi
     done
-    echo "Federated identity credentials cleanup complete."
   fi
 else
-  echo ""
-  echo "Skipping FIC deletion (--skip-fic-delete)"
+  info "Skipping FIC deletion (--skip-fic-delete)"
 fi
 
-# ============================================================
-# Step 3: Delete AzureML Extension
-# ============================================================
+#------------------------------------------------------------------------------
+# Delete AzureML Extension
+#------------------------------------------------------------------------------
+section "Delete AzureML Extension"
 
-echo ""
-echo "============================"
-echo "Step 3: Delete AzureML Extension"
-echo "============================"
-
-existing_extension=$(az k8s-extension show \
-    --name "${extension_name}" \
-    --cluster-type managedClusters \
-    --cluster-name "${aks_name}" \
-    --resource-group "${resource_group}" \
-    --query "name" -o tsv 2>/dev/null || true)
-
-if [[ -n "${existing_extension}" ]]; then
-  echo "Deleting AzureML extension '${extension_name}'..."
-
-  delete_args=(
-    --name "${extension_name}"
-    --cluster-type managedClusters
-    --cluster-name "${aks_name}"
-    --resource-group "${resource_group}"
-    --yes
-  )
-
-  if [[ "${force_delete}" == "true" ]]; then
-    echo "Using --force flag for deletion..."
-    delete_args+=(--force)
-  fi
-
+if az k8s-extension show --name "$extension_name" --cluster-type managedClusters \
+    --cluster-name "$cluster" --resource-group "$rg" &>/dev/null; then
+  info "Deleting AzureML extension '$extension_name'..."
+  delete_args=(--name "$extension_name" --cluster-type managedClusters --cluster-name "$cluster" --resource-group "$rg" --yes)
+  [[ "$force_delete" == "true" ]] && delete_args+=(--force)
   az k8s-extension delete "${delete_args[@]}"
-  echo "Extension deletion initiated."
+  info "Extension deletion initiated"
 else
-  echo "Extension '${extension_name}' not found, skipping..."
+  info "Extension '$extension_name' not found, skipping..."
 fi
 
-# ============================================================
-# Step 4: Cleanup Kubernetes Resources
-# ============================================================
+#------------------------------------------------------------------------------
+# Cleanup Kubernetes Resources
+#------------------------------------------------------------------------------
 
-if [[ "${skip_k8s_cleanup}" != "true" ]]; then
-  echo ""
-  echo "============================"
-  echo "Step 4: Cleanup Kubernetes Resources"
-  echo "============================"
+if [[ "$skip_k8s_cleanup" == "false" ]]; then
+  section "Cleanup Kubernetes Resources"
 
-  echo "Waiting for extension deletion to propagate..."
+  info "Waiting for extension deletion to propagate..."
   sleep 30
 
-  # Delete InstanceType resources and CRD if they persist
   if kubectl get crd instancetypes.amlarc.azureml.com &>/dev/null; then
-    echo "Cleaning up InstanceType resources..."
+    info "Cleaning up InstanceType resources..."
     kubectl delete instancetype --all --ignore-not-found 2>/dev/null || true
-    echo "Cleaning up InstanceType CRD..."
     kubectl delete crd instancetypes.amlarc.azureml.com --ignore-not-found
-  else
-    echo "InstanceType CRD not found, skipping..."
   fi
 
-  # Delete azureml namespace if it persists
   if kubectl get namespace azureml &>/dev/null; then
-    echo "Cleaning up azureml namespace..."
+    info "Cleaning up azureml namespace..."
     kubectl delete namespace azureml --ignore-not-found --timeout=60s || true
-  else
-    echo "azureml namespace not found, skipping..."
   fi
-
-  echo "Kubernetes resource cleanup complete."
 else
-  echo ""
-  echo "Skipping K8s cleanup (--skip-k8s-cleanup)"
+  info "Skipping K8s cleanup (--skip-k8s-cleanup)"
 fi
 
-# ============================================================
+#------------------------------------------------------------------------------
 # Verification
-# ============================================================
+#------------------------------------------------------------------------------
+section "Verification"
 
-echo ""
-echo "============================"
-echo "Verification"
-echo "============================"
+remaining_extension=$(az k8s-extension show --name "$extension_name" --cluster-type managedClusters \
+    --cluster-name "$cluster" --resource-group "$rg" --query "name" -o tsv 2>/dev/null || true)
 
-echo ""
-echo "Checking extension status..."
-remaining_extension=$(az k8s-extension show \
-    --name "${extension_name}" \
-    --cluster-type managedClusters \
-    --cluster-name "${aks_name}" \
-    --resource-group "${resource_group}" \
-    --query "name" -o tsv 2>/dev/null || true)
-
-if [[ -n "${remaining_extension}" ]]; then
-  echo "  WARNING: Extension '${extension_name}' still exists (may be deleting)"
+if [[ -n "$remaining_extension" ]]; then
+  warn "Extension '$extension_name' still exists (may be deleting)"
 else
-  echo "  OK: Extension removed"
+  info "Extension removed"
 fi
 
-echo ""
-echo "Checking azureml namespace..."
 if kubectl get namespace azureml &>/dev/null; then
-  echo "  WARNING: azureml namespace still exists (may be terminating)"
+  warn "azureml namespace still exists (may be terminating)"
 else
-  echo "  OK: azureml namespace removed"
+  info "azureml namespace removed"
 fi
 
-echo ""
-echo "Checking InstanceType CRD..."
 if kubectl get crd instancetypes.amlarc.azureml.com &>/dev/null; then
-  echo "  WARNING: InstanceType CRD still exists"
+  warn "InstanceType CRD still exists"
 else
-  echo "  OK: InstanceType CRD removed"
+  info "InstanceType CRD removed"
 fi
 
-# ============================================================
+#------------------------------------------------------------------------------
 # Summary
-# ============================================================
+#------------------------------------------------------------------------------
+section "Uninstall Summary"
+print_kv "Cluster" "$cluster"
+print_kv "Resource Group" "$rg"
+print_kv "Extension" "$extension_name"
+print_kv "Compute" "$compute_name"
+echo
+info "To reinstall, run: ../02-deploy-azureml-extension.sh"
 
-echo ""
-echo "============================"
-echo "AzureML Extension Uninstall Summary"
-echo "============================"
-echo "AKS Cluster:      ${aks_name}"
-echo "Resource Group:   ${resource_group}"
-echo "Extension Name:   ${extension_name}"
-echo "Compute Target:   ${compute_name}"
-echo ""
-echo "To reinstall the AzureML extension, run:"
-echo "  ../02-deploy-azureml-extension.sh"
-echo ""
-echo "Uninstall completed."
+info "AzureML extension uninstall complete"

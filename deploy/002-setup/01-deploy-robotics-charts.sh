@@ -24,18 +24,22 @@ OPTIONS:
     --kai-version VERSION    KAI Scheduler version (default: $KAI_SCHEDULER_VERSION)
     --skip-gpu-operator      Skip GPU Operator installation
     --skip-kai-scheduler     Skip KAI Scheduler installation
+    --config-preview         Print configuration and exit
 
 EXAMPLES:
     $(basename "$0")
-    $(basename "$0") --tf-dir ../001-iac --gpu-version v24.9.1
+    $(basename "$0") --gpu-version v24.9.1 --kai-version 0.3.0
+    $(basename "$0") --skip-kai-scheduler
 EOF
 }
 
+# Defaults
 tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
 gpu_version="$GPU_OPERATOR_VERSION"
 kai_version="$KAI_SCHEDULER_VERSION"
 skip_gpu=false
 skip_kai=false
+config_preview=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,25 +49,58 @@ while [[ $# -gt 0 ]]; do
     --kai-version)        kai_version="$2"; shift 2 ;;
     --skip-gpu-operator)  skip_gpu=true; shift ;;
     --skip-kai-scheduler) skip_kai=true; shift ;;
+    --config-preview)     config_preview=true; shift ;;
     *)                    fatal "Unknown option: $1" ;;
   esac
 done
 
 require_tools az terraform kubectl helm jq
 
+#------------------------------------------------------------------------------
+# Gather Configuration
+#------------------------------------------------------------------------------
+
 info "Reading terraform outputs from $tf_dir..."
 tf_output=$(read_terraform_outputs "$tf_dir")
+
 cluster=$(tf_require "$tf_output" "aks_cluster.value.name" "AKS cluster name")
 rg=$(tf_require "$tf_output" "resource_group.value.name" "Resource group")
 
+if [[ "$config_preview" == "true" ]]; then
+  section "Configuration Preview"
+  print_kv "Cluster" "$cluster"
+  print_kv "Resource Group" "$rg"
+  print_kv "GPU Operator" "$([[ $skip_gpu == true ]] && echo 'Skipped' || echo "$gpu_version")"
+  print_kv "KAI Scheduler" "$([[ $skip_kai == true ]] && echo 'Skipped' || echo "$kai_version")"
+  exit 0
+fi
+
+#------------------------------------------------------------------------------
+# Validate Required Files
+#------------------------------------------------------------------------------
+
+gpu_values="$VALUES_DIR/nvidia-gpu-operator.yaml"
+kai_values="$VALUES_DIR/kai-scheduler.yaml"
+
+[[ "$skip_gpu" == "true" || -f "$gpu_values" ]] || fatal "GPU Operator values not found: $gpu_values"
+[[ "$skip_kai" == "true" || -f "$kai_values" ]] || fatal "KAI Scheduler values not found: $kai_values"
+
+#------------------------------------------------------------------------------
+# Connect and Prepare Cluster
+#------------------------------------------------------------------------------
+section "Connect and Prepare Cluster"
+
 connect_aks "$rg" "$cluster"
 
-info "Preparing namespaces..."
 ensure_namespace "$NS_OSMO"
 kubectl create serviceaccount osmo-workload -n "$NS_OSMO" --dry-run=client -o yaml | kubectl apply -f -
 
+#------------------------------------------------------------------------------
+# Install GPU Operator
+#------------------------------------------------------------------------------
+
 if [[ "$skip_gpu" == "false" ]]; then
-  section "Installing GPU Operator $gpu_version"
+  section "Install GPU Operator $gpu_version"
 
   helm repo add nvidia "$HELM_REPO_GPU_OPERATOR" 2>/dev/null || true
   helm repo update >/dev/null
@@ -73,9 +110,10 @@ if [[ "$skip_gpu" == "false" ]]; then
     --create-namespace \
     --version "${gpu_version#v}" \
     --disable-openapi-validation \
-    -f "$VALUES_DIR/nvidia-gpu-operator.yaml" \
+    -f "$gpu_values" \
     --wait --timeout "$TIMEOUT_DEPLOY"
 
+  # Configure metrics scraping based on available monitoring stack
   if kubectl get crd podmonitors.monitoring.coreos.com &>/dev/null; then
     info "Applying GPU PodMonitor (Prometheus Operator detected)..."
     kubectl apply -f "$MANIFESTS_DIR/gpu-podmonitor.yaml"
@@ -91,16 +129,18 @@ else
   info "Skipping GPU Operator (--skip-gpu-operator)"
 fi
 
+#------------------------------------------------------------------------------
+# Install KAI Scheduler
+#------------------------------------------------------------------------------
+
 if [[ "$skip_kai" == "false" ]]; then
-  section "Installing KAI Scheduler $kai_version"
+  section "Install KAI Scheduler $kai_version"
 
-  helm fetch oci://ghcr.io/nvidia/kai-scheduler/kai-scheduler --version "$kai_version"
-  trap 'rm -f kai-scheduler-*.tgz' EXIT
-
-  helm upgrade --install kai-scheduler "kai-scheduler-${kai_version}.tgz" \
+  helm upgrade --install kai-scheduler oci://ghcr.io/nvidia/kai-scheduler/kai-scheduler \
     --namespace "$NS_KAI_SCHEDULER" \
     --create-namespace \
-    --values "$VALUES_DIR/kai-scheduler.yaml" \
+    --version "$kai_version" \
+    -f "$kai_values" \
     --wait --timeout "$TIMEOUT_DEPLOY"
 
   info "KAI Scheduler installed successfully"
@@ -108,6 +148,9 @@ else
   info "Skipping KAI Scheduler (--skip-kai-scheduler)"
 fi
 
+#------------------------------------------------------------------------------
+# Summary
+#------------------------------------------------------------------------------
 section "Deployment Summary"
 print_kv "Cluster" "$cluster"
 print_kv "Resource Group" "$rg"
