@@ -20,7 +20,7 @@ workflows_namespace="osmo-workflows"
 skip_workflow_sa=false
 pod_template_file="${script_dir}/config/pod-template-config-example.json"
 
-help="Usage: configure-osmo-storage.sh [OPTIONS]
+help="Usage: 05-configure-osmo.sh [OPTIONS]
 
 Creates the blob container backing OSMO workflow data and configures
 workflow storage credentials. By default, NGC credentials are required

@@ -63,9 +63,9 @@ Parameters are passed as key=value pairs through the submission script:
 
 ## Prerequisites
 
-1. OSMO control plane deployed (`02-deploy-osmo-control-plane.sh`)
-2. OSMO backend operator installed (`03-deploy-osmo-backend.sh`)
-3. Storage configured for checkpoints (`04-configure-osmo-storage.sh`)
+1. OSMO control plane deployed (`03-deploy-osmo-control-plane.sh`)
+2. OSMO backend operator installed (`04-deploy-osmo-backend.sh`)
+3. Storage configured for checkpoints (`05-configure-osmo.sh`)
 4. OSMO CLI installed and authenticated
 
 ## Monitoring

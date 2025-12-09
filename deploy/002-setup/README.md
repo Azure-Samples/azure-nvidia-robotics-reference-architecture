@@ -26,16 +26,16 @@ Start: Infrastructure deployed via 001-iac?
             ▼
        Choose Platform:
             │
-            ├── AzureML ──► Run: ./02-install-azureml-extension.sh
+            ├── AzureML ──► Run: ./02-deploy-azureml-extension.sh
             │               └── Submit jobs via scripts/submit-azureml-*.sh
             │
-            └── OSMO ──► Run: ./02-deploy-osmo-control-plane.sh
+            └── OSMO ──► Run: ./03-deploy-osmo-control-plane.sh
                          │
                          ▼
-                    Run: ./03-deploy-osmo-backend.sh
+                    Run: ./04-deploy-osmo-backend.sh
                          │
                          ▼
-                    Run: ./04-configure-osmo-storage.sh
+                    Run: ./05-configure-osmo.sh
                          │
                          └── Submit jobs via scripts/submit-osmo-training.sh
 ```
@@ -45,10 +45,10 @@ Start: Infrastructure deployed via 001-iac?
 | # | Script | Purpose | Required |
 |---|--------|---------|----------|
 | 01 | `01-deploy-robotics-charts.sh` | GPU Operator, KAI Scheduler | Always |
-| 02a | `02-install-azureml-extension.sh` | AzureML K8s extension | AzureML path |
-| 02b | `02-deploy-osmo-control-plane.sh` | OSMO control plane | OSMO path |
-| 03 | `03-deploy-osmo-backend.sh` | OSMO backend operator | OSMO path |
-| 04 | `04-configure-osmo-storage.sh` | OSMO storage configuration | OSMO path |
+| 02 | `02-deploy-azureml-extension.sh` | AzureML K8s extension | AzureML path |
+| 03 | `03-deploy-osmo-control-plane.sh` | OSMO control plane | OSMO path |
+| 04 | `04-deploy-osmo-backend.sh` | OSMO backend operator | OSMO path |
+| 05 | `05-configure-osmo.sh` | OSMO storage and workflow configuration | OSMO path |
 
 ## Directory Structure
 
@@ -56,33 +56,41 @@ Start: Infrastructure deployed via 001-iac?
 002-setup/
 ├── README.md                          # This file
 ├── 01-deploy-robotics-charts.sh       # GPU Operator, KAI Scheduler
-├── 02-install-azureml-extension.sh    # AzureML path
-├── 02-deploy-osmo-control-plane.sh    # OSMO path
-├── 03-deploy-osmo-backend.sh          # OSMO backend
-├── 04-configure-osmo-storage.sh       # OSMO storage
-├── values/                            # Helm values files
-│   ├── nvidia-gpu-operator.yaml
-│   ├── kai-scheduler.yaml
-│   ├── volcano.yaml
-│   ├── osmo-control-plane.yaml
-│   ├── osmo-router.yaml
-│   ├── osmo-ui.yaml
-│   └── osmo-backend-operator.yaml
-├── manifests/                         # Kubernetes manifests
-│   ├── gpu-podmonitor.yaml
-│   ├── ama-metrics-dcgm-scrape.yaml
-│   ├── internal-lb-ingress.yaml
-│   └── gpu-instance-type.yaml
+├── 02-deploy-azureml-extension.sh     # AzureML path
+├── 03-deploy-osmo-control-plane.sh    # OSMO path
+├── 04-deploy-osmo-backend.sh          # OSMO backend
+├── 05-configure-osmo.sh               # OSMO storage and workflow config
+├── cleanup/                           # Uninstall scripts
+│   └── uninstall-azureml-extension.sh
 ├── config/                            # OSMO configuration templates
-│   ├── scheduler-config-example.json
-│   ├── pod-template-config-example.json
 │   ├── default-pool-config-example.json
-│   └── workflow-config-example.json
-└── optional/                          # Optional/utility scripts
-    ├── deploy-volcano-scheduler.sh
-    ├── uninstall-volcano-scheduler.sh
-    ├── uninstall-robotics-charts.sh
-    └── validate-gpu-metrics.sh
+│   ├── pod-template-config-example.json
+│   ├── scheduler-config-example.json
+│   ├── service-config-example.json
+│   ├── workflow-config-example.json
+│   └── out/                           # Generated config outputs
+├── manifests/                         # Kubernetes manifests
+│   ├── ama-metrics-dcgm-scrape.yaml
+│   ├── gpu-instance-type.yaml
+│   ├── gpu-podmonitor.yaml
+│   ├── internal-lb-ingress.yaml
+│   └── osmo-workflow-sa.yaml
+├── optional/                          # Optional/utility scripts
+│   ├── deploy-volcano-scheduler.sh
+│   ├── uninstall-robotics-charts.sh
+│   ├── uninstall-volcano-scheduler.sh
+│   └── validate-gpu-metrics.sh
+└── values/                            # Helm values files
+    ├── kai-scheduler.yaml
+    ├── nvidia-gpu-operator.yaml
+    ├── osmo-backend-operator.yaml
+    ├── osmo-backend-operator-identity.yaml
+    ├── osmo-control-plane.yaml
+    ├── osmo-control-plane-identity.yaml
+    ├── osmo-router.yaml
+    ├── osmo-router-identity.yaml
+    ├── osmo-ui.yaml
+    └── volcano.yaml
 ```
 
 ## Prerequisites
@@ -113,7 +121,7 @@ For Azure Machine Learning workloads:
 ./01-deploy-robotics-charts.sh
 
 # Step 2: Install AzureML extension
-./02-install-azureml-extension.sh
+./02-deploy-azureml-extension.sh
 
 # Submit training jobs
 ../scripts/submit-azureml-training.sh
@@ -128,13 +136,13 @@ For NVIDIA OSMO orchestrated workloads:
 ./01-deploy-robotics-charts.sh
 
 # Step 2: Deploy OSMO control plane
-./02-deploy-osmo-control-plane.sh
+./03-deploy-osmo-control-plane.sh
 
 # Step 3: Deploy backend operator
-./03-deploy-osmo-backend.sh
+./04-deploy-osmo-backend.sh
 
-# Step 4: Configure storage
-./04-configure-osmo-storage.sh
+# Step 4: Configure storage and workflows
+./05-configure-osmo.sh
 
 # Submit training workflows
 ../scripts/submit-osmo-training.sh
@@ -151,7 +159,7 @@ Override with `--service-url URL` if needed:
 
 ```bash
 # Use internal nginx controller directly
-./03-deploy-osmo-backend.sh --service-url http://azureml-ingress-nginx-controller.azureml.svc.cluster.local
+./04-deploy-osmo-backend.sh --service-url http://azureml-ingress-nginx-controller.azureml.svc.cluster.local
 ```
 
 > **Note**: The `azureml-fe` LoadBalancer is reserved for AzureML inference endpoints and should not be used for OSMO.
