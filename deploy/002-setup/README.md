@@ -1,4 +1,4 @@
-# 002-setup
+# Setup
 
 AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 
