@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install AzureML extension on AKS cluster and attach as compute target
-set -o errexit -o nounset -o pipefail
+set -o errexit -o nounset
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
