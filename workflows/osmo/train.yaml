@@ -34,6 +34,7 @@ workflow:
         CHECKPOINT_URI: "{{ checkpoint_uri }}"
         CHECKPOINT_MODE: "{{ checkpoint_mode }}"
         REGISTER_CHECKPOINT: "{{ register_checkpoint }}"
+        TRAINING_BACKEND: "{{ training_backend }}"
       files:
         - path: /tmp/entry.sh
           contents: |
@@ -99,4 +100,5 @@ default-values:
   checkpoint_uri: ""
   checkpoint_mode: "from-scratch"
   register_checkpoint: ""
+  training_backend: "skrl"
 
