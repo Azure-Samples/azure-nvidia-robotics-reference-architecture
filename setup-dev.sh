@@ -4,54 +4,115 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${SCRIPT_DIR}/.venv"
 
-echo "Setting up local development environment..."
+# shellcheck source=deploy/002-setup/lib/common.sh
+source "${SCRIPT_DIR}/deploy/002-setup/lib/common.sh"
 
-if command -v pyenv &> /dev/null; then
-    PYTHON_VERSION="$(cat "${SCRIPT_DIR}/.python-version")"
-    echo "Python version from .python-version: ${PYTHON_VERSION}"
-    echo "Installing Python ${PYTHON_VERSION} via pyenv..."
-    pyenv install -s "${PYTHON_VERSION}"
+# Preamble: Recommend devcontainer for easier setup
+echo
+echo "💡 RECOMMENDED: Use the Dev Container for the best experience."
+echo
+echo "The devcontainer includes all tools pre-configured:"
+echo "  • Azure CLI, Terraform, kubectl, helm, jq"
+echo "  • Python with all dependencies"
+echo "  • VS Code extensions for Terraform and Python"
+echo
+echo "To use:"
+echo "  VS Code    → Reopen in Container (F1 → Dev Containers: Reopen)"
+echo "  Codespaces → Open in Codespace from GitHub"
+echo
+echo "If this script fails, the devcontainer is your fallback."
+echo
+
+section "Tool Verification"
+
+require_tools az terraform kubectl helm jq
+info "All required tools found"
+
+if ! az account show &>/dev/null; then
+  warn "Not logged into Azure CLI"
+  echo "  To log in, run: az login"
+  echo "  (Azure login needed before running deploy scripts)"
+else
+  info "Azure CLI logged in: $(az account show --query name -o tsv)"
 fi
 
-echo "Using pyenv Python $(python --version)"
+if ! az extension show --name ml &>/dev/null 2>&1; then
+  info "Installing Azure ML CLI extension..."
+  az extension add --name ml --yes
+else
+  info "Azure ML CLI extension already installed"
+fi
+
+section "Python Environment Setup"
+
+PYTHON_VERSION="$(cat "${SCRIPT_DIR}/.python-version")"
+info "Target Python version: ${PYTHON_VERSION}"
+
+if command -v pyenv &>/dev/null; then
+  info "Installing Python ${PYTHON_VERSION} via pyenv..."
+  pyenv install -s "${PYTHON_VERSION}"
+  PYTHON_CMD="python"
+elif command -v python3 &>/dev/null; then
+  warn "pyenv not found, using system python3"
+  PYTHON_CMD="python3"
+else
+  fatal "Neither pyenv nor python3 found. Please install Python 3.11+"
+fi
+
+info "Using Python: $($PYTHON_CMD --version)"
 
 if [[ ! -d "${VENV_DIR}" ]]; then
-    echo "Creating virtual environment at ${VENV_DIR}..."
-    python -m venv "${VENV_DIR}"
+  info "Creating virtual environment at ${VENV_DIR}..."
+  $PYTHON_CMD -m venv "${VENV_DIR}"
 else
-    echo "Virtual environment already exists at ${VENV_DIR}"
+  info "Virtual environment already exists at ${VENV_DIR}"
 fi
 
-echo "Activating virtual environment..."
+info "Activating virtual environment..."
 source "${VENV_DIR}/bin/activate"
 
-echo "Upgrading pip..."
-pip install --upgrade pip
+info "Upgrading pip..."
+pip install --upgrade pip --quiet
 
-echo "Installing root dependencies..."
-pip install -r "${SCRIPT_DIR}/requirements.txt"
+info "Installing root dependencies..."
+if ! pip install -r "${SCRIPT_DIR}/requirements.txt" --quiet 2>/dev/null; then
+  warn "Some packages failed to install (expected on macOS for Linux-only packages)"
+fi
 
-echo "Installing training dependencies..."
-pip install -r "${SCRIPT_DIR}/src/training/requirements.txt"
+info "Installing training dependencies..."
+if ! pip install -r "${SCRIPT_DIR}/src/training/requirements.txt" --quiet 2>/dev/null; then
+  warn "Some training packages failed to install"
+fi
 
-echo ""
-echo "Setting up IsaacLab for local development..."
+section "IsaacLab Setup"
+
 ISAACLAB_DIR="${SCRIPT_DIR}/external/IsaacLab"
 
 if [[ -d "${ISAACLAB_DIR}" ]]; then
-    echo "IsaacLab already cloned at ${ISAACLAB_DIR}"
-    echo "To update, run: cd ${ISAACLAB_DIR} && git pull"
+  info "IsaacLab already cloned at ${ISAACLAB_DIR}"
+  info "To update, run: cd ${ISAACLAB_DIR} && git pull"
 else
-    echo "Cloning IsaacLab for intellisense/Pylance support..."
-    mkdir -p "${SCRIPT_DIR}/external"
-    git clone https://github.com/isaac-sim/IsaacLab.git "${ISAACLAB_DIR}"
-    echo "✓ IsaacLab cloned successfully"
+  info "Cloning IsaacLab for intellisense/Pylance support..."
+  mkdir -p "${SCRIPT_DIR}/external"
+  git clone https://github.com/isaac-sim/IsaacLab.git "${ISAACLAB_DIR}"
+  info "IsaacLab cloned successfully"
 fi
 
-echo ""
-echo "✓ Development environment setup complete!"
-echo ""
-echo "To activate the environment, run:"
+section "Setup Complete"
+
+echo
+echo "✅ Development environment setup complete!"
+echo
+warn "Run this command to activate the virtual environment:"
+echo
 echo "  source .venv/bin/activate"
-echo ""
-echo "Python path: ${VENV_DIR}/bin/python"
+echo
+echo "Next steps (after activating venv):"
+echo "  1. Run: source deploy/000-prerequisites/az-sub-init.sh"
+echo "  2. Configure: deploy/001-iac/terraform.tfvars"
+echo "  3. Deploy: cd deploy/001-iac && terraform init && terraform apply"
+echo
+echo "Documentation:"
+echo "  - README.md           - Quick start guide"
+echo "  - deploy/README.md    - Deployment overview"
+echo
