@@ -4,35 +4,58 @@ Production-ready framework for orchestrating robotics and AI workloads on [Azure
 
 ## 🚀 Features
 
-- **Infrastructure as Code** – [Terraform modules](deploy/001-iac/) for reproducible deployments
-- **Dual Orchestration** – [AzureML jobs](workflows/azureml/) and [NVIDIA OSMO workflows](workflows/osmo/) both available
-- **Workload Identity** – Key-less authentication via Azure AD federation ([setup](deploy/002-setup/README.md#scenario-2-workload-identity--ngc-production))
-- **Private Networking** – Azure services secured on a private VNet with [private endpoints](deploy/001-iac/variables.tf) and private links; optional [VPN gateway](deploy/001-iac/vpn/) for secure remote access; public access configurable when needed
-- **MLflow Integration** – Experiment tracking with Azure ML ([details](docs/mlflow-integration.md))
-- **GPU Scheduling** – [KAI Scheduler](deploy/002-setup/values/kai-scheduler.yaml) for efficient GPU utilization
-- **Auto-scaling** – Pay-per-use GPU compute on AKS Spot nodes
+| Capability | Description |
+|------------|-------------|
+| Infrastructure as Code | [Terraform modules](deploy/001-iac/) for reproducible Azure deployments |
+| Dual Orchestration | Submit jobs via [AzureML](workflows/azureml/) or [OSMO](workflows/osmo/) |
+| Workload Identity | Key-less auth via Azure AD ([setup guide](deploy/002-setup/README.md#scenario-2-workload-identity--ngc)) |
+| Private Networking | Services on private VNet with optional [VPN gateway](deploy/001-iac/vpn/) |
+| MLflow Integration | Experiment tracking with Azure ML ([details](docs/mlflow-integration.md)) |
+| GPU Scheduling | [KAI Scheduler](deploy/002-setup/values/kai-scheduler.yaml) for efficient utilization |
+| Auto-scaling | Pay-per-use GPU compute on AKS Spot nodes |
 
 ## 🏗️ Architecture
 
 The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA GPU Operator and KAI Scheduler. Training workloads can be submitted via OSMO workflows (control plane and backend operator) and AzureML jobs (ML extension). Both platforms share common infrastructure: Azure Storage for checkpoints and data, Key Vault for secrets, and Azure Container Registry for container images. OSMO additionally uses PostgreSQL for workflow state and Redis for caching.
 
-**Core Components**:
+**Azure Infrastructure** (deployed by [Terraform](deploy/001-iac/)):
 
-- **AKS Cluster** – Hosts GPU workloads with Spot node pools for cost optimization
-- **NVIDIA GPU Operator** – Manages GPU drivers and device plugins
-- **KAI Scheduler** – GPU-aware scheduling for training jobs
-- **AzureML Extension** – Enables Azure ML job submission to Kubernetes
-- **OSMO Control Plane** – Workflow orchestration (service, router, web-ui)
-- **OSMO Backend Operator** – Executes workflows on the cluster
+| Component | Purpose |
+|-----------|--------|
+| Virtual Network | Private networking with NAT Gateway and DNS Resolver |
+| Private Endpoints | Secure access to Azure services (7 endpoints, 11+ DNS zones) |
+| AKS Cluster | Kubernetes with GPU Spot node pools and Workload Identity |
+| Key Vault | Secrets management with RBAC authorization |
+| Azure ML Workspace | Experiment tracking, model registry, compute management |
+| Storage Account | Training data, checkpoints, and workflow artifacts |
+| Container Registry | Training and OSMO container images |
+| Azure Monitor | Log Analytics, Prometheus metrics, Managed Grafana |
+| PostgreSQL | OSMO workflow state persistence |
+| Redis | OSMO job queue and caching |
+| VPN Gateway ⚙️ | Point-to-Site and Site-to-Site connectivity |
+
+**Kubernetes Components** (deployed by [setup scripts](deploy/002-setup/)):
+
+| Component | Purpose |
+|-----------|--------|
+| NVIDIA GPU Operator | GPU drivers, device plugin, DCGM metrics exporter |
+| KAI Scheduler | GPU-aware scheduling with bin-packing |
+| AzureML Extension | ML training and inference job submission |
+| OSMO Control Plane | Workflow API, router, and web interface |
+| OSMO Backend Operator | Workflow execution on cluster |
+
+⚙️ = Optional component
 
 ## 🌍 Real World Examples
 
 OSMO orchestration on Azure enables production-scale robotics training across industries:
 
-- **Warehouse AMRs** – Train navigation policies with 1000+ parallel environments on auto-scaling GPU nodes, checkpoint to Azure Storage, track experiments in Azure ML
-- **Manufacturing Arms** – Develop manipulation strategies with physics-accurate simulation, leveraging pay-per-use GPU compute and global Azure regions
-- **Legged Robots** – Optimize locomotion policies with MLflow experiment tracking for sim-to-real transfer
-- **Collaborative Robots** – Create safe interaction policies with Azure Monitor logging for compliance auditing
+| Use Case | Training Scenario |
+|----------|-------------------|
+| Warehouse AMRs | Navigation policies with 1000+ parallel environments, checkpointing to Azure Storage |
+| Manufacturing Arms | Manipulation strategies with physics-accurate simulation on pay-per-use GPU |
+| Legged Robots | Locomotion optimization with MLflow tracking for sim-to-real transfer |
+| Collaborative Robots | Safe interaction policies with Azure Monitor logging for compliance |
 
 ## 📋 Prerequisites
 
@@ -63,18 +86,22 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 ### 1. Deploy Infrastructure
 
 ```bash
-# Login to Azure CLI (required for Terraform and cluster configuration)
-source deploy/000-prerequisites/az-sub-init.sh # --tenant <tenant-id>  (Optionally) Specify tenant
+# Set subscription for Terraform
+source deploy/000-prerequisites/az-sub-init.sh
 
 cd deploy/001-iac
-cp terraform.tfvars.example terraform.tfvars  # Edit with your values
-terraform init && terraform apply
 
-# Optional: Deploy VPN for secure access to private resources
-cd vpn
+# Create terraform.tfvars with your values
+cat > terraform.tfvars << 'EOF'
+environment     = "dev"
+resource_prefix = "robotst"       # Your prefix (3-8 chars)
+location        = "eastus2"   # Azure region with GPU quota
+EOF
+
 terraform init && terraform apply
-# Download VPN client config from Azure Portal > Virtual Network Gateway > Point-to-site configuration
 ```
+
+For optional VPN deployment and additional configuration, see [deploy/001-iac/README.md](deploy/001-iac/README.md).
 
 ### 2. Configure Cluster
 
@@ -173,9 +200,14 @@ See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
 
 ## 📖 Documentation
 
-- [002-setup README](deploy/002-setup/README.md) – Cluster setup and deployment scenarios
-- [Workflows README](workflows/README.md) – Job and workflow templates
-- [MLflow Integration](docs/mlflow-integration.md) – Experiment tracking setup
+| Guide | Description |
+|-------|-------------|
+| [Deploy Overview](deploy/README.md) | Deployment order and quick path |
+| [Infrastructure](deploy/001-iac/README.md) | Terraform configuration and modules |
+| [Cluster Setup](deploy/002-setup/README.md) | Scripts and deployment scenarios |
+| [Scripts](scripts/README.md) | Training and validation submission |
+| [Workflows](workflows/README.md) | Job and workflow templates |
+| [MLflow Integration](docs/mlflow-integration.md) | Experiment tracking setup |
 
 ## 🪪 License
 
