@@ -61,8 +61,9 @@ derive_model_name() {
 normalize_checkpoint_mode() {
   local mode="$1"
   [[ -z "$mode" ]] && { echo "from-scratch"; return; }
-  case "${mode,,}" in
-    from-scratch|warm-start|resume) echo "${mode,,}" ;;
+  lowered=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
+  case "$lowered" in
+    from-scratch|warm-start|resume) echo "$lowered" ;;
     fresh) echo "from-scratch" ;;
     *) fatal "Unsupported checkpoint mode: $mode" ;;
   esac
