@@ -213,9 +213,9 @@ if [[ "$skip_register" == "false" && -z "$register_checkpoint" ]]; then
   info "Auto-derived model name: $register_checkpoint"
 fi
 
-code_path="$REPO_ROOT/src/training"
-[[ -d "$code_path" ]] || fatal "Training source not found: $code_path"
-[[ -f "$code_path/.amlignore" ]] || warn "No .amlignore found; __pycache__ may be included in snapshot"
+code_path="$REPO_ROOT/src"
+[[ -d "$code_path/training" ]] || fatal "Training source not found: $code_path/training"
+[[ -f "$code_path/training/.amlignore" ]] || warn "No .amlignore found; __pycache__ may be included in snapshot"
 
 #------------------------------------------------------------------------------
 # Register Environment
@@ -288,7 +288,7 @@ fi
 
 [[ "$headless" == "true" ]] && cmd="$cmd --headless"
 
-az_args+=(--set "command=bash scripts/train.sh $cmd")
+az_args+=(--set "command=bash training/scripts/train.sh $cmd")
 
 # Input values
 az_args+=(

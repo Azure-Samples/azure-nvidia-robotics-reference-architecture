@@ -162,8 +162,8 @@ if [[ -z "$model_name" ]]; then
   info "Auto-derived model name: $model_name"
 fi
 
-code_path="$REPO_ROOT/src/training"
-[[ -d "$code_path" ]] || fatal "Training source not found: $code_path"
+code_path="$REPO_ROOT/src"
+[[ -d "$code_path/training" ]] || fatal "Training source not found: $code_path/training"
 [[ -f "$code_path/.amlignore" ]] || warn "No .amlignore found; __pycache__ may be included in snapshot"
 
 #------------------------------------------------------------------------------
@@ -246,7 +246,7 @@ cmd="$cmd --success-threshold \${{inputs.success_threshold}}"
 [[ "$headless" == "true" ]] && cmd="$cmd --headless"
 
 az_args+=(
-  --set "command=bash scripts/validate.sh $cmd"
+  --set "command=bash training/scripts/validate.sh $cmd"
   --set "inputs.task=${task:-auto}"
   --set "inputs.framework=${framework:-auto}"
   --set "inputs.success_threshold=${threshold:--1.0}"
