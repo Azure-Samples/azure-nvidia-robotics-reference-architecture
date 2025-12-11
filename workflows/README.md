@@ -21,7 +21,8 @@ workflows/
 │   └── validate.yaml   # Validation job specification
 └── osmo/               # NVIDIA OSMO workflow templates
     ├── README.md
-    └── train.yaml      # OSMO training workflow specification
+    ├── train.yaml      # OSMO training workflow specification
+    └── infer.yaml      # OSMO inference workflow specification
 ```
 
 ## Platform Comparison
@@ -56,6 +57,33 @@ Submit an OSMO training workflow:
 
 ```bash
 ./scripts/submit-osmo-training.sh
+```
+
+Submit an OSMO inference workflow:
+
+```bash
+./scripts/submit-osmo-inference.sh --checkpoint-uri "runs:/abc123/checkpoints/model_999.pt" --task Isaac-Ant-v0
+```
+
+Inference workflow options:
+
+```bash
+# ONNX-only inference with custom parameters
+./scripts/submit-osmo-inference.sh \
+    --checkpoint-uri "models:/my-model/1" \
+    --task Isaac-Velocity-Rough-Anymal-C-v0 \
+    --format onnx \
+    --num-envs 8 \
+    --max-steps 1000 \
+    --video-length 300
+
+# With explicit Azure context
+./scripts/submit-osmo-inference.sh \
+    --checkpoint-uri "runs:/abc123/checkpoints/model_999.pt" \
+    --task Isaac-Ant-v0 \
+    --azure-subscription-id "00000000-0000-0000-0000-000000000000" \
+    --azure-resource-group "rg-robotics" \
+    --azure-workspace-name "aml-robotics"
 ```
 
 ## Prerequisites

@@ -94,10 +94,76 @@ from isaaclab.envs import (
 )
 from isaaclab.utils.dict import print_dict
 
-from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
+# Handle different versions of isaaclab_rl
+try:
+    from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg as RslRlRunnerCfg
+except ImportError:
+    try:
+        from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg as RslRlRunnerCfg
+    except ImportError:
+        from isaaclab_rl.rsl_rl import RslRlPpoRunnerCfg as RslRlRunnerCfg
+
+from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
+from tensordict import TensorDict
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
+
+
+class RslRl3xCompatWrapper:
+    """Compatibility wrapper for RSL-RL 3.x TensorDict observation format.
+
+    RSL-RL 3.x expects observations to be a TensorDict with observation group keys.
+    Older Isaac Lab wrappers may return raw tensors or dicts. This wrapper ensures
+    get_observations() always returns a properly formatted TensorDict.
+    """
+
+    def __init__(self, env: RslRlVecEnvWrapper):
+        self._env = env
+        for attr in dir(env):
+            if not attr.startswith("_") and attr not in ("get_observations", "step", "reset"):
+                try:
+                    setattr(self, attr, getattr(env, attr))
+                except AttributeError:
+                    pass
+
+    def __getattr__(self, name: str):
+        return getattr(self._env, name)
+
+    def _ensure_tensordict(self, obs) -> TensorDict:
+        """Convert observations to TensorDict format expected by RSL-RL 3.x."""
+        if isinstance(obs, TensorDict):
+            return obs
+        if isinstance(obs, dict):
+            return TensorDict(obs, batch_size=[self._env.num_envs])
+        if isinstance(obs, torch.Tensor):
+            return TensorDict({"policy": obs}, batch_size=[self._env.num_envs])
+        if isinstance(obs, tuple):
+            obs_data = obs[0]
+            if isinstance(obs_data, dict):
+                return TensorDict(obs_data, batch_size=[self._env.num_envs])
+            return TensorDict({"policy": obs_data}, batch_size=[self._env.num_envs])
+        raise TypeError(f"Unsupported observation type: {type(obs)}")
+
+    def get_observations(self) -> TensorDict:
+        """Get observations in RSL-RL 3.x TensorDict format."""
+        obs = self._env.get_observations()
+        return self._ensure_tensordict(obs)
+
+    def step(self, actions: torch.Tensor):
+        """Step the environment and return observations as TensorDict."""
+        result = self._env.step(actions)
+        obs, rew, dones, extras = result
+        obs_td = self._ensure_tensordict(obs)
+        return obs_td, rew, dones, extras
+
+    def reset(self):
+        """Reset the environment and return observations as TensorDict."""
+        result = self._env.reset()
+        if isinstance(result, tuple):
+            obs, extras = result
+            return self._ensure_tensordict(obs), extras
+        return self._ensure_tensordict(result), {}
 
 
 class OnnxPolicy:
@@ -150,10 +216,10 @@ class OnnxPolicy:
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(
     env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
-    agent_cfg: RslRlBaseRunnerCfg,
+    agent_cfg: RslRlRunnerCfg,
 ):
     """Play with ONNX policy in Isaac Sim environment."""
-    agent_cfg: RslRlBaseRunnerCfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
+    agent_cfg: RslRlRunnerCfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
 
     env_cfg.seed = agent_cfg.seed
@@ -183,6 +249,7 @@ def main(
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+    env = RslRl3xCompatWrapper(env)
 
     policy = OnnxPolicy(onnx_path, device=env.unwrapped.device, use_gpu=args_cli.use_gpu)
 
