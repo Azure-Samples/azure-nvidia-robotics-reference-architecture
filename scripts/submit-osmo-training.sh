@@ -232,7 +232,14 @@ mkdir -p "$TMP_DIR"
 rm -f "$ARCHIVE_PATH" "$B64_PATH"
 
 pushd "$REPO_ROOT" >/dev/null
-if ! zip -qr "$ARCHIVE_PATH" src/training; then
+# Exclude __pycache__, .pyc files, and other build artifacts to reduce payload size
+if ! zip -qr "$ARCHIVE_PATH" src/training \
+  -x "**/__pycache__/*" \
+  -x "*.pyc" \
+  -x "*.pyo" \
+  -x "**/.pytest_cache/*" \
+  -x "**/.mypy_cache/*" \
+  -x "**/*.egg-info/*"; then
   echo "Failed to create training archive" >&2
   popd >/dev/null
   exit 1
