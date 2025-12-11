@@ -35,6 +35,7 @@ Options:
       --skip-register-checkpoint  Skip automatic model registration.
       --sleep-after-unpack VALUE  Provide a non-empty value to sleep post-unpack (ex. 7200 to sleep 2 hours).
   -s, --run-smoke-test    Enable the Azure connectivity smoke test before training.
+  -b, --backend BACKEND   Training backend: skrl (default), rsl_rl.
 
 Azure context overrides (resolved from Terraform outputs if not provided):
       --azure-subscription-id ID    Azure subscription ID
@@ -47,7 +48,7 @@ General:
 Environment overrides:
   TASK, NUM_ENVS, MAX_ITERATIONS, IMAGE, PAYLOAD_ROOT, RUN_AZURE_SMOKE_TEST
   CHECKPOINT_URI, CHECKPOINT_MODE, REGISTER_CHECKPOINT, SLEEP_AFTER_UNPACK
-  AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZUREML_WORKSPACE_NAME
+  TRAINING_BACKEND, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZUREML_WORKSPACE_NAME
 
 Additional arguments after -- are forwarded to osmo workflow submit.
 
@@ -84,6 +85,7 @@ CHECKPOINT_URI_VALUE=${CHECKPOINT_URI:-}
 CHECKPOINT_MODE_VALUE=${CHECKPOINT_MODE:-from-scratch}
 REGISTER_CHECKPOINT_VALUE=${REGISTER_CHECKPOINT:-}
 SLEEP_AFTER_UNPACK_VALUE=${SLEEP_AFTER_UNPACK:-}
+BACKEND_VALUE=${TRAINING_BACKEND:-skrl}
 
 # Three-tier value resolution: CLI > ENV > Terraform
 AZURE_SUBSCRIPTION_ID_VALUE="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
@@ -166,6 +168,10 @@ while [[ $# -gt 0 ]]; do
     -s|--run-smoke-test)
       RUN_AZURE_SMOKE_TEST_VALUE="1"
       shift
+      ;;
+    -b|--backend)
+      BACKEND_VALUE="$2"
+      shift 2
       ;;
     --sleep-after-unpack)
       SLEEP_AFTER_UNPACK_VALUE="$2"
@@ -263,6 +269,7 @@ submit_args=(
   "checkpoint_mode=$CHECKPOINT_MODE_VALUE"
   "register_checkpoint=$REGISTER_CHECKPOINT_VALUE"
   "sleep_after_unpack=$SLEEP_AFTER_UNPACK_VALUE"
+  "training_backend=$BACKEND_VALUE"
 )
 
 # Add Azure context from Terraform outputs
