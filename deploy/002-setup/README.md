@@ -27,7 +27,7 @@ az aks get-credentials --resource-group <rg> --name <aks>
 
 Three authentication and registry configurations are supported. Choose based on your security requirements.
 
-### Scenario 1: Access Keys + NGC (Development)
+### Scenario 1: Access Keys + NGC
 
 Simplest setup using storage account keys and NVIDIA NGC registry.
 
@@ -51,7 +51,7 @@ export NGC_API_KEY="your-ngc-token"
 ./04-deploy-osmo-backend.sh --ngc-token "$NGC_API_KEY" --use-access-keys
 ```
 
-### Scenario 2: Workload Identity + NGC (Production)
+### Scenario 2: Workload Identity + NGC
 
 Secure, key-less authentication via Azure Workload Identity.
 
@@ -129,7 +129,6 @@ cd ../002-setup
 | Storage Auth | Access Keys | Workload Identity | Workload Identity |
 | Registry | NGC | NGC | Private ACR |
 | NGC Token | Required | Required | Import only |
-| Security | Development | Production | Enterprise |
 | Air-Gap | ✗ | ✗ | ✓ |
 
 ## Scripts
