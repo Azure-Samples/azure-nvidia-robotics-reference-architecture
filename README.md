@@ -46,6 +46,9 @@ The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA
 
 ⚙️ = Optional component
 
+> [!NOTE]
+> Running both AzureML and OSMO on the same cluster? Create **separate GPU node pools** for each platform. AzureML uses [Volcano](https://volcano.sh/) while OSMO uses [KAI Scheduler](https://github.com/NVIDIA/KAI-Scheduler)—these schedulers don't share resource visibility. Without dedicated pools, jobs from one platform may fail when the other is using GPU resources. Configure node selectors and taints to isolate workloads.
+
 ## 🌍 Real World Examples
 
 OSMO orchestration on Azure enables production-scale robotics training across industries:
