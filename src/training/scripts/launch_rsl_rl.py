@@ -59,6 +59,18 @@ def _parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, list[st
         default=None,
         help="MLflow artifact URI for the checkpoint to materialize before training",
     )
+    parser.add_argument(
+        "--checkpoint-mode",
+        type=_optional_str,
+        default="from-scratch",
+        help="Checkpoint handling mode (fresh is treated as from-scratch)",
+    )
+    parser.add_argument(
+        "--register-checkpoint",
+        type=_optional_str,
+        default=None,
+        help="Register the final checkpoint as this Azure ML model name",
+    )
     args, remaining = parser.parse_known_args(argv)
     return args, list(remaining)
 

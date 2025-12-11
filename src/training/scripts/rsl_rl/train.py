@@ -133,6 +133,7 @@ if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
 import gymnasium as gym
 import statistics
 import torch
+from tensordict import TensorDict
 from typing import Any, Optional
 
 import omni
@@ -153,7 +154,7 @@ from isaaclab.envs import (
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.io import dump_yaml
 
-from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
+from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path
@@ -180,6 +181,66 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
+
+
+class RslRl3xCompatWrapper:
+    """Compatibility wrapper for RSL-RL 3.x TensorDict observation format.
+
+    RSL-RL 3.x expects observations to be a TensorDict with observation group keys.
+    Older Isaac Lab wrappers may return raw tensors or dicts. This wrapper ensures
+    get_observations() always returns a properly formatted TensorDict.
+    """
+
+    def __init__(self, env: RslRlVecEnvWrapper):
+        self._env = env
+        # Proxy all attributes to the underlying env
+        for attr in dir(env):
+            if not attr.startswith("_") and attr not in ("get_observations", "step", "reset"):
+                try:
+                    setattr(self, attr, getattr(env, attr))
+                except AttributeError:
+                    pass
+
+    def __getattr__(self, name: str):
+        return getattr(self._env, name)
+
+    def _ensure_tensordict(self, obs) -> TensorDict:
+        """Convert observations to TensorDict format expected by RSL-RL 3.x."""
+        if isinstance(obs, TensorDict):
+            return obs
+        if isinstance(obs, dict):
+            return TensorDict(obs, batch_size=[self._env.num_envs])
+        if isinstance(obs, torch.Tensor):
+            # Single tensor - wrap as 'policy' observation group
+            return TensorDict({"policy": obs}, batch_size=[self._env.num_envs])
+        if isinstance(obs, tuple):
+            # Tuple (obs_tensor, extras) from older wrappers
+            obs_data = obs[0]
+            if isinstance(obs_data, dict):
+                return TensorDict(obs_data, batch_size=[self._env.num_envs])
+            return TensorDict({"policy": obs_data}, batch_size=[self._env.num_envs])
+        raise TypeError(f"Unsupported observation type: {type(obs)}")
+
+    def get_observations(self) -> TensorDict:
+        """Get observations in RSL-RL 3.x TensorDict format."""
+        obs = self._env.get_observations()
+        return self._ensure_tensordict(obs)
+
+    def step(self, actions: torch.Tensor):
+        """Step the environment and return observations as TensorDict."""
+        result = self._env.step(actions)
+        # result is (obs, rew, dones, extras) - ensure obs is TensorDict
+        obs, rew, dones, extras = result
+        obs_td = self._ensure_tensordict(obs)
+        return obs_td, rew, dones, extras
+
+    def reset(self):
+        """Reset the environment and return observations as TensorDict."""
+        result = self._env.reset()
+        if isinstance(result, tuple):
+            obs, extras = result
+            return self._ensure_tensordict(obs), extras
+        return self._ensure_tensordict(result), {}
 
 
 def _is_primary_rank(args_cli: argparse.Namespace, app_launcher: AppLauncher) -> bool:
@@ -301,8 +362,20 @@ def _register_final_model(
     model_path: str,
     model_name: str,
     tags: dict[str, str],
+    properties: Optional[dict[str, str]] = None,
 ) -> bool:
-    """Register a trained model in Azure ML if dependencies are available."""
+    """Register a trained model in Azure ML if dependencies are available.
+
+    Args:
+        context: Azure ML context with client.
+        model_path: Path to model file or directory.
+        model_name: Name for registered model.
+        tags: Model tags (task, framework, etc.).
+        properties: Model properties (success_threshold, etc.).
+
+    Returns:
+        True if registration succeeded, False otherwise.
+    """
     if context is None:
         return False
 
@@ -319,6 +392,7 @@ def _register_final_model(
             type="custom_model",
             description="RSL-RL checkpoint registered via Azure ML",
             tags=tags,
+            properties=properties or {},
         )
         context.client.models.create_or_update(model)
         print(f"[INFO] Registered final model '{model_name}' with Azure ML")
@@ -479,7 +553,7 @@ def _create_enhanced_save(
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(
     env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
-    agent_cfg: RslRlBaseRunnerCfg,
+    agent_cfg: RslRlOnPolicyRunnerCfg,
 ):
     """Train with RSL-RL agent."""
     is_primary_process = _is_primary_rank(args_cli, app_launcher)
@@ -613,13 +687,25 @@ def main(
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+    # Apply RSL-RL 3.x compatibility wrapper to ensure TensorDict observations
+    env = RslRl3xCompatWrapper(env)
 
-    if agent_cfg.class_name == "OnPolicyRunner":
-        runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
-    elif agent_cfg.class_name == "DistillationRunner":
-        runner = DistillationRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+    # Convert config to dict and ensure RSL-RL 3.x required fields are present
+    agent_cfg_dict = agent_cfg.to_dict()
+    # RSL-RL 3.x requires 'obs_groups' with a 'policy' key mapping to observation group names
+    if "obs_groups" not in agent_cfg_dict or agent_cfg_dict["obs_groups"] is None:
+        agent_cfg_dict["obs_groups"] = {"policy": ["policy"]}
+    elif "policy" not in agent_cfg_dict["obs_groups"]:
+        agent_cfg_dict["obs_groups"]["policy"] = ["policy"]
+    # RSL-RL 3.x requires 'class_name' for runner selection
+    runner_class_name = agent_cfg_dict.get("class_name", "OnPolicyRunner")
+
+    if runner_class_name == "OnPolicyRunner":
+        runner = OnPolicyRunner(env, agent_cfg_dict, log_dir=log_dir, device=agent_cfg.device)
+    elif runner_class_name == "DistillationRunner":
+        runner = DistillationRunner(env, agent_cfg_dict, log_dir=log_dir, device=agent_cfg.device)
     else:
-        raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
+        raise ValueError(f"Unsupported runner class: {runner_class_name}")
     runner.add_git_repo_to_log(__file__)
     if resume_path:
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
@@ -702,8 +788,14 @@ def main(
                     model_name=f"rsl_rl_model_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
                     tags={
                         "task": args_cli.task or "",
+                        "framework": "rsl_rl",
+                        "algorithm": "PPO",
                         "experiment": agent_cfg.experiment_name,
                         "entrypoint": "scripts/rsl_rl/train.py",
+                        "validated": "false",
+                    },
+                    properties={
+                        "success_threshold": "0.7",
                     },
                 )
 

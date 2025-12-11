@@ -1,0 +1,137 @@
+# Global configuration shared across all OSMO services
+global:
+  osmoImageLocation: nvcr.io/nvidia/osmo
+  osmoImageTag: 6.0.0
+  imagePullSecret: nvcr-secret
+  serviceAccountName: osmo-control-plane
+
+  logs:
+    enabled: true
+    logLevel: DEBUG
+    k8sLogLevel: WARNING
+
+# Individual service configurations
+services:
+  # Configuration file service settings
+  configFile:
+    enabled: true
+
+  # PostgreSQL database configuration
+  postgres:
+    enabled: false  # Set to false if using external PostgreSQL
+
+    # Settings still in use internal to osmo
+    serviceName: "<replace-me>.postgres.database.azure.com"
+    db: "osmo"
+    user: "pgadmin"
+
+  # Redis cache configuration
+  # Azure Managed Redis provides Redis 7.4+ natively - fully compatible with OSMO
+  # Default: enabled=false uses Azure Managed Redis from terraform (recommended)
+  # Set enabled=true only for local testing without Azure Redis
+  redis:
+    enabled: false  # DEFAULT: Use Azure Managed Redis from terraform (Redis 7.4+)
+
+    # External Redis settings (configured automatically via helm --set from terraform outputs)
+    # serviceName: "<your-redis>.redis.azure.net"
+    # port: 10000
+
+  # Main API service configuration
+  service:
+    scaling:
+      minReplicas: 1
+      maxReplicas: 3
+
+    # Authentication configuration
+    auth:
+      enabled: false
+
+    # Ingress configuration
+    ingress:
+      prefix: /
+      ingressClass: azureml-nginx  # e.g. alb, nginx
+      sslEnabled: false  # Set to true if managing SSL at the ingress level
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+        nginx.ingress.kubernetes.io/proxy-buffers: "8 16k"
+        nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "32k"
+        nginx.ingress.kubernetes.io/large-client-header-buffers: "4 16k"
+
+    # Resource allocation - reduced for constrained system node pools
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        memory: "1Gi"
+
+  # Worker service configuration
+  worker:
+    scaling:
+      minReplicas: 1
+      maxReplicas: 3
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        memory: "800Mi"
+
+  # Logger service configuration
+  logger:
+    scaling:
+      minReplicas: 1
+      maxReplicas: 3
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        memory: "512Mi"
+
+  # Agent service configuration
+  agent:
+    scaling:
+      minReplicas: 1
+      maxReplicas: 1
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        memory: "256Mi"
+
+  # Delayed job monitor configuration
+  delayedJobMonitor:
+    replicas: 1
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        memory: "512Mi"
+
+# Sidecar container configurations
+sidecars:
+  # Global Envoy proxy configuration
+  envoy:
+    enabled: false
+
+    # OSMO auth service configuration
+    osmoauth:
+      enabled: false
+
+  logAgent:
+    enabled: false
+
+  # OpenTelemetry configuration (optional)
+  otel:
+    enabled: false
+
+  # Rate limiting configuration (optional)
+  rateLimit:
+    enabled: false
+    # Uncomment and configure if using rate limiting
+    # redis:
+    #   serviceName: <your-redis-host>
+    #   port: 6379

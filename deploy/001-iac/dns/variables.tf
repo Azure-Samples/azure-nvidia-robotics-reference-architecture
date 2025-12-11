@@ -1,3 +1,9 @@
+/**
+ * # DNS Deployment Variables
+ *
+ * Input variables for standalone OSMO private DNS zone deployment.
+ */
+
 /*
  * Core Variables - Required
  */

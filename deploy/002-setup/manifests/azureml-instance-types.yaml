@@ -1,0 +1,31 @@
+# AzureML GPU Instance Types for AKS
+# Applied after AzureML extension creates the InstanceType CRD
+apiVersion: amlarc.azureml.com/v1alpha1
+kind: InstanceType
+metadata:
+  name: defaultinstancetype
+spec:
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      cpu: "2"
+      memory: "8Gi"
+---
+apiVersion: amlarc.azureml.com/v1alpha1
+kind: InstanceType
+metadata:
+  name: gpuspot
+spec:
+  nodeSelector:
+    accelerator: nvidia
+    kubernetes.azure.com/scalesetpriority: spot
+  resources:
+    requests:
+      cpu: "4"
+      memory: "16Gi"
+    limits:
+      cpu: "8"
+      memory: "32Gi"
+      nvidia.com/gpu: 1

@@ -1,0 +1,48 @@
+{
+    "name": "${BACKEND_NAME}",
+    "backend": "${BACKEND_NAME}",
+    "default_platform": "a10_platform",
+    "platforms": {
+        "a10_platform": {
+            "description": "A10 GPU platform with spot instance support",
+            "host_network_allowed": false,
+            "privileged_allowed": true,
+            "default_variables": {},
+            "resource_validations": [],
+            "override_pod_template": [
+                "aks_a10",
+                "workload_identity"
+            ],
+            "allowed_mounts": []
+        }
+    },
+    "resources": {
+        "gpu": null
+    },
+    "description": "${BACKEND_DESCRIPTION}",
+    "enable_maintenance": false,
+    "common_pod_template": [
+        "default_user",
+        "default_ctrl"
+    ],
+    "default_exec_timeout": "",
+    "default_exit_actions": {},
+    "default_queue_timeout": "",
+    "common_default_variables": {
+        "USER_CPU": 1,
+        "USER_GPU": 0,
+        "USER_MEMORY": "1Gi",
+        "USER_STORAGE": "1Gi"
+    },
+    "common_resource_validations": [
+        "default_cpu",
+        "default_memory",
+        "default_storage"
+    ],
+    "action_permissions": {
+        "rsync": "POOL",
+        "cancel": "PRIVATE",
+        "execute": "POOL",
+        "portforward": "POOL"
+    }
+}

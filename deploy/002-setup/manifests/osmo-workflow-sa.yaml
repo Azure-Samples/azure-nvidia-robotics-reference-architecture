@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: osmo-workflow
+  namespace: ${WORKFLOWS_NAMESPACE}
+  annotations:
+    azure.workload.identity/client-id: "${OSMO_IDENTITY_CLIENT_ID}"

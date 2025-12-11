@@ -1,3 +1,10 @@
+/**
+ * # Robotics Blueprint Variables
+ *
+ * Input variables for robotics infrastructure deployment.
+ * Variables are organized by functional grouping with required variables first.
+ */
+
 /*
  * Core Variables - Required
  */
@@ -37,10 +44,22 @@ variable "should_create_resource_group" {
   default     = true
 }
 
-variable "should_use_current_user_key_vault_admin" {
+variable "should_add_current_user_key_vault_admin" {
   type        = bool
-  description = "Whether to give the current user the Key Vault Secrets Officer Role"
+  description = "Whether to add the current user as Key Vault Secrets Officer"
   default     = true
+}
+
+variable "should_add_current_user_storage_blob" {
+  type        = bool
+  description = "Whether to add the current user as Storage Blob Data Contributor"
+  default     = true
+}
+
+variable "should_enable_purge_protection" {
+  type        = bool
+  description = "Whether to enable purge protection on Key Vault. Set to false for dev/test to allow easy cleanup. WARNING: Once enabled, purge protection cannot be disabled"
+  default     = false
 }
 
 /*
@@ -52,8 +71,6 @@ variable "should_deploy_postgresql" {
   description = "Whether to deploy PostgreSQL Flexible Server component"
   default     = true
 }
-
-
 
 variable "postgresql_databases" {
   type = map(object({
@@ -67,12 +84,6 @@ variable "postgresql_databases" {
       charset   = "utf8"
     }
   }
-}
-
-variable "postgresql_delegated_subnet_id" {
-  type        = string
-  description = "Subnet ID with delegation to Microsoft.DBforPostgreSQL/flexibleServers. (Otherwise, created when should_create_networking is true)."
-  default     = null
 }
 
 variable "postgresql_subnet_address_prefixes" {
@@ -111,14 +122,14 @@ variable "should_deploy_redis" {
 
 variable "redis_sku_name" {
   type        = string
-  description = "SKU name for Azure Managed Redis cache"
+  description = "SKU name for Azure Managed Redis cache. Format: {Tier}_{Size} (e.g., Balanced_B10, Memory_M20, Compute_X10)"
   default     = "Balanced_B10"
 }
 
 variable "redis_clustering_policy" {
   type        = string
-  description = "Clustering policy for Redis cache (OSSCluster or EnterpriseCluster)"
-  default     = "OSSCluster"
+  description = "Clustering policy for Redis cache (OSSCluster or EnterpriseCluster). EnterpriseCluster recommended for clients that don't support Redis Cluster MOVED redirects"
+  default     = "EnterpriseCluster"
 
   validation {
     condition     = contains(["OSSCluster", "EnterpriseCluster"], var.redis_clustering_policy)
@@ -126,28 +137,26 @@ variable "redis_clustering_policy" {
   }
 }
 
-variable "redis_access_keys_authentication_enabled" {
-  type        = bool
-  description = "Whether to enable access key authentication for Redis. Set to true to use access keys"
-  default     = true
-}
-
-
-
 /*
- * Chart Installation Configuration - Optional
+ * OSMO Workload Identity Configuration
  */
 
-variable "should_install_robotics_charts" {
-  type        = bool
-  description = "Whether to install robotics charts (NVIDIA related)"
-  default     = true
-}
-
-variable "should_install_azureml_charts" {
-  type        = bool
-  description = "Whether to install AzureML charts"
-  default     = true
+variable "osmo_config" {
+  description = "OSMO configuration including workload identity settings"
+  type = object({
+    should_enable_identity   = bool
+    should_federate_identity = bool
+    control_plane_namespace  = string
+    operator_namespace       = string
+    workflows_namespace      = string
+  })
+  default = {
+    should_enable_identity   = true
+    should_federate_identity = true
+    control_plane_namespace  = "osmo-control-plane"
+    operator_namespace       = "osmo-operator"
+    workflows_namespace      = "osmo-workflows"
+  }
 }
 
 /*
@@ -160,43 +169,23 @@ variable "resource_group_name" {
   default     = null
 }
 
-variable "virtual_network_name" {
-  type        = string
-  description = "Existing or desired virtual network name (Otherwise 'vnet-{resource_prefix}-{environment}-{instance}')"
-  default     = null
-}
-
-variable "aks_cluster_name" {
-  type        = string
-  description = "Existing AKS cluster name for ML integration (Otherwise 'aks-{resource_prefix}-{environment}-{instance}')"
-  default     = null
-}
-
-variable "azureml_workspace_name" {
-  type        = string
-  description = "Existing or desired Azure ML workspace name (Otherwise 'mlw-{resource_prefix}-{environment}-{instance}')"
-  default     = null
-}
-
-variable "should_create_ml_workload_identity" {
-  type        = bool
-  description = "Whether to create user-assigned managed identity for AzureML workload federation"
-  default     = true
-}
-
 /*
  * Networking Configuration - Optional
  */
 
 variable "virtual_network_config" {
   type = object({
-    address_space         = string
-    subnet_address_prefix = string
+    address_space                  = string
+    subnet_address_prefix          = string
+    subnet_address_prefix_pe       = optional(string, "10.0.2.0/24")
+    subnet_address_prefix_resolver = optional(string, "10.0.9.0/28")
   })
-  description = "Configuration for the virtual network including address space and subnet prefix"
+  description = "Configuration for the virtual network including address space and subnet prefixes. PE subnet prefix is required when private endpoints are enabled. Resolver subnet enables DNS resolution for VPN clients and on-premises networks"
   default = {
-    address_space         = "10.0.0.0/16"
-    subnet_address_prefix = "10.0.1.0/24"
+    address_space                  = "10.0.0.0/16"
+    subnet_address_prefix          = "10.0.1.0/24"
+    subnet_address_prefix_pe       = "10.0.2.0/24"
+    subnet_address_prefix_resolver = "10.0.9.0/28"
   }
   validation {
     condition     = can(cidrhost(var.virtual_network_config.address_space, 0)) && can(cidrhost(var.virtual_network_config.subnet_address_prefix, 0))
@@ -229,7 +218,7 @@ variable "node_vm_size" {
 variable "node_count" {
   type        = number
   description = "Number of nodes for the agent pool in the AKS cluster"
-  default     = 2
+  default     = 1
 }
 
 variable "enable_auto_scaling" {
@@ -256,33 +245,31 @@ variable "max_count" {
 
 variable "node_pools" {
   type = map(object({
-    node_count                  = optional(number, null)
-    vm_size                     = string
-    subnet_address_prefixes     = list(string)
-    pod_subnet_address_prefixes = list(string)
-    node_taints                 = optional(list(string), [])
-    enable_auto_scaling         = optional(bool, false)
-    min_count                   = optional(number, null)
-    max_count                   = optional(number, null)
-    priority                    = optional(string, "Regular")
-    zones                       = optional(list(string), null)
-    eviction_policy             = optional(string, "Deallocate")
-    gpu_driver                  = optional(string, null)
+    node_count              = optional(number, null)
+    vm_size                 = string
+    subnet_address_prefixes = list(string)
+    node_taints             = optional(list(string), [])
+    enable_auto_scaling     = optional(bool, false)
+    min_count               = optional(number, null)
+    max_count               = optional(number, null)
+    priority                = optional(string, "Regular")
+    zones                   = optional(list(string), null)
+    eviction_policy         = optional(string, "Deallocate")
+    gpu_driver              = optional(string, null)
   }))
-  description = "Additional node pools for the AKS cluster. Map key is used as the node pool name"
+  description = "Additional node pools for the AKS cluster. Map key is used as the node pool name. Note: Pod subnets are not used with Azure CNI Overlay mode"
   default = {
     gpu = {
-      vm_size                     = "Standard_NV36ads_A10_v5"
-      subnet_address_prefixes     = ["10.0.7.0/24"]
-      pod_subnet_address_prefixes = ["10.0.8.0/24"]
-      node_taints                 = ["nvidia.com/gpu:NoSchedule", "kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
-      gpu_driver                  = "Install"
-      priority                    = "Spot"
-      enable_auto_scaling         = true
-      min_count                   = 0
-      max_count                   = 0
-      zones                       = []
-      eviction_policy             = "Delete"
+      vm_size                 = "Standard_NV36ads_A10_v5"
+      subnet_address_prefixes = ["10.0.7.0/24"]
+      node_taints             = ["nvidia.com/gpu:NoSchedule", "kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
+      gpu_driver              = "Install"
+      priority                = "Spot"
+      enable_auto_scaling     = true
+      min_count               = 1
+      max_count               = 1
+      zones                   = []
+      eviction_policy         = "Delete"
     }
   }
 }
@@ -349,9 +336,8 @@ variable "cluster_integration_instance_types" {
           "nvidia.com/gpu" = 1
         }
         requests = {
-          cpu              = "1"
-          memory           = "1Gi"
-          "nvidia.com/gpu" = 1
+          cpu    = "1"
+          memory = "1Gi"
         }
       }
     }
@@ -359,20 +345,10 @@ variable "cluster_integration_instance_types" {
 }
 
 /*
- * Edge Deployment Configuration - Optional
- */
-
-variable "should_deploy_edge_extension" {
-  type        = bool
-  description = "Whether to deploy Azure ML edge extension on a connected cluster"
-  default     = false
-}
-
-/*
  * Private Endpoints Configuration - Optional
  */
 
-variable "should_enable_private_endpoints" {
+variable "should_enable_private_endpoint" {
   type        = bool
   description = "Whether to enable private endpoints across resources for secure connectivity"
   default     = true
@@ -389,121 +365,6 @@ variable "should_enable_public_network_access" {
 }
 
 /*
- * Outbound Access Configuration - Optional
- */
-
-variable "should_enable_managed_outbound_access" {
-  type        = bool
-  description = "Whether to enable managed outbound egress via NAT gateway instead of platform default internet access"
-  default     = true
-}
-
-/*
- * VPN Gateway Configuration - Optional
- */
-
-variable "should_enable_vpn_gateway" {
-  type        = bool
-  description = "Whether to create VPN Gateway for remote access"
-  default     = true
-}
-
-variable "vpn_site_connections" {
-  type = list(object({
-    name                 = string
-    address_spaces       = list(string)
-    shared_key_reference = string
-    gateway_ip_address   = optional(string)
-    gateway_fqdn         = optional(string)
-    bgp_asn              = optional(number)
-    bgp_peering_address  = optional(string)
-    ike_protocol         = optional(string, "IKEv2")
-  }))
-  description = "Site-to-site VPN site definitions for connecting on-premises networks"
-  default     = []
-}
-
-variable "vpn_site_default_ipsec_policy" {
-  type = object({
-    dh_group            = string
-    ike_encryption      = string
-    ike_integrity       = string
-    ipsec_encryption    = string
-    ipsec_integrity     = string
-    pfs_group           = string
-    sa_datasize_kb      = optional(number)
-    sa_lifetime_seconds = optional(number)
-  })
-  description = "Fallback IPsec policy applied when vpn_site_connections omit ipsec_policy overrides"
-  default     = null
-}
-
-variable "vpn_site_shared_keys" {
-  type        = map(string)
-  description = "Pre-shared keys for site-to-site VPN connections indexed by connection name"
-  sensitive   = true
-  default     = {}
-}
-
-/*
- * VM Host Configuration - Optional
- */
-
-variable "should_create_vm_host" {
-  type        = bool
-  description = "Whether to create VM host for GPU workloads and testing"
-  default     = false
-}
-
-variable "vm_host_count" {
-  type        = number
-  description = "Number of VM hosts to create"
-  default     = 1
-}
-
-variable "vm_sku_size" {
-  type        = string
-  description = "VM SKU size for the host"
-  default     = "Standard_D8s_v3"
-}
-
-variable "vm_priority" {
-  type        = string
-  description = "VM priority: Regular or Spot for cost optimization"
-  default     = "Regular"
-}
-
-variable "vm_eviction_policy" {
-  type        = string
-  description = "Eviction policy for Spot VMs: Deallocate or Delete"
-  default     = "Deallocate"
-}
-
-variable "vm_max_bid_price" {
-  type        = number
-  description = "Maximum hourly price for Spot VM (-1 for Azure default)"
-  default     = -1
-}
-
-variable "should_assign_current_user_vm_admin" {
-  type        = bool
-  description = "Whether to assign current user VM admin role for Azure AD login"
-  default     = true
-}
-
-variable "should_use_vm_password_auth" {
-  type        = bool
-  description = "Whether to use password authentication for VM access"
-  default     = false
-}
-
-variable "should_create_vm_ssh_key" {
-  type        = bool
-  description = "Whether to generate SSH key pair for VM access"
-  default     = true
-}
-
-/*
  * Inference Router Configuration - Optional
  */
 
@@ -516,6 +377,3 @@ variable "inference_router_service_type" {
     error_message = "inference_router_service_type must be one of: LoadBalancer, NodePort, or ClusterIP."
   }
 }
-
-
-
