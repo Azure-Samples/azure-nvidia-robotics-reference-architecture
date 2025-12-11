@@ -87,7 +87,7 @@
 	},
 
 	"onCreateCommand": {
-		// "pip": "pip install -r requirements.txt",
+		"setup-dev": "./setup-dev.sh --disable-venv",
 		"apt": "sudo apt update && sudo apt install -y shellcheck jq unzip",
 		"tflint": "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash",
 		"update-bashrc": "echo 'export PATH=\"${containerWorkspaceFolder}/scripts:$PATH\"' | sudo tee -a  ~/.bashrc",

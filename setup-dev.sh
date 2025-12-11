@@ -3,6 +3,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${SCRIPT_DIR}/.venv"
+DISABLE_VENV=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --disable-venv)
+      DISABLE_VENV=true
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
 # shellcheck source=deploy/002-setup/lib/common.sh
 source "${SCRIPT_DIR}/deploy/002-setup/lib/common.sh"
@@ -28,21 +42,6 @@ section "Tool Verification"
 require_tools az terraform kubectl helm jq
 info "All required tools found"
 
-if ! az account show &>/dev/null; then
-  warn "Not logged into Azure CLI"
-  echo "  To log in, run: az login"
-  echo "  (Azure login needed before running deploy scripts)"
-else
-  info "Azure CLI logged in: $(az account show --query name -o tsv)"
-fi
-
-if ! az extension show --name ml &>/dev/null 2>&1; then
-  info "Installing Azure ML CLI extension..."
-  az extension add --name ml --yes
-else
-  info "Azure ML CLI extension already installed"
-fi
-
 section "Python Environment Setup"
 
 PYTHON_VERSION="$(cat "${SCRIPT_DIR}/.python-version")"
@@ -61,15 +60,18 @@ fi
 
 info "Using Python: $($PYTHON_CMD --version)"
 
-if [[ ! -d "${VENV_DIR}" ]]; then
-  info "Creating virtual environment at ${VENV_DIR}..."
-  $PYTHON_CMD -m venv "${VENV_DIR}"
+if [[ "${DISABLE_VENV}" == "true" ]]; then
+  info "Virtual environment disabled, installing packages directly..."
 else
-  info "Virtual environment already exists at ${VENV_DIR}"
+  if [[ ! -d "${VENV_DIR}" ]]; then
+    info "Creating virtual environment at ${VENV_DIR}..."
+    $PYTHON_CMD -m venv "${VENV_DIR}"
+  else
+    info "Virtual environment already exists at ${VENV_DIR}"
+  fi
+  info "Activating virtual environment..."
+  source "${VENV_DIR}/bin/activate"
 fi
-
-info "Activating virtual environment..."
-source "${VENV_DIR}/bin/activate"
 
 info "Upgrading pip..."
 pip install --upgrade pip --quiet
@@ -103,11 +105,13 @@ section "Setup Complete"
 echo
 echo "✅ Development environment setup complete!"
 echo
-warn "Run this command to activate the virtual environment:"
-echo
-echo "  source .venv/bin/activate"
-echo
-echo "Next steps (after activating venv):"
+if [[ "${DISABLE_VENV}" == "false" ]]; then
+  warn "Run this command to activate the virtual environment:"
+  echo
+  echo "  source .venv/bin/activate"
+  echo
+fi
+echo "Next steps:"
 echo "  1. Run: source deploy/000-prerequisites/az-sub-init.sh"
 echo "  2. Configure: deploy/001-iac/terraform.tfvars"
 echo "  3. Deploy: cd deploy/001-iac && terraform init && terraform apply"
