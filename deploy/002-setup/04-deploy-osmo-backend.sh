@@ -32,9 +32,9 @@ OPTIONS:
     --regenerate-token      Force creation of a fresh service token
     --expires-at DATE       Token expiry date YYYY-MM-DD (default: +1 year)
     --config-preview        Print configuration and exit
-    --configure-datasets    Configure dataset buckets using workflow storage
-    --dataset-container NAME  Container name for datasets (default: datasets)
-    --dataset-bucket NAME     OSMO bucket name (default: training)
+    --skip-configure-datasets  Skip dataset bucket configuration
+    --dataset-container NAME   Container name for datasets (default: datasets)
+    --dataset-bucket NAME      OSMO bucket name (default: training)
 
 EXAMPLES:
     $(basename "$0") --use-acr
@@ -59,7 +59,7 @@ osmo_identity_client_id=""
 regenerate_token=false
 custom_expiry=""
 config_preview=false
-configure_datasets=false
+skip_configure_datasets=false
 dataset_container="${DATASET_CONTAINER_NAME}"
 dataset_bucket="${DATASET_BUCKET_NAME}"
 
@@ -81,7 +81,7 @@ while [[ $# -gt 0 ]]; do
     --regenerate-token)    regenerate_token=true; shift ;;
     --expires-at)          custom_expiry="$2"; shift 2 ;;
     --config-preview)      config_preview=true; shift ;;
-    --configure-datasets)  configure_datasets=true; shift ;;
+    --skip-configure-datasets) skip_configure_datasets=true; shift ;;
     --dataset-container)   dataset_container="$2"; shift 2 ;;
     --dataset-bucket)      dataset_bucket="$2"; shift 2 ;;
     *)                     fatal "Unknown option: $1" ;;
@@ -147,10 +147,8 @@ if [[ "$config_preview" == "true" ]]; then
   print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'NGC')"
   print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
   print_kv "Token Expiry" "$expiry_date"
-  if [[ "$configure_datasets" == "true" ]]; then
-    print_kv "Dataset Container" "$dataset_container"
-    print_kv "Dataset Bucket" "$dataset_bucket"
-  fi
+  print_kv "Dataset Container" "$dataset_container"
+  print_kv "Dataset Bucket" "$dataset_bucket"
   exit 0
 fi
 
@@ -172,7 +170,7 @@ ngc_images_template="$CONFIG_DIR/workflow-backend-images-ngc.template.json"
 dataset_template="$CONFIG_DIR/dataset-config-${auth_mode}.template.json"
 
 required_files=("$values_file" "$scheduler_template" "$pod_template_file" "$default_pool_template" "$workflow_template")
-[[ "$configure_datasets" == "true" ]] && required_files+=("$dataset_template")
+[[ "$skip_configure_datasets" == "false" ]] && required_files+=("$dataset_template")
 
 for f in "${required_files[@]}"; do
   [[ -f "$f" ]] || fatal "Required file not found: $f"
@@ -317,9 +315,9 @@ info "Setting default pool profile..."
 osmo profile set pool "$backend_name"
 
 #------------------------------------------------------------------------------
-# Configure Dataset Buckets (if enabled)
+# Configure Dataset Buckets
 #------------------------------------------------------------------------------
-if [[ "$configure_datasets" == "true" ]]; then
+if [[ "$skip_configure_datasets" == "false" ]]; then
   section "Configure Dataset Buckets"
 
   # Create dataset container
@@ -371,7 +369,7 @@ print_kv "Agent Namespace" "$NS_OSMO_OPERATOR"
 print_kv "Backend Namespace" "$NS_OSMO_WORKFLOWS"
 print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'NGC')"
 print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
-if [[ "$configure_datasets" == "true" ]]; then
+if [[ "$skip_configure_datasets" == "false" ]]; then
   print_kv "Dataset Bucket" "$dataset_bucket"
   print_kv "Dataset Container" "$dataset_container"
 fi

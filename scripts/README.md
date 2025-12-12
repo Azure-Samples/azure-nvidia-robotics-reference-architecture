@@ -8,7 +8,8 @@ Submission scripts for training and validation workflows on Azure ML and OSMO pl
 |--------|---------|----------|
 | `submit-azureml-training.sh` | Package code and submit Azure ML training job | Azure ML |
 | `submit-azureml-validation.sh` | Submit model validation job | Azure ML |
-| `submit-osmo-training.sh` | Package code and submit OSMO workflow | OSMO |
+| `submit-osmo-training.sh` | Package code and submit OSMO workflow (base64) | OSMO |
+| `submit-osmo-dataset-training.sh` | Submit OSMO workflow using dataset folder injection | OSMO |
 
 ## Quick Start
 
@@ -18,8 +19,11 @@ Scripts auto-detect Azure context from Terraform outputs in `deploy/001-iac/`:
 # Azure ML training
 ./submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 
-# OSMO training
+# OSMO training (base64 encoded)
 ./submit-osmo-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
+
+# OSMO training (dataset folder upload)
+./submit-osmo-dataset-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 
 # Validation (requires registered model)
 ./submit-azureml-validation.sh --model-name anymal-c-velocity --model-version 1

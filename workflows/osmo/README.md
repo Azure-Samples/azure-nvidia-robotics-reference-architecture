@@ -14,7 +14,18 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 
 | Template | Purpose | Submission Script |
 |----------|---------|-------------------|
-| [train.yaml](train.yaml) | Distributed training workflows | `scripts/submit-osmo-training.sh` |
+| [train.yaml](train.yaml) | Distributed training (base64 inline) | `scripts/submit-osmo-training.sh` |
+| [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh` |
+
+## Workflow Comparison
+
+| Aspect | train.yaml | train-dataset.yaml |
+|--------|------------|--------------------|
+| Payload | Base64-encoded archive | Dataset folder upload |
+| Size limit | ~1MB | Unlimited |
+| Versioning | None | Automatic |
+| Reusability | Per-run | Across runs |
+| Setup | None | Bucket configured |
 
 ## Training Workflow (`train.yaml`)
 
@@ -52,6 +63,37 @@ Parameters are passed as key=value pairs through the submission script:
   --azure-resource-group "rg-custom"
 ```
 
+## Dataset Training Workflow (`train-dataset.yaml`)
+
+Submits Isaac Lab training using OSMO dataset folder injection instead of base64-encoded archives.
+
+### Features
+
+* Dataset versioning and reusability
+* No payload size limits
+* Training folder mounted at `/data/<dataset_name>/training`
+* All features from `train.yaml`
+
+### Dataset Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `dataset_bucket` | `training` | OSMO bucket for training code |
+| `dataset_name` | `training-code` | Dataset name in bucket |
+| `training_localpath` | (required) | Local path to src/training relative to workflow |
+
+### Usage
+
+```bash
+# Default configuration
+./scripts/submit-osmo-dataset-training.sh
+
+# Custom dataset bucket
+./scripts/submit-osmo-dataset-training.sh \
+  --dataset-bucket custom-bucket \
+  --dataset-name my-training-code
+```
+
 ## Environment Variables
 
 | Variable | Description |
@@ -60,6 +102,8 @@ Parameters are passed as key=value pairs through the submission script:
 | `AZURE_RESOURCE_GROUP` | Resource group name |
 | `WORKFLOW_TEMPLATE` | Path to workflow template |
 | `OSMO_CONFIG_DIR` | OSMO configuration directory |
+| `OSMO_DATASET_BUCKET` | Dataset bucket name (default: training) |
+| `OSMO_DATASET_NAME` | Dataset name (default: training-code) |
 
 ## Prerequisites
 
