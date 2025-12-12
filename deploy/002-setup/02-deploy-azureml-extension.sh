@@ -74,7 +74,11 @@ ml_workspace=$(tf_get "$tf_output" "azureml_workspace.value.name")
 ml_identity_id=$(tf_get "$tf_output" "ml_workload_identity.value.id")
 
 extension_name="azureml-$cluster"
-[[ -z "$compute_name" ]] && compute_name="k8s-${cluster#aks-}"
+if [[ -z "$compute_name" ]]; then
+  compute_name="k8s-${cluster#aks-}"
+  compute_name="${compute_name:0:16}"
+  compute_name="${compute_name%-}"
+fi
 [[ -n "$ml_identity_id" ]] && ml_identity_name="${ml_identity_id##*/}"
 
 if [[ "$config_preview" == "true" ]]; then
