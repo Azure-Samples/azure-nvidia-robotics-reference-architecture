@@ -1,0 +1,15 @@
+{
+  "buckets": {
+    "${DATASET_BUCKET_NAME}": {
+      "dataset_path": "azure://${STORAGE_ACCOUNT_NAME}/${DATASET_CONTAINER_NAME}",
+      "region": "${AZURE_REGION}",
+      "description": "Dataset storage using access keys",
+      "mode": "read-write",
+      "default_credential": {
+        "access_key_id": "${STORAGE_ACCESS_KEY_ID}",
+        "access_key": "${STORAGE_ACCESS_KEY}"
+      }
+    }
+  },
+  "default_bucket": "${DATASET_BUCKET_NAME}"
+}
