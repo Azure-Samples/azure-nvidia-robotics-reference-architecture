@@ -9,6 +9,10 @@ locals {
   runbook_name            = "Start-AzureResources"
   schedule_name           = "morning-startup"
   location                = coalesce(var.location, var.resource_group.location)
+
+  # Construct schedule start_time: tomorrow at the configured time (RFC3339 format)
+  tomorrow_date = formatdate("YYYY-MM-DD", timeadd(timestamp(), "24h"))
+  schedule_time = "${local.tomorrow_date}T${var.schedule_config.start_time}:00+00:00"
 }
 
 // ============================================================
@@ -58,7 +62,7 @@ resource "azurerm_automation_schedule" "morning_startup" {
   frequency               = "Week"
   interval                = 1
   timezone                = var.schedule_config.timezone
-  start_time              = timeadd(timestamp(), "24h")
+  start_time              = local.schedule_time
   week_days               = var.schedule_config.week_days
   description             = "Start AKS and PostgreSQL every morning at ${var.schedule_config.start_time} ${var.schedule_config.timezone}"
 
