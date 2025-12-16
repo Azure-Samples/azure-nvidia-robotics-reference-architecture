@@ -1,0 +1,406 @@
+workflow:
+  name: isaaclab-inference
+  timeout:
+    exec_timeout: 2h
+  resources:
+    default:
+      gpu: 1
+      cpu: 4
+      memory: 32Gi
+      storage: 40Gi
+  tasks:
+    - name: isaac-inference
+      image: "{{ image }}"
+      command:
+        - /bin/bash
+        - /tmp/infer_entry.sh
+      environment:
+        TASK: "{{ task }}"
+        NUM_ENVS: "{{ num_envs }}"
+        MAX_STEPS: "{{ max_steps }}"
+        VIDEO_LENGTH: "{{ video_length }}"
+        ACCEPT_EULA: "Y"
+        PRIVACY_CONSENT: "Y"
+        ENCODED_ARCHIVE: "{{ encoded_archive }}"
+        PAYLOAD_ROOT: "{{ payload_root }}"
+        CHECKPOINT_URI: "{{ checkpoint_uri }}"
+        INFERENCE_FORMAT: "{{ inference_format }}"
+        AZURE_SUBSCRIPTION_ID: "{{ azure_subscription_id }}"
+        AZURE_RESOURCE_GROUP: "{{ azure_resource_group }}"
+        AZUREML_WORKSPACE_NAME: "{{ azure_workspace_name }}"
+        AZURE_STORAGE_ACCOUNT_NAME: "{{ azure_storage_account_name }}"
+        AZURE_STORAGE_CONTAINER_NAME: "{{ azure_storage_container_name }}"
+        AZURE_AUTHORITY_HOST: "{{ azure_authority_host }}"
+        PYTHON: "{{ python }}"
+      files:
+        - path: /tmp/infer_entry.sh
+          contents: |
+            #!/bin/bash
+            set -euo pipefail
+
+            if [[ -z "${ENCODED_ARCHIVE:-}" ]]; then
+              echo "encoded_archive is required" >&2
+              exit 1
+            fi
+
+            if [[ -z "${CHECKPOINT_URI:-}" ]]; then
+              echo "checkpoint_uri is required" >&2
+              exit 1
+            fi
+
+            ARCHIVE_PATH="${TEMP_ARCHIVE:-/tmp/isaac_payload.zip}"
+            export PAYLOAD_ROOT="${PAYLOAD_ROOT:-/workspace/isaac_payload}"
+            # TRAINING_ROOT should be the parent of the 'training' package so Python can import 'training.utils'
+            export TRAINING_ROOT="${TRAINING_ROOT:-${PAYLOAD_ROOT}/src}"
+            export DEPLOY_ROOT="${DEPLOY_ROOT:-${PAYLOAD_ROOT}/deploy}"
+
+            mkdir -p "${PAYLOAD_ROOT}"
+            printf '%s' "${ENCODED_ARCHIVE}" | base64 -d > "${ARCHIVE_PATH}"
+            unzip -oq "${ARCHIVE_PATH}" -d "${PAYLOAD_ROOT}"
+
+            export PYTHONPATH="${TRAINING_ROOT}:${PYTHONPATH:-}"
+
+            PYTHON_CMD="${PYTHON:-python}"
+            ${PYTHON_CMD} -m pip install --no-cache-dir -r "${TRAINING_ROOT}/training/requirements.txt"
+            # onnxruntime required for ONNX inference but not in base image
+            ${PYTHON_CMD} -m pip install --no-cache-dir onnxruntime-gpu || ${PYTHON_CMD} -m pip install --no-cache-dir onnxruntime
+
+            CHECKPOINT_DIR=$(mktemp -d)
+            echo "Downloading checkpoint from: ${CHECKPOINT_URI}"
+
+            # Detect URI type and download accordingly
+            # Also extract storage account/container for video uploads if blob URL
+            BLOB_STORAGE_ACCOUNT=""
+            BLOB_CONTAINER=""
+            if [[ "${CHECKPOINT_URI}" == runs:/* ]] || [[ "${CHECKPOINT_URI}" == models:/* ]]; then
+              # MLflow artifact URI - use mlflow.artifacts.download_artifacts
+              echo "Detected MLflow artifact URI"
+              CHECKPOINT_PATH=$(${PYTHON_CMD} -c "
+            import mlflow
+            local_path = mlflow.artifacts.download_artifacts(artifact_uri='${CHECKPOINT_URI}', dst_path='${CHECKPOINT_DIR}')
+            print(local_path)
+            ")
+            elif [[ "${CHECKPOINT_URI}" == https://*.blob.core.windows.net/* ]]; then
+              # Azure Blob Storage URL - download using Python with azure-identity
+              echo "Detected Azure Blob Storage URL"
+              # Extract storage account and container from URL for later video uploads
+              BLOB_STORAGE_ACCOUNT=$(echo "${CHECKPOINT_URI}" | sed -n 's|https://\([^.]*\)\.blob\.core\.windows\.net/.*|\1|p')
+              BLOB_CONTAINER=$(echo "${CHECKPOINT_URI}" | sed -n 's|https://[^/]*/\([^/]*\)/.*|\1|p')
+              echo "Will upload videos to: ${BLOB_STORAGE_ACCOUNT}/${BLOB_CONTAINER}"
+              ${PYTHON_CMD} << DOWNLOAD_BLOB
+            import os
+            from pathlib import Path
+            from urllib.parse import urlparse
+
+            uri = "${CHECKPOINT_URI}"
+            dst_dir = "${CHECKPOINT_DIR}"
+
+            parsed = urlparse(uri)
+            # Extract storage account, container, and blob path from URL
+            # Format: https://<account>.blob.core.windows.net/<container>/<blob_path>
+            account = parsed.netloc.split('.')[0]
+            path_parts = parsed.path.lstrip('/').split('/', 1)
+            container = path_parts[0]
+            blob_path = path_parts[1] if len(path_parts) > 1 else ''
+
+            print(f"Storage account: {account}")
+            print(f"Container: {container}")
+            print(f"Blob path: {blob_path}")
+
+            from azure.identity import DefaultAzureCredential
+            from azure.storage.blob import BlobServiceClient
+
+            credential = DefaultAzureCredential()
+            blob_service = BlobServiceClient(
+                account_url=f"https://{account}.blob.core.windows.net",
+                credential=credential
+            )
+
+            blob_client = blob_service.get_blob_client(container=container, blob=blob_path)
+            local_file = Path(dst_dir) / Path(blob_path).name
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+
+            print(f"Downloading to: {local_file}")
+            with open(local_file, "wb") as f:
+                stream = blob_client.download_blob()
+                f.write(stream.readall())
+
+            print(f"Downloaded: {local_file}")
+            DOWNLOAD_BLOB
+              CHECKPOINT_PATH="${CHECKPOINT_DIR}"
+            else
+              # Assume it's a direct HTTP(S) URL - use curl/wget
+              echo "Detected HTTP URL, using curl"
+              FILENAME=$(basename "${CHECKPOINT_URI}")
+              curl -fsSL -o "${CHECKPOINT_DIR}/${FILENAME}" "${CHECKPOINT_URI}"
+              CHECKPOINT_PATH="${CHECKPOINT_DIR}"
+            fi
+
+            CHECKPOINT_FILE=$(find "${CHECKPOINT_PATH}" -name "*.pt" -type f | head -1)
+            if [[ -z "${CHECKPOINT_FILE}" ]]; then
+              echo "No .pt checkpoint file found in ${CHECKPOINT_PATH}" >&2
+              exit 1
+            fi
+            echo "Found checkpoint: ${CHECKPOINT_FILE}"
+
+            EXPORT_DIR="${CHECKPOINT_DIR}/exported"
+            echo "Exporting policy to ${EXPORT_DIR}..."
+            ${PYTHON_CMD} "${DEPLOY_ROOT}/export_policy.py" \
+                --checkpoint "${CHECKPOINT_FILE}" \
+                --output-dir "${EXPORT_DIR}"
+
+            INFERENCE_FORMAT="${INFERENCE_FORMAT:-both}"
+            VIDEO_DIR="${EXPORT_DIR}/videos"
+            mkdir -p "${VIDEO_DIR}"
+
+            # Run inference with error tolerance (continue even if one format fails)
+            ONNX_SUCCESS=0
+            JIT_SUCCESS=0
+
+            if [[ "${INFERENCE_FORMAT}" == "onnx" ]] || [[ "${INFERENCE_FORMAT}" == "both" ]]; then
+              echo "Running ONNX inference..."
+              if ${PYTHON_CMD} "${TRAINING_ROOT}/training/scripts/rsl_rl/play_onnx.py" \
+                  --task "${TASK}" \
+                  --onnx-model "${EXPORT_DIR}/policy.onnx" \
+                  --num_envs "${NUM_ENVS:-4}" \
+                  --max-steps "${MAX_STEPS:-500}" \
+                  --video_length "${VIDEO_LENGTH:-200}" \
+                  --headless --video; then
+                ONNX_SUCCESS=1
+                echo "ONNX inference completed successfully"
+              else
+                echo "Warning: ONNX inference failed, continuing..."
+              fi
+            fi
+
+            if [[ "${INFERENCE_FORMAT}" == "jit" ]] || [[ "${INFERENCE_FORMAT}" == "both" ]]; then
+              echo "Running JIT inference..."
+              if ${PYTHON_CMD} "${TRAINING_ROOT}/training/scripts/rsl_rl/play_jit.py" \
+                  --task "${TASK}" \
+                  --jit-model "${EXPORT_DIR}/policy.pt" \
+                  --num_envs "${NUM_ENVS:-4}" \
+                  --max-steps "${MAX_STEPS:-500}" \
+                  --video_length "${VIDEO_LENGTH:-200}" \
+                  --headless --video; then
+                JIT_SUCCESS=1
+                echo "JIT inference completed successfully"
+              else
+                echo "Warning: JIT inference failed, continuing..."
+              fi
+            fi
+
+            echo "Uploading artifacts to MLflow (Azure ML Studio)..."
+            export EXPORT_DIR
+            export BLOB_STORAGE_ACCOUNT
+            export BLOB_CONTAINER
+            export CHECKPOINT_URI
+            export ONNX_SUCCESS
+            export JIT_SUCCESS
+            echo "[DEBUG] TRAINING_ROOT=${TRAINING_ROOT}"
+            echo "[DEBUG] PYTHONPATH=${PYTHONPATH}"
+            echo "[DEBUG] AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-<not set>}"
+            echo "[DEBUG] AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP:-<not set>}"
+            echo "[DEBUG] AZUREML_WORKSPACE_NAME=${AZUREML_WORKSPACE_NAME:-<not set>}"
+            ${PYTHON_CMD} << 'UPLOAD_SCRIPT'
+            """Upload inference artifacts using the same MLflow integration as train.py."""
+            import os
+            import sys
+            from pathlib import Path
+            from datetime import datetime
+            from urllib.parse import urlparse
+
+            # Ensure training module is importable - must happen before any training imports
+            training_root = os.environ.get("TRAINING_ROOT", "")
+            print(f"[DEBUG] Python TRAINING_ROOT={training_root}")
+            print(f"[DEBUG] Python sys.path before: {sys.path[:3]}...")
+            if training_root:
+                # Insert at position 0 to ensure it takes precedence
+                if training_root not in sys.path:
+                    sys.path.insert(0, training_root)
+                print(f"[DEBUG] Python sys.path after: {sys.path[:3]}...")
+
+            task = os.environ.get("TASK", "unknown")
+            export_dir = Path(os.environ.get("EXPORT_DIR", "/tmp/exported"))
+            checkpoint_uri = os.environ.get("CHECKPOINT_URI", "")
+            blob_account = os.environ.get("BLOB_STORAGE_ACCOUNT", "")
+            blob_container = os.environ.get("BLOB_CONTAINER", "")
+            onnx_success = os.environ.get("ONNX_SUCCESS", "0") == "1"
+            jit_success = os.environ.get("JIT_SUCCESS", "0") == "1"
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+            # Use the same bootstrap_azure_ml from training utils
+            mlflow_logged = False
+            try:
+                from training.utils import bootstrap_azure_ml, AzureConfigError
+                import mlflow
+
+                experiment_name = f"inference-{task}"
+                context = bootstrap_azure_ml(experiment_name=experiment_name)
+                print(f"[MLflow] Connected to workspace: {context.workspace_name}")
+                print(f"[MLflow] Tracking URI: {context.tracking_uri}")
+
+                run_name = f"inference-{task}-{timestamp}"
+                with mlflow.start_run(run_name=run_name) as run:
+                    mlflow.set_tags({
+                        "task": task,
+                        "checkpoint_uri": checkpoint_uri,
+                        "inference_type": "policy_validation",
+                        "onnx_success": str(onnx_success),
+                        "jit_success": str(jit_success),
+                    })
+                    mlflow.log_params({
+                        "num_envs": os.environ.get("NUM_ENVS", "4"),
+                        "max_steps": os.environ.get("MAX_STEPS", "500"),
+                        "video_length": os.environ.get("VIDEO_LENGTH", "200"),
+                        "inference_format": os.environ.get("INFERENCE_FORMAT", "both"),
+                    })
+
+                    # Log exported models
+                    for model_file in export_dir.glob("policy.*"):
+                        mlflow.log_artifact(str(model_file), artifact_path="exported_models")
+                        print(f"[MLflow] Logged model: {model_file.name}")
+
+                    # Log videos from multiple possible locations
+                    video_search_paths = [
+                        export_dir / "videos",
+                        export_dir.parent / "videos",
+                        Path("/isaac-sim/videos"),
+                        Path.home() / "videos",
+                        Path("/tmp/videos"),
+                    ]
+
+                    videos_logged = 0
+                    for video_dir in video_search_paths:
+                        if video_dir.exists():
+                            for video_file in video_dir.rglob("*.mp4"):
+                                if "onnx" in str(video_file).lower():
+                                    artifact_subpath = "videos/onnx"
+                                elif "jit" in str(video_file).lower():
+                                    artifact_subpath = "videos/jit"
+                                else:
+                                    artifact_subpath = "videos"
+                                mlflow.log_artifact(str(video_file), artifact_path=artifact_subpath)
+                                print(f"[MLflow] Logged video: {video_file.name} -> {artifact_subpath}/")
+                                videos_logged += 1
+
+                    print(f"\n{'='*60}")
+                    print(f"[MLflow] Artifacts logged to Azure ML Studio!")
+                    print(f"[MLflow] Run ID: {run.info.run_id}")
+                    print(f"[MLflow] Experiment: {experiment_name}")
+                    print(f"[MLflow] Run name: {run_name}")
+                    print(f"[MLflow] Total videos: {videos_logged}")
+                    print(f"{'='*60}\n")
+                    mlflow_logged = True
+
+                    # Also upload to blob storage if configured (for direct URL access)
+                    if context.storage:
+                        base_path = f"inference_outputs/{task}/{timestamp}"
+                        files_to_upload = []
+
+                        for model_file in export_dir.glob("policy.*"):
+                            files_to_upload.append((str(model_file), f"{base_path}/models/{model_file.name}"))
+
+                        for video_dir in video_search_paths:
+                            if video_dir.exists():
+                                for video_file in video_dir.rglob("*.mp4"):
+                                    files_to_upload.append((str(video_file), f"{base_path}/videos/{video_file.name}"))
+
+                        if files_to_upload:
+                            uploaded = context.storage.upload_files_batch(files_to_upload)
+                            print(f"[Blob] Uploaded {len(uploaded)} files to storage")
+
+            except ImportError as e:
+                print(f"[WARNING] training.utils not available: {e}")
+                print("[WARNING] Falling back to direct blob storage upload...")
+            except AzureConfigError as e:
+                print(f"[WARNING] Azure ML not configured: {e}")
+                print("[WARNING] Falling back to direct blob storage upload...")
+            except Exception as e:
+                print(f"[WARNING] MLflow logging failed: {e}")
+                import traceback
+                traceback.print_exc()
+                print("[WARNING] Falling back to direct blob storage upload...")
+
+            # Blob storage fallback if MLflow failed
+            if not mlflow_logged:
+                if not blob_account and checkpoint_uri.startswith("https://") and ".blob.core.windows.net" in checkpoint_uri:
+                    parsed = urlparse(checkpoint_uri)
+                    blob_account = parsed.netloc.split('.')[0]
+                    path_parts = parsed.path.lstrip('/').split('/', 1)
+                    blob_container = path_parts[0] if path_parts else "inference-outputs"
+
+                if not blob_account:
+                    blob_account = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME", "")
+                    blob_container = os.environ.get("AZURE_STORAGE_CONTAINER_NAME", "isaaclab-training-logs")
+
+                if blob_account:
+                    print(f"[Blob] Uploading to storage account: {blob_account}/{blob_container}")
+                    from azure.identity import DefaultAzureCredential
+                    from azure.storage.blob import BlobServiceClient
+
+                    credential = DefaultAzureCredential()
+                    blob_service = BlobServiceClient(
+                        account_url=f"https://{blob_account}.blob.core.windows.net",
+                        credential=credential
+                    )
+                    container_client = blob_service.get_container_client(blob_container)
+
+                    base_path = f"inference_outputs/{task}/{timestamp}"
+                    uploaded = 0
+
+                    for model_file in export_dir.glob("policy.*"):
+                        blob_name = f"{base_path}/models/{model_file.name}"
+                        try:
+                            with open(model_file, "rb") as f:
+                                container_client.upload_blob(name=blob_name, data=f, overwrite=True)
+                            print(f"[Blob] Uploaded model: {blob_name}")
+                            uploaded += 1
+                        except Exception as e:
+                            print(f"Warning: Failed to upload {model_file}: {e}")
+
+                    video_search_paths = [
+                        export_dir / "videos",
+                        export_dir.parent / "videos",
+                        Path("/isaac-sim/videos"),
+                        Path.home() / "videos",
+                        Path("/tmp/videos"),
+                    ]
+
+                    for video_dir in video_search_paths:
+                        if video_dir.exists():
+                            for video_file in video_dir.rglob("*.mp4"):
+                                blob_name = f"{base_path}/videos/{video_file.name}"
+                                try:
+                                    with open(video_file, "rb") as f:
+                                        container_client.upload_blob(name=blob_name, data=f, overwrite=True)
+                                    print(f"[Blob] Uploaded video: {blob_name}")
+                                    uploaded += 1
+                                except Exception as e:
+                                    print(f"Warning: Failed to upload {video_file}: {e}")
+
+                    print(f"[Blob] Total files uploaded: {uploaded}")
+                    if uploaded > 0:
+                        print(f"[Blob] Direct URL: https://{blob_account}.blob.core.windows.net/{blob_container}/{base_path}/")
+                else:
+                    print("Warning: No storage configured; videos only saved locally")
+            UPLOAD_SCRIPT
+
+            echo "Inference workflow complete"
+
+default-values:
+  image: nvcr.io/nvidia/isaac-lab:2.2.0
+  task: Isaac-Ant-v0
+  num_envs: "4"
+  max_steps: "500"
+  video_length: "200"
+  encoded_archive: ""
+  payload_root: /workspace/isaac_payload
+  checkpoint_uri: ""
+  inference_format: "both"
+  azure_subscription_id: ""
+  azure_resource_group: ""
+  azure_workspace_name: ""
+  azure_storage_account_name: ""
+  azure_storage_container_name: "isaaclab-training-logs"
+  azure_authority_host: https://login.microsoftonline.com
+  python: "/workspace/isaaclab/isaaclab.sh -p"

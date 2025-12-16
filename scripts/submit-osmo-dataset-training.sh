@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Submit OSMO training workflow with src/training/ packaged as base64 payload
-# Excludes __pycache__ and build artifacts to reduce payload size
+# Submit OSMO training workflow using dataset folder injection
+# Uploads src/training/ via OSMO localpath and registers as versioned dataset
+# Excludes __pycache__ and build artifacts via staging directory
 set -o errexit -o nounset
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || dirname "$SCRIPT_DIR")"
+TMP_DIR="$SCRIPT_DIR/.tmp"
+STAGING_DIR="$TMP_DIR/osmo-dataset-staging"
 
 source "$REPO_ROOT/deploy/002-setup/lib/common.sh"
 source "$SCRIPT_DIR/lib/terraform-outputs.sh"
@@ -16,18 +19,23 @@ read_terraform_outputs "$REPO_ROOT/deploy/001-iac" 2>/dev/null || true
 
 show_help() {
   cat << 'EOF'
-Usage: submit-osmo-training.sh [OPTIONS] [-- osmo-submit-flags]
+Usage: submit-osmo-dataset-training.sh [OPTIONS] [-- osmo-submit-flags]
 
-Package src/training/, encode as base64, and submit an OSMO workflow.
+Submit an OSMO training workflow using dataset folder injection.
+The src/training folder is uploaded as a versioned OSMO dataset via localpath.
 
 WORKFLOW OPTIONS:
-    -w, --workflow PATH           Workflow template (default: workflows/osmo/train.yaml)
+    -w, --workflow PATH           Workflow template (default: workflows/osmo/train-dataset.yaml)
     -t, --task NAME               IsaacLab task (default: Isaac-Velocity-Rough-Anymal-C-v0)
     -n, --num-envs COUNT          Number of environments (default: 2048)
     -m, --max-iterations N        Maximum iterations (empty to unset)
     -i, --image IMAGE             Container image (default: nvcr.io/nvidia/isaac-lab:2.2.0)
-    -p, --payload-root DIR        Runtime extraction root (default: /workspace/isaac_payload)
     -b, --backend BACKEND         Training backend: skrl (default), rsl_rl
+
+DATASET OPTIONS:
+        --dataset-bucket NAME     OSMO bucket name (default: training)
+        --dataset-name NAME       Dataset name (default: training-code)
+        --training-path PATH      Local path to upload (default: src/training)
 
 CHECKPOINT OPTIONS:
     -c, --checkpoint-uri URI      MLflow checkpoint artifact URI
@@ -41,7 +49,6 @@ AZURE CONTEXT:
         --azure-workspace-name NAME   Azure ML workspace
 
 OTHER:
-        --sleep-after-unpack VALUE  Sleep seconds post-unpack (for debugging)
     -s, --run-smoke-test          Enable Azure connectivity smoke test
     -h, --help                    Show this help message
 
@@ -53,6 +60,23 @@ EOF
 #------------------------------------------------------------------------------
 # Helpers
 #------------------------------------------------------------------------------
+
+osmo-dev() {
+  local args=()
+  for arg in "$@"; do
+    if [[ "$arg" == ./* || "$arg" == ../* || "$arg" == ~* ]] && [[ -e "$arg" ]]; then
+      # Only convert if it looks like a relative path AND exists
+      args+=("$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")")
+    elif [[ "$arg" == /* ]]; then
+      # Absolute paths pass through as-is
+      args+=("$arg")
+    else
+      # Everything else (commands, flags, URLs) passes through unchanged
+      args+=("$arg")
+    fi
+  done
+  (cd /Users/allengreaves/projects/nvidia/OSMO && bazel run @osmo_workspace//src/cli -- "${args[@]}")
+}
 
 derive_model_name() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
@@ -69,21 +93,36 @@ normalize_checkpoint_mode() {
   esac
 }
 
+# Build rsync exclude arguments from ignore file (gitignore syntax)
+build_rsync_excludes() {
+  local ignore_file="${1:?ignore file required}"
+  local excludes=()
+  [[ -f "$ignore_file" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # Skip comments and empty lines
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    # Strip trailing slashes for rsync compatibility
+    line="${line%/}"
+    excludes+=("--exclude=$line")
+  done < "$ignore_file"
+  printf '%s\n' "${excludes[@]}"
+}
+
 #------------------------------------------------------------------------------
 # Defaults
 #------------------------------------------------------------------------------
 
-TMP_DIR="$SCRIPT_DIR/.tmp"
-ARCHIVE_PATH="$TMP_DIR/osmo-training.zip"
-B64_PATH="$TMP_DIR/osmo-training.b64"
-
-workflow="$REPO_ROOT/workflows/osmo/train.yaml"
+workflow="$REPO_ROOT/workflows/osmo/train-dataset.yaml"
 task="${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}"
 num_envs="${NUM_ENVS:-2048}"
 max_iterations="${MAX_ITERATIONS:-}"
 image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.2.0}"
-payload_root="${PAYLOAD_ROOT:-/workspace/isaac_payload}"
 backend="${TRAINING_BACKEND:-skrl}"
+
+# Dataset configuration
+dataset_bucket="${OSMO_DATASET_BUCKET:-training}"
+dataset_name="${OSMO_DATASET_NAME:-training-code}"
+training_path="${TRAINING_PATH:-$REPO_ROOT/src/training}"
 
 checkpoint_uri="${CHECKPOINT_URI:-}"
 checkpoint_mode="${CHECKPOINT_MODE:-from-scratch}"
@@ -94,7 +133,6 @@ subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
 resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
 workspace_name="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
 
-sleep_after_unpack="${SLEEP_AFTER_UNPACK:-}"
 run_smoke="${RUN_AZURE_SMOKE_TEST:-0}"
 forward_args=()
 
@@ -110,8 +148,10 @@ while [[ $# -gt 0 ]]; do
     -n|--num-envs)                num_envs="$2"; shift 2 ;;
     -m|--max-iterations)          max_iterations="$2"; shift 2 ;;
     -i|--image)                   image="$2"; shift 2 ;;
-    -p|--payload-root)            payload_root="$2"; shift 2 ;;
     -b|--backend)                 backend="$2"; shift 2 ;;
+    --dataset-bucket)             dataset_bucket="$2"; shift 2 ;;
+    --dataset-name)               dataset_name="$2"; shift 2 ;;
+    --training-path)              training_path="$2"; shift 2 ;;
     -c|--checkpoint-uri)          checkpoint_uri="$2"; shift 2 ;;
     -M|--checkpoint-mode)         checkpoint_mode="$2"; shift 2 ;;
     -r|--register-checkpoint)     register_checkpoint="$2"; shift 2 ;;
@@ -119,7 +159,6 @@ while [[ $# -gt 0 ]]; do
     --azure-subscription-id)      subscription_id="$2"; shift 2 ;;
     --azure-resource-group)       resource_group="$2"; shift 2 ;;
     --azure-workspace-name)       workspace_name="$2"; shift 2 ;;
-    --sleep-after-unpack)         sleep_after_unpack="$2"; shift 2 ;;
     -s|--run-smoke-test)          run_smoke="1"; shift ;;
     --)                           shift; forward_args=("$@"); break ;;
     *)                            forward_args+=("$1"); shift ;;
@@ -130,10 +169,10 @@ done
 # Validation
 #------------------------------------------------------------------------------
 
-require_tools osmo zip base64
+require_tools osmo-dev rsync
 
 [[ -f "$workflow" ]] || fatal "Workflow template not found: $workflow"
-[[ -d "$REPO_ROOT/src/training" ]] || fatal "Directory src/training not found"
+[[ -d "$training_path" ]] || fatal "Training directory not found: $training_path"
 
 checkpoint_mode="$(normalize_checkpoint_mode "$checkpoint_mode")"
 
@@ -145,56 +184,52 @@ fi
 [[ "$skip_register" == "true" ]] && register_checkpoint=""
 
 #------------------------------------------------------------------------------
-# Package Training Payload
+# Stage Training Folder (exclude cache and build artifacts)
 #------------------------------------------------------------------------------
 
-info "Packaging training payload..."
-mkdir -p "$TMP_DIR"
-rm -f "$ARCHIVE_PATH" "$B64_PATH"
+info "Staging training folder (excluding cache/build artifacts)..."
+rm -rf "$STAGING_DIR"
+mkdir -p "$STAGING_DIR"
 
-# Exclude __pycache__, .pyc, and build artifacts to reduce payload size
-(cd "$REPO_ROOT" && zip -qr "$ARCHIVE_PATH" src/training \
-  -x "**/__pycache__/*" \
-  -x "*.pyc" \
-  -x "*.pyo" \
-  -x "**/.pytest_cache/*" \
-  -x "**/.mypy_cache/*" \
-  -x "**/*.egg-info/*") || fatal "Failed to create training archive"
-
-[[ -f "$ARCHIVE_PATH" ]] || fatal "Archive not created: $ARCHIVE_PATH"
-
-# Base64 encode (macOS vs Linux compatible)
-if base64 --help 2>&1 | grep -q '\-\-input'; then
-  base64 --input "$ARCHIVE_PATH" | tr -d '\n' > "$B64_PATH"
-else
-  base64 -i "$ARCHIVE_PATH" | tr -d '\n' > "$B64_PATH"
+# Build exclude args from .amlignore (uses gitignore syntax)
+amlignore_file="$REPO_ROOT/src/.amlignore"
+rsync_excludes=()
+if [[ -f "$amlignore_file" ]]; then
+  while IFS= read -r exclude; do
+    rsync_excludes+=("$exclude")
+  done < <(build_rsync_excludes "$amlignore_file")
 fi
 
-[[ -s "$B64_PATH" ]] || fatal "Failed to encode archive"
-
-archive_size=$(wc -c < "$ARCHIVE_PATH" | tr -d ' ')
-b64_size=$(wc -c < "$B64_PATH" | tr -d ' ')
-info "Payload: ${archive_size} bytes (${b64_size} bytes base64)"
-
-encoded_payload=$(<"$B64_PATH")
+rsync -a --delete "${rsync_excludes[@]}" "$training_path/" "$STAGING_DIR/training/"
 
 #------------------------------------------------------------------------------
 # Build Submission Command
 #------------------------------------------------------------------------------
 
+info "Submitting workflow with dataset folder injection..."
+info "  Training path: $training_path (staged)"
+info "  Dataset: $dataset_bucket/$dataset_name"
+info "  Task: $task"
+info "  Backend: $backend"
+info "  Image: $image"
+
+# Convert staged path to relative path from workflow location for localpath
+workflow_dir="$(dirname "$workflow")"
+rel_training_path="$(python3 -c "import os.path; print(os.path.relpath('$STAGING_DIR/training', '$workflow_dir'))")"
+
 submit_args=(
   workflow submit "$workflow"
   --set-string "image=$image"
-  "encoded_archive=$encoded_payload"
   "task=$task"
   "num_envs=$num_envs"
-  "payload_root=$payload_root"
   "run_azure_smoke_test=$run_smoke"
   "checkpoint_uri=$checkpoint_uri"
   "checkpoint_mode=$checkpoint_mode"
   "register_checkpoint=$register_checkpoint"
-  "sleep_after_unpack=$sleep_after_unpack"
   "training_backend=$backend"
+  "dataset_bucket=$dataset_bucket"
+  "dataset_name=$dataset_name"
+  "training_localpath=$rel_training_path"
 )
 
 [[ -n "$subscription_id" ]] && submit_args+=("azure_subscription_id=$subscription_id")
@@ -213,11 +248,7 @@ fi
 # Submit Workflow
 #------------------------------------------------------------------------------
 
-info "Submitting workflow to OSMO..."
-info "  Task: $task"
-info "  Backend: $backend"
-info "  Image: $image"
-
-osmo "${submit_args[@]}" || fatal "Failed to submit workflow"
+osmo-dev "${submit_args[@]}" || fatal "Failed to submit workflow"
 
 info "Workflow submitted successfully"
+info "Dataset uploaded: $dataset_bucket/$dataset_name"
