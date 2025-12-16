@@ -28,8 +28,7 @@ OPTIONS:
     --use-access-keys       Use storage access keys instead of workload identity
     --use-incluster-redis   Use in-cluster Redis instead of Azure Managed Redis
     --enable-external-hil   Deploy external LoadBalancer for HIL cluster access
-    --hil-cidrs CIDRS       Comma-separated CIDRs for external HIL access
-                            (e.g., "203.0.113.0/24,198.51.100.0/24")
+    --hil-cidrs-file FILE   File with allowed CIDRs (one per line, # comments supported)
     --include-current-ip    Also allow current machine's WAN IP (dev/testing)
     --skip-mek              Skip MEK configuration
     --force-mek             Replace existing MEK (data loss warning)
@@ -37,12 +36,17 @@ OPTIONS:
     --skip-service-config   Skip service_base_url configuration
     --config-preview        Print configuration and exit
 
+HIL ACCESS:
+    When --enable-external-hil is set, CIDRs are collected from (in order):
+      1. Terraform output: effective_hil_cluster_cidrs
+      2. --hil-cidrs-file (if provided)
+      3. Current WAN IP (if --include-current-ip)
+
 EXAMPLES:
     $(basename "$0") --use-acr
     $(basename "$0") --ngc-token \$NGC_API_KEY
-    $(basename "$0") --use-acr --use-access-keys
-    $(basename "$0") --use-acr --enable-external-hil --hil-cidrs "203.0.113.0/24"
-    $(basename "$0") --use-acr --enable-external-hil --hil-cidrs "10.0.0.0/8" --include-current-ip
+    $(basename "$0") --use-acr --enable-external-hil --hil-cidrs-file config/hil-cidrs.txt
+    $(basename "$0") --use-acr --enable-external-hil --include-current-ip
 EOF
 }
 
@@ -57,7 +61,7 @@ use_access_keys=false
 osmo_identity_client_id=""
 use_incluster_redis=false
 enable_external_hil=false
-hil_cidrs_cli=""
+hil_cidrs_file=""
 include_current_ip=false
 skip_mek=false
 force_mek=false
@@ -78,7 +82,7 @@ while [[ $# -gt 0 ]]; do
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
     --use-incluster-redis) use_incluster_redis=true; shift ;;
     --enable-external-hil) enable_external_hil=true; shift ;;
-    --hil-cidrs)           hil_cidrs_cli="$2"; shift 2 ;;
+    --hil-cidrs-file)      hil_cidrs_file="$2"; shift 2 ;;
     --include-current-ip)  include_current_ip=true; shift ;;
     --skip-mek)            skip_mek=true; shift ;;
     --force-mek)           force_mek=true; shift ;;
@@ -90,21 +94,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$use_acr" == "false" && -z "$ngc_token" ]] && fatal "--ngc-token required when not using --use-acr"
+[[ -n "$hil_cidrs_file" && ! -f "$hil_cidrs_file" ]] && fatal "CIDR file not found: $hil_cidrs_file"
 
 require_tools az terraform kubectl helm jq openssl envsubst
-
-# Get WAN IP via HTTP (enterprise-backed services only)
-get_wan_ip() {
-  local ip=""
-  for service in "https://icanhazip.com" "https://checkip.amazonaws.com"; do
-    ip=$(curl -s --connect-timeout 5 "$service" 2>/dev/null | tr -d '[:space:]')
-    if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      echo "$ip"
-      return 0
-    fi
-  done
-  return 1
-}
 
 #------------------------------------------------------------------------------
 # Gather Configuration
@@ -253,77 +245,52 @@ ingress_manifest="$SCRIPT_DIR/manifests/internal-lb-ingress.yaml"
 if [[ "$enable_external_hil" == "true" ]]; then
   section "External LoadBalancer for HIL Access"
 
-  # Collect CIDRs from all sources
-  hil_cidrs=$(terraform -chdir="$tf_dir" output -json effective_hil_cluster_cidrs 2>/dev/null | jq -r '.[]' 2>/dev/null || true)
+  hil_cidrs=()
 
-  # Add command-line CIDRs (comma-separated)
-  if [[ -n "$hil_cidrs_cli" ]]; then
-    cli_cidrs=$(echo "$hil_cidrs_cli" | tr ',' '\n')
-    info "Adding command-line CIDRs to allowed list"
-    if [[ -n "$hil_cidrs" ]]; then
-      hil_cidrs="${hil_cidrs}"$'\n'"${cli_cidrs}"
-    else
-      hil_cidrs="$cli_cidrs"
-    fi
-  fi
+  # HiL CIDRs from terraform if any configured
+  tf_cidrs=$(terraform -chdir="$tf_dir" output -json effective_hil_cluster_cidrs 2>/dev/null | jq -r '.[]' 2>/dev/null || true)
+  [[ -n "$tf_cidrs" ]] && while read -r c; do [[ -n "$c" ]] && hil_cidrs+=("$c"); done <<< "$tf_cidrs"
 
-  # Add current WAN IP if requested
+  # HiL CIDRs from file if provided
+  [[ -n "$hil_cidrs_file" ]] && while read -r c; do hil_cidrs+=("$c"); done < <(read_cidrs_from_file "$hil_cidrs_file")
+
+  # HiL CIDR from current IP if specified
   if [[ "$include_current_ip" == "true" ]]; then
-    current_ip=$(get_wan_ip)
-    if [[ -n "$current_ip" ]]; then
-      info "Adding current WAN IP to allowed CIDRs: ${current_ip}/32"
-      if [[ -n "$hil_cidrs" ]]; then
-        hil_cidrs="${hil_cidrs}"$'\n'"${current_ip}/32"
-      else
-        hil_cidrs="${current_ip}/32"
-      fi
+    if wan_ip=$(get_wan_ip); then
+      hil_cidrs+=("${wan_ip}/32")
     else
-      warn "Could not detect current WAN IP - skipping --include-current-ip"
+      warn "Could not detect WAN IP"
     fi
   fi
 
-  if [[ -z "$hil_cidrs" ]]; then
-    warn "No HIL CIDRs specified - skipping external LoadBalancer"
-    warn "Use --hil-cidrs, --include-current-ip, or set hil_cluster_cidrs in Terraform"
+  if [[ ${#hil_cidrs[@]} -eq 0 ]]; then
+    warn "No HIL CIDRs found - skipping external LoadBalancer"
+    warn "Provide --hil-cidrs-file, --include-current-ip, or set hil_cluster_cidrs in Terraform"
   else
-    external_manifest="$SCRIPT_DIR/manifests/external-lb-ingress.yaml"
-    [[ -f "$external_manifest" ]] || fatal "External LB manifest not found: $external_manifest"
+    info "Allowed CIDRs (${#hil_cidrs[@]}):"
+    printf '  - %s\n' "${hil_cidrs[@]}"
 
-    info "Deploying external LoadBalancer for HIL cluster access..."
-    info "Allowed CIDRs:"
-    echo "$hil_cidrs" | while read -r cidr; do
-      [[ -n "$cidr" ]] && info "  - $cidr"
-    done
+    {
+      cat "$SCRIPT_DIR/manifests/external-lb-ingress.yaml"
+      echo "  loadBalancerSourceRanges:"
+      printf '    - "%s"\n' "${hil_cidrs[@]}"
+    } > "$CONFIG_DIR/out/external-lb-ingress.yaml"
 
-    cidr_yaml=""
-    while IFS= read -r cidr; do
-      [[ -n "$cidr" ]] && cidr_yaml+="  - \"${cidr}\""$'\n'
-    done <<< "$hil_cidrs"
+    kubectl apply -f "$CONFIG_DIR/out/external-lb-ingress.yaml"
 
-    temp_manifest=$(mktemp)
-    trap 'rm -f "$temp_manifest"' EXIT
-
-    sed '/PLACEHOLDER_CIDR/d' "$external_manifest" | \
-      sed "s|loadBalancerSourceRanges:|loadBalancerSourceRanges:\n${cidr_yaml}|" > "$temp_manifest"
-
-    kubectl apply -f "$temp_manifest"
-
-    info "Waiting for external LoadBalancer IP..."
+    info "Waiting for external IP..."
+    external_ip=""
     for _ in {1..30}; do
       external_ip=$(kubectl get svc azureml-ingress-nginx-external-lb -n azureml \
         -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
-      if [[ -n "$external_ip" ]]; then
-        break
-      fi
+      [[ -n "$external_ip" ]] && break
       sleep 2
     done
 
     if [[ -n "$external_ip" ]]; then
-      info "External LoadBalancer IP: $external_ip"
-      info "HIL clusters should connect to: http://${external_ip}"
+      info "External IP: $external_ip (HIL clusters connect here)"
     else
-      warn "External LoadBalancer IP not yet assigned"
-      warn "Check with: kubectl get svc azureml-ingress-nginx-external-lb -n azureml"
+      warn "IP not yet assigned. Check: kubectl get svc azureml-ingress-nginx-external-lb -n azureml"
     fi
   fi
 fi

@@ -392,11 +392,6 @@ variable "hil_cluster_cidrs" {
     Example: ["203.0.113.0/24", "198.51.100.0/24"]
   EOT
   default     = []
-
-  validation {
-    condition     = alltrue([for cidr in var.hil_cluster_cidrs : can(cidrhost(cidr, 0))])
-    error_message = "All entries must be valid CIDR blocks (e.g., '203.0.113.0/24')."
-  }
 }
 
 variable "should_get_wan_ip_for_hil" {

@@ -4,10 +4,10 @@
 # Deployed by: 03-deploy-osmo-control-plane.sh --enable-external-hil
 # Used by: External HIL clusters connecting to OSMO control plane
 #
-# SECURITY: Traffic is restricted to CIDRs in loadBalancerSourceRanges.
+# SECURITY: Traffic is restricted via loadBalancerSourceRanges (appended at deploy time).
 # Azure automatically creates NSG rules to enforce this at the network layer.
 #
-# WARNING: Do not remove loadBalancerSourceRanges - this would expose OSMO publicly!
+# WARNING: Do not deploy without loadBalancerSourceRanges - this would expose OSMO publicly!
 apiVersion: v1
 kind: Service
 metadata:
@@ -29,5 +29,7 @@ spec:
     port: 443
     targetPort: https
     protocol: TCP
-  loadBalancerSourceRanges:
-  - "PLACEHOLDER_CIDR"
+  # loadBalancerSourceRanges is appended by deploy script. Example:
+  # loadBalancerSourceRanges:
+  #   - "10.0.0.0/8"
+  #   - "192.168.1.0/24"

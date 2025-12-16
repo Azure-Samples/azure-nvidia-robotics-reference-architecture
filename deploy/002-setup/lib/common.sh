@@ -147,3 +147,28 @@ section() {
 print_kv() {
   printf '%-18s %s\n' "$1:" "$2"
 }
+
+# Read CIDRs from a file (one per line, supports # comments)
+read_cidrs_from_file() {
+  local file="${1:?file path required}"
+  [[ -f "$file" ]] || { error "CIDR file not found: $file"; return 1; }
+  local line cidr
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"                           # strip comments
+    cidr="$(echo "$line" | tr -d '[:space:]')"   # trim whitespace
+    [[ -n "$cidr" ]] && echo "$cidr"
+  done < "$file"
+}
+
+# Get WAN IP via HTTP (enterprise-backed services only)
+get_wan_ip() {
+  local ip=""
+  for service in "https://icanhazip.com" "https://checkip.amazonaws.com"; do
+    ip=$(curl -s --connect-timeout 5 "$service" 2>/dev/null | tr -d '[:space:]')
+    if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "$ip"
+      return 0
+    fi
+  done
+  return 1
+}

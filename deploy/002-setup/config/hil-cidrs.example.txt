@@ -1,0 +1,15 @@
+# HIL Cluster CIDR Allowlist
+# One CIDR per line. Lines starting with # are comments.
+# Used with: 03-deploy-osmo-control-plane.sh --hil-cidrs-file config/hil-cidrs.txt
+
+# Example: On-premises data center ranges
+# 10.0.0.0/8
+# 172.16.0.0/12
+# 192.168.0.0/16
+
+# Example: Specific HIL cluster subnets
+# 203.0.113.0/24
+# 198.51.100.0/24
+
+# Example: Partner/vendor access
+# 192.0.2.0/24
