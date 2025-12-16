@@ -113,6 +113,25 @@ output "subnets" {
 }
 
 // ============================================================
+// HIL Cluster External Access
+// ============================================================
+
+output "nat_gateway_public_ip" {
+  description = "NAT Gateway public IP. HIL clusters should allow-list this for outbound connectivity."
+  value       = module.platform.nat_gateway_public_ip
+}
+
+output "hil_cluster_cidrs" {
+  description = "Configured CIDR blocks for HIL cluster external access to OSMO control plane"
+  value       = var.hil_cluster_cidrs
+}
+
+output "effective_hil_cluster_cidrs" {
+  description = "Effective CIDRs including current IP if should_get_wan_ip_for_hil is true"
+  value       = local.effective_hil_cluster_cidrs
+}
+
+// ============================================================
 // DNS Private Resolver Outputs
 // ============================================================
 

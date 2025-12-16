@@ -45,6 +45,11 @@ output "nat_gateway" {
   }
 }
 
+output "nat_gateway_public_ip" {
+  description = "NAT Gateway public IP address for HIL clusters to allow-list"
+  value       = azurerm_public_ip.nat_gateway.ip_address
+}
+
 /*
  * DNS Private Resolver Outputs
  */

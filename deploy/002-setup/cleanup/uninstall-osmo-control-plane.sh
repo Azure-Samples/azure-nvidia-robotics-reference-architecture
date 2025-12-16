@@ -153,6 +153,11 @@ else
     kubectl delete svc azureml-ingress-nginx-internal-lb -n azureml --ignore-not-found || true
   fi
 
+  if kubectl get svc azureml-ingress-nginx-external-lb -n azureml &>/dev/null; then
+    info "Deleting external LB ingress service..."
+    kubectl delete svc azureml-ingress-nginx-external-lb -n azureml --ignore-not-found || true
+  fi
+
   if kubectl get namespace "$NS_OSMO_CONTROL_PLANE" &>/dev/null; then
     info "Deleting namespace '$NS_OSMO_CONTROL_PLANE'..."
     kubectl delete namespace "$NS_OSMO_CONTROL_PLANE" --ignore-not-found --timeout=60s || true

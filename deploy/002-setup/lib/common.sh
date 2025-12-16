@@ -109,24 +109,30 @@ detect_osmo_identity() {
 }
 
 # Detect OSMO service URL from cluster
+# Checks external LB first (HIL access), then internal LB, then ClusterIP
 detect_service_url() {
-  local url=""
-  # Try internal load balancer first
+  local external_lb_ip
+  external_lb_ip=$(kubectl get svc azureml-ingress-nginx-external-lb -n azureml \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+  if [[ -n "$external_lb_ip" ]]; then
+    echo "http://${external_lb_ip}"
+    return
+  fi
+
   local lb_ip
   lb_ip=$(kubectl get svc azureml-ingress-nginx-internal-lb -n azureml \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   if [[ -n "$lb_ip" ]]; then
-    url="http://${lb_ip}"
-  else
-    # Fallback to ClusterIP
-    local cluster_ip
-    cluster_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml \
-      -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
-    if [[ -n "$cluster_ip" && "$cluster_ip" != "None" ]]; then
-      url="http://${cluster_ip}"
-    fi
+    echo "http://${lb_ip}"
+    return
   fi
-  echo "$url"
+
+  local cluster_ip
+  cluster_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml \
+    -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
+  if [[ -n "$cluster_ip" && "$cluster_ip" != "None" ]]; then
+    echo "http://${cluster_ip}"
+  fi
 }
 
 # Print section header

@@ -27,6 +27,10 @@ OPTIONS:
     --ngc-token TOKEN       NGC API token (required when not using --use-acr)
     --use-access-keys       Use storage access keys instead of workload identity
     --use-incluster-redis   Use in-cluster Redis instead of Azure Managed Redis
+    --enable-external-hil   Deploy external LoadBalancer for HIL cluster access
+    --hil-cidrs CIDRS       Comma-separated CIDRs for external HIL access
+                            (e.g., "203.0.113.0/24,198.51.100.0/24")
+    --include-current-ip    Also allow current machine's WAN IP (dev/testing)
     --skip-mek              Skip MEK configuration
     --force-mek             Replace existing MEK (data loss warning)
     --mek-config-file PATH  Use existing MEK config file
@@ -37,6 +41,8 @@ EXAMPLES:
     $(basename "$0") --use-acr
     $(basename "$0") --ngc-token \$NGC_API_KEY
     $(basename "$0") --use-acr --use-access-keys
+    $(basename "$0") --use-acr --enable-external-hil --hil-cidrs "203.0.113.0/24"
+    $(basename "$0") --use-acr --enable-external-hil --hil-cidrs "10.0.0.0/8" --include-current-ip
 EOF
 }
 
@@ -50,6 +56,9 @@ acr_name=""
 use_access_keys=false
 osmo_identity_client_id=""
 use_incluster_redis=false
+enable_external_hil=false
+hil_cidrs_cli=""
+include_current_ip=false
 skip_mek=false
 force_mek=false
 mek_config_file=""
@@ -68,6 +77,9 @@ while [[ $# -gt 0 ]]; do
     --use-access-keys)     use_access_keys=true; shift ;;
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
     --use-incluster-redis) use_incluster_redis=true; shift ;;
+    --enable-external-hil) enable_external_hil=true; shift ;;
+    --hil-cidrs)           hil_cidrs_cli="$2"; shift 2 ;;
+    --include-current-ip)  include_current_ip=true; shift ;;
     --skip-mek)            skip_mek=true; shift ;;
     --force-mek)           force_mek=true; shift ;;
     --mek-config-file)     mek_config_file="$2"; shift 2 ;;
@@ -80,6 +92,19 @@ done
 [[ "$use_acr" == "false" && -z "$ngc_token" ]] && fatal "--ngc-token required when not using --use-acr"
 
 require_tools az terraform kubectl helm jq openssl envsubst
+
+# Get WAN IP via HTTP (enterprise-backed services only)
+get_wan_ip() {
+  local ip=""
+  for service in "https://icanhazip.com" "https://checkip.amazonaws.com"; do
+    ip=$(curl -s --connect-timeout 5 "$service" 2>/dev/null | tr -d '[:space:]')
+    if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "$ip"
+      return 0
+    fi
+  done
+  return 1
+}
 
 #------------------------------------------------------------------------------
 # Gather Configuration
@@ -220,6 +245,88 @@ fi
 # Apply internal LB ingress if present
 ingress_manifest="$SCRIPT_DIR/manifests/internal-lb-ingress.yaml"
 [[ -f "$ingress_manifest" ]] && kubectl apply -f "$ingress_manifest"
+
+#------------------------------------------------------------------------------
+# Deploy External LoadBalancer for HIL Access (Optional)
+#------------------------------------------------------------------------------
+
+if [[ "$enable_external_hil" == "true" ]]; then
+  section "External LoadBalancer for HIL Access"
+
+  # Collect CIDRs from all sources
+  hil_cidrs=$(terraform -chdir="$tf_dir" output -json effective_hil_cluster_cidrs 2>/dev/null | jq -r '.[]' 2>/dev/null || true)
+
+  # Add command-line CIDRs (comma-separated)
+  if [[ -n "$hil_cidrs_cli" ]]; then
+    cli_cidrs=$(echo "$hil_cidrs_cli" | tr ',' '\n')
+    info "Adding command-line CIDRs to allowed list"
+    if [[ -n "$hil_cidrs" ]]; then
+      hil_cidrs="${hil_cidrs}"$'\n'"${cli_cidrs}"
+    else
+      hil_cidrs="$cli_cidrs"
+    fi
+  fi
+
+  # Add current WAN IP if requested
+  if [[ "$include_current_ip" == "true" ]]; then
+    current_ip=$(get_wan_ip)
+    if [[ -n "$current_ip" ]]; then
+      info "Adding current WAN IP to allowed CIDRs: ${current_ip}/32"
+      if [[ -n "$hil_cidrs" ]]; then
+        hil_cidrs="${hil_cidrs}"$'\n'"${current_ip}/32"
+      else
+        hil_cidrs="${current_ip}/32"
+      fi
+    else
+      warn "Could not detect current WAN IP - skipping --include-current-ip"
+    fi
+  fi
+
+  if [[ -z "$hil_cidrs" ]]; then
+    warn "No HIL CIDRs specified - skipping external LoadBalancer"
+    warn "Use --hil-cidrs, --include-current-ip, or set hil_cluster_cidrs in Terraform"
+  else
+    external_manifest="$SCRIPT_DIR/manifests/external-lb-ingress.yaml"
+    [[ -f "$external_manifest" ]] || fatal "External LB manifest not found: $external_manifest"
+
+    info "Deploying external LoadBalancer for HIL cluster access..."
+    info "Allowed CIDRs:"
+    echo "$hil_cidrs" | while read -r cidr; do
+      [[ -n "$cidr" ]] && info "  - $cidr"
+    done
+
+    cidr_yaml=""
+    while IFS= read -r cidr; do
+      [[ -n "$cidr" ]] && cidr_yaml+="  - \"${cidr}\""$'\n'
+    done <<< "$hil_cidrs"
+
+    temp_manifest=$(mktemp)
+    trap 'rm -f "$temp_manifest"' EXIT
+
+    sed '/PLACEHOLDER_CIDR/d' "$external_manifest" | \
+      sed "s|loadBalancerSourceRanges:|loadBalancerSourceRanges:\n${cidr_yaml}|" > "$temp_manifest"
+
+    kubectl apply -f "$temp_manifest"
+
+    info "Waiting for external LoadBalancer IP..."
+    for _ in {1..30}; do
+      external_ip=$(kubectl get svc azureml-ingress-nginx-external-lb -n azureml \
+        -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+      if [[ -n "$external_ip" ]]; then
+        break
+      fi
+      sleep 2
+    done
+
+    if [[ -n "$external_ip" ]]; then
+      info "External LoadBalancer IP: $external_ip"
+      info "HIL clusters should connect to: http://${external_ip}"
+    else
+      warn "External LoadBalancer IP not yet assigned"
+      warn "Check with: kubectl get svc azureml-ingress-nginx-external-lb -n azureml"
+    fi
+  fi
+fi
 
 #------------------------------------------------------------------------------
 # Deploy OSMO Charts

@@ -1,0 +1,33 @@
+# External LoadBalancer for OSMO control plane access from HIL clusters
+# This service provides a public IP restricted to allowed CIDR blocks.
+#
+# Deployed by: 03-deploy-osmo-control-plane.sh --enable-external-hil
+# Used by: External HIL clusters connecting to OSMO control plane
+#
+# SECURITY: Traffic is restricted to CIDRs in loadBalancerSourceRanges.
+# Azure automatically creates NSG rules to enforce this at the network layer.
+#
+# WARNING: Do not remove loadBalancerSourceRanges - this would expose OSMO publicly!
+apiVersion: v1
+kind: Service
+metadata:
+  name: azureml-ingress-nginx-external-lb
+  namespace: azureml
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: azureml-ingress-nginx
+    app.kubernetes.io/instance: azureml-ingress-nginx
+    app.kubernetes.io/component: controller
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: https
+    protocol: TCP
+  loadBalancerSourceRanges:
+  - "PLACEHOLDER_CIDR"

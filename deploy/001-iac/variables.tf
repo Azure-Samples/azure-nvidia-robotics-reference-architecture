@@ -377,3 +377,34 @@ variable "inference_router_service_type" {
     error_message = "inference_router_service_type must be one of: LoadBalancer, NodePort, or ClusterIP."
   }
 }
+
+/*
+ * HIL Cluster External Access
+ */
+
+variable "hil_cluster_cidrs" {
+  type        = list(string)
+  description = <<-EOT
+    CIDR blocks of HIL clusters allowed to access Azure services and OSMO control plane.
+    Configures firewall rules on Storage Account, ACR, Key Vault, and enables external
+    LoadBalancer with loadBalancerSourceRanges during 002-setup.
+    Use NAT gateway or firewall egress IPs (post-NAT), not internal IPs.
+    Example: ["203.0.113.0/24", "198.51.100.0/24"]
+  EOT
+  default     = []
+
+  validation {
+    condition     = alltrue([for cidr in var.hil_cluster_cidrs : can(cidrhost(cidr, 0))])
+    error_message = "All entries must be valid CIDR blocks (e.g., '203.0.113.0/24')."
+  }
+}
+
+variable "should_get_wan_ip_for_hil" {
+  type        = bool
+  description = <<-EOT
+    Include the current machine's public IP in hil_cluster_cidrs.
+    Useful for development and testing scenarios.
+    WARNING: IP may change between terraform applies.
+  EOT
+  default     = false
+}

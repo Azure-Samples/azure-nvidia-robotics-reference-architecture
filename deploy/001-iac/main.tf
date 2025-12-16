@@ -14,6 +14,24 @@ locals {
   current_user_oid    = try(msgraph_resource_action.current_user[0].output.oid, null)
 }
 
+// ============================================================
+// HIL Cluster External Access - WAN IP Detection (Optional)
+// ============================================================
+
+data "http" "current_wan_ip" {
+  count = var.should_get_wan_ip_for_hil ? 1 : 0
+  url   = "https://icanhazip.com"
+
+  request_headers = {
+    Accept = "text/plain"
+  }
+}
+
+locals {
+  current_wan_cidr            = var.should_get_wan_ip_for_hil ? ["${trimspace(data.http.current_wan_ip[0].response_body)}/32"] : []
+  effective_hil_cluster_cidrs = concat(var.hil_cluster_cidrs, local.current_wan_cidr)
+}
+
 resource "msgraph_resource_action" "current_user" {
   count = var.should_add_current_user_key_vault_admin ? 1 : 0
 
@@ -109,6 +127,9 @@ module "platform" {
 
   // OSMO workload identity
   should_enable_osmo_identity = var.osmo_config.should_enable_identity
+
+  // HIL cluster external access
+  hil_allowed_cidr_blocks = local.effective_hil_cluster_cidrs
 }
 
 // ============================================================

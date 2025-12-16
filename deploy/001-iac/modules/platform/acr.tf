@@ -22,6 +22,21 @@ resource "azurerm_container_registry" "main" {
   anonymous_pull_enabled        = false
   public_network_access_enabled = var.should_enable_public_network_access
   tags                          = local.tags
+
+  dynamic "network_rule_set" {
+    for_each = length(var.hil_allowed_cidr_blocks) > 0 ? [1] : []
+    content {
+      default_action = "Deny"
+
+      dynamic "ip_rule" {
+        for_each = var.hil_allowed_cidr_blocks
+        content {
+          action   = "Allow"
+          ip_range = ip_rule.value
+        }
+      }
+    }
+  }
 }
 
 // ============================================================

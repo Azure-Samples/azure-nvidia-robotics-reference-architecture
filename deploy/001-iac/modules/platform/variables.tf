@@ -51,6 +51,12 @@ variable "should_enable_public_network_access" {
   default     = false
 }
 
+variable "hil_allowed_cidr_blocks" {
+  type        = list(string)
+  description = "CIDR blocks allowed for HIL cluster access to Azure services"
+  default     = []
+}
+
 /*
  * Security Variables
  */

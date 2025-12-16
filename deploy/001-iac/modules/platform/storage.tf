@@ -33,6 +33,16 @@ resource "azurerm_storage_account" "main" {
       days = 7
     }
   }
+
+  dynamic "network_rules" {
+    for_each = length(var.hil_allowed_cidr_blocks) > 0 ? [1] : []
+    content {
+      default_action             = "Deny"
+      bypass                     = ["AzureServices"]
+      ip_rules                   = var.hil_allowed_cidr_blocks
+      virtual_network_subnet_ids = []
+    }
+  }
 }
 
 // ============================================================
