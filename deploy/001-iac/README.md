@@ -113,6 +113,95 @@ terraform init && terraform apply
 
 See [automation/README.md](automation/README.md) for runbook configuration.
 
+## Destroy Infrastructure
+
+Remove Azure resources deployed by Terraform. Clean up cluster components first.
+
+### Prerequisites
+
+- Cluster components uninstalled (see [002-setup/README.md](../002-setup/README.md#cleanup))
+- Terraform state accessible
+- Azure CLI authenticated
+
+### Option A: Terraform Destroy
+
+Preserves Terraform state and allows redeployment:
+
+```bash
+cd deploy/001-iac
+
+# Preview resources to be destroyed
+terraform plan -destroy -var-file=terraform.tfvars
+
+# Destroy infrastructure
+terraform destroy -var-file=terraform.tfvars
+```
+
+If VPN was deployed separately:
+
+```bash
+cd vpn
+terraform destroy -var-file=terraform.tfvars
+```
+
+### Option B: Delete Resource Group
+
+Fastest cleanup method (completely deletes the resource group):
+
+```bash
+# Get resource group name
+terraform output -raw resource_group | jq -r '.name'
+
+# Or check Azure portal / terraform.tfvars for naming pattern
+# Default: <resource_prefix>-<environment>-rg
+
+# Delete entire resource group
+az group delete --name <resource-group-name> --yes
+
+# For async deletion (returns immediately)
+az group delete --name <resource-group-name> --yes --no-wait
+```
+
+Resource group deletion removes all contained resources regardless of how they were created.
+
+### Cleanup Order
+
+Follow this order to avoid dependency failures:
+
+| Order | Component | Command |
+|:-----:|-----------|--------|
+| 1 | OSMO Backend | `../002-setup/cleanup/uninstall-osmo-backend.sh` |
+| 2 | OSMO Control Plane | `../002-setup/cleanup/uninstall-osmo-control-plane.sh` |
+| 3 | AzureML Extension | `../002-setup/cleanup/uninstall-azureml-extension.sh` |
+| 4 | GPU Infrastructure | `../002-setup/cleanup/uninstall-robotics-charts.sh` |
+| 5 | VPN (if deployed) | `cd vpn && terraform destroy -var-file=terraform.tfvars` |
+| 6 | Main Infrastructure | `terraform destroy -var-file=terraform.tfvars` |
+
+### Troubleshooting Destroy
+
+**Resources stuck deleting**: Some resources (Private Endpoints, AKS) may take 10-15 minutes. Check status:
+
+```bash
+az resource list --resource-group <rg> --query "[].{name:name, type:type}" -o table
+```
+
+**Terraform state mismatch**: If resources were manually deleted:
+
+```bash
+# Refresh state to match Azure
+terraform refresh -var-file=terraform.tfvars
+
+# Then destroy
+terraform destroy -var-file=terraform.tfvars
+```
+
+**Locks preventing deletion**: Remove resource locks if present:
+
+```bash
+az lock list --resource-group <rg> -o table
+az lock delete --name <lock-name> --resource-group <rg>
+```
+
 ## Directory Structure
 
 ```

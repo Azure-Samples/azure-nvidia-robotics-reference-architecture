@@ -67,7 +67,7 @@ variable "schedule_config" {
   })
   description = "Schedule configuration for startup runbook including start time (HH:MM), week days, and timezone"
   default = {
-    start_time = "08:00"
+    start_time = "13:00"
     week_days  = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
     timezone   = "UTC"
   }

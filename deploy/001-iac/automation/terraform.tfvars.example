@@ -1,0 +1,21 @@
+// =============================================================================
+// Automation Terraform Variables Example
+// =============================================================================
+// Copy to terraform.tfvars and customize:  cp terraform.tfvars.example terraform.tfvars
+// Full variable reference: variables.tf
+// =============================================================================
+
+// Core Configuration (must match 001-iac deployment)
+environment     = "dev"
+location        = "westus3"
+resource_prefix = "yourprefix"
+instance        = "001"
+
+// Automation Configuration
+should_start_postgresql = true
+
+schedule_config = {
+  start_time = "13:00"
+  week_days  = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+  timezone   = "UTC"
+}

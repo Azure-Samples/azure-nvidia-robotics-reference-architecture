@@ -132,7 +132,7 @@ if [[ "$skip_k8s_cleanup" == "true" ]]; then
 else
   section "Cleanup Kubernetes Resources"
 
-  for secret in "$SECRET_POSTGRES" "$SECRET_REDIS" "$SECRET_NGC"; do
+  for secret in "$SECRET_POSTGRES" "$SECRET_REDIS"; do
     if kubectl get secret "$secret" -n "$NS_OSMO_CONTROL_PLANE" &>/dev/null; then
       info "Deleting secret '$secret'..."
       kubectl delete secret "$secret" -n "$NS_OSMO_CONTROL_PLANE" --ignore-not-found

@@ -8,7 +8,7 @@ Production-ready framework for orchestrating robotics and AI workloads on [Azure
 |------------|-------------|
 | Infrastructure as Code | [Terraform modules](deploy/001-iac/) for reproducible Azure deployments |
 | Dual Orchestration | Submit jobs via [AzureML](workflows/azureml/) or [OSMO](workflows/osmo/) |
-| Workload Identity | Key-less auth via Azure AD ([setup guide](deploy/002-setup/README.md#scenario-2-workload-identity--ngc)) |
+| Workload Identity | Key-less auth via Azure AD ([setup guide](deploy/002-setup/README.md#scenario-2-workload-identity)) |
 | Private Networking | Services on private VNet with optional [VPN gateway](deploy/001-iac/vpn/) |
 | MLflow Integration | Experiment tracking with Azure ML ([details](docs/mlflow-integration.md)) |
 | GPU Scheduling | [KAI Scheduler](deploy/002-setup/values/kai-scheduler.yaml) for efficient utilization |
@@ -82,7 +82,6 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 ### NVIDIA Requirements
 
 - [NVIDIA Developer](https://developer.nvidia.com/) account with OSMO access
-- [NGC API Key](https://ngc.nvidia.com/setup/api-key) for container registry access
 
 ## 🏃 Quick Start
 
@@ -91,6 +90,9 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 ```bash
 # Set subscription for Terraform
 source deploy/000-prerequisites/az-sub-init.sh
+
+# Register providers (new subscriptions only)
+./deploy/000-prerequisites/register-azure-providers.sh
 
 cd deploy/001-iac
 
@@ -120,10 +122,9 @@ az aks get-credentials --resource-group <rg> --name <aks>
 # Deploy AzureML extension
 ./02-deploy-azureml-extension.sh
 
-# Deploy OSMO (requires NGC token)
-export NGC_API_KEY="your-token"
-./03-deploy-osmo-control-plane.sh --ngc-token "$NGC_API_KEY"
-./04-deploy-osmo-backend.sh --ngc-token "$NGC_API_KEY"
+# Deploy OSMO
+./03-deploy-osmo-control-plane.sh
+./04-deploy-osmo-backend.sh
 ```
 
 ### 3. Submit Workloads
@@ -177,8 +178,8 @@ export NGC_API_KEY="your-token"
 
 | Scenario | Storage Auth | Registry | Use Case |
 |----------|--------------|----------|----------|
-| Access Keys + NGC | Keys | nvcr.io | Development |
-| Workload Identity + NGC | Federated | nvcr.io | Production |
+| Access Keys | Keys | nvcr.io | Development |
+| Workload Identity | Federated | nvcr.io | Production |
 | Workload Identity + ACR | Federated | Private ACR | Air-gapped |
 
 See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.

@@ -280,8 +280,8 @@ variable "node_pools" {
 
 variable "should_integrate_aks_cluster" {
   type        = bool
-  description = "Whether to integrate an AKS cluster as a compute target with the workspace"
-  default     = true
+  description = "Whether to integrate an AKS cluster as a compute target with the workspace (available through scripting in 002-setup)"
+  default     = false
 }
 
 variable "aks_cluster_purpose" {
