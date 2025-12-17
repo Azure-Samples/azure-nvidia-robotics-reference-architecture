@@ -104,7 +104,7 @@ if [[ "$config_preview" == "true" ]]; then
   print_kv "Image Version" "$image_version"
   print_kv "PostgreSQL" "$pg_fqdn"
   print_kv "Redis" "$([[ $use_incluster_redis == true ]] && echo 'in-cluster' || echo "$redis_hostname:$redis_port")"
-  print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'NGC')"
+  print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
   print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
   exit 0
 fi
@@ -223,7 +223,7 @@ base_helm_args=(
   --namespace "$NS_OSMO_CONTROL_PLANE"
   --set-string "global.osmoImageTag=$image_version"
 )
-[[ "$use_acr" == "true" ]] && base_helm_args+=(--set "global.osmoImageLocation=${acr_login_server}/osmo" --set "global.imagePullSecret=")
+[[ "$use_acr" == "true" ]] && base_helm_args+=(--set "global.osmoImageLocation=${acr_login_server}/osmo")
 
 # Deploy service
 info "Deploying osmo/service..."

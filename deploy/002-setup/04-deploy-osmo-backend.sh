@@ -138,7 +138,7 @@ if [[ "$config_preview" == "true" ]]; then
   print_kv "Image Version" "$image_version"
   print_kv "Storage Account" "$storage_name"
   print_kv "Container" "$container_name"
-  print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'NGC')"
+  print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
   print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
   print_kv "Token Expiry" "$expiry_date"
   print_kv "Dataset Container" "$dataset_container"
@@ -242,7 +242,7 @@ helm_args=(
 )
 
 if [[ "$use_acr" == "true" ]]; then
-  helm_args+=(--set "global.osmoImageLocation=${acr_login_server}/osmo" --set "global.imagePullSecret=")
+  helm_args+=(--set "global.osmoImageLocation=${acr_login_server}/osmo")
 fi
 
 if [[ "$use_access_keys" == "false" ]]; then
@@ -350,7 +350,7 @@ print_kv "Storage Account" "$storage_name"
 print_kv "Container" "$container_name"
 print_kv "Agent Namespace" "$NS_OSMO_OPERATOR"
 print_kv "Backend Namespace" "$NS_OSMO_WORKFLOWS"
-print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'NGC')"
+print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
 print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
 if [[ "$skip_configure_datasets" == "false" ]]; then
   print_kv "Dataset Bucket" "$dataset_bucket"

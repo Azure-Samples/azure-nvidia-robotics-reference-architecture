@@ -85,7 +85,7 @@ cd ../001-iac
 ACR_NAME=$(terraform output -json container_registry | jq -r '.value.name')
 az acr login --name "$ACR_NAME"
 
-# Set versions (check NGC for latest: https://catalog.ngc.nvidia.com/orgs/nvidia/teams/osmo)
+# Set versions
 OSMO_VERSION="${OSMO_VERSION:-6.0.0}"
 CHART_VERSION="${CHART_VERSION:-1.0.0}"
 
