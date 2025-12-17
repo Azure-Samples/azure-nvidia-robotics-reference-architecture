@@ -27,7 +27,6 @@ OPTIONS:
     --container-name NAME   Blob container for workflows (default: osmo)
     --use-acr               Pull images from ACR deployed by 001-iac
     --acr-name NAME         Pull images from specified ACR
-    --ngc-token TOKEN       NGC API token (required when not using --use-acr)
     --use-access-keys       Use storage access keys instead of workload identity
     --regenerate-token      Force creation of a fresh service token
     --expires-at DATE       Token expiry date YYYY-MM-DD (default: +1 year)
@@ -38,7 +37,6 @@ OPTIONS:
 
 EXAMPLES:
     $(basename "$0") --use-acr
-    $(basename "$0") --ngc-token \$NGC_API_KEY
     $(basename "$0") --use-acr --backend-name gpu-pool --use-access-keys
 EOF
 }
@@ -53,7 +51,6 @@ container_name="osmo"
 service_url=""
 use_acr=false
 acr_name=""
-ngc_token=""
 use_access_keys=false
 osmo_identity_client_id=""
 regenerate_token=false
@@ -75,7 +72,6 @@ while [[ $# -gt 0 ]]; do
     --container-name)      container_name="$2"; shift 2 ;;
     --use-acr)             use_acr=true; shift ;;
     --acr-name)            acr_name="$2"; use_acr=true; shift 2 ;;
-    --ngc-token)           ngc_token="$2"; shift 2 ;;
     --use-access-keys)     use_access_keys=true; shift ;;
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
     --regenerate-token)    regenerate_token=true; shift ;;
@@ -87,8 +83,6 @@ while [[ $# -gt 0 ]]; do
     *)                     fatal "Unknown option: $1" ;;
   esac
 done
-
-[[ "$use_acr" == "false" && -z "$ngc_token" ]] && fatal "--ngc-token required when not using --use-acr"
 
 require_tools terraform osmo kubectl helm jq az envsubst
 
@@ -166,7 +160,6 @@ account_secret="osmo-operator-token"
 auth_mode="workload-identity"
 [[ "$use_access_keys" == "true" ]] && auth_mode="access-keys"
 workflow_template="$CONFIG_DIR/workflow-config-${auth_mode}.template.json"
-ngc_images_template="$CONFIG_DIR/workflow-backend-images-ngc.template.json"
 dataset_template="$CONFIG_DIR/dataset-config-${auth_mode}.template.json"
 
 required_files=("$values_file" "$scheduler_template" "$pod_template_file" "$default_pool_template" "$workflow_template")
@@ -250,8 +243,6 @@ helm_args=(
 
 if [[ "$use_acr" == "true" ]]; then
   helm_args+=(--set "global.osmoImageLocation=${acr_login_server}/osmo" --set "global.imagePullSecret=")
-else
-  helm_args+=(--set-string "global.imagePullSecret=$SECRET_NGC")
 fi
 
 if [[ "$use_access_keys" == "false" ]]; then
@@ -283,7 +274,6 @@ export WORKFLOW_LOG_ENDPOINT="${azure_container}/workflows/logs"
 export WORKFLOW_APP_ENDPOINT="${azure_container}/apps"
 export AZURE_REGION="$location"
 export ACR_LOGIN_SERVER="$acr_login_server"
-export NGC_TOKEN="$ngc_token"
 
 # Render configurations
 envsubst < "$pod_template_file" > "$CONFIG_DIR/out/pod-template-config.json"
@@ -303,13 +293,6 @@ osmo config update POOL "$backend_name" --file "$CONFIG_DIR/out/default-pool-con
 
 info "Applying workflow storage configuration..."
 osmo config update WORKFLOW --file "$CONFIG_DIR/out/workflow-config.json" --description "Workflow storage configuration"
-
-# Apply NGC backend images config when not using ACR
-if [[ "$use_acr" == "false" ]]; then
-  envsubst < "$ngc_images_template" > "$CONFIG_DIR/out/workflow-backend-images.json"
-  info "Applying NGC backend images configuration..."
-  osmo config update WORKFLOW --file "$CONFIG_DIR/out/workflow-backend-images.json" --description "NGC backend images"
-fi
 
 info "Setting default pool profile..."
 osmo profile set pool "$backend_name"

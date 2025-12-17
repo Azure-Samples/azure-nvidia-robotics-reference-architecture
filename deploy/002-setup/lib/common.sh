@@ -67,29 +67,6 @@ login_acr() {
   az acr login --name "$acr"
 }
 
-# Setup NGC Helm repository
-setup_ngc_repo() {
-  local token="${1:?ngc token required}" repo_name="${2:-osmo}"
-  info "Configuring NGC Helm repository..."
-  # shellcheck disable=SC2016
-  helm repo add "$repo_name" "https://helm.ngc.nvidia.com/nvidia/$repo_name" \
-    --username='$oauthtoken' --password="$token" 2>/dev/null || true
-  helm repo update >/dev/null
-}
-
-# Create NGC image pull secret
-create_ngc_secret() {
-  local ns="${1:?namespace required}" token="${2:?token required}" name="${3:-nvcr-secret}"
-  info "Creating NGC pull secret $name in namespace $ns..."
-  # shellcheck disable=SC2016
-  kubectl create secret docker-registry "$name" \
-    --namespace="$ns" \
-    --docker-server=nvcr.io \
-    --docker-username='$oauthtoken' \
-    --docker-password="$token" \
-    --dry-run=client -o yaml | kubectl apply -f -
-}
-
 # Auto-detect ACR name from terraform outputs
 detect_acr_name() {
   local tf_output="${1:?terraform output required}"

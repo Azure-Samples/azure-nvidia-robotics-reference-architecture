@@ -24,7 +24,6 @@ OPTIONS:
     --image-version TAG     OSMO image tag (default: $OSMO_IMAGE_VERSION)
     --use-acr               Pull images from ACR deployed by 001-iac
     --acr-name NAME         Pull images from specified ACR
-    --ngc-token TOKEN       NGC API token (required when not using --use-acr)
     --use-access-keys       Use storage access keys instead of workload identity
     --use-incluster-redis   Use in-cluster Redis instead of Azure Managed Redis
     --skip-mek              Skip MEK configuration
@@ -35,7 +34,6 @@ OPTIONS:
 
 EXAMPLES:
     $(basename "$0") --use-acr
-    $(basename "$0") --ngc-token \$NGC_API_KEY
     $(basename "$0") --use-acr --use-access-keys
 EOF
 }
@@ -44,7 +42,6 @@ EOF
 tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
 chart_version="$OSMO_CHART_VERSION"
 image_version="$OSMO_IMAGE_VERSION"
-ngc_token=""
 use_acr=false
 acr_name=""
 use_access_keys=false
@@ -64,7 +61,6 @@ while [[ $# -gt 0 ]]; do
     --image-version)       image_version="$2"; shift 2 ;;
     --use-acr)             use_acr=true; shift ;;
     --acr-name)            acr_name="$2"; use_acr=true; shift 2 ;;
-    --ngc-token)           ngc_token="$2"; shift 2 ;;
     --use-access-keys)     use_access_keys=true; shift ;;
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
     --use-incluster-redis) use_incluster_redis=true; shift ;;
@@ -76,8 +72,6 @@ while [[ $# -gt 0 ]]; do
     *)                     fatal "Unknown option: $1" ;;
   esac
 done
-
-[[ "$use_acr" == "false" && -z "$ngc_token" ]] && fatal "--ngc-token required when not using --use-acr"
 
 require_tools az terraform kubectl helm jq openssl envsubst
 
@@ -198,9 +192,6 @@ section "Configure Registry and Secrets"
 
 if [[ "$use_acr" == "true" ]]; then
   login_acr "$acr_name"
-else
-  setup_ngc_repo "$ngc_token"
-  create_ngc_secret "$NS_OSMO_CONTROL_PLANE" "$ngc_token"
 fi
 
 info "Creating database secret..."
@@ -294,7 +285,7 @@ section "Deployment Summary"
 print_kv "Namespace" "$NS_OSMO_CONTROL_PLANE"
 print_kv "Chart Version" "$chart_version"
 print_kv "Image Version" "$image_version"
-print_kv "Registry" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io/nvidia/osmo')"
+print_kv "Registry" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
 print_kv "PostgreSQL" "$pg_fqdn"
 print_kv "Redis" "$([[ $use_incluster_redis == true ]] && echo 'in-cluster' || echo "$redis_hostname:$redis_port")"
 print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"

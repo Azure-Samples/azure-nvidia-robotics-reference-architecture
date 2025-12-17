@@ -27,9 +27,9 @@ az aks get-credentials --resource-group <rg> --name <aks>
 
 Three authentication and registry configurations are supported. Choose based on your security requirements.
 
-### Scenario 1: Access Keys + NGC
+### Scenario 1: Access Keys
 
-Simplest setup using storage account keys and NVIDIA NGC registry.
+Simplest setup using storage account keys and public NVIDIA registry.
 
 ```bash
 # terraform.tfvars
@@ -43,15 +43,13 @@ osmo_config = {
 ```
 
 ```bash
-export NGC_API_KEY="your-ngc-token"
-
 ./01-deploy-robotics-charts.sh
 ./02-deploy-azureml-extension.sh
-./03-deploy-osmo-control-plane.sh --ngc-token "$NGC_API_KEY" --use-access-keys
-./04-deploy-osmo-backend.sh --ngc-token "$NGC_API_KEY" --use-access-keys
+./03-deploy-osmo-control-plane.sh --use-access-keys
+./04-deploy-osmo-backend.sh --use-access-keys
 ```
 
-### Scenario 2: Workload Identity + NGC
+### Scenario 2: Workload Identity
 
 Secure, key-less authentication via Azure Workload Identity.
 
@@ -67,12 +65,10 @@ osmo_config = {
 ```
 
 ```bash
-export NGC_API_KEY="your-ngc-token"
-
 ./01-deploy-robotics-charts.sh
 ./02-deploy-azureml-extension.sh
-./03-deploy-osmo-control-plane.sh --ngc-token "$NGC_API_KEY"
-./04-deploy-osmo-backend.sh --ngc-token "$NGC_API_KEY"
+./03-deploy-osmo-control-plane.sh
+./04-deploy-osmo-backend.sh
 ```
 
 Scripts auto-detect the OSMO managed identity from Terraform outputs and configure ServiceAccount annotations.
@@ -101,12 +97,10 @@ OSMO_IMAGES=(
 for img in "${OSMO_IMAGES[@]}"; do
   az acr import --name "$ACR_NAME" \
     --source "nvcr.io/nvidia/osmo/${img}:${OSMO_VERSION}" \
-    --image "osmo/${img}:${OSMO_VERSION}" \
-    --username '$oauthtoken' --password "$NGC_API_KEY"
+    --image "osmo/${img}:${OSMO_VERSION}"
 done
 
 # Import Helm charts
-helm registry login nvcr.io --username '$oauthtoken' --password "$NGC_API_KEY"
 for chart in osmo router ui backend-operator; do
   helm pull "oci://nvcr.io/nvidia/osmo/${chart}" --version "$CHART_VERSION"
   helm push "${chart}-${CHART_VERSION}.tgz" "oci://${ACR_NAME}.azurecr.io/helm"
@@ -124,11 +118,10 @@ cd ../002-setup
 
 ## Scenario Comparison
 
-| | Access Keys + NGC | Workload Identity + NGC | Workload Identity + ACR |
+| | Access Keys | Workload Identity | Workload Identity + ACR |
 |---|:---:|:---:|:---:|
 | Storage Auth | Access Keys | Workload Identity | Workload Identity |
-| Registry | NGC | NGC | Private ACR |
-| NGC Token | Required | Required | Import only |
+| Registry | nvcr.io | nvcr.io | Private ACR |
 | Air-Gap | ✗ | ✗ | ✓ |
 
 ## Scripts
@@ -144,7 +137,6 @@ cd ../002-setup
 
 | Flag | Description |
 |------|-------------|
-| `--ngc-token TOKEN` | NGC API token (required unless `--use-acr`) |
 | `--use-access-keys` | Storage account keys instead of workload identity |
 | `--use-acr` | Pull from Terraform-deployed ACR |
 | `--acr-name NAME` | Specify alternate ACR |
