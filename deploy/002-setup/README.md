@@ -207,4 +207,76 @@ kubectl describe sa osmo-service -n osmo-control-plane
 |--------|---------|
 | `optional/deploy-volcano-scheduler.sh` | Volcano (alternative to KAI) |
 | `optional/validate-gpu-metrics.sh` | GPU metrics verification |
-| `cleanup/uninstall-azureml-extension.sh` | Remove AzureML extension |
+
+## Cleanup
+
+Uninstall scripts in `cleanup/` remove cluster components in reverse deployment order.
+
+### Cleanup Scripts
+
+| Script | Removes |
+|--------|---------|
+| `cleanup/uninstall-osmo-backend.sh` | Backend operator, workflow namespaces |
+| `cleanup/uninstall-osmo-control-plane.sh` | OSMO service, router, web-ui |
+| `cleanup/uninstall-azureml-extension.sh` | ML extension, compute target, FICs |
+| `cleanup/uninstall-robotics-charts.sh` | GPU Operator, KAI Scheduler |
+
+### Uninstall Order
+
+Run scripts in this order to avoid dependency issues:
+
+```bash
+cd cleanup
+
+# 1. OSMO backend (workflows namespace, operator)
+./uninstall-osmo-backend.sh
+
+# 2. OSMO control plane (service, router, UI)
+./uninstall-osmo-control-plane.sh
+
+# 3. AzureML extension (extension, compute target)
+./uninstall-azureml-extension.sh
+
+# 4. GPU infrastructure (operator, scheduler)
+./uninstall-robotics-charts.sh
+```
+
+### Data Preservation
+
+By default, uninstall scripts preserve data. Use flags for complete removal:
+
+| Script | Preservation Flag | Description |
+|--------|-------------------|-------------|
+| `uninstall-osmo-backend.sh` | `--delete-container` | Deletes blob container with workflow artifacts |
+| `uninstall-osmo-control-plane.sh` | `--delete-mek` | Removes encryption key ConfigMap |
+| `uninstall-osmo-control-plane.sh` | `--purge-postgres` | Drops OSMO tables from PostgreSQL |
+| `uninstall-osmo-control-plane.sh` | `--purge-redis` | Flushes OSMO keys from Redis |
+| `uninstall-robotics-charts.sh` | `--delete-namespaces` | Removes gpu-operator, kai-scheduler namespaces |
+| `uninstall-robotics-charts.sh` | `--delete-crds` | Removes GPU Operator CRDs |
+
+### Full Component Cleanup
+
+Remove everything including data:
+
+```bash
+cd cleanup
+./uninstall-osmo-backend.sh --delete-container
+./uninstall-osmo-control-plane.sh --purge-postgres --purge-redis --delete-mek
+./uninstall-azureml-extension.sh --force
+./uninstall-robotics-charts.sh --delete-namespaces --delete-crds
+```
+
+### Selective Cleanup
+
+Remove only specific components:
+
+```bash
+# OSMO only (preserve AzureML and GPU infrastructure)
+./uninstall-osmo-backend.sh
+./uninstall-osmo-control-plane.sh
+
+# AzureML only (preserve OSMO)
+./uninstall-azureml-extension.sh
+```
+
+After cluster cleanup, proceed to [001-iac](../001-iac/README.md#destroy-infrastructure) to destroy Azure infrastructure.
