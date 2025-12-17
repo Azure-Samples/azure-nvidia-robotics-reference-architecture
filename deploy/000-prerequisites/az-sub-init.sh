@@ -34,6 +34,10 @@ get_current_subscription_id() {
   az account show -o tsv --query "id" 2>/dev/null
 }
 
+validate_azure_token() {
+  az account get-access-token --query "accessToken" -o tsv &>/dev/null
+}
+
 is_correct_tenant() {
   if [[ -z "${tenant}" ]]; then
     return 0 # No specific tenant required
@@ -62,6 +66,11 @@ login_to_azure() {
 }
 
 current_subscription_id=$(get_current_subscription_id)
+
+if [[ -n "${current_subscription_id}" ]] && ! validate_azure_token; then
+  echo "Azure CLI session expired. Re-authenticating..."
+  current_subscription_id=""
+fi
 
 if [[ -z "${current_subscription_id}" ]] || ! is_correct_tenant; then
   login_to_azure
