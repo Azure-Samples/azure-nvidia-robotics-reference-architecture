@@ -24,7 +24,6 @@ OPTIONS:
     --image-version TAG     OSMO image tag (default: $OSMO_IMAGE_VERSION)
     --use-acr               Pull images from ACR deployed by 001-iac
     --acr-name NAME         Pull images from specified ACR
-    --use-access-keys       Use storage access keys instead of workload identity
     --use-incluster-redis   Use in-cluster Redis instead of Azure Managed Redis
     --skip-mek              Skip MEK configuration
     --force-mek             Replace existing MEK (data loss warning)
@@ -34,7 +33,7 @@ OPTIONS:
 
 EXAMPLES:
     $(basename "$0") --use-acr
-    $(basename "$0") --use-acr --use-access-keys
+    $(basename "$0") --use-acr --use-incluster-redis
 EOF
 }
 
@@ -44,7 +43,6 @@ chart_version="$OSMO_CHART_VERSION"
 image_version="$OSMO_IMAGE_VERSION"
 use_acr=false
 acr_name=""
-use_access_keys=false
 osmo_identity_client_id=""
 use_incluster_redis=false
 skip_mek=false
@@ -61,7 +59,6 @@ while [[ $# -gt 0 ]]; do
     --image-version)       image_version="$2"; shift 2 ;;
     --use-acr)             use_acr=true; shift ;;
     --acr-name)            acr_name="$2"; use_acr=true; shift 2 ;;
-    --use-access-keys)     use_access_keys=true; shift ;;
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
     --use-incluster-redis) use_incluster_redis=true; shift ;;
     --skip-mek)            skip_mek=true; shift ;;
@@ -91,12 +88,12 @@ redis_hostname=$(tf_get "$tf_output" "managed_redis_connection_info.value.hostna
 redis_port=$(tf_get "$tf_output" "managed_redis_connection_info.value.port" "6380")
 
 [[ "$use_acr" == "true" && -z "$acr_name" ]] && acr_name=$(detect_acr_name "$tf_output")
-[[ "$use_access_keys" == "false" && -z "$osmo_identity_client_id" ]] && osmo_identity_client_id=$(detect_osmo_identity "$tf_output")
+[[ -z "$osmo_identity_client_id" ]] && osmo_identity_client_id=$(detect_osmo_identity "$tf_output" 2>/dev/null || true)
 [[ "$use_incluster_redis" == "false" && -z "$redis_hostname" ]] && fatal "Redis not deployed. Use --use-incluster-redis or ensure should_deploy_redis is true."
 
 # Get tenant ID for workload identity authentication
 tenant_id=""
-[[ "$use_access_keys" == "false" && -n "$osmo_identity_client_id" ]] && tenant_id=$(az account show --query tenantId -o tsv)
+[[ -n "$osmo_identity_client_id" ]] && tenant_id=$(az account show --query tenantId -o tsv)
 
 acr_login_server="${acr_name}.azurecr.io"
 
@@ -109,7 +106,7 @@ if [[ "$config_preview" == "true" ]]; then
   print_kv "PostgreSQL" "$pg_fqdn"
   print_kv "Redis" "$([[ $use_incluster_redis == true ]] && echo 'in-cluster' || echo "$redis_hostname:$redis_port")"
   print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
-  print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
+  print_kv "Auth Mode" "$([[ -n $osmo_identity_client_id ]] && echo 'workload-identity' || echo 'kubectl-secrets')"
   exit 0
 fi
 
@@ -137,19 +134,6 @@ section "Connect and Prepare Cluster"
 
 connect_aks "$rg" "$cluster"
 ensure_namespace "$NS_OSMO_CONTROL_PLANE"
-
-# Retrieve secrets from Key Vault (only needed for access-key mode)
-pg_password=""
-redis_key=""
-if [[ "$use_access_keys" == "true" || -z "$osmo_identity_client_id" ]]; then
-  info "Retrieving PostgreSQL password from Key Vault..."
-  pg_password=$(az keyvault secret show --vault-name "$keyvault" --name "psql-admin-password" --query value -o tsv)
-
-  if [[ "$use_incluster_redis" == "false" ]]; then
-    info "Retrieving Redis access key from Key Vault..."
-    redis_key=$(az keyvault secret show --vault-name "$keyvault" --name "redis-primary-key" --query value -o tsv)
-  fi
-fi
 
 #------------------------------------------------------------------------------
 # Configure MEK (Master Encryption Key)
@@ -201,18 +185,22 @@ if [[ "$use_acr" == "true" ]]; then
   login_acr "$acr_name"
 fi
 
-if [[ "$use_access_keys" == "false" && -n "$osmo_identity_client_id" ]]; then
-  info "Syncing secrets from Azure Key Vault via CSI driver..."
+if [[ -n "$osmo_identity_client_id" ]]; then
+  info "Applying SecretProviderClass for Azure Key Vault CSI driver..."
   apply_secret_provider_class "$NS_OSMO_CONTROL_PLANE" "$keyvault" "$osmo_identity_client_id" "$tenant_id"
 else
-  info "Creating database secret (access-key mode)..."
+  info "Workload identity not configured; retrieving secrets from Key Vault..."
+  pg_password=$(az keyvault secret show --vault-name "$keyvault" --name "psql-admin-password" --query value -o tsv)
+
+  info "Creating database secret..."
   kubectl create secret generic "$SECRET_POSTGRES" \
     --namespace="$NS_OSMO_CONTROL_PLANE" \
     --from-literal=db-password="$pg_password" \
     --dry-run=client -o yaml | kubectl apply -f -
 
   if [[ "$use_incluster_redis" == "false" ]]; then
-    info "Creating Redis secret (access-key mode)..."
+    redis_key=$(az keyvault secret show --vault-name "$keyvault" --name "redis-primary-key" --query value -o tsv)
+    info "Creating Redis secret..."
     kubectl create secret generic "$SECRET_REDIS" \
       --namespace="$NS_OSMO_CONTROL_PLANE" \
       --from-literal=redis-password="$redis_key" \
@@ -241,7 +229,7 @@ base_helm_args=(
 info "Deploying osmo/service..."
 helm_args=("${base_helm_args[@]}" -f "$service_values" --set "services.postgres.serviceName=$pg_fqdn" --set "services.postgres.user=$pg_user")
 [[ "$use_incluster_redis" == "false" ]] && helm_args+=(--set "services.redis.serviceName=$redis_hostname" --set "services.redis.port=$redis_port")
-[[ "$use_access_keys" == "false" ]] && helm_args+=(-f "$service_identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
+[[ -n "$osmo_identity_client_id" ]] && helm_args+=(-f "$service_identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
 
 if [[ "$use_acr" == "true" ]]; then
   helm upgrade -i service "oci://${acr_login_server}/helm/osmo" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
@@ -252,7 +240,7 @@ fi
 # Deploy router
 info "Deploying osmo/router..."
 helm_args=("${base_helm_args[@]}" -f "$router_values" --set "services.postgres.serviceName=$pg_fqdn" --set "services.postgres.user=$pg_user")
-[[ "$use_access_keys" == "false" ]] && helm_args+=(-f "$router_identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
+[[ -n "$osmo_identity_client_id" ]] && helm_args+=(-f "$router_identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
 
 if [[ "$use_acr" == "true" ]]; then
   helm upgrade -i router "oci://${acr_login_server}/helm/router" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
@@ -300,7 +288,7 @@ print_kv "Image Version" "$image_version"
 print_kv "Registry" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
 print_kv "PostgreSQL" "$pg_fqdn"
 print_kv "Redis" "$([[ $use_incluster_redis == true ]] && echo 'in-cluster' || echo "$redis_hostname:$redis_port")"
-print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
+print_kv "Auth Mode" "$([[ -n $osmo_identity_client_id ]] && echo 'workload-identity' || echo 'kubectl-secrets')"
 echo
 kubectl get pods -n "$NS_OSMO_CONTROL_PLANE" --no-headers | head -5
 echo
