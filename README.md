@@ -82,7 +82,6 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 ### NVIDIA Requirements
 
 - [NVIDIA Developer](https://developer.nvidia.com/) account with OSMO access
-- [NGC API Key](https://ngc.nvidia.com/setup/api-key) for container registry access
 
 ## 🏃 Quick Start
 
