@@ -22,7 +22,6 @@ resource "azurerm_storage_account" "main" {
   shared_access_key_enabled       = var.should_enable_storage_shared_access_key
   public_network_access_enabled   = var.should_enable_public_network_access
   allow_nested_items_to_be_public = false
-  tags                            = local.tags
 
   blob_properties {
     delete_retention_policy {
@@ -58,7 +57,6 @@ resource "azurerm_private_endpoint" "storage_blob" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = azurerm_subnet.private_endpoints[0].id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-blob-${local.resource_name_suffix}"
@@ -82,7 +80,6 @@ resource "azurerm_private_endpoint" "storage_file" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = azurerm_subnet.private_endpoints[0].id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-file-${local.resource_name_suffix}"

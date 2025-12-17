@@ -29,6 +29,7 @@ resource "azurerm_resource_group" "this" {
   count    = var.should_create_resource_group ? 1 : 0
   name     = local.resource_group_name
   location = var.location
+  tags     = var.tags
 }
 
 // Defer resource group data source to support build systems without plan-time permissions
@@ -71,7 +72,6 @@ module "platform" {
   resource_prefix = var.resource_prefix
   location        = var.location
   instance        = var.instance
-  tags            = {}
   resource_group  = local.resource_group
 
   // Current user OID for role assignments (from Microsoft Graph)
@@ -126,25 +126,24 @@ module "sil" {
   resource_prefix = var.resource_prefix
   location        = var.location
   instance        = var.instance
-  tags            = {}
   resource_group  = local.resource_group
 
   // Current user OID for cluster admin role assignments (from Microsoft Graph)
   current_user_oid = local.current_user_oid
 
   // Dependencies from platform module (passed as typed objects)
-  virtual_network          = module.platform.virtual_network
-  subnets                  = module.platform.subnets
-  network_security_group   = module.platform.network_security_group
-  nat_gateway              = module.platform.nat_gateway
+  virtual_network           = module.platform.virtual_network
+  subnets                   = module.platform.subnets
+  network_security_group    = module.platform.network_security_group
+  nat_gateway               = module.platform.nat_gateway
   should_enable_nat_gateway = var.should_enable_nat_gateway
-  log_analytics_workspace  = module.platform.log_analytics_workspace
-  monitor_workspace        = module.platform.monitor_workspace
-  data_collection_endpoint = module.platform.data_collection_endpoint
-  container_registry       = module.platform.container_registry
-  azureml_workspace        = module.platform.azureml_workspace
-  ml_workload_identity     = module.platform.ml_workload_identity
-  private_dns_zones        = module.platform.private_dns_zones
+  log_analytics_workspace   = module.platform.log_analytics_workspace
+  monitor_workspace         = module.platform.monitor_workspace
+  data_collection_endpoint  = module.platform.data_collection_endpoint
+  container_registry        = module.platform.container_registry
+  azureml_workspace         = module.platform.azureml_workspace
+  ml_workload_identity      = module.platform.ml_workload_identity
+  private_dns_zones         = module.platform.private_dns_zones
 
   // AKS subnet configuration - uses module defaults when null
   aks_subnet_config = {

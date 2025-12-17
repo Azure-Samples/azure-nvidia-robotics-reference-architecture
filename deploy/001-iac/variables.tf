@@ -34,6 +34,12 @@ variable "instance" {
   default     = "001"
 }
 
+variable "tags" {
+  type        = map(string)
+  description = "Tags to apply to all resources"
+  default     = {}
+}
+
 /*
  * Infrastructure Creation Flags - Optional
  */

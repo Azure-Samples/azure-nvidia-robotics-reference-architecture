@@ -64,7 +64,6 @@ resource "azurerm_key_vault_secret" "postgresql_password" {
   name         = "psql-admin-password"
   value        = random_password.postgresql[0].result
   key_vault_id = azurerm_key_vault.main.id
-  tags         = local.tags
 
   depends_on = [azurerm_role_assignment.user_kv_officer]
 }
@@ -90,7 +89,6 @@ resource "azurerm_postgresql_flexible_server" "main" {
   backup_retention_days         = 7
   geo_redundant_backup_enabled  = false
   public_network_access_enabled = false
-  tags                          = local.tags
 
   high_availability {
     mode                      = "ZoneRedundant"

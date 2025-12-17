@@ -19,7 +19,6 @@ resource "azapi_resource" "ml_workspace" {
   name      = "mlw-${local.resource_name_suffix}"
   location  = var.resource_group.location
   parent_id = var.resource_group.id
-  tags      = local.tags
 
   // Disable schema validation because azapi provider schema doesn't include
   // systemDatastoresAuthMode property, but it's valid per Microsoft ARM docs.
@@ -64,7 +63,6 @@ resource "azurerm_private_endpoint" "azureml_api" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = azurerm_subnet.private_endpoints[0].id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-ml-api-${local.resource_name_suffix}"

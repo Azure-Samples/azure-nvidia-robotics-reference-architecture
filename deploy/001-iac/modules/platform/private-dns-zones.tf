@@ -16,7 +16,6 @@ resource "azurerm_private_dns_zone" "core" {
 
   name                = each.value
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "core" {
@@ -27,7 +26,6 @@ resource "azurerm_private_dns_zone_virtual_network_link" "core" {
   private_dns_zone_name = azurerm_private_dns_zone.core[each.key].name
   virtual_network_id    = azurerm_virtual_network.main.id
   registration_enabled  = false
-  tags                  = local.tags
 }
 
 // ============================================================
@@ -40,7 +38,6 @@ resource "azurerm_private_dns_zone" "postgresql" {
 
   name                = "privatelink.postgres.database.azure.com"
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "postgresql" {
@@ -51,7 +48,6 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgresql" {
   private_dns_zone_name = azurerm_private_dns_zone.postgresql[0].name
   virtual_network_id    = azurerm_virtual_network.main.id
   registration_enabled  = false
-  tags                  = local.tags
 }
 
 // Redis DNS Zone (conditional on deployment and PE enabled)
@@ -60,7 +56,6 @@ resource "azurerm_private_dns_zone" "redis" {
 
   name                = "privatelink.redis.azure.net"
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "redis" {
@@ -71,5 +66,4 @@ resource "azurerm_private_dns_zone_virtual_network_link" "redis" {
   private_dns_zone_name = azurerm_private_dns_zone.redis[0].name
   virtual_network_id    = azurerm_virtual_network.main.id
   registration_enabled  = false
-  tags                  = local.tags
 }

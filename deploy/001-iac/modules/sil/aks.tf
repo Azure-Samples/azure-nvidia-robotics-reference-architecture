@@ -24,7 +24,6 @@ resource "azurerm_user_assigned_identity" "aks" {
   name                = "id-aks-${local.resource_name_suffix}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 // ============================================================
@@ -47,7 +46,6 @@ resource "azurerm_kubernetes_cluster" "main" {
   workload_identity_enabled         = true
   role_based_access_control_enabled = true
   node_os_upgrade_channel           = "NodeImage"
-  tags                              = local.tags
 
   default_node_pool {
     name                        = "system"
@@ -150,7 +148,6 @@ resource "azurerm_private_endpoint" "aks" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = var.subnets.private_endpoints.id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-aks-${local.resource_name_suffix}"

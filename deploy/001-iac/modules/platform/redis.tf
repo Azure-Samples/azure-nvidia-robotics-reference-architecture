@@ -28,7 +28,6 @@ resource "azurerm_managed_redis" "main" {
   }
 
   public_network_access = var.should_enable_public_network_access ? "Enabled" : "Disabled"
-  tags                  = local.tags
 }
 
 // ============================================================
@@ -41,7 +40,6 @@ resource "azurerm_key_vault_secret" "redis_primary_key" {
   name         = "redis-primary-key"
   value        = azurerm_managed_redis.main[0].default_database[0].primary_access_key
   key_vault_id = azurerm_key_vault.main.id
-  tags         = local.tags
 
   depends_on = [azurerm_role_assignment.user_kv_officer]
 }
@@ -57,7 +55,6 @@ resource "azurerm_private_endpoint" "redis" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = azurerm_subnet.private_endpoints[0].id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-redis-${local.resource_name_suffix}"

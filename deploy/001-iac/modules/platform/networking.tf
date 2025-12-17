@@ -15,7 +15,6 @@ resource "azurerm_network_security_group" "main" {
   name                = "nsg-${local.resource_name_suffix}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 // Virtual Network
@@ -24,7 +23,6 @@ resource "azurerm_virtual_network" "main" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   address_space       = [var.virtual_network_config.address_space]
-  tags                = local.tags
 }
 
 // Main Subnet - General workloads
@@ -70,7 +68,6 @@ resource "azurerm_public_ip" "nat_gateway" {
   allocation_method   = "Static"
   sku                 = "Standard"
   zones               = ["1"]
-  tags                = local.tags
 }
 
 // NAT Gateway
@@ -83,7 +80,6 @@ resource "azurerm_nat_gateway" "main" {
   sku_name                = "Standard"
   idle_timeout_in_minutes = 10
   zones                   = ["1"]
-  tags                    = local.tags
 }
 
 // NAT Gateway Public IP Association
@@ -134,7 +130,6 @@ resource "azurerm_private_dns_resolver" "main" {
   resource_group_name = var.resource_group.name
   location            = var.resource_group.location
   virtual_network_id  = azurerm_virtual_network.main.id
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_resolver_inbound_endpoint" "main" {
@@ -143,7 +138,6 @@ resource "azurerm_private_dns_resolver_inbound_endpoint" "main" {
   name                    = "ipe-${local.resource_name_suffix}"
   private_dns_resolver_id = azurerm_private_dns_resolver.main[0].id
   location                = var.resource_group.location
-  tags                    = local.tags
 
   ip_configurations {
     private_ip_allocation_method = "Dynamic"
