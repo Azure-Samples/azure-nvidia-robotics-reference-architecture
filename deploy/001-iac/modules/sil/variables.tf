@@ -205,3 +205,17 @@ variable "osmo_config" {
     workflows_namespace      = "osmo-workflows"
   }
 }
+
+/*
+ * Key Vault Variables
+ */
+
+variable "key_vault" {
+  description = "Key Vault from platform module for secrets provider configuration"
+  type = object({
+    id        = string
+    name      = string
+    vault_uri = string
+  })
+  default = null
+}

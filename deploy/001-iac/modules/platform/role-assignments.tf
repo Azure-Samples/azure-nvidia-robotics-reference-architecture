@@ -118,6 +118,19 @@ resource "azurerm_role_assignment" "ml_acr_pull" {
 }
 
 // ============================================================
+// OSMO Workload Identity Role Assignments
+// ============================================================
+
+// Grant OSMO identity Key Vault Secrets User for CSI secrets provider
+resource "azurerm_role_assignment" "osmo_kv_secrets_user" {
+  count = var.should_enable_osmo_identity ? 1 : 0
+
+  scope                = azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.osmo[0].principal_id
+}
+
+// ============================================================
 // Grafana Role Assignments
 // ============================================================
 

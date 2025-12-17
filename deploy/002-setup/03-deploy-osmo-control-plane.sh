@@ -94,6 +94,10 @@ redis_port=$(tf_get "$tf_output" "managed_redis_connection_info.value.port" "638
 [[ "$use_access_keys" == "false" && -z "$osmo_identity_client_id" ]] && osmo_identity_client_id=$(detect_osmo_identity "$tf_output")
 [[ "$use_incluster_redis" == "false" && -z "$redis_hostname" ]] && fatal "Redis not deployed. Use --use-incluster-redis or ensure should_deploy_redis is true."
 
+# Get tenant ID for workload identity authentication
+tenant_id=""
+[[ "$use_access_keys" == "false" && -n "$osmo_identity_client_id" ]] && tenant_id=$(az account show --query tenantId -o tsv)
+
 acr_login_server="${acr_name}.azurecr.io"
 
 if [[ "$config_preview" == "true" ]]; then
@@ -134,14 +138,17 @@ section "Connect and Prepare Cluster"
 connect_aks "$rg" "$cluster"
 ensure_namespace "$NS_OSMO_CONTROL_PLANE"
 
-# Retrieve secrets from Key Vault
-info "Retrieving PostgreSQL password from Key Vault..."
-pg_password=$(az keyvault secret show --vault-name "$keyvault" --name "psql-admin-password" --query value -o tsv)
-
+# Retrieve secrets from Key Vault (only needed for access-key mode)
+pg_password=""
 redis_key=""
-if [[ "$use_incluster_redis" == "false" ]]; then
-  info "Retrieving Redis access key from Key Vault..."
-  redis_key=$(az keyvault secret show --vault-name "$keyvault" --name "redis-primary-key" --query value -o tsv)
+if [[ "$use_access_keys" == "true" || -z "$osmo_identity_client_id" ]]; then
+  info "Retrieving PostgreSQL password from Key Vault..."
+  pg_password=$(az keyvault secret show --vault-name "$keyvault" --name "psql-admin-password" --query value -o tsv)
+
+  if [[ "$use_incluster_redis" == "false" ]]; then
+    info "Retrieving Redis access key from Key Vault..."
+    redis_key=$(az keyvault secret show --vault-name "$keyvault" --name "redis-primary-key" --query value -o tsv)
+  fi
 fi
 
 #------------------------------------------------------------------------------
@@ -194,18 +201,23 @@ if [[ "$use_acr" == "true" ]]; then
   login_acr "$acr_name"
 fi
 
-info "Creating database secret..."
-kubectl create secret generic "$SECRET_POSTGRES" \
-  --namespace="$NS_OSMO_CONTROL_PLANE" \
-  --from-literal=db-password="$pg_password" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-if [[ "$use_incluster_redis" == "false" ]]; then
-  info "Creating Redis secret..."
-  kubectl create secret generic "$SECRET_REDIS" \
+if [[ "$use_access_keys" == "false" && -n "$osmo_identity_client_id" ]]; then
+  info "Syncing secrets from Azure Key Vault via CSI driver..."
+  apply_secret_provider_class "$NS_OSMO_CONTROL_PLANE" "$keyvault" "$osmo_identity_client_id" "$tenant_id"
+else
+  info "Creating database secret (access-key mode)..."
+  kubectl create secret generic "$SECRET_POSTGRES" \
     --namespace="$NS_OSMO_CONTROL_PLANE" \
-    --from-literal=redis-password="$redis_key" \
+    --from-literal=db-password="$pg_password" \
     --dry-run=client -o yaml | kubectl apply -f -
+
+  if [[ "$use_incluster_redis" == "false" ]]; then
+    info "Creating Redis secret (access-key mode)..."
+    kubectl create secret generic "$SECRET_REDIS" \
+      --namespace="$NS_OSMO_CONTROL_PLANE" \
+      --from-literal=redis-password="$redis_key" \
+      --dry-run=client -o yaml | kubectl apply -f -
+  fi
 fi
 
 # Apply internal LB ingress if present

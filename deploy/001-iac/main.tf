@@ -183,6 +183,9 @@ module "sil" {
     workflows_namespace      = var.osmo_config.workflows_namespace
   }
 
+  // Key Vault for secrets provider configuration
+  key_vault = module.platform.key_vault
+
   // Feature flags
   should_enable_private_endpoint = var.should_enable_private_endpoint
 }
