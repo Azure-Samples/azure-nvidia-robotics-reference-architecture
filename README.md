@@ -91,6 +91,9 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 # Set subscription for Terraform
 source deploy/000-prerequisites/az-sub-init.sh
 
+# Register providers (new subscriptions only)
+./deploy/000-prerequisites/register-azure-providers.sh
+
 cd deploy/001-iac
 
 # Create terraform.tfvars with your values

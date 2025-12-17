@@ -16,13 +16,16 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 # 1. Set subscription
 source 000-prerequisites/az-sub-init.sh
 
-# 2. Deploy infrastructure
+# 2. Register providers (new subscriptions only)
+./000-prerequisites/register-azure-providers.sh
+
+# 3. Deploy infrastructure
 cd 001-iac
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values
 terraform init && terraform apply
 
-# 3. Configure cluster
+# 4. Configure cluster
 cd ../002-setup
 ./01-deploy-robotics-charts.sh
 ./02-deploy-azureml-extension.sh
