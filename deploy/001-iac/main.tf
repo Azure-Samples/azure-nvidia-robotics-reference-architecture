@@ -78,6 +78,7 @@ module "platform" {
   current_user_oid = local.current_user_oid
 
   // Networking configuration
+  should_enable_nat_gateway = var.should_enable_nat_gateway
   virtual_network_config = {
     address_space                  = var.virtual_network_config.address_space
     subnet_address_prefix_main     = var.virtual_network_config.subnet_address_prefix
@@ -136,6 +137,7 @@ module "sil" {
   subnets                  = module.platform.subnets
   network_security_group   = module.platform.network_security_group
   nat_gateway              = module.platform.nat_gateway
+  should_enable_nat_gateway = var.should_enable_nat_gateway
   log_analytics_workspace  = module.platform.log_analytics_workspace
   monitor_workspace        = module.platform.monitor_workspace
   data_collection_endpoint = module.platform.data_collection_endpoint

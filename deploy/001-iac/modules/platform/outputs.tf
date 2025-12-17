@@ -39,10 +39,10 @@ output "network_security_group" {
 }
 
 output "nat_gateway" {
-  description = "NAT Gateway for outbound connectivity"
-  value = {
-    id = azurerm_nat_gateway.main.id
-  }
+  description = "NAT Gateway for outbound connectivity. Null when NAT Gateway is disabled"
+  value = try({
+    id = azurerm_nat_gateway.main[0].id
+  }, null)
 }
 
 /*

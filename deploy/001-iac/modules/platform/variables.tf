@@ -19,6 +19,12 @@ variable "current_user_oid" {
  * Networking Variables
  */
 
+variable "should_enable_nat_gateway" {
+  type        = bool
+  description = "Whether to deploy NAT Gateway for explicit outbound connectivity. When true, subnets use NAT Gateway; when false, subnets use Azure default outbound access"
+  default     = true
+}
+
 variable "virtual_network_config" {
   type = object({
     address_space                  = string

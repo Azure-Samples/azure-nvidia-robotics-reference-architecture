@@ -25,6 +25,12 @@ variable "should_enable_private_endpoint" {
   default     = true
 }
 
+variable "should_enable_nat_gateway" {
+  type        = bool
+  description = "Whether NAT Gateway is enabled for outbound connectivity. When true, subnets disable default outbound access; when false, subnets use Azure default outbound access"
+  default     = true
+}
+
 /*
  * Cluster Admin Configuration
  */

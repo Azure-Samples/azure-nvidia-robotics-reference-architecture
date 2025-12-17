@@ -41,7 +41,7 @@ variable "nat_gateway" {
   type = object({
     id = string
   })
-  description = "NAT Gateway from platform module"
+  description = "NAT Gateway from platform module. Null when NAT Gateway is disabled"
 }
 
 variable "log_analytics_workspace" {

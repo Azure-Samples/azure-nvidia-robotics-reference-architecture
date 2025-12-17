@@ -88,7 +88,7 @@ variable "postgresql_databases" {
 
 variable "postgresql_subnet_address_prefixes" {
   type        = list(string)
-  description = "Address prefixes for the PostgreSQL delegated subnet."
+  description = "Address prefixes for the PostgreSQL delegated subnet"
   default     = ["10.0.12.0/24"]
 }
 
@@ -172,6 +172,12 @@ variable "resource_group_name" {
 /*
  * Networking Configuration - Optional
  */
+
+variable "should_enable_nat_gateway" {
+  type        = bool
+  description = "Whether to deploy NAT Gateway for explicit outbound connectivity. When true, subnets use NAT Gateway; when false, subnets use Azure default outbound access"
+  default     = true
+}
 
 variable "virtual_network_config" {
   type = object({

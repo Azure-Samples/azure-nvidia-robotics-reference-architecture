@@ -17,11 +17,12 @@
 resource "azurerm_subnet" "postgresql" {
   count = var.should_deploy_postgresql ? 1 : 0
 
-  name                 = "snet-psql-${local.resource_name_suffix}"
-  resource_group_name  = var.resource_group.name
-  virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = var.postgresql_config.subnet_prefixes
-  service_endpoints    = ["Microsoft.Storage"]
+  name                            = "snet-psql-${local.resource_name_suffix}"
+  resource_group_name             = var.resource_group.name
+  virtual_network_name            = azurerm_virtual_network.main.name
+  address_prefixes                = var.postgresql_config.subnet_prefixes
+  service_endpoints               = ["Microsoft.Storage"]
+  default_outbound_access_enabled = !var.should_enable_nat_gateway
 
   delegation {
     name = "postgresql-delegation"
