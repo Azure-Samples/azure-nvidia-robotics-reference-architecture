@@ -25,7 +25,6 @@ resource "azurerm_log_analytics_workspace" "main" {
   retention_in_days          = 30
   internet_ingestion_enabled = var.should_enable_public_network_access
   internet_query_enabled     = var.should_enable_public_network_access
-  tags                       = local.tags
 }
 
 // ============================================================
@@ -40,7 +39,6 @@ resource "azurerm_application_insights" "main" {
   application_type           = "other"
   internet_ingestion_enabled = var.should_enable_public_network_access
   internet_query_enabled     = var.should_enable_public_network_access
-  tags                       = local.tags
 }
 
 // ============================================================
@@ -52,7 +50,6 @@ resource "azurerm_monitor_workspace" "main" {
   location                      = var.resource_group.location
   resource_group_name           = var.resource_group.name
   public_network_access_enabled = var.should_enable_public_network_access
-  tags                          = local.tags
 }
 
 // ============================================================
@@ -69,7 +66,6 @@ resource "azurerm_dashboard_grafana" "main" {
   grafana_major_version             = 11
   sku                               = "Standard"
   zone_redundancy_enabled           = false
-  tags                              = local.tags
 
   azure_monitor_workspace_integrations {
     resource_id = azurerm_monitor_workspace.main.id
@@ -90,7 +86,6 @@ resource "azurerm_monitor_data_collection_endpoint" "main" {
   resource_group_name           = var.resource_group.name
   kind                          = "Linux"
   public_network_access_enabled = var.should_enable_public_network_access
-  tags                          = local.tags
 }
 
 // ============================================================
@@ -104,7 +99,6 @@ resource "azurerm_monitor_private_link_scope" "main" {
   resource_group_name   = var.resource_group.name
   ingestion_access_mode = "Open"
   query_access_mode     = "PrivateOnly"
-  tags                  = local.tags
 }
 
 // Link Log Analytics Workspace to AMPLS
@@ -148,7 +142,6 @@ resource "azurerm_private_endpoint" "monitor" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = azurerm_subnet.private_endpoints[0].id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-monitor-${local.resource_name_suffix}"

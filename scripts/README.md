@@ -10,7 +10,7 @@ ms.topic: reference
 
 Submission scripts for training and validation workflows on Azure ML and OSMO platforms.
 
-## Submission Scripts
+## 📜 Submission Scripts
 
 | Script | Purpose | Platform |
 |--------|---------|----------|
@@ -19,7 +19,7 @@ Submission scripts for training and validation workflows on Azure ML and OSMO pl
 | `submit-osmo-training.sh` | Package code and submit OSMO workflow (base64) | OSMO |
 | `submit-osmo-dataset-training.sh` | Submit OSMO workflow using dataset folder injection | OSMO |
 
-## Quick Start
+## 🚀 Quick Start
 
 Scripts auto-detect Azure context from Terraform outputs in `deploy/001-iac/`:
 
@@ -37,7 +37,7 @@ Scripts auto-detect Azure context from Terraform outputs in `deploy/001-iac/`:
 ./submit-azureml-validation.sh --model-name anymal-c-velocity --model-version 1
 ```
 
-## OSMO Dataset Training
+## 💾 OSMO Dataset Training
 
 The `submit-osmo-dataset-training.sh` script uploads `src/training/` as a versioned OSMO dataset. This approach removes the ~1MB size limit of base64-encoded archives and enables dataset reuse across runs.
 
@@ -70,7 +70,7 @@ The `submit-osmo-dataset-training.sh` script uploads `src/training/` as a versio
 
 The script stages files to exclude `__pycache__` and build artifacts via `.amlignore` patterns before upload.
 
-## Configuration
+## ⚙️ Configuration
 
 Scripts resolve values in order: CLI arguments → environment variables → Terraform outputs.
 
@@ -84,7 +84,7 @@ Scripts resolve values in order: CLI arguments → environment variables → Ter
 | `OSMO_DATASET_BUCKET` | Dataset bucket for OSMO training |
 | `OSMO_DATASET_NAME` | Dataset name for OSMO training |
 
-## Library
+## 📚 Library
 
 | File | Purpose |
 |------|---------|
@@ -99,7 +99,7 @@ get_aks_cluster_name   # Returns AKS cluster name
 get_azureml_workspace  # Returns ML workspace name
 ```
 
-## Related Documentation
+## 🔗 Related Documentation
 
 | Resource | Description |
 |----------|-------------|

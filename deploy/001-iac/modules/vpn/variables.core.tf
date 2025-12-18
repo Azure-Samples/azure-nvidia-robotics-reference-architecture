@@ -31,7 +31,7 @@ variable "resource_group" {
     name     = string
     location = string
   })
-  description = "Resource group object for all resources"
+  description = "Resource group object containing name, id, and location"
 }
 
 variable "resource_prefix" {

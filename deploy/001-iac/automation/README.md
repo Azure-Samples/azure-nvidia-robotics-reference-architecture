@@ -2,16 +2,16 @@
 
 Azure Automation account for scheduled infrastructure operations.
 
-## Purpose
+## 🎯 Purpose
 
 Runs scheduled PowerShell runbooks to manage infrastructure resources, such as starting PostgreSQL and AKS at the beginning of business hours to reduce costs.
 
-## Prerequisites
+## 📋 Prerequisites
 
 - Platform infrastructure deployed (`cd .. && terraform apply`)
 - Core variables matching parent deployment
 
-## Usage
+## 🚀 Usage
 
 ```bash
 cd deploy/001-iac/automation
@@ -22,7 +22,7 @@ cd deploy/001-iac/automation
 terraform init && terraform apply
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 Example `terraform.tfvars`:
 
@@ -41,13 +41,13 @@ schedule_config = {
 }
 ```
 
-## Resources Created
+## 📦 Resources Created
 
 - Azure Automation Account with system-assigned managed identity
 - PowerShell 7.2 runbook for starting resources
 - Weekly schedule with configurable days and start time
 - Role assignments for AKS and PostgreSQL management
 
-## Related
+## 🔗 Related
 
 - [Parent README](../README.md) - Main infrastructure documentation

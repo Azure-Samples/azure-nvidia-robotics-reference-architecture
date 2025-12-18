@@ -20,7 +20,6 @@ resource "azurerm_monitor_data_collection_rule" "logs" {
   resource_group_name         = var.resource_group.name
   data_collection_endpoint_id = var.data_collection_endpoint.id
   kind                        = "Linux"
-  tags                        = local.tags
 
   destinations {
     log_analytics {
@@ -58,7 +57,6 @@ resource "azurerm_monitor_data_collection_rule" "metrics" {
   resource_group_name         = var.resource_group.name
   data_collection_endpoint_id = var.data_collection_endpoint.id
   kind                        = "Linux"
-  tags                        = local.tags
 
   destinations {
     monitor_account {

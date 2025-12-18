@@ -2,14 +2,14 @@
 
 AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 
-## Prerequisites
+## 📋 Prerequisites
 
 - Terraform infrastructure deployed (`cd ../001-iac && terraform apply`)
 - Azure CLI authenticated (`az login`)
 - kubectl, Helm 3.x, jq installed
 - OSMO CLI (`osmo`) for backend deployment
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 # Connect to cluster (values from terraform output)
@@ -23,7 +23,7 @@ az aks get-credentials --resource-group <rg> --name <aks>
 # - OSMO:    ./03-deploy-osmo-control-plane.sh && ./04-deploy-osmo-backend.sh
 ```
 
-## Deployment Scenarios
+## 🔐 Deployment Scenarios
 
 Three authentication and registry configurations are supported. Choose based on your security requirements.
 
@@ -45,7 +45,7 @@ osmo_config = {
 ```bash
 ./01-deploy-robotics-charts.sh
 ./02-deploy-azureml-extension.sh
-./03-deploy-osmo-control-plane.sh --use-access-keys
+./03-deploy-osmo-control-plane.sh
 ./04-deploy-osmo-backend.sh --use-access-keys
 ```
 
@@ -116,7 +116,7 @@ cd ../002-setup
 ./04-deploy-osmo-backend.sh --use-acr
 ```
 
-## Scenario Comparison
+## ⚖️ Scenario Comparison
 
 | | Access Keys | Workload Identity | Workload Identity + ACR |
 |---|:---:|:---:|:---:|
@@ -124,7 +124,7 @@ cd ../002-setup
 | Registry | nvcr.io | nvcr.io | Private ACR |
 | Air-Gap | ✗ | ✗ | ✓ |
 
-## Scripts
+## 📜 Scripts
 
 | Script | Purpose |
 |--------|---------|
@@ -133,16 +133,16 @@ cd ../002-setup
 | `03-deploy-osmo-control-plane.sh` | OSMO service, router, web-ui |
 | `04-deploy-osmo-backend.sh` | Backend operator, workflow storage |
 
-## Script Flags
+## 🚩 Script Flags
 
-| Flag | Description |
-|------|-------------|
-| `--use-access-keys` | Storage account keys instead of workload identity |
-| `--use-acr` | Pull from Terraform-deployed ACR |
-| `--acr-name NAME` | Specify alternate ACR |
-| `--config-preview` | Print config and exit |
+| Flag | Scripts | Description |
+|------|---------|-------------|
+| `--use-access-keys` | `04-deploy-osmo-backend.sh` | Storage account keys instead of workload identity |
+| `--use-acr` | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Pull from Terraform-deployed ACR |
+| `--acr-name NAME` | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Specify alternate ACR |
+| `--config-preview` | All | Print config and exit |
 
-## Configuration
+## ⚙️ Configuration
 
 Scripts read from Terraform outputs in `../001-iac/`. Override with environment variables:
 
@@ -152,7 +152,7 @@ Scripts read from Terraform outputs in `../001-iac/`. Override with environment 
 | `AZURE_RESOURCE_GROUP` | Resource group |
 | `AKS_CLUSTER_NAME` | Cluster name |
 
-## Verification
+## ✅ Verification
 
 ```bash
 # Check pods
@@ -169,7 +169,7 @@ osmo backend list
 kubectl get sa -n osmo-control-plane osmo-service -o yaml | grep azure.workload.identity
 ```
 
-## Troubleshooting
+## 🔍 Troubleshooting
 
 ```bash
 # Workload identity
@@ -185,7 +185,7 @@ kubectl get secret postgres-secret -n osmo-control-plane
 kubectl describe sa osmo-service -n osmo-control-plane
 ```
 
-## Directory Structure
+## 📁 Directory Structure
 
 ```
 002-setup/
@@ -201,14 +201,15 @@ kubectl describe sa osmo-service -n osmo-control-plane
 └── values/                     # Helm values files
 ```
 
-## Optional Scripts
+## 🧩 Optional Scripts
 
 | Script | Purpose |
 |--------|---------|
 | `optional/deploy-volcano-scheduler.sh` | Volcano (alternative to KAI) |
-| `optional/validate-gpu-metrics.sh` | GPU metrics verification |
+| `optional/uninstall-volcano-scheduler.sh` | Remove Volcano scheduler |
+| `optional/add-user-to-platform.sh` | Add user to OSMO platform |
 
-## Cleanup
+## 🗑️ Cleanup
 
 Uninstall scripts in `cleanup/` remove cluster components in reverse deployment order.
 

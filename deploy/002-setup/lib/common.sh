@@ -118,3 +118,23 @@ section() {
 print_kv() {
   printf '%-18s %s\n' "$1:" "$2"
 }
+
+# Apply SecretProviderClass for Azure Key Vault secrets sync
+# Usage: apply_secret_provider_class <namespace> <keyvault> <client_id> <tenant_id>
+apply_secret_provider_class() {
+  local namespace="${1:?namespace required}"
+  local keyvault="${2:?keyvault name required}"
+  local client_id="${3:?client_id required}"
+  local tenant_id="${4:?tenant_id required}"
+
+  local manifest_dir
+  manifest_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/manifests"
+
+  export NAMESPACE="$namespace"
+  export KEY_VAULT_NAME="$keyvault"
+  export OSMO_CLIENT_ID="$client_id"
+  export TENANT_ID="$tenant_id"
+
+  info "Applying SecretProviderClass to namespace $namespace..."
+  envsubst < "$manifest_dir/aks-secret-provider-class.yaml" | kubectl apply -f -
+}

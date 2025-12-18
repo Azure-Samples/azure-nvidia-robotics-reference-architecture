@@ -21,7 +21,6 @@ resource "azurerm_container_registry" "main" {
   admin_enabled                 = false
   anonymous_pull_enabled        = false
   public_network_access_enabled = var.should_enable_public_network_access
-  tags                          = local.tags
 }
 
 // ============================================================
@@ -35,7 +34,6 @@ resource "azurerm_private_endpoint" "acr" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = azurerm_subnet.private_endpoints[0].id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-acr-${local.resource_name_suffix}"

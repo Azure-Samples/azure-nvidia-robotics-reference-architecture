@@ -43,6 +43,13 @@ locals {
       sa_name   = "osmo-workflow"
     }
   } : {}
+
+  // Namespaces requiring default ServiceAccount federation for CSI secrets provider
+  osmo_namespaces_for_default_sa = [
+    var.osmo_config.control_plane_namespace,
+    var.osmo_config.operator_namespace,
+    var.osmo_config.workflows_namespace,
+  ]
 }
 
 resource "azurerm_federated_identity_credential" "osmo" {
@@ -53,5 +60,22 @@ resource "azurerm_federated_identity_credential" "osmo" {
   parent_id           = var.osmo_workload_identity.id
   issuer              = azurerm_kubernetes_cluster.main.oidc_issuer_url
   subject             = "system:serviceaccount:${each.value.namespace}:${each.value.sa_name}"
+  audience            = ["api://AzureADTokenExchange"]
+}
+
+// ============================================================
+// OSMO Default ServiceAccount Federation (for CSI Secrets Provider)
+// ============================================================
+// Links default ServiceAccount in each namespace to OSMO identity
+// enabling workload identity authentication for SecretProviderClass
+
+resource "azurerm_federated_identity_credential" "osmo_default_sa" {
+  for_each = var.osmo_config.should_federate_identity ? toset(local.osmo_namespaces_for_default_sa) : toset([])
+
+  name                = "osmo-${each.key}-default-sa-fic"
+  resource_group_name = var.resource_group.name
+  parent_id           = var.osmo_workload_identity.id
+  issuer              = azurerm_kubernetes_cluster.main.oidc_issuer_url
+  subject             = "system:serviceaccount:${each.key}:default"
   audience            = ["api://AzureADTokenExchange"]
 }

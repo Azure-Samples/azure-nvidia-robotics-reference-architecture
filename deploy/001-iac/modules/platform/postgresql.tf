@@ -17,11 +17,12 @@
 resource "azurerm_subnet" "postgresql" {
   count = var.should_deploy_postgresql ? 1 : 0
 
-  name                 = "snet-psql-${local.resource_name_suffix}"
-  resource_group_name  = var.resource_group.name
-  virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = var.postgresql_config.subnet_prefixes
-  service_endpoints    = ["Microsoft.Storage"]
+  name                            = "snet-psql-${local.resource_name_suffix}"
+  resource_group_name             = var.resource_group.name
+  virtual_network_name            = azurerm_virtual_network.main.name
+  address_prefixes                = var.postgresql_config.subnet_prefixes
+  service_endpoints               = ["Microsoft.Storage"]
+  default_outbound_access_enabled = !var.should_enable_nat_gateway
 
   delegation {
     name = "postgresql-delegation"
@@ -63,7 +64,6 @@ resource "azurerm_key_vault_secret" "postgresql_password" {
   name         = "psql-admin-password"
   value        = random_password.postgresql[0].result
   key_vault_id = azurerm_key_vault.main.id
-  tags         = local.tags
 
   depends_on = [azurerm_role_assignment.user_kv_officer]
 }
@@ -85,15 +85,17 @@ resource "azurerm_postgresql_flexible_server" "main" {
   private_dns_zone_id           = azurerm_private_dns_zone.postgresql[0].id
   administrator_login           = "psqladmin"
   administrator_password        = random_password.postgresql[0].result
-  zone                          = "1"
+  zone                          = var.postgresql_config.zone
   backup_retention_days         = 7
   geo_redundant_backup_enabled  = false
   public_network_access_enabled = false
-  tags                          = local.tags
 
-  high_availability {
-    mode                      = "ZoneRedundant"
-    standby_availability_zone = "2"
+  dynamic "high_availability" {
+    for_each = var.postgresql_config.high_availability_enabled ? [1] : []
+    content {
+      mode                      = "ZoneRedundant"
+      standby_availability_zone = var.postgresql_config.standby_availability_zone
+    }
   }
 
   depends_on = [azurerm_private_dns_zone_virtual_network_link.postgresql]

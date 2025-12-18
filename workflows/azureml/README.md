@@ -10,14 +10,14 @@ ms.topic: reference
 
 Azure Machine Learning job templates for Isaac Lab training and validation workloads.
 
-## Available Templates
+## 📜 Available Templates
 
 | Template | Purpose | Submission Script |
 |----------|---------|-------------------|
 | [train.yaml](train.yaml) | Training jobs with checkpoint support | `scripts/submit-azureml-training.sh` |
 | [validate.yaml](validate.yaml) | Policy validation and inference | `scripts/submit-azureml-validation.sh` |
 
-## Training Job (`train.yaml`)
+## 🏋️ Training Job (`train.yaml`)
 
 Submits Isaac Lab reinforcement learning training to AKS GPU nodes via Azure ML.
 
@@ -44,7 +44,7 @@ Submits Isaac Lab reinforcement learning training to AKS GPU nodes via Azure ML.
   --workspace-name mlw-custom
 ```
 
-## Validation Job (`validate.yaml`)
+## ✅ Validation Job (`validate.yaml`)
 
 Runs trained policy validation and generates inference metrics.
 
@@ -68,7 +68,7 @@ Runs trained policy validation and generates inference metrics.
   --checkpoint-path "azureml://datastores/checkpoints/paths/model.pt"
 ```
 
-## Environment Variables
+## ⚙️ Environment Variables
 
 All scripts support environment variable configuration:
 
@@ -79,7 +79,7 @@ All scripts support environment variable configuration:
 | `AZUREML_WORKSPACE_NAME` | Azure ML workspace name |
 | `AZUREML_COMPUTE` | Compute target name |
 
-## Prerequisites
+## 📋 Prerequisites
 
 1. Azure ML extension installed on AKS cluster
 2. Kubernetes compute target attached to workspace

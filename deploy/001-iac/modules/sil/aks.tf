@@ -24,7 +24,6 @@ resource "azurerm_user_assigned_identity" "aks" {
   name                = "id-aks-${local.resource_name_suffix}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 // ============================================================
@@ -47,20 +46,19 @@ resource "azurerm_kubernetes_cluster" "main" {
   workload_identity_enabled         = true
   role_based_access_control_enabled = true
   node_os_upgrade_channel           = "NodeImage"
-  tags                              = local.tags
 
   default_node_pool {
     name                        = "system"
-    vm_size                     = var.aks_config.node_vm_size
-    node_count                  = var.aks_config.enable_auto_scaling ? null : var.aks_config.node_count
-    auto_scaling_enabled        = var.aks_config.enable_auto_scaling
-    min_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.min_count : null
-    max_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.max_count : null
+    vm_size                     = var.aks_config.system_node_pool_vm_size
+    node_count                  = var.aks_config.system_node_pool_enable_auto_scaling ? null : var.aks_config.system_node_pool_node_count
+    auto_scaling_enabled        = var.aks_config.system_node_pool_enable_auto_scaling
+    min_count                   = var.aks_config.system_node_pool_enable_auto_scaling ? var.aks_config.system_node_pool_min_count : null
+    max_count                   = var.aks_config.system_node_pool_enable_auto_scaling ? var.aks_config.system_node_pool_max_count : null
     vnet_subnet_id              = azurerm_subnet.aks.id
     os_disk_size_gb             = 128
     os_disk_type                = "Ephemeral"
     temporary_name_for_rotation = "systemtemp"
-    zones                       = ["1"]
+    zones                       = var.aks_config.system_node_pool_zones
 
     upgrade_settings {
       max_surge                     = "10%"
@@ -150,7 +148,6 @@ resource "azurerm_private_endpoint" "aks" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = var.subnets.private_endpoints.id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-aks-${local.resource_name_suffix}"

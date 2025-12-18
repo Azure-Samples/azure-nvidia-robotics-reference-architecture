@@ -16,10 +16,4 @@ locals {
 
   // Private endpoint configuration
   pe_enabled = var.should_enable_private_endpoint
-
-  // Combined resource tags
-  tags = merge(var.tags, {
-    module      = "sil"
-    environment = var.environment
-  })
 }
