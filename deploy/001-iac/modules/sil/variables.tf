@@ -216,12 +216,3 @@ variable "osmo_config" {
  * Key Vault Variables
  */
 
-variable "key_vault" {
-  description = "Key Vault from platform module for secrets provider configuration"
-  type = object({
-    id        = string
-    name      = string
-    vault_uri = string
-  })
-  default = null
-}

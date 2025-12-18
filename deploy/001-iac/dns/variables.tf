@@ -13,11 +13,6 @@ variable "environment" {
   description = "Environment for all resources in this module: dev, test, or prod"
 }
 
-variable "location" {
-  type        = string
-  description = "Location for all resources in this module"
-}
-
 variable "resource_prefix" {
   type        = string
   description = "Prefix for all resources in this module"
