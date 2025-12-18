@@ -40,7 +40,6 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | `should_enable_public_network_access` | Allow public access to resources | `true` |
 | `should_deploy_postgresql` | Deploy PostgreSQL Flexible Server for OSMO | `true` |
 | `should_deploy_redis` | Deploy Azure Managed Redis for OSMO | `true` |
-| `should_integrate_aks_cluster` | Install AzureML extension and compute target | `false` |
 
 ### OSMO Workload Identity
 
@@ -75,7 +74,6 @@ Root Module (001-iac/)
 └── SiL Module              # AKS-specific infrastructure
     ├── AKS Cluster         # Azure CNI Overlay, workload identity
     ├── GPU Node Pools      # Configurable via node_pools variable
-    ├── AzureML Extension   # Training/inference support (optional)
     └── Observability       # Container Insights, Prometheus DCRs
 ```
 
@@ -87,7 +85,7 @@ Root Module (001-iac/)
 | Security | Key Vault (RBAC mode), ML identity, OSMO identity |
 | Observability | Log Analytics, App Insights, Monitor Workspace, Grafana, DCE, AMPLS |
 | Storage | Storage Account (blob/file), Container Registry (Premium) |
-| Machine Learning | AzureML Workspace, Kubernetes compute target, ML extension |
+| Machine Learning | AzureML Workspace |
 | AKS | Cluster with Azure CNI Overlay, system pool, GPU node pools |
 | Private DNS | 11 core zones (Key Vault, Storage, ACR, ML, AKS, Monitor) |
 | OSMO Services | PostgreSQL Flexible Server (HA), Azure Managed Redis |
@@ -100,14 +98,13 @@ Root Module (001-iac/)
 | `should_enable_nat_gateway` | NAT Gateway, Public IP, subnet associations |
 | `should_deploy_postgresql` | PostgreSQL server, databases, delegated subnet, DNS zone |
 | `should_deploy_redis` | Redis cache, private endpoint (if PE enabled), DNS zone |
-| `should_integrate_aks_cluster` | AzureML Extension, Kubernetes compute, federated credentials |
 
 ## Modules
 
 | Module | Purpose |
 |--------|---------|
 | [platform](modules/platform/) | Networking, storage, Key Vault, ML workspace, PostgreSQL, Redis |
-| [sil](modules/sil/) | AKS cluster with GPU node pools and AzureML extension |
+| [sil](modules/sil/) | AKS cluster with GPU node pools |
 | [vpn](modules/vpn/) | VPN Gateway module (used by vpn/ standalone deployment) |
 
 ## Outputs
@@ -256,11 +253,10 @@ az lock delete --name <lock-name> --resource-group <rg>
 │   │   ├── postgresql.tf              # PostgreSQL Flexible Server
 │   │   ├── redis.tf                   # Azure Managed Redis
 │   │   └── private-dns-zones.tf       # Private DNS zones
-│   ├── sil/                           # AKS + ML extension
+│   ├── sil/                           # AKS cluster
 │   │   ├── aks.tf                     # AKS cluster, node pools
 │   │   ├── networking.tf              # AKS subnets, NAT associations
 │   │   ├── observability.tf           # Container Insights, Prometheus DCRs
-│   │   ├── azureml-extension.tf       # ML extension, compute target
 │   │   └── osmo-federated-credentials.tf  # OSMO workload identity
 │   ├── vpn/                           # VPN Gateway module
 │   └── automation/                    # Automation Account module

@@ -26,7 +26,7 @@ The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA
 | Private Endpoints | Secure access to Azure services (7 endpoints, 11+ DNS zones) |
 | AKS Cluster | Kubernetes with GPU Spot node pools and Workload Identity |
 | Key Vault | Secrets management with RBAC authorization |
-| Azure ML Workspace | Experiment tracking, model registry, compute management |
+| Azure ML Workspace | Experiment tracking, model registry |
 | Storage Account | Training data, checkpoints, and workflow artifacts |
 | Container Registry | Training and OSMO container images |
 | Azure Monitor | Log Analytics, Prometheus metrics, Managed Grafana |

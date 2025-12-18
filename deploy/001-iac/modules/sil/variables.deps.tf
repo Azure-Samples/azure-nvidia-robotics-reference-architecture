@@ -75,25 +75,6 @@ variable "container_registry" {
   description = "ACR from platform module"
 }
 
-variable "azureml_workspace" {
-  type = object({
-    id           = string
-    name         = string
-    workspace_id = string
-  })
-  description = "ML workspace from platform module"
-}
-
-variable "ml_workload_identity" {
-  type = object({
-    id           = string
-    principal_id = string
-    client_id    = string
-    tenant_id    = string
-  })
-  description = "ML identity from platform module"
-}
-
 variable "private_dns_zones" {
   type = map(object({
     id   = string

@@ -141,8 +141,6 @@ module "sil" {
   monitor_workspace         = module.platform.monitor_workspace
   data_collection_endpoint  = module.platform.data_collection_endpoint
   container_registry        = module.platform.container_registry
-  azureml_workspace         = module.platform.azureml_workspace
-  ml_workload_identity      = module.platform.ml_workload_identity
   private_dns_zones         = module.platform.private_dns_zones
 
   // AKS subnet configuration - uses module defaults when null
@@ -162,18 +160,6 @@ module "sil" {
   }
 
   node_pools = var.node_pools
-
-  // AzureML extension configuration
-  azureml_config = {
-    should_integrate_aks               = var.should_integrate_aks_cluster
-    should_install_extension           = var.should_integrate_aks_cluster
-    should_federate_ml_identity        = var.should_integrate_aks_cluster
-    aks_cluster_purpose                = var.aks_cluster_purpose
-    inference_router_service_type      = var.inference_router_service_type
-    internal_load_balancer_provider    = "azure"
-    workload_tolerations               = var.workload_tolerations
-    cluster_integration_instance_types = var.cluster_integration_instance_types
-  }
 
   // OSMO workload identity
   osmo_workload_identity = module.platform.osmo_workload_identity

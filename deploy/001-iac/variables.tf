@@ -287,76 +287,6 @@ variable "node_pools" {
 }
 
 /*
- * AKS Integration Configuration - Optional
- */
-
-variable "should_integrate_aks_cluster" {
-  type        = bool
-  description = "Whether to integrate an AKS cluster as a compute target with the workspace (available through scripting in 002-setup)"
-  default     = false
-}
-
-variable "aks_cluster_purpose" {
-  type        = string
-  description = "Purpose of AKS cluster: DevTest, DenseProd, or FastProd"
-  default     = "DevTest"
-  validation {
-    condition     = contains(["DevTest", "DenseProd", "FastProd"], var.aks_cluster_purpose)
-    error_message = "aks_cluster_purpose must be one of: DevTest, DenseProd, or FastProd."
-  }
-}
-
-variable "workload_tolerations" {
-  type = list(object({
-    key      = string
-    operator = string
-    value    = optional(string)
-    effect   = string
-  }))
-  description = "Tolerations for AzureML workloads (training/inference) to schedule on nodes with taints"
-  default = [
-    {
-      key      = "nvidia.com/gpu"
-      operator = "Exists"
-      effect   = "NoSchedule"
-    },
-    {
-      key      = "kubernetes.azure.com/scalesetpriority"
-      operator = "Equal"
-      value    = "spot"
-      effect   = "NoSchedule"
-    }
-  ]
-}
-
-variable "cluster_integration_instance_types" {
-  type = map(object({
-    nodeSelector = optional(map(string))
-    resources = optional(object({
-      requests = optional(map(any))
-      limits   = optional(map(any))
-    }))
-  }))
-  description = "Instance types configuration for Kubernetes compute. Key is the instance type name, value contains nodeSelector and resource specifications"
-  default = {
-    gpuinstancetype = {
-      nodeSelector = null
-      resources = {
-        limits = {
-          cpu              = "8"
-          memory           = "32Gi"
-          "nvidia.com/gpu" = 1
-        }
-        requests = {
-          cpu    = "1"
-          memory = "1Gi"
-        }
-      }
-    }
-  }
-}
-
-/*
  * Private Endpoints Configuration - Optional
  */
 
@@ -374,18 +304,4 @@ variable "should_enable_public_network_access" {
   type        = bool
   description = "Whether to enable public network access to the Azure ML workspace"
   default     = true
-}
-
-/*
- * Inference Router Configuration - Optional
- */
-
-variable "inference_router_service_type" {
-  type        = string
-  description = "Service type for inference router: LoadBalancer, NodePort, or ClusterIP"
-  default     = "NodePort"
-  validation {
-    condition     = contains(["LoadBalancer", "NodePort", "ClusterIP"], var.inference_router_service_type)
-    error_message = "inference_router_service_type must be one of: LoadBalancer, NodePort, or ClusterIP."
-  }
 }
