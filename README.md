@@ -161,7 +161,7 @@ az aks get-credentials --resource-group <rg> --name <aks>
 ./scripts/submit-azureml-validation.sh --model-name my-policy --stream
 ```
 
-> **Tip**: Run `./scripts/submit-*-training.sh --help` for all available options.
+> **Tip**: Run any script with `--help` for all available options.
 
 ## 🔐 Deployment Scenarios
 
@@ -178,7 +178,7 @@ See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
 ```text
 .
 ├── deploy/
-│   ├── 000-prerequisites/              # Validation scripts
+│   ├── 000-prerequisites/              # Azure CLI and provider setup
 │   ├── 001-iac/                        # Terraform infrastructure
 │   └── 002-setup/                      # Cluster configuration scripts
 ├── scripts/
