@@ -18,6 +18,56 @@ Production-ready framework for orchestrating robotics and AI workloads on [Azure
 
 The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA GPU Operator and KAI Scheduler. Training workloads can be submitted via OSMO workflows (control plane and backend operator) and AzureML jobs (ML extension). Both platforms share common infrastructure: Azure Storage for checkpoints and data, Key Vault for secrets, and Azure Container Registry for container images. OSMO additionally uses PostgreSQL for workflow state and Redis for caching.
 
+```text
++==========================================================================+
+|  Resource Group                                                          |
+|                                                                          |
+|  :--- Virtual Network (10.0.0.0/16) ---------------------------------:   |
+|  :                                                                   :   |
+|  :  +-------------+     +------------------+     +---------------+   :   |
+|  :  | NAT Gateway |---->|  AKS Cluster     |<--->|     ACR       |   :   |
+|  :  +------+------+     +--------+---------+     +-------+-------+   :   |
+|  :         |                     |                       |           :   |
+|  :         v                     v                       |           :   |
+|  :  +-------------+     +------------------+             |           :   |
+|  :  | GPU Node    |     | AzureML Extension|-------------+           :   |
+|  :  | Pool (A10)  |     | KAI Scheduler    |                         :   |
+|  :  +-------------+     | GPU Operator     |                         :   |
+|  :                      | OSMO Backend     |                         :   |
+|  :                      +------------------+                         :   |
+|  :                              |                                    :   |
+|  :  +------------------+        |        +------------------+        :   |
+|  :  | PostgreSQL       |<-------+------->| Azure Redis      |        :   |
+|  :  | Flexible Server  |                 | (Enterprise)     |        :   |
+|  :  +------------------+                 +------------------+        :   |
+|  :                                                                   :   |
+|  :  +-- Private Endpoint Subnet --------------------------------+    :   |
+|  :  |  PE-KeyVault  PE-Storage  PE-ACR  PE-AzureML  PE-Monitor  |    :   |
+|  :  +-----------------------------------------------------------+    :   |
+|  :                                                                   :   |
+|  :-------------------------------------------------------------------:   |
+|                                                                          |
+|  +------------------+        +------------------+                        |
+|  | Key Vault        |        | Storage Account  |                        |
+|  | (RBAC-enabled)   |        | - ml-workspace   |                        |
+|  +------------------+        | - osmo           |                        |
+|                              | - datasets       |                        |
+|                              +------------------+                        |
+|                                                                          |
+|  +------------------+        +------------------+                        |
+|  | AzureML Workspace|------->| Log Analytics    |                        |
+|  | + App Insights   |        | + Grafana        |                        |
+|  +------------------+        | + Monitor WS     |                        |
+|                              +------------------+                        |
+|                                                                          |
+|  +------------------+        +------------------+                        |
+|  | Managed Identity |        | Managed Identity |                        |
+|  | (ML Workloads)   |        | (OSMO Workloads) |                        |
+|  +------------------+        +------------------+                        |
+|                                                                          |
++==========================================================================+
+```
+
 **Azure Infrastructure** (deployed by [Terraform](deploy/001-iac/)):
 
 | Component | Purpose |
