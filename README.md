@@ -9,7 +9,7 @@ Production-ready framework for orchestrating robotics and AI workloads on [Azure
 | Infrastructure as Code | [Terraform modules](deploy/001-iac/) for reproducible Azure deployments |
 | Dual Orchestration | Submit jobs via [AzureML](workflows/azureml/) or [OSMO](workflows/osmo/) |
 | Workload Identity | Key-less auth via Azure AD ([setup guide](deploy/002-setup/README.md#scenario-2-workload-identity)) |
-| Private Networking | Services on private VNet with optional [VPN gateway](deploy/001-iac/vpn/) |
+| Private Networking | Services on private VNet with optional [VPN gateway](deploy/001-iac/vpn/) ([client setup](deploy/001-iac/vpn/README.md#-vpn-client-setup)) |
 | MLflow Integration | Experiment tracking with Azure ML ([details](docs/mlflow-integration.md)) |
 | GPU Scheduling | [KAI Scheduler](deploy/002-setup/values/kai-scheduler.yaml) for efficient utilization |
 | Auto-scaling | Pay-per-use GPU compute on AKS Spot nodes |
