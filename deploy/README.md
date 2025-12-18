@@ -2,7 +2,7 @@
 
 Infrastructure deployment and cluster configuration for the robotics reference architecture.
 
-## Deployment Order
+## 📋 Deployment Order
 
 | Step | Folder | Description | Time |
 |:----:|--------|-------------|------|
@@ -10,7 +10,7 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 | 2 | [001-iac](001-iac/) | Terraform: AKS, ML workspace, storage, PostgreSQL, Redis | 15-20 min |
 | 3 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 10-15 min |
 
-## Quick Path
+## 🚀 Quick Path
 
 ```bash
 # 1. Set subscription
@@ -33,7 +33,7 @@ cd ../002-setup
 
 For OSMO deployment, see [002-setup/README.md](002-setup/README.md) for authentication scenarios.
 
-## What Gets Deployed
+## 📦 What Gets Deployed
 
 - **AKS Cluster**: System and GPU (Spot) node pools with OIDC enabled
 - **Azure ML Workspace**: Attached to AKS for training job submission
@@ -44,7 +44,7 @@ For OSMO deployment, see [002-setup/README.md](002-setup/README.md) for authenti
 
 See the [root README](../README.md) for architecture details.
 
-## Cleanup
+## 🗑️ Cleanup
 
 Remove deployed components in reverse order. Cluster components must be removed before infrastructure.
 

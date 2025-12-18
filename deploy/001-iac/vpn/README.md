@@ -2,13 +2,13 @@
 
 Point-to-Site and Site-to-Site VPN connectivity for secure remote access to private endpoints.
 
-## Prerequisites
+## 📋 Prerequisites
 
 - Platform infrastructure deployed (`cd ../001-iac && terraform apply`)
 - Terraform 1.5+ installed
 - Core variables matching parent deployment (`environment`, `resource_prefix`, `location`)
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 cd deploy/001-iac/vpn
@@ -22,7 +22,7 @@ terraform init && terraform apply
 
 Deployment takes 20-30 minutes for the VPN Gateway.
 
-## Configuration
+## ⚙️ Configuration
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -31,7 +31,7 @@ Deployment takes 20-30 minutes for the VPN Gateway.
 | `vpn_gateway_config.client_address_pool` | P2S client IP range | `["192.168.200.0/24"]` |
 | `aad_auth_config.enabled` | Enable Azure AD auth | `true` |
 
-## Authentication Options
+## 🔐 Authentication Options
 
 ### Azure AD (Recommended)
 
@@ -54,14 +54,14 @@ aad_auth_config = {
 root_certificate_public_data = "MIIC5jCCAc6g..." # Base64-encoded cert
 ```
 
-## VPN Client Setup
+## 💻 VPN Client Setup
 
 1. Download the VPN client configuration from Azure Portal
 2. Install Azure VPN Client (Windows/macOS) or OpenVPN
 3. Import the downloaded profile
 4. Connect using Azure AD credentials or certificate
 
-## Site-to-Site VPN
+## 🏢 Site-to-Site VPN
 
 Connect on-premises networks:
 
@@ -78,7 +78,7 @@ vpn_site_shared_keys = {
 }
 ```
 
-## Related
+## 🔗 Related
 
 - [Parent README](../README.md) - Main infrastructure documentation
 - [dns/README.md](../dns/README.md) - Private DNS for OSMO UI (requires VPN)

@@ -10,7 +10,7 @@ ms.topic: reference
 
 Workflow templates for submitting robotics training and validation jobs to Azure infrastructure.
 
-## Directory Structure
+## 📁 Directory Structure
 
 ```text
 workflows/
@@ -25,7 +25,7 @@ workflows/
     └── train-dataset.yaml   # OSMO training (dataset folder upload)
 ```
 
-## Platform Comparison
+## ⚖️ Platform Comparison
 
 | Feature | AzureML | OSMO |
 |---------|---------|------|
@@ -35,7 +35,7 @@ workflows/
 | Checkpointing | MLflow integration | MLflow + custom handlers |
 | Monitoring | Azure ML Studio | OSMO UI Dashboard |
 
-## Quick Start
+## 🚀 Quick Start
 
 ### AzureML Workflows
 
@@ -57,7 +57,7 @@ workflows/
 ./scripts/submit-osmo-dataset-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 ```
 
-## OSMO Dataset Workflow
+## 💾 OSMO Dataset Workflow
 
 The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO dataset instead of base64-encoding it inline.
 
@@ -91,7 +91,7 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
 
 The training folder mounts at `/data/<dataset_name>/training` inside the container.
 
-## Prerequisites
+## 📋 Prerequisites
 
 | Requirement | Setup |
 |-------------|-------|
@@ -100,7 +100,7 @@ The training folder mounts at `/data/<dataset_name>/training` inside the contain
 | Azure CLI authenticated | `az login` |
 | OSMO CLI (for OSMO workflows) | Installed and configured |
 
-## Configuration
+## ⚙️ Configuration
 
 Scripts resolve values in order:
 

@@ -2,7 +2,7 @@
 
 Terraform configuration for the robotics reference architecture. Deploys Azure resources including AKS with GPU node pools, Azure ML workspace, storage, and OSMO backend services (PostgreSQL, Redis).
 
-## Prerequisites
+## 📋 Prerequisites
 
 | Tool | Version | Installation |
 |------|---------|--------------|
@@ -10,7 +10,7 @@ Terraform configuration for the robotics reference architecture. Deploys Azure r
 | Terraform | 1.5+ | `terraform version` |
 | GPU VM quota | Region-specific | e.g., `Standard_NV36ads_A10_v5` |
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 cd deploy/001-iac
@@ -19,7 +19,7 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 ### Core Variables
 
@@ -68,7 +68,39 @@ osmo_config = {
 
 See [variables.tf](variables.tf) for all configuration options.
 
-## Architecture
+## 🏗️ Architecture
+
+### Directory Structure
+
+```text
+001-iac/
+├── main.tf                            # Module composition
+├── variables.tf                       # Input variables
+├── outputs.tf                         # Output values
+├── versions.tf                        # Provider versions
+├── terraform.tfvars                   # Configuration (gitignored)
+├── modules/
+│   ├── platform/
+│   │   ├── networking.tf              # VNet, subnets, NAT Gateway, DNS resolver
+│   │   ├── security.tf                # Key Vault, managed identities
+│   │   ├── observability.tf           # LAW, Monitor, Grafana, AMPLS
+│   │   ├── storage.tf                 # Storage Account
+│   │   ├── acr.tf                     # Container Registry
+│   │   ├── azureml.tf                 # ML Workspace
+│   │   ├── postgresql.tf              # PostgreSQL Flexible Server
+│   │   ├── redis.tf                   # Azure Managed Redis
+│   │   └── private-dns-zones.tf       # Private DNS zones
+│   ├── sil/
+│   │   ├── aks.tf                     # AKS cluster, node pools
+│   │   ├── networking.tf              # AKS subnets, NAT associations
+│   │   ├── observability.tf           # Container Insights, Prometheus DCRs
+│   │   └── osmo-federated-credentials.tf  # OSMO workload identity
+│   ├── vpn/                           # VPN Gateway module
+│   └── automation/                    # Automation Account module
+├── vpn/                               # Standalone VPN deployment
+├── dns/                               # OSMO UI DNS configuration
+└── automation/                        # Scheduled startup deployment
+```
 
 ### Module Structure
 
@@ -110,7 +142,7 @@ Root Module (001-iac/)
 | `should_deploy_postgresql` | PostgreSQL server, databases, delegated subnet, DNS zone |
 | `should_deploy_redis` | Redis cache, private endpoint (if PE enabled), DNS zone |
 
-## Modules
+## 📦 Modules
 
 | Module | Purpose |
 |--------|---------|
@@ -118,7 +150,7 @@ Root Module (001-iac/)
 | [sil](modules/sil/) | AKS cluster with GPU node pools |
 | [vpn](modules/vpn/) | VPN Gateway module (used by vpn/ standalone deployment) |
 
-## Outputs
+## 📤 Outputs
 
 ```bash
 terraform output
@@ -137,7 +169,7 @@ terraform output key_vault_name
 terraform output dns_server_ip
 ```
 
-## Optional Components
+## 🔧 Optional Components
 
 Standalone deployments extend the base infrastructure.
 
@@ -177,7 +209,7 @@ terraform init && terraform apply -var-file=terraform.tfvars
 
 See [automation/README.md](automation/README.md) for schedule configuration.
 
-## Destroy Infrastructure
+## 🗑️ Destroy Infrastructure
 
 Remove Azure resources deployed by Terraform. Clean up cluster components first.
 
@@ -222,56 +254,100 @@ terraform output -raw resource_group | jq -r '.name'
 az group delete --name <resource-group-name> --yes --no-wait
 ```
 
-### Troubleshooting Destroy
+## 🔍 Troubleshooting
 
-**Resources stuck deleting**: Some resources (Private Endpoints, AKS) may take 10-15 minutes:
+Issues and resolutions encountered during infrastructure deployment and teardown.
+
+### Destroy Takes a Long Time
+
+Terraform destroy removes resources in dependency order. Private Endpoints, AKS clusters, and PostgreSQL servers commonly take 10-15 minutes each.
+
+Monitor remaining resources during destruction:
 
 ```bash
-az resource list --resource-group <rg> --query "[].{name:name, type:type}" -o table
+az resource list --resource-group <resource-group> --query "[].{name:name, type:type}" -o table
 ```
 
-**Terraform state mismatch**: If resources were manually deleted:
+### Soft-Deleted Resources Block Redeployment
+
+Azure retains certain deleted resources in a soft-deleted state. Redeployment fails when Terraform attempts to create a resource with the same name as a soft-deleted one.
+
+| Resource | Soft Delete | Retention Period | Blocks Redeployment |
+|----------|-------------|------------------|---------------------|
+| Key Vault | Mandatory | 7-90 days (configurable) | Yes |
+| Azure ML Workspace | Mandatory | 14 days (fixed) | Yes |
+| Container Registry | Opt-in (preview) | 1-90 days (configurable) | No (disabled by default) |
+| Storage Account | Recovery only | 14 days | No (same-name creation allowed) |
+
+#### Purge Soft-Deleted Key Vault
+
+List soft-deleted vaults and purge:
+
+```bash
+# List soft-deleted Key Vaults
+az keyvault list-deleted --subscription <subscription-id> --resource-type vault -o table
+
+# Purge a specific vault
+az keyvault purge --subscription <subscription-id> --name <key-vault-name>
+```
+
+> [!NOTE]
+> Key Vaults with `purge_protection_enabled = true` cannot be purged and must wait for retention expiry. This configuration defaults to `should_enable_purge_protection = false`.
+
+#### Purge Soft-Deleted Azure ML Workspace
+
+Azure ML workspaces enter soft-delete for 14 days after deletion. List via Azure Portal under **Azure Machine Learning > Manage deleted workspaces**.
+
+Permanently delete via CLI:
+
+```bash
+az ml workspace delete \
+  --name <workspace-name> \
+  --resource-group <resource-group> \
+  --permanently-delete
+```
+
+### Terraform State Mismatch
+
+Resources manually deleted or created outside Terraform cause state mismatches.
+
+#### Refresh State for Deleted Resources
+
+Resources deleted outside Terraform leave orphaned state entries:
 
 ```bash
 terraform refresh -var-file=terraform.tfvars
-terraform destroy -var-file=terraform.tfvars
+terraform plan -var-file=terraform.tfvars
 ```
 
-**Locks preventing deletion**:
+#### Import Existing Resources
+
+Resources created outside Terraform can be imported into state:
 
 ```bash
-az lock list --resource-group <rg> -o table
-az lock delete --name <lock-name> --resource-group <rg>
+# Identify the resource address from terraform plan output
+terraform plan -var-file=terraform.tfvars
+
+# Import using resource address and Azure resource ID
+terraform import -var-file=terraform.tfvars '<resource_address>' '<azure_resource_id>'
+
+# Example: Import a resource group
+terraform import -var-file=terraform.tfvars 'module.platform.azurerm_resource_group.main' '/subscriptions/<sub-id>/resourceGroups/<rg-name>'
+
+# Example: Import an AKS cluster
+terraform import -var-file=terraform.tfvars 'module.sil.azurerm_kubernetes_cluster.main' '/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/Microsoft.ContainerService/managedClusters/<aks-name>'
 ```
 
-## Directory Structure
+After import, run `terraform plan` to verify the imported resource matches the configuration.
 
-```text
-001-iac/
-├── main.tf                            # Module composition
-├── variables.tf                       # Input variables
-├── outputs.tf                         # Output values
-├── versions.tf                        # Provider versions
-├── terraform.tfvars                   # Configuration (gitignored)
-├── modules/
-│   ├── platform/                      # Shared Azure services
-│   │   ├── networking.tf              # VNet, subnets, NAT Gateway, DNS resolver
-│   │   ├── security.tf                # Key Vault, managed identities
-│   │   ├── observability.tf           # LAW, Monitor, Grafana, AMPLS
-│   │   ├── storage.tf                 # Storage Account
-│   │   ├── acr.tf                     # Container Registry
-│   │   ├── azureml.tf                 # ML Workspace
-│   │   ├── postgresql.tf              # PostgreSQL Flexible Server
-│   │   ├── redis.tf                   # Azure Managed Redis
-│   │   └── private-dns-zones.tf       # Private DNS zones
-│   ├── sil/                           # AKS cluster
-│   │   ├── aks.tf                     # AKS cluster, node pools
-│   │   ├── networking.tf              # AKS subnets, NAT associations
-│   │   ├── observability.tf           # Container Insights, Prometheus DCRs
-│   │   └── osmo-federated-credentials.tf  # OSMO workload identity
-│   ├── vpn/                           # VPN Gateway module
-│   └── automation/                    # Automation Account module
-├── vpn/                               # Standalone VPN deployment
-├── dns/                               # OSMO UI DNS configuration
-└── automation/                        # Scheduled startup deployment
+### Resource Locks Prevent Deletion
+
+Management locks block deletion operations:
+
+```bash
+# List locks on resource group
+az lock list --resource-group <resource-group> -o table
+
+# Delete a specific lock
+az lock delete --name <lock-name> --resource-group <resource-group>
 ```

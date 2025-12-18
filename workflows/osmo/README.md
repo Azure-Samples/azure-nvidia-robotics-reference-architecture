@@ -10,14 +10,14 @@ ms.topic: reference
 
 NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kubernetes Service.
 
-## Available Templates
+## 📜 Available Templates
 
 | Template | Purpose | Submission Script |
 |----------|---------|-------------------|
 | [train.yaml](train.yaml) | Distributed training (base64 inline) | `scripts/submit-osmo-training.sh` |
 | [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh` |
 
-## Workflow Comparison
+## ⚖️ Workflow Comparison
 
 | Aspect | train.yaml | train-dataset.yaml |
 |--------|------------|--------------------|
@@ -27,7 +27,7 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 | Reusability | Per-run | Across runs |
 | Setup | None | Bucket configured |
 
-## Training Workflow (`train.yaml`)
+## 🏋️ Training Workflow (`train.yaml`)
 
 Submits Isaac Lab distributed training through OSMO's workflow orchestration engine.
 
@@ -63,7 +63,7 @@ Parameters are passed as key=value pairs through the submission script:
   --azure-resource-group "rg-custom"
 ```
 
-## Dataset Training Workflow (`train-dataset.yaml`)
+## 💾 Dataset Training Workflow (`train-dataset.yaml`)
 
 Submits Isaac Lab training using OSMO dataset folder injection instead of base64-encoded archives.
 
@@ -94,7 +94,7 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
   --dataset-name my-training-code
 ```
 
-## Environment Variables
+## ⚙️ Environment Variables
 
 | Variable | Description |
 |----------|-------------|
@@ -105,14 +105,14 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
 | `OSMO_DATASET_BUCKET` | Dataset bucket name (default: training) |
 | `OSMO_DATASET_NAME` | Dataset name (default: training-code) |
 
-## Prerequisites
+## 📋 Prerequisites
 
 1. OSMO control plane deployed (`03-deploy-osmo-control-plane.sh`)
 2. OSMO backend operator installed (`04-deploy-osmo-backend.sh`)
 3. Storage configured for checkpoints (`05-configure-osmo.sh`)
 4. OSMO CLI installed and authenticated
 
-## Monitoring
+## 📺 Monitoring
 
 Access the OSMO UI dashboard to monitor workflow execution:
 
