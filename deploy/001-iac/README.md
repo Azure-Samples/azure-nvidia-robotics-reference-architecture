@@ -4,40 +4,43 @@ Terraform configuration for the robotics reference architecture. Deploys Azure r
 
 ## Prerequisites
 
-- Azure CLI authenticated (`az login`)
-- Terraform 1.5+ (`terraform version`)
-- GPU VM quota in target region (e.g., `Standard_NV36ads_A10_v5`)
-- Subscription initialized (`source ../000-prerequisites/az-sub-init.sh`)
+| Tool | Version | Installation |
+|------|---------|--------------|
+| Azure CLI | Latest | `az login` |
+| Terraform | 1.5+ | `terraform version` |
+| GPU VM quota | Region-specific | e.g., `Standard_NV36ads_A10_v5` |
 
 ## Quick Start
 
 ```bash
 cd deploy/001-iac
-
-# Initialize subscription
 source ../000-prerequisites/az-sub-init.sh
-
-# Configure (edit values as needed)
 cp terraform.tfvars.example terraform.tfvars
-
-# Deploy
-terraform init && terraform apply
+terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
 ## Configuration
 
-Key variables in `terraform.tfvars`:
+### Core Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `environment` | Deployment environment (dev, test, prod) | Yes |
+| `resource_prefix` | Resource naming prefix | Yes |
+| `location` | Azure region | Yes |
+| `instance` | Instance identifier | No (default: "001") |
+| `tags` | Resource group tags | No (default: {}) |
+
+### Feature Flags
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `environment` | Deployment environment | - |
-| `resource_prefix` | Resource naming prefix | - |
-| `location` | Azure region | - |
-| `node_pools.gpu.vm_size` | GPU VM SKU | `Standard_NV36ads_A10_v5` |
-| `should_deploy_postgresql` | Deploy PostgreSQL for OSMO | `true` |
-| `should_deploy_redis` | Deploy Redis for OSMO | `true` |
-
-See [variables.tf](variables.tf) for all configuration options.
+| `should_enable_nat_gateway` | Deploy NAT Gateway for outbound connectivity | `true` |
+| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones | `true` |
+| `should_enable_public_network_access` | Allow public access to resources | `true` |
+| `should_deploy_postgresql` | Deploy PostgreSQL Flexible Server for OSMO | `true` |
+| `should_deploy_redis` | Deploy Azure Managed Redis for OSMO | `true` |
+| `should_integrate_aks_cluster` | Install AzureML extension and compute target | `false` |
 
 ### OSMO Workload Identity
 
@@ -53,6 +56,52 @@ osmo_config = {
 }
 ```
 
+See [variables.tf](variables.tf) for all configuration options.
+
+## Architecture
+
+### Module Structure
+
+```text
+Root Module (001-iac/)
+├── Platform Module         # Shared Azure services
+│   ├── Networking          # VNet, subnets, NAT Gateway, DNS resolver
+│   ├── Security            # Key Vault (RBAC), managed identities
+│   ├── Observability       # Log Analytics, Monitor, Grafana, AMPLS
+│   ├── Storage             # Storage Account, ACR
+│   ├── Machine Learning    # AzureML Workspace
+│   └── OSMO Backend        # PostgreSQL, Redis
+│
+└── SiL Module              # AKS-specific infrastructure
+    ├── AKS Cluster         # Azure CNI Overlay, workload identity
+    ├── GPU Node Pools      # Configurable via node_pools variable
+    ├── AzureML Extension   # Training/inference support (optional)
+    └── Observability       # Container Insights, Prometheus DCRs
+```
+
+### Resources by Category
+
+| Category | Resources |
+|----------|-----------|
+| Networking | VNet, subnets (main, PE, AKS, GPU pools), NSG, NAT Gateway, DNS Private Resolver |
+| Security | Key Vault (RBAC mode), ML identity, OSMO identity |
+| Observability | Log Analytics, App Insights, Monitor Workspace, Grafana, DCE, AMPLS |
+| Storage | Storage Account (blob/file), Container Registry (Premium) |
+| Machine Learning | AzureML Workspace, Kubernetes compute target, ML extension |
+| AKS | Cluster with Azure CNI Overlay, system pool, GPU node pools |
+| Private DNS | 11 core zones (Key Vault, Storage, ACR, ML, AKS, Monitor) |
+| OSMO Services | PostgreSQL Flexible Server (HA), Azure Managed Redis |
+
+### Conditional Resources
+
+| Condition | Resources Created |
+|-----------|-------------------|
+| `should_enable_private_endpoint` | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS |
+| `should_enable_nat_gateway` | NAT Gateway, Public IP, subnet associations |
+| `should_deploy_postgresql` | PostgreSQL server, databases, delegated subnet, DNS zone |
+| `should_deploy_redis` | Redis cache, private endpoint (if PE enabled), DNS zone |
+| `should_integrate_aks_cluster` | AzureML Extension, Kubernetes compute, federated credentials |
+
 ## Modules
 
 | Module | Purpose |
@@ -64,20 +113,25 @@ osmo_config = {
 ## Outputs
 
 ```bash
-# View all outputs
 terraform output
 
-# Get AKS cluster name
+# AKS cluster details
 terraform output -json aks_cluster | jq -r '.name'
 
-# OSMO connection details (PostgreSQL, Redis)
+# OSMO connection details
 terraform output postgresql_connection_info
 terraform output managed_redis_connection_info
+
+# Key Vault name (for 002-setup scripts)
+terraform output key_vault_name
+
+# DNS server IP (for VPN clients)
+terraform output dns_server_ip
 ```
 
 ## Optional Components
 
-These standalone deployments extend the base infrastructure.
+Standalone deployments extend the base infrastructure.
 
 ### VPN Gateway
 
@@ -86,17 +140,18 @@ Point-to-Site VPN for secure remote access to private endpoints:
 ```bash
 cd vpn
 cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply
+terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
 See [vpn/README.md](vpn/README.md) for client setup and AAD authentication.
 
 ### Private DNS for OSMO UI
 
-Configure DNS resolution for the OSMO UI LoadBalancer (requires VPN):
+Configure DNS resolution for the OSMO UI LoadBalancer after setup from `deploy/002-setup/03-deploy-osmo-control-plane.sh` (requires VPN):
 
 ```bash
 cd dns
+terraform init
 terraform apply -var="osmo_loadbalancer_ip=10.0.x.x"
 ```
 
@@ -104,82 +159,64 @@ See [dns/README.md](dns/README.md) for details.
 
 ### Automation Account
 
-Azure Automation resources for scheduled operations:
+Scheduled startup of AKS and PostgreSQL to reduce costs:
 
 ```bash
 cd automation
-terraform init && terraform apply
+cp terraform.tfvars.example terraform.tfvars
+terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
-See [automation/README.md](automation/README.md) for runbook configuration.
+See [automation/README.md](automation/README.md) for schedule configuration.
 
 ## Destroy Infrastructure
 
 Remove Azure resources deployed by Terraform. Clean up cluster components first.
 
-### Prerequisites
+### Cleanup Order
 
-- Cluster components uninstalled (see [002-setup/README.md](../002-setup/README.md#cleanup))
-- Terraform state accessible
-- Azure CLI authenticated
+```bash
+# 1. OSMO Backend
+../002-setup/cleanup/uninstall-osmo-backend.sh
 
-### Option A: Terraform Destroy
+# 2. OSMO Control Plane
+../002-setup/cleanup/uninstall-osmo-control-plane.sh
 
-Preserves Terraform state and allows redeployment:
+# 3. AzureML Extension
+../002-setup/cleanup/uninstall-azureml-extension.sh
+
+# 4. GPU Infrastructure
+../002-setup/cleanup/uninstall-robotics-charts.sh
+
+# 5. VPN (if deployed)
+cd vpn && terraform destroy -var-file=terraform.tfvars
+
+# 6. Main Infrastructure
+terraform destroy -var-file=terraform.tfvars
+```
+
+### Terraform Destroy
+
+Preserves state and allows redeployment:
 
 ```bash
 cd deploy/001-iac
-
-# Preview resources to be destroyed
 terraform plan -destroy -var-file=terraform.tfvars
-
-# Destroy infrastructure
 terraform destroy -var-file=terraform.tfvars
 ```
 
-If VPN was deployed separately:
+### Delete Resource Group
+
+Fastest cleanup method (removes all resources regardless of how they were created):
 
 ```bash
-cd vpn
-terraform destroy -var-file=terraform.tfvars
-```
-
-### Option B: Delete Resource Group
-
-Fastest cleanup method (completely deletes the resource group):
-
-```bash
-# Get resource group name
 terraform output -raw resource_group | jq -r '.name'
-
-# Or check Azure portal / terraform.tfvars for naming pattern
-# Default: <resource_prefix>-<environment>-rg
-
-# Delete entire resource group
-az group delete --name <resource-group-name> --yes
-
-# For async deletion (returns immediately)
 az group delete --name <resource-group-name> --yes --no-wait
 ```
 
-Resource group deletion removes all contained resources regardless of how they were created.
-
-### Cleanup Order
-
-Follow this order to avoid dependency failures:
-
-| Order | Component | Command |
-|:-----:|-----------|--------|
-| 1 | OSMO Backend | `../002-setup/cleanup/uninstall-osmo-backend.sh` |
-| 2 | OSMO Control Plane | `../002-setup/cleanup/uninstall-osmo-control-plane.sh` |
-| 3 | AzureML Extension | `../002-setup/cleanup/uninstall-azureml-extension.sh` |
-| 4 | GPU Infrastructure | `../002-setup/cleanup/uninstall-robotics-charts.sh` |
-| 5 | VPN (if deployed) | `cd vpn && terraform destroy -var-file=terraform.tfvars` |
-| 6 | Main Infrastructure | `terraform destroy -var-file=terraform.tfvars` |
-
 ### Troubleshooting Destroy
 
-**Resources stuck deleting**: Some resources (Private Endpoints, AKS) may take 10-15 minutes. Check status:
+**Resources stuck deleting**: Some resources (Private Endpoints, AKS) may take 10-15 minutes:
 
 ```bash
 az resource list --resource-group <rg> --query "[].{name:name, type:type}" -o table
@@ -188,14 +225,11 @@ az resource list --resource-group <rg> --query "[].{name:name, type:type}" -o ta
 **Terraform state mismatch**: If resources were manually deleted:
 
 ```bash
-# Refresh state to match Azure
 terraform refresh -var-file=terraform.tfvars
-
-# Then destroy
 terraform destroy -var-file=terraform.tfvars
 ```
 
-**Locks preventing deletion**: Remove resource locks if present:
+**Locks preventing deletion**:
 
 ```bash
 az lock list --resource-group <rg> -o table
@@ -204,18 +238,33 @@ az lock delete --name <lock-name> --resource-group <rg>
 
 ## Directory Structure
 
-```
+```text
 001-iac/
-├── main.tf                 # Module composition
-├── variables.tf            # Input variables
-├── outputs.tf              # Output values
-├── versions.tf             # Provider versions
-├── terraform.tfvars        # Configuration (gitignored)
+├── main.tf                            # Module composition
+├── variables.tf                       # Input variables
+├── outputs.tf                         # Output values
+├── versions.tf                        # Provider versions
+├── terraform.tfvars                   # Configuration (gitignored)
 ├── modules/
-│   ├── platform/           # Shared Azure services
-│   ├── sil/                # AKS + ML extension
-│   └── vpn/                # VPN Gateway module
-├── vpn/                    # Standalone VPN deployment
-├── dns/                    # OSMO UI DNS configuration
-└── automation/             # Automation account
+│   ├── platform/                      # Shared Azure services
+│   │   ├── networking.tf              # VNet, subnets, NAT Gateway, DNS resolver
+│   │   ├── security.tf                # Key Vault, managed identities
+│   │   ├── observability.tf           # LAW, Monitor, Grafana, AMPLS
+│   │   ├── storage.tf                 # Storage Account
+│   │   ├── acr.tf                     # Container Registry
+│   │   ├── azureml.tf                 # ML Workspace
+│   │   ├── postgresql.tf              # PostgreSQL Flexible Server
+│   │   ├── redis.tf                   # Azure Managed Redis
+│   │   └── private-dns-zones.tf       # Private DNS zones
+│   ├── sil/                           # AKS + ML extension
+│   │   ├── aks.tf                     # AKS cluster, node pools
+│   │   ├── networking.tf              # AKS subnets, NAT associations
+│   │   ├── observability.tf           # Container Insights, Prometheus DCRs
+│   │   ├── azureml-extension.tf       # ML extension, compute target
+│   │   └── osmo-federated-credentials.tf  # OSMO workload identity
+│   ├── vpn/                           # VPN Gateway module
+│   └── automation/                    # Automation Account module
+├── vpn/                               # Standalone VPN deployment
+├── dns/                               # OSMO UI DNS configuration
+└── automation/                        # Scheduled startup deployment
 ```
