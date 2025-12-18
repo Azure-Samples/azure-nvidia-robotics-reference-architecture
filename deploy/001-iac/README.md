@@ -197,7 +197,7 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
-See [vpn/README.md](vpn/README.md) for client setup and AAD authentication.
+See [vpn/README.md](vpn/README.md) for configuration options and [VPN client setup](vpn/README.md#-vpn-client-setup) for connecting from your local machine.
 
 ### Private DNS for OSMO UI
 

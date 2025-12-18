@@ -59,7 +59,7 @@ Point-to-Site VPN enabling secure remote access to private endpoints. Required f
 - Connecting to private PostgreSQL and Redis from local machine
 - Debugging workloads over private network
 
-See [001-iac/vpn/README.md](001-iac/vpn/README.md) for client setup and AAD authentication.
+See [001-iac/vpn/README.md](001-iac/vpn/README.md) for deployment and [VPN client setup](001-iac/vpn/README.md#-vpn-client-setup).
 
 See the [root README](../README.md) for architecture details.
 

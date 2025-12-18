@@ -56,10 +56,41 @@ root_certificate_public_data = "MIIC5jCCAc6g..." # Base64-encoded cert
 
 ## 💻 VPN Client Setup
 
-1. Download the VPN client configuration from Azure Portal
-2. Install Azure VPN Client (Windows/macOS) or OpenVPN
-3. Import the downloaded profile
-4. Connect using Azure AD credentials or certificate
+### Install Azure VPN Client
+
+| Platform | Installation |
+|----------|--------------|
+| Windows | [Microsoft Store](https://apps.microsoft.com/detail/9NP355QT2SQB) |
+| macOS | [App Store](https://apps.apple.com/us/app/azure-vpn-client/id1553936137) |
+| Ubuntu 20.04/22.04 | [Microsoft Docs](https://learn.microsoft.com/en-us/azure/vpn-gateway/point-to-site-entra-vpn-client-linux#install-the-azure-vpn-client) |
+
+### Download VPN Configuration
+
+1. Open the [Azure Portal](https://portal.azure.com)
+2. Navigate to your Virtual Network Gateway resource:
+   - Search for "Virtual network gateways" in the portal search bar
+   - Select the gateway matching your deployment (e.g., `vgw-<resource_prefix>-<environment>-<instance>`)
+3. Select **Point-to-site configuration** from the left menu
+4. Click **Download VPN client** button
+5. Save and extract the downloaded ZIP file
+
+### Import Configuration
+
+1. Open the Azure VPN Client application
+2. Click the **+** (Import) button in the bottom left
+3. Navigate to the extracted ZIP folder
+4. Open the `AzureVPN` folder
+5. Select `azurevpnconfig_aad.xml` (for Azure AD authentication)
+6. Click **Save**
+
+### Connect
+
+1. Select the imported connection profile
+2. Click **Connect**
+3. Authenticate with your Azure AD credentials when prompted
+4. Verify connection status shows "Connected"
+
+Once connected, you can access private endpoints including OSMO UI, PostgreSQL, and Redis.
 
 ## 🏢 Site-to-Site VPN
 
