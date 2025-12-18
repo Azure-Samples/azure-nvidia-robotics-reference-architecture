@@ -132,6 +132,11 @@ if [[ "$skip_k8s_cleanup" == "true" ]]; then
 else
   section "Cleanup Kubernetes Resources"
 
+  if kubectl get secretproviderclass azure-keyvault-secrets -n "$NS_OSMO_CONTROL_PLANE" &>/dev/null; then
+    info "Deleting SecretProviderClass 'azure-keyvault-secrets'..."
+    kubectl delete secretproviderclass azure-keyvault-secrets -n "$NS_OSMO_CONTROL_PLANE" --ignore-not-found
+  fi
+
   for secret in "$SECRET_POSTGRES" "$SECRET_REDIS"; do
     if kubectl get secret "$secret" -n "$NS_OSMO_CONTROL_PLANE" &>/dev/null; then
       info "Deleting secret '$secret'..."
