@@ -8,6 +8,7 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 |:----:|--------|-------------|------|
 | 1 | [000-prerequisites](000-prerequisites/) | Azure CLI login, subscription setup | 2 min |
 | 2 | [001-iac](001-iac/) | Terraform: AKS, ML workspace, storage, PostgreSQL, Redis | 30-40 min |
+| 2b | [001-iac/vpn](001-iac/vpn/) | Optional: VPN Gateway for private endpoint access | 20-30 min |
 | 3 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 30 min |
 
 ## 🚀 Quick Path
@@ -25,7 +26,14 @@ cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values
 terraform init && terraform apply
 
-# 4. Configure cluster
+# 4. Deploy VPN Gateway (optional, for private endpoint access)
+cd vpn
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars - must match parent deployment values
+terraform init && terraform apply
+cd ..
+
+# 5. Configure cluster
 cd ../002-setup
 ./01-deploy-robotics-charts.sh
 ./02-deploy-azureml-extension.sh
@@ -35,12 +43,23 @@ For OSMO deployment, see [002-setup/README.md](002-setup/README.md) for authenti
 
 ## 📦 What Gets Deployed
 
+### Core Infrastructure (001-iac)
+
 - **AKS Cluster**: System and GPU (Spot) node pools with OIDC enabled
 - **Azure ML Workspace**: Attached to AKS for training job submission
 - **Storage Account**: Training checkpoints and datasets
 - **PostgreSQL + Redis**: OSMO workflow state and caching
 - **Container Registry**: Private image storage
-- **Optional**: VPN Gateway for private endpoint access
+
+### VPN Gateway (001-iac/vpn)
+
+Point-to-Site VPN enabling secure remote access to private endpoints. Required for:
+
+- Accessing OSMO UI via private DNS
+- Connecting to private PostgreSQL and Redis from local machine
+- Debugging workloads over private network
+
+See [001-iac/vpn/README.md](001-iac/vpn/README.md) for client setup and AAD authentication.
 
 See the [root README](../README.md) for architecture details.
 
@@ -51,7 +70,8 @@ Remove deployed components in reverse order. Cluster components must be removed 
 | Step | Folder | Description | Time |
 |:----:|--------|-------------|------|
 | 1 | [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 10-15 min |
-| 2 | [001-iac](001-iac/) | Terraform destroy or resource group deletion | 20-30 min |
+| 2 | [001-iac/vpn](001-iac/vpn/) | Destroy VPN Gateway (if deployed) | 10-15 min |
+| 3 | [001-iac](001-iac/) | Terraform destroy or resource group deletion | 20-30 min |
 
 ### Partial Cleanup (Cluster Components Only)
 
