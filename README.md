@@ -75,9 +75,11 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 
 ### Azure Requirements
 
-- Azure subscription with **Contributor** access
+- Azure subscription with **Contributor** + **Role Based Access Control Administrator**
+  - Scope: Subscription (if creating new resource group) or Resource Group (if using existing)
+  - Terraform creates role assignments for managed identities
+  - Alternative: **Owner** (grants more permissions than required)
 - GPU VM quota for your target region (e.g., `Standard_NV36ads_A10_v5`)
-- Permissions to create: Resource Groups, AKS, Storage, Key Vault, AzureML Workspace
 
 ## 🏃 Quick Start
 
