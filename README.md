@@ -67,7 +67,7 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 | Tool | Version | Installation |
 |------|---------|--------------|
 | [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) | 2.50+ | `brew install azure-cli` |
-| [Terraform](https://www.terraform.io/downloads) | 1.5+ | `brew install terraform` |
+| [Terraform](https://www.terraform.io/downloads) | 1.9.8+ | `brew install terraform` |
 | [kubectl](https://kubernetes.io/docs/tasks/tools/) | 1.28+ | `brew install kubectl` |
 | [Helm](https://helm.sh/docs/intro/install/) | 3.x | `brew install helm` |
 | [jq](https://stedolan.github.io/jq/) | latest | `brew install jq` |
@@ -78,10 +78,6 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 - Azure subscription with **Contributor** access
 - GPU VM quota for your target region (e.g., `Standard_NV36ads_A10_v5`)
 - Permissions to create: Resource Groups, AKS, Storage, Key Vault, AzureML Workspace
-
-### NVIDIA Requirements
-
-- [NVIDIA Developer](https://developer.nvidia.com/) account with OSMO access
 
 ## 🏃 Quick Start
 
@@ -201,6 +197,25 @@ See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
 | [Scripts](scripts/README.md) | Training and validation submission |
 | [Workflows](workflows/README.md) | Job and workflow templates |
 | [MLflow Integration](docs/mlflow-integration.md) | Experiment tracking setup |
+
+## 💰 Cost Estimation
+
+Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) to estimate costs. Add these services based on the architecture:
+
+| Service | Configuration | Notes |
+|---------|---------------|-------|
+| Azure Kubernetes Service (AKS) | System pool: Standard_D4s_v3 (3 nodes) | Always-on control plane |
+| Virtual Machines (Spot) | Standard_NV36ads_A10_v5 or NC-series | GPU nodes scale to zero when idle |
+| Azure Database for PostgreSQL | Flexible Server, Burstable B1ms | OSMO workflow state |
+| Azure Cache for Redis | Basic C0 or Standard C1 | OSMO job queue |
+| Azure Machine Learning | Basic workspace | No additional compute costs (uses AKS) |
+| Storage Account | Standard LRS, ~100GB | Checkpoints and datasets |
+| Container Registry | Basic or Standard | Image storage |
+| Log Analytics | ~5GB/day ingestion | Monitoring data |
+| Azure Managed Grafana | Essential tier | Dashboards (optional) |
+| VPN Gateway | VpnGw1 | Point-to-site access (optional) |
+
+GPU Spot VMs provide significant savings (60-90%) compared to on-demand pricing. Actual costs depend on training frequency, job duration, and data volumes.
 
 ## 🪪 License
 

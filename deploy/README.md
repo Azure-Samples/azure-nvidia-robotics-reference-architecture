@@ -7,8 +7,8 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 | Step | Folder | Description | Time |
 |:----:|--------|-------------|------|
 | 1 | [000-prerequisites](000-prerequisites/) | Azure CLI login, subscription setup | 2 min |
-| 2 | [001-iac](001-iac/) | Terraform: AKS, ML workspace, storage, PostgreSQL, Redis | 15-20 min |
-| 3 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 10-15 min |
+| 2 | [001-iac](001-iac/) | Terraform: AKS, ML workspace, storage, PostgreSQL, Redis | 30-40 min |
+| 3 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 30 min |
 
 ## 🚀 Quick Path
 
@@ -50,8 +50,8 @@ Remove deployed components in reverse order. Cluster components must be removed 
 
 | Step | Folder | Description | Time |
 |:----:|--------|-------------|------|
-| 1 | [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 5-10 min |
-| 2 | [001-iac](001-iac/) | Terraform destroy or resource group deletion | 10-15 min |
+| 1 | [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 10-15 min |
+| 2 | [001-iac](001-iac/) | Terraform destroy or resource group deletion | 20-30 min |
 
 ### Partial Cleanup (Cluster Components Only)
 

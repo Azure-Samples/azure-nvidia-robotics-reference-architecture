@@ -260,7 +260,7 @@ Issues and resolutions encountered during infrastructure deployment and teardown
 
 ### Destroy Takes a Long Time
 
-Terraform destroy removes resources in dependency order. Private Endpoints, AKS clusters, and PostgreSQL servers commonly take 10-15 minutes each.
+Terraform destroy removes resources in dependency order. Private Endpoints, AKS clusters, and PostgreSQL servers commonly take 5-10 minutes each. Full destruction typically takes 20-30 minutes.
 
 Monitor remaining resources during destruction:
 
