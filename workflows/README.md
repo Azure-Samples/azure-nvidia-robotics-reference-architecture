@@ -43,8 +43,8 @@ workflows/
 # Training job
 ./scripts/submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 
-# Validation job
-./scripts/submit-azureml-validation.sh --model-name anymal-c-velocity --model-version 1
+# Validation job (model name derived from task by default)
+./scripts/submit-azureml-validation.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 ```
 
 ### OSMO Workflows
@@ -85,9 +85,9 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `dataset_bucket` | `training` | OSMO bucket for training code |
-| `dataset_name` | `training-code` | Dataset name (auto-versioned) |
-| `training_localpath` | (set by script) | Local path relative to workflow |
+| `--dataset-bucket` | `training` | OSMO bucket for training code |
+| `--dataset-name` | `training-code` | Dataset name (auto-versioned) |
+| `--training-path` | `src/training` | Local folder to upload |
 
 The training folder mounts at `/data/<dataset_name>/training` inside the container.
 
@@ -106,7 +106,7 @@ Scripts resolve values in order:
 
 | Precedence | Source | Example |
 |------------|--------|---------|
-| 1 (highest) | CLI arguments | `--azure-resource-group rg-custom` |
+| 1 (highest) | CLI arguments | `--resource-group rg-custom` |
 | 2 | Environment variables | `AZURE_RESOURCE_GROUP=rg-custom` |
 | 3 (default) | Terraform outputs | `deploy/001-iac/` |
 
