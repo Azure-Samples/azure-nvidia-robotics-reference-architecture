@@ -9,6 +9,17 @@ AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 - kubectl, Helm 3.x, jq installed
 - OSMO CLI (`osmo`) for backend deployment
 
+### Azure RBAC Permissions
+
+For least-privilege access:
+
+| Role | Scope | Purpose |
+|------|-------|---------|
+| Azure Kubernetes Service Cluster User Role | AKS Cluster | Get cluster credentials |
+| Contributor | Resource Group | Extension and FIC creation |
+| Key Vault Secrets User | Key Vault | Read PostgreSQL/Redis credentials |
+| Storage Blob Data Contributor | Storage Account | Create workflow containers |
+
 ## 🚀 Quick Start
 
 ```bash

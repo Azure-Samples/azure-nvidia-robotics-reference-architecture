@@ -10,6 +10,20 @@ Terraform configuration for the robotics reference architecture. Deploys Azure r
 | Terraform | 1.5+ | `terraform version` |
 | GPU VM quota | Region-specific | e.g., `Standard_NV36ads_A10_v5` |
 
+### Azure RBAC Permissions
+
+| Role | Scope |
+|------|-------|
+| Contributor | Subscription (new RG) or Resource Group (existing RG) |
+| Role Based Access Control Administrator | Subscription (new RG) or Resource Group (existing RG) |
+
+Terraform creates role assignments for managed identities, requiring `Microsoft.Authorization/roleAssignments/write` permission. The Contributor role explicitly blocks this action; the RBAC Administrator role provides it.
+
+> [!NOTE]
+> Use subscription scope if creating a new resource group (`should_create_resource_group = true`). Use resource group scope if the resource group already exists.
+
+**Alternative**: Owner role (grants more permissions than required).
+
 ## 🚀 Quick Start
 
 ```bash
@@ -260,7 +274,7 @@ Issues and resolutions encountered during infrastructure deployment and teardown
 
 ### Destroy Takes a Long Time
 
-Terraform destroy removes resources in dependency order. Private Endpoints, AKS clusters, and PostgreSQL servers commonly take 10-15 minutes each.
+Terraform destroy removes resources in dependency order. Private Endpoints, AKS clusters, and PostgreSQL servers commonly take 5-10 minutes each. Full destruction typically takes 20-30 minutes.
 
 Monitor remaining resources during destruction:
 
