@@ -88,25 +88,14 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 ### 1. Deploy Infrastructure
 
 ```bash
-# Set subscription for Terraform
-source deploy/000-prerequisites/az-sub-init.sh
-
-# Register providers (new subscriptions only)
-./deploy/000-prerequisites/register-azure-providers.sh
-
 cd deploy/001-iac
-
-# Create terraform.tfvars with your values
-cat > terraform.tfvars << 'EOF'
-environment     = "dev"
-resource_prefix = "robotst"       # Your prefix (3-8 chars)
-location        = "eastus2"   # Azure region with GPU quota
-EOF
-
-terraform init && terraform apply
+source ../000-prerequisites/az-sub-init.sh
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
+terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
-For optional VPN deployment and additional configuration, see [deploy/001-iac/README.md](deploy/001-iac/README.md).
+For VPN, automation, and additional configuration, see [deploy/001-iac/README.md](deploy/001-iac/README.md).
 
 ### 2. Configure Cluster
 
@@ -189,17 +178,17 @@ See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
 ```text
 .
 ├── deploy/
-│   ├── 000-prerequisites/    # Validation scripts
-│   ├── 001-iac/              # Terraform infrastructure
-│   └── 002-setup/            # Cluster configuration scripts
+│   ├── 000-prerequisites/              # Validation scripts
+│   ├── 001-iac/                        # Terraform infrastructure
+│   └── 002-setup/                      # Cluster configuration scripts
 ├── scripts/
-│   ├── submit-azureml-*.sh   # AzureML job submission
-│   └── submit-osmo-*.sh      # OSMO workflow submission
+│   ├── submit-azureml-*.sh             # AzureML job submission
+│   └── submit-osmo-*.sh                # OSMO workflow submission
 ├── workflows/
-│   ├── azureml/              # AzureML job templates
-│   └── osmo/                 # OSMO workflow templates
-├── src/training/             # Training code
-└── docs/                     # Additional documentation
+│   ├── azureml/                        # AzureML job templates
+│   └── osmo/                           # OSMO workflow templates
+├── src/training/                       # Training code
+└── docs/                               # Additional documentation
 ```
 
 ## 📖 Documentation
