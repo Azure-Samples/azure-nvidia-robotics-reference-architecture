@@ -98,6 +98,12 @@ resource "azurerm_postgresql_flexible_server" "main" {
     }
   }
 
+  // When the zone is set to null Azure will pick an available zone which then could cause
+  // terraform to try and change the zone, this results in an error on multiple deployments
+  lifecycle {
+    ignore_changes = [zone]
+  }
+
   depends_on = [azurerm_private_dns_zone_virtual_network_link.postgresql]
 }
 
