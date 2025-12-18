@@ -116,6 +116,24 @@ variable "postgresql_version" {
   default     = "16"
 }
 
+variable "postgresql_zone" {
+  type        = string
+  description = "Primary availability zone for PostgreSQL. Set to null for Azure auto-selection"
+  default     = null
+}
+
+variable "postgresql_high_availability" {
+  type = object({
+    enabled                   = bool
+    standby_availability_zone = optional(string)
+  })
+  description = "PostgreSQL high availability configuration. Set enabled=false to deploy without HA"
+  default = {
+    enabled                   = false
+    standby_availability_zone = null
+  }
+}
+
 /*
  * Azure Managed Redis Configuration - Optional
  */
@@ -141,6 +159,12 @@ variable "redis_clustering_policy" {
     condition     = contains(["OSSCluster", "EnterpriseCluster"], var.redis_clustering_policy)
     error_message = "Clustering policy must be either OSSCluster or EnterpriseCluster."
   }
+}
+
+variable "redis_high_availability_enabled" {
+  type        = bool
+  description = "Enable high availability for Redis. Increases cost but provides zone redundancy"
+  default     = false
 }
 
 /*
@@ -218,36 +242,42 @@ variable "subnet_address_prefixes_aks_pod" {
 }
 
 /*
- * AKS Cluster Configuration - Optional
+ * AKS System Node Pool Configuration - Optional
  */
 
-variable "node_vm_size" {
+variable "system_node_pool_vm_size" {
   type        = string
-  description = "VM size for the agent pool in the AKS cluster. Default is Standard_D8ds_v5"
+  description = "VM size for the AKS system node pool"
   default     = "Standard_D8ds_v5"
 }
 
-variable "node_count" {
+variable "system_node_pool_node_count" {
   type        = number
-  description = "Number of nodes for the agent pool in the AKS cluster"
+  description = "Number of nodes for the AKS system node pool"
   default     = 1
 }
 
-variable "enable_auto_scaling" {
+variable "system_node_pool_enable_auto_scaling" {
   type        = bool
-  description = "Should enable auto-scaler for the default node pool"
+  description = "Enable auto-scaling for the AKS system node pool"
   default     = false
 }
 
-variable "min_count" {
+variable "system_node_pool_min_count" {
   type        = number
-  description = "The minimum number of nodes which should exist in the default node pool. Valid values are between 0 and 1000"
+  description = "Minimum node count for AKS system node pool when auto-scaling is enabled (0-1000)"
   default     = null
 }
 
-variable "max_count" {
+variable "system_node_pool_max_count" {
   type        = number
-  description = "The maximum number of nodes which should exist in the default node pool. Valid values are between 0 and 1000"
+  description = "Maximum node count for AKS system node pool when auto-scaling is enabled (0-1000)"
+  default     = null
+}
+
+variable "system_node_pool_zones" {
+  type        = list(string)
+  description = "Availability zones for AKS system node pool. Set to null or empty for regional deployment (no zone constraint)"
   default     = null
 }
 

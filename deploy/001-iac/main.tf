@@ -97,15 +97,19 @@ module "platform" {
   should_deploy_postgresql = var.should_deploy_postgresql
   should_deploy_redis      = var.should_deploy_redis
   postgresql_config = {
-    sku_name        = var.postgresql_sku_name
-    storage_mb      = var.postgresql_storage_mb
-    version         = var.postgresql_version
-    subnet_prefixes = var.postgresql_subnet_address_prefixes
-    databases       = var.postgresql_databases
+    sku_name                  = var.postgresql_sku_name
+    storage_mb                = var.postgresql_storage_mb
+    version                   = var.postgresql_version
+    subnet_prefixes           = var.postgresql_subnet_address_prefixes
+    databases                 = var.postgresql_databases
+    zone                      = var.postgresql_zone
+    high_availability_enabled = var.postgresql_high_availability.enabled
+    standby_availability_zone = var.postgresql_high_availability.standby_availability_zone
   }
   redis_config = {
-    sku_name          = var.redis_sku_name
-    clustering_policy = var.redis_clustering_policy
+    sku_name                  = var.redis_sku_name
+    clustering_policy         = var.redis_clustering_policy
+    high_availability_enabled = var.redis_high_availability_enabled
   }
 
   // OSMO workload identity
@@ -124,7 +128,6 @@ module "sil" {
   // Core variables
   environment     = var.environment
   resource_prefix = var.resource_prefix
-  location        = var.location
   instance        = var.instance
   resource_group  = local.resource_group
 
@@ -149,14 +152,15 @@ module "sil" {
     subnet_address_prefix_aks_pod = try(var.subnet_address_prefixes_aks_pod[0], null)
   }
 
-  // AKS configuration
+  // AKS system node pool configuration
   aks_config = {
-    node_vm_size        = var.node_vm_size
-    node_count          = var.node_count
-    enable_auto_scaling = var.enable_auto_scaling
-    min_count           = var.min_count
-    max_count           = var.max_count
-    is_private_cluster  = var.should_enable_private_endpoint
+    system_node_pool_vm_size             = var.system_node_pool_vm_size
+    system_node_pool_node_count          = var.system_node_pool_node_count
+    system_node_pool_enable_auto_scaling = var.system_node_pool_enable_auto_scaling
+    system_node_pool_min_count           = var.system_node_pool_min_count
+    system_node_pool_max_count           = var.system_node_pool_max_count
+    is_private_cluster                   = var.should_enable_private_endpoint
+    system_node_pool_zones               = var.system_node_pool_zones
   }
 
   node_pools = var.node_pools

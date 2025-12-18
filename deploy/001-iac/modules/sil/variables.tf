@@ -59,21 +59,23 @@ variable "aks_subnet_config" {
 
 variable "aks_config" {
   type = object({
-    node_vm_size        = string
-    node_count          = number
-    enable_auto_scaling = bool
-    min_count           = optional(number)
-    max_count           = optional(number)
-    is_private_cluster  = bool
+    system_node_pool_vm_size             = string
+    system_node_pool_node_count          = number
+    system_node_pool_enable_auto_scaling = bool
+    system_node_pool_min_count           = optional(number)
+    system_node_pool_max_count           = optional(number)
+    is_private_cluster                   = bool
+    system_node_pool_zones               = optional(list(string))
   })
   description = "AKS cluster configuration for the system node pool"
   default = {
-    node_vm_size        = "Standard_D8ds_v5"
-    node_count          = 2
-    enable_auto_scaling = false
-    min_count           = null
-    max_count           = null
-    is_private_cluster  = true
+    system_node_pool_vm_size             = "Standard_D8ds_v5"
+    system_node_pool_node_count          = 2
+    system_node_pool_enable_auto_scaling = false
+    system_node_pool_min_count           = null
+    system_node_pool_max_count           = null
+    is_private_cluster                   = true
+    system_node_pool_zones               = null
   }
 }
 

@@ -14,9 +14,9 @@ instance        = "001"
 // Resource Group
 should_create_resource_group = true
 
-// AKS Cluster
-node_vm_size = "Standard_D8ds_v5"
-node_count   = 1
+// AKS System Node Pool
+system_node_pool_vm_size    = "Standard_D8ds_v5"
+system_node_pool_node_count = 1
 
 // GPU Node Pool
 node_pools = {
@@ -36,7 +36,7 @@ node_pools = {
 
 // OSMO Backend Services
 should_deploy_postgresql = true
-should_deploy_redis = true
+should_deploy_redis      = true
 
 // Security
 should_enable_private_endpoint          = true

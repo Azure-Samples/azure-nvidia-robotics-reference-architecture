@@ -49,16 +49,16 @@ resource "azurerm_kubernetes_cluster" "main" {
 
   default_node_pool {
     name                        = "system"
-    vm_size                     = var.aks_config.node_vm_size
-    node_count                  = var.aks_config.enable_auto_scaling ? null : var.aks_config.node_count
-    auto_scaling_enabled        = var.aks_config.enable_auto_scaling
-    min_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.min_count : null
-    max_count                   = var.aks_config.enable_auto_scaling ? var.aks_config.max_count : null
+    vm_size                     = var.aks_config.system_node_pool_vm_size
+    node_count                  = var.aks_config.system_node_pool_enable_auto_scaling ? null : var.aks_config.system_node_pool_node_count
+    auto_scaling_enabled        = var.aks_config.system_node_pool_enable_auto_scaling
+    min_count                   = var.aks_config.system_node_pool_enable_auto_scaling ? var.aks_config.system_node_pool_min_count : null
+    max_count                   = var.aks_config.system_node_pool_enable_auto_scaling ? var.aks_config.system_node_pool_max_count : null
     vnet_subnet_id              = azurerm_subnet.aks.id
     os_disk_size_gb             = 128
     os_disk_type                = "Ephemeral"
     temporary_name_for_rotation = "systemtemp"
-    zones                       = ["1"]
+    zones                       = var.aks_config.system_node_pool_zones
 
     upgrade_settings {
       max_surge                     = "10%"

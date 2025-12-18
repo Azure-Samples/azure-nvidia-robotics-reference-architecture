@@ -31,6 +31,17 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | `instance` | Instance identifier | No (default: "001") |
 | `tags` | Resource group tags | No (default: {}) |
 
+### AKS System Node Pool
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `system_node_pool_vm_size` | VM size for AKS system node pool | `Standard_D8ds_v5` |
+| `system_node_pool_node_count` | Number of nodes for AKS system node pool | `1` |
+| `system_node_pool_zones` | Availability zones for system node pool | `null` |
+| `system_node_pool_enable_auto_scaling` | Enable auto-scaling for system node pool | `false` |
+| `system_node_pool_min_count` | Minimum nodes when auto-scaling enabled | `null` |
+| `system_node_pool_max_count` | Maximum nodes when auto-scaling enabled | `null` |
+
 ### Feature Flags
 
 | Variable | Description | Default |

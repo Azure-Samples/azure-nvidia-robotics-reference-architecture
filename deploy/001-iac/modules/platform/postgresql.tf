@@ -85,14 +85,17 @@ resource "azurerm_postgresql_flexible_server" "main" {
   private_dns_zone_id           = azurerm_private_dns_zone.postgresql[0].id
   administrator_login           = "psqladmin"
   administrator_password        = random_password.postgresql[0].result
-  zone                          = "1"
+  zone                          = var.postgresql_config.zone
   backup_retention_days         = 7
   geo_redundant_backup_enabled  = false
   public_network_access_enabled = false
 
-  high_availability {
-    mode                      = "ZoneRedundant"
-    standby_availability_zone = "2"
+  dynamic "high_availability" {
+    for_each = var.postgresql_config.high_availability_enabled ? [1] : []
+    content {
+      mode                      = "ZoneRedundant"
+      standby_availability_zone = var.postgresql_config.standby_availability_zone
+    }
   }
 
   depends_on = [azurerm_private_dns_zone_virtual_network_link.postgresql]
