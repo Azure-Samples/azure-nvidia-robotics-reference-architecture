@@ -33,6 +33,9 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
+> [!IMPORTANT]
+> The default configuration creates a **private AKS cluster** (`should_enable_private_endpoint = true`). After deploying infrastructure, you must deploy the [VPN Gateway](vpn/) and connect before running `kubectl` commands or [002-setup](../002-setup/) scripts.
+
 ## ⚙️ Configuration
 
 ### Core Variables
@@ -61,10 +64,13 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `should_enable_nat_gateway` | Deploy NAT Gateway for outbound connectivity | `true` |
-| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones | `true` |
+| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones (requires VPN for cluster access) | `true` |
 | `should_enable_public_network_access` | Allow public access to resources | `true` |
 | `should_deploy_postgresql` | Deploy PostgreSQL Flexible Server for OSMO | `true` |
 | `should_deploy_redis` | Deploy Azure Managed Redis for OSMO | `true` |
+
+> [!NOTE]
+> When `should_enable_private_endpoint = true` (default), the AKS cluster API endpoint is only accessible via private network. Deploy the [VPN Gateway](vpn/) to access the cluster from your local machine.
 
 ### OSMO Workload Identity
 
@@ -189,7 +195,10 @@ Standalone deployments extend the base infrastructure.
 
 ### VPN Gateway
 
-Point-to-Site VPN for secure remote access to private endpoints:
+Point-to-Site VPN for secure remote access to the private AKS cluster and Azure services.
+
+> [!IMPORTANT]
+> **Required for default configuration.** With `should_enable_private_endpoint = true`, you cannot run `kubectl` commands or 002-setup scripts without VPN connectivity.
 
 ```bash
 cd vpn

@@ -5,9 +5,15 @@ AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 ## 📋 Prerequisites
 
 - Terraform infrastructure deployed (`cd ../001-iac && terraform apply`)
+- VPN connected (default private cluster configuration)
 - Azure CLI authenticated (`az login`)
 - kubectl, Helm 3.x, jq installed
 - OSMO CLI (`osmo`) for backend deployment
+
+> [!IMPORTANT]
+> The default infrastructure deploys a **private AKS cluster**. You must deploy the VPN Gateway and connect before running these scripts. See [VPN setup](../001-iac/vpn/README.md#-vpn-client-setup) for instructions. Without VPN, `kubectl` commands fail with `no such host` errors.
+>
+> To deploy a public cluster instead, set `should_enable_private_endpoint = false` in your Terraform configuration.
 
 ### Azure RBAC Permissions
 
@@ -25,6 +31,11 @@ For least-privilege access:
 ```bash
 # Connect to cluster (values from terraform output)
 az aks get-credentials --resource-group <rg> --name <aks>
+
+# Verify connectivity (requires VPN for private clusters)
+kubectl cluster-info
+# Expected: Kubernetes control plane is running at https://...
+# If you see "no such host" errors, connect to VPN first
 
 # Deploy GPU infrastructure (required for all paths)
 ./01-deploy-robotics-charts.sh
@@ -182,16 +193,44 @@ kubectl get sa -n osmo-control-plane osmo-service -o yaml | grep azure.workload.
 
 ## 🔍 Troubleshooting
 
+### Private Cluster Connectivity
+
+If you see `no such host` errors when running `kubectl` commands:
+
+```text
+E1219 15:11:03.714667 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: 
+Get \"https://aks-xxx.privatelink.westus3.azmk8s.io:443/api?timeout=32s\": 
+dial tcp: lookup aks-xxx.privatelink.westus3.azmk8s.io on 10.255.255.254:53: no such host"
+```
+
+This indicates the AKS cluster has a private endpoint and your machine cannot resolve the private DNS name.
+
+**Resolution:**
+
+1. Deploy the VPN Gateway: `cd ../001-iac/vpn && terraform apply`
+2. Download and import VPN client configuration (see [VPN client setup](../001-iac/vpn/README.md#-vpn-client-setup))
+3. Connect to VPN using Azure VPN Client
+4. Verify connectivity: `kubectl cluster-info`
+
+**Alternative:** Redeploy infrastructure with `should_enable_private_endpoint = false` for a public cluster endpoint.
+
+### Workload Identity
+
 ```bash
-# Workload identity
 az identity federated-credential list --identity-name osmo-identity --resource-group <rg>
 az aks show -g <rg> -n <aks> --query oidcIssuerProfile.issuerUrl
+```
 
-# ACR pull
+### ACR Pull
+
+```bash
 az aks check-acr --name <aks> --resource-group <rg> --acr <acr>
 az acr repository show-tags --name <acr> --repository osmo/osmo-service
+```
 
-# Storage access
+### Storage Access
+
+```bash
 kubectl get secret postgres-secret -n osmo-control-plane
 kubectl describe sa osmo-service -n osmo-control-plane
 ```

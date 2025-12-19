@@ -39,6 +39,9 @@ should_deploy_postgresql = true
 should_deploy_redis      = true
 
 // Security
+// IMPORTANT: With should_enable_private_endpoint = true (default), deploy the VPN Gateway
+// (001-iac/vpn/) after deploying this infra, and connect before running kubectl or 002-setup scripts.
+// Set to false for a public cluster endpoint (not recommended for production).
 should_enable_private_endpoint          = true
 should_enable_public_network_access     = true
 should_add_current_user_key_vault_admin = true
