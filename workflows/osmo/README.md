@@ -109,15 +109,58 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
 
 1. OSMO control plane deployed (`03-deploy-osmo-control-plane.sh`)
 2. OSMO backend operator installed (`04-deploy-osmo-backend.sh`)
-3. Storage configured for checkpoints (`05-configure-osmo.sh`)
-4. OSMO CLI installed and authenticated
+3. Storage configured for checkpoints
+4. OSMO CLI installed and authenticated (see [Accessing OSMO](#-accessing-osmo))
+
+## 🔌 Accessing OSMO
+
+OSMO services are deployed to the `osmo-control-plane` namespace. Access method depends on your network configuration.
+
+### Via VPN (Default Private Cluster)
+
+When connected to VPN, OSMO is accessible via the internal load balancer:
+
+| Service | URL |
+|---------|-----|
+| UI Dashboard | http://10.0.5.7 |
+| API Service | http://10.0.5.7/api |
+
+```bash
+osmo login http://10.0.5.7 --method=dev --username=testuser
+osmo info
+```
+
+> [!NOTE]
+> Verify the internal load balancer IP with: `kubectl get svc -n azureml azureml-nginx-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`
+
+### Via Port-Forward (Public Cluster without VPN)
+
+If `should_enable_private_aks_cluster = false` and not using VPN:
+
+| Service | Port-Forward Command | Local URL |
+|---------|---------------------|----------|
+| UI Dashboard | `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` | http://localhost:3000 |
+| API Service | `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` | http://localhost:9000 |
+| Router | `kubectl port-forward svc/osmo-router 8080:80 -n osmo-control-plane` | http://localhost:8080 |
+
+```bash
+# Start port-forward in background (or separate terminal)
+kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane &
+
+# Login to OSMO (dev mode for local access)
+osmo login http://localhost:9000 --method=dev --username=testuser
+
+# Verify connection
+osmo info
+osmo backend list
+```
+
+> [!NOTE]
+> When accessing OSMO through port-forwarding, `osmo workflow exec` and `osmo workflow port-forward` commands are not supported. These require the router service to be accessible via ingress.
 
 ## 📺 Monitoring
 
-Access the OSMO UI dashboard to monitor workflow execution:
+Access the OSMO UI dashboard:
 
-```bash
-kubectl port-forward svc/osmo-ui 8080:80 -n osmo-system
-```
-
-Then open `http://localhost:8080` in your browser.
+- **VPN**: Open http://10.0.5.7 in your browser
+- **Port-forward**: Run `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` then open http://localhost:3000

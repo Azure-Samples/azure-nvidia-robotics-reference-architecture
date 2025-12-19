@@ -37,7 +37,6 @@ output "key_vault_name" {
 output "aks_cluster" {
   description = "AKS cluster for robotics workloads."
   value       = module.sil.aks_cluster
-  sensitive   = true
 }
 
 output "aks_oidc_issuer_url" {

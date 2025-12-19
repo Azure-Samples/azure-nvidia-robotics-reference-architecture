@@ -30,11 +30,9 @@ output "aks_cluster" {
     id                  = azurerm_kubernetes_cluster.main.id
     name                = azurerm_kubernetes_cluster.main.name
     fqdn                = azurerm_kubernetes_cluster.main.fqdn
-    kube_config         = azurerm_kubernetes_cluster.main.kube_config_raw
     kubelet_identity    = azurerm_kubernetes_cluster.main.kubelet_identity[0]
     node_resource_group = azurerm_kubernetes_cluster.main.node_resource_group
   }
-  sensitive = true
 }
 
 output "aks_oidc_issuer_url" {

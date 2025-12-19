@@ -51,7 +51,48 @@ connect_aks() {
   local rg="${1:?resource group required}" name="${2:?cluster name required}"
   info "Connecting to AKS cluster $name..."
   az aks get-credentials --resource-group "$rg" --name "$name" --overwrite-existing
-  kubectl cluster-info &>/dev/null || fatal "Failed to connect to cluster"
+  verify_cluster_connectivity
+}
+
+# Verify kubectl can reach the cluster API server
+verify_cluster_connectivity() {
+  info "Verifying cluster connectivity..."
+  if ! kubectl cluster-info &>/dev/null; then
+    error "Cannot connect to Kubernetes cluster"
+    echo
+    echo "This typically means the AKS cluster has a private endpoint and your machine"
+    echo "cannot resolve the private DNS name. The error usually looks like:"
+    echo
+    echo "  dial tcp: lookup aks-xxx.privatelink.<region>.azmk8s.io: no such host"
+    echo
+    echo "To resolve this, you need to connect via VPN:"
+    echo
+    echo "  1. Deploy the VPN Gateway (if not already deployed):"
+    echo "     cd ../001-iac/vpn && terraform apply"
+    echo
+    echo "  2. Install Azure VPN Client:"
+    echo "     - Windows: Microsoft Store (search 'Azure VPN Client')"
+    echo "     - macOS:   App Store (search 'Azure VPN Client')"
+    echo "     - Linux:   https://learn.microsoft.com/azure/vpn-gateway/point-to-site-entra-vpn-client-linux"
+    echo
+    echo "  3. Download VPN configuration from Azure Portal:"
+    echo "     - Navigate to your Virtual Network Gateway"
+    echo "     - Select 'Point-to-site configuration'"
+    echo "     - Click 'Download VPN client'"
+    echo
+    echo "  4. Import the configuration in Azure VPN Client and connect"
+    echo
+    echo "  5. Re-run this script after VPN connection is established"
+    echo
+    echo "For detailed instructions, see: ../001-iac/vpn/README.md"
+    echo
+    echo "Alternatively, redeploy infrastructure with:"
+    echo "  should_enable_private_aks_cluster = false"
+    echo "in your terraform.tfvars for a public AKS control plane."
+    echo
+    fatal "Cluster connectivity check failed"
+  fi
+  info "Cluster connectivity verified"
 }
 
 # Ensure Kubernetes namespace exists

@@ -8,8 +8,13 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 |:----:|--------|-------------|------|
 | 1 | [000-prerequisites](000-prerequisites/) | Azure CLI login, subscription setup | 2 min |
 | 2 | [001-iac](001-iac/) | Terraform: AKS, ML workspace, storage, PostgreSQL, Redis | 30-40 min |
-| 2b | [001-iac/vpn](001-iac/vpn/) | Optional: VPN Gateway for private endpoint access | 20-30 min |
-| 3 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 30 min |
+| 3 | [001-iac/vpn](001-iac/vpn/) | VPN Gateway for private cluster access | 20-30 min |
+| 4 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 30 min |
+
+> [!IMPORTANT]
+> The default configuration deploys a **private AKS cluster**. The cluster API endpoint is not publicly accessible. You must deploy the VPN Gateway (step 3) and connect before running cluster setup scripts (step 4).
+>
+> **Skip step 3** if you set `should_enable_private_aks_cluster = false` in your Terraform configuration. See [Network Configuration Modes](001-iac/README.md#network-configuration-modes) for options.
 
 ## 🚀 Quick Path
 
@@ -26,15 +31,20 @@ cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values
 terraform init && terraform apply
 
-# 4. Deploy VPN Gateway (optional, for private endpoint access)
+# 4. Deploy VPN Gateway (required for private cluster access)
 cd vpn
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars - must match parent deployment values
 terraform init && terraform apply
 cd ..
 
-# 5. Configure cluster
+# 5. Connect to VPN (see vpn/README.md for client setup)
+# Open Azure VPN Client, import configuration, connect
+
+# 6. Configure cluster (requires VPN connection)
 cd ../002-setup
+az aks get-credentials --resource-group <rg> --name <aks>
+kubectl cluster-info  # Verify connectivity before proceeding
 ./01-deploy-robotics-charts.sh
 ./02-deploy-azureml-extension.sh
 ```
@@ -53,11 +63,19 @@ For OSMO deployment, see [002-setup/README.md](002-setup/README.md) for authenti
 
 ### VPN Gateway (001-iac/vpn)
 
-Point-to-Site VPN enabling secure remote access to private endpoints. Required for:
+Point-to-Site VPN enabling secure remote access to the private AKS cluster and Azure services.
 
+> [!IMPORTANT]
+> With default settings (`should_enable_private_aks_cluster = true`), VPN is **required** before running any `kubectl` commands or 002-setup scripts. Without VPN, you cannot reach the private cluster endpoint.
+>
+> To skip VPN, set `should_enable_private_aks_cluster = false` in your `terraform.tfvars` for a public AKS control plane.
+
+Required for:
+
+- Running `kubectl` commands against the private AKS cluster
+- Executing 002-setup deployment scripts
 - Accessing OSMO UI via private DNS
 - Connecting to private PostgreSQL and Redis from local machine
-- Debugging workloads over private network
 
 See [001-iac/vpn/README.md](001-iac/vpn/README.md) for deployment and [VPN client setup](001-iac/vpn/README.md#-vpn-client-setup).
 
@@ -70,7 +88,7 @@ Remove deployed components in reverse order. Cluster components must be removed 
 | Step | Folder | Description | Time |
 |:----:|--------|-------------|------|
 | 1 | [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 10-15 min |
-| 2 | [001-iac/vpn](001-iac/vpn/) | Destroy VPN Gateway (if deployed) | 10-15 min |
+| 2 | [001-iac/vpn](001-iac/vpn/) | Destroy VPN Gateway | 10-15 min |
 | 3 | [001-iac](001-iac/) | Terraform destroy or resource group deletion | 20-30 min |
 
 ### Partial Cleanup (Cluster Components Only)

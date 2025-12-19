@@ -33,6 +33,9 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
+> [!IMPORTANT]
+> The default configuration creates a **private AKS cluster** (`should_enable_private_aks_cluster = true`). After deploying infrastructure, you must deploy the [VPN Gateway](vpn/) and connect before running `kubectl` commands or [002-setup](../002-setup/) scripts.
+
 ## ⚙️ Configuration
 
 ### Core Variables
@@ -61,10 +64,56 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `should_enable_nat_gateway` | Deploy NAT Gateway for outbound connectivity | `true` |
-| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones | `true` |
+| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones for Azure services | `true` |
+| `should_enable_private_aks_cluster` | Make AKS API endpoint private (requires VPN for kubectl) | `true` |
 | `should_enable_public_network_access` | Allow public access to resources | `true` |
 | `should_deploy_postgresql` | Deploy PostgreSQL Flexible Server for OSMO | `true` |
 | `should_deploy_redis` | Deploy Azure Managed Redis for OSMO | `true` |
+
+### Network Configuration Modes
+
+Three deployment modes are supported based on security requirements:
+
+#### Full Private (Default)
+
+All Azure services use private endpoints and AKS has a private control plane. Requires VPN for all access.
+
+```hcl
+# terraform.tfvars (default values)
+should_enable_private_endpoint    = true
+should_enable_private_aks_cluster = true
+```
+
+Deploy VPN Gateway after infrastructure: `cd vpn && terraform apply`
+
+#### Hybrid: Private Services, Public AKS
+
+Azure services (Storage, Key Vault, ACR, PostgreSQL, Redis) use private endpoints, but AKS control plane is publicly accessible. No VPN required for `kubectl` access.
+
+```hcl
+# terraform.tfvars
+should_enable_private_endpoint    = true
+should_enable_private_aks_cluster = false
+```
+
+This mode provides security for Azure resources while allowing cluster management without VPN.
+
+#### Full Public
+
+All endpoints are publicly accessible. Not recommended for production without additional hardening.
+
+```hcl
+# terraform.tfvars
+should_enable_private_endpoint    = false
+should_enable_private_aks_cluster = false
+```
+
+> [!WARNING]
+> Public endpoints expose services to the internet. When using this configuration, you **must** secure cluster workloads:
+>
+> **AzureML Extension**: Configure HTTPS and restrict access via inference router settings. See [Secure online endpoints](https://learn.microsoft.com/azure/machine-learning/how-to-secure-kubernetes-online-endpoint) and [Inference routing](https://learn.microsoft.com/azure/machine-learning/how-to-kubernetes-inference-routing-azureml-fe).
+>
+> **OSMO UI**: Enable Keycloak authentication to protect the web interface. See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_guide/getting_started/deploy_service.html#step-2-configure-keycloak).
 
 ### OSMO Workload Identity
 
@@ -189,7 +238,10 @@ Standalone deployments extend the base infrastructure.
 
 ### VPN Gateway
 
-Point-to-Site VPN for secure remote access to private endpoints:
+Point-to-Site VPN for secure remote access to the private AKS cluster and Azure services.
+
+> [!IMPORTANT]
+> **Required for default configuration.** With `should_enable_private_aks_cluster = true`, you cannot run `kubectl` commands or 002-setup scripts without VPN connectivity. To skip VPN, set `should_enable_private_aks_cluster = false` in your `terraform.tfvars`.
 
 ```bash
 cd vpn

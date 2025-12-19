@@ -9,7 +9,7 @@ Production-ready framework for orchestrating robotics and AI workloads on [Azure
 | Infrastructure as Code | [Terraform modules](deploy/001-iac/) for reproducible Azure deployments |
 | Dual Orchestration | Submit jobs via [AzureML](workflows/azureml/) or [OSMO](workflows/osmo/) |
 | Workload Identity | Key-less auth via Azure AD ([setup guide](deploy/002-setup/README.md#scenario-2-workload-identity)) |
-| Private Networking | Services on private VNet with optional [VPN gateway](deploy/001-iac/vpn/) ([client setup](deploy/001-iac/vpn/README.md#-vpn-client-setup)) |
+| Private Networking | Services on private VNet with [VPN gateway](deploy/001-iac/vpn/) for cluster access ([client setup](deploy/001-iac/vpn/README.md#-vpn-client-setup)) |
 | MLflow Integration | Experiment tracking with Azure ML ([details](docs/mlflow-integration.md)) |
 | GPU Scheduling | [KAI Scheduler](deploy/002-setup/values/kai-scheduler.yaml) for efficient utilization |
 | Auto-scaling | Pay-per-use GPU compute on AKS Spot nodes |
@@ -34,7 +34,7 @@ The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA
 | Azure Monitor | Log Analytics, Prometheus metrics, Managed Grafana |
 | PostgreSQL | OSMO workflow state persistence |
 | Redis | OSMO job queue and caching |
-| VPN Gateway ⚙️ | Point-to-Site and Site-to-Site connectivity |
+| VPN Gateway | Point-to-Site and Site-to-Site connectivity (required for private cluster access) |
 
 **Kubernetes Components** (deployed by [setup scripts](deploy/002-setup/)):
 
@@ -95,15 +95,34 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
-For VPN, automation, and additional configuration, see [deploy/001-iac/README.md](deploy/001-iac/README.md).
+For automation and additional configuration, see [deploy/001-iac/README.md](deploy/001-iac/README.md).
 
-### 2. Configure Cluster
+### 2. Deploy VPN Gateway
+
+The default configuration creates a private AKS cluster. Deploy the VPN Gateway to access the cluster:
 
 ```bash
-cd ../002-setup
+cd vpn
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars - must match parent deployment values
+terraform init && terraform apply -var-file=terraform.tfvars
+```
+
+See [VPN client setup](deploy/001-iac/vpn/README.md#-vpn-client-setup) for connecting from your local machine.
+
+> [!NOTE]
+> Skip this step if you set `should_enable_private_aks_cluster = false` for a public AKS control plane. See [Network Configuration Modes](deploy/001-iac/README.md#network-configuration-modes) for hybrid options that keep Azure services private while allowing public cluster access.
+
+### 3. Configure Cluster
+
+```bash
+cd ../../002-setup
 
 # Get cluster credentials (resource group and cluster name from terraform output)
 az aks get-credentials --resource-group <rg> --name <aks>
+
+# Verify connectivity (requires VPN for private clusters)
+kubectl cluster-info
 
 # Deploy GPU infrastructure
 ./01-deploy-robotics-charts.sh
@@ -116,7 +135,7 @@ az aks get-credentials --resource-group <rg> --name <aks>
 ./04-deploy-osmo-backend.sh
 ```
 
-### 3. Submit Workloads
+### 4. Submit Workloads
 
 **OSMO Training** – Submits to NVIDIA OSMO orchestrator:
 
