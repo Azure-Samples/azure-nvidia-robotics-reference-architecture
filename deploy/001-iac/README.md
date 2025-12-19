@@ -72,6 +72,22 @@ terraform init && terraform apply -var-file=terraform.tfvars
 > [!NOTE]
 > When `should_enable_private_endpoint = true` (default), the AKS cluster API endpoint is only accessible via private network. Deploy the [VPN Gateway](vpn/) to access the cluster from your local machine.
 
+### Public Network Configuration
+
+To deploy with public internet-facing endpoints (no VPN required):
+
+```hcl
+# terraform.tfvars
+should_enable_private_endpoint = false
+```
+
+> [!WARNING]
+> Public endpoints expose services to the internet. When using this configuration, you **must** secure cluster workloads:
+>
+> **AzureML Extension**: Configure HTTPS and restrict access via inference router settings. See [Secure online endpoints](https://learn.microsoft.com/azure/machine-learning/how-to-secure-kubernetes-online-endpoint) and [Inference routing](https://learn.microsoft.com/azure/machine-learning/how-to-kubernetes-inference-routing-azureml-fe).
+>
+> **OSMO UI**: Enable Keycloak authentication to protect the web interface. See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_guide/getting_started/deploy_service.html#step-2-configure-keycloak).
+
 ### OSMO Workload Identity
 
 Enable managed identity for OSMO services (recommended for production):

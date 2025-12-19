@@ -146,6 +146,29 @@ cd ../002-setup
 | Registry | nvcr.io | nvcr.io | Private ACR |
 | Air-Gap | ✗ | ✗ | ✓ |
 
+## 🔒 Security Considerations for Public Deployments
+
+When deploying with `should_enable_private_endpoint = false`, cluster endpoints are publicly accessible. Secure the following components:
+
+### AzureML Extension
+
+The AzureML inference router (`azureml-fe`) handles incoming requests. For public deployments:
+
+- Enable HTTPS with TLS certificates (`allowInsecureConnections=False`)
+- Configure `sslSecret` or provide certificate files
+- Consider using `internalLoadBalancerProvider=azure` for internal-only access
+
+See [Secure Kubernetes online endpoints](https://learn.microsoft.com/azure/machine-learning/how-to-secure-kubernetes-online-endpoint) and [Inference routing configuration](https://learn.microsoft.com/azure/machine-learning/how-to-kubernetes-inference-routing-azureml-fe).
+
+### OSMO UI
+
+The OSMO web interface requires authentication for public access:
+
+- Enable Keycloak for user authentication and authorization
+- Configure OIDC integration with Azure AD or other identity providers
+
+See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_guide/getting_started/deploy_service.html#step-2-configure-keycloak).
+
 ## 📜 Scripts
 
 | Script | Purpose |
@@ -198,8 +221,8 @@ kubectl get sa -n osmo-control-plane osmo-service -o yaml | grep azure.workload.
 If you see `no such host` errors when running `kubectl` commands:
 
 ```text
-E1219 15:11:03.714667 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: 
-Get \"https://aks-xxx.privatelink.westus3.azmk8s.io:443/api?timeout=32s\": 
+E1219 15:11:03.714667 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list:
+Get \"https://aks-xxx.privatelink.westus3.azmk8s.io:443/api?timeout=32s\":
 dial tcp: lookup aks-xxx.privatelink.westus3.azmk8s.io on 10.255.255.254:53: no such host"
 ```
 
