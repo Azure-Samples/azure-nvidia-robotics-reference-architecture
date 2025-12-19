@@ -34,7 +34,7 @@ terraform init && terraform apply -var-file=terraform.tfvars
 ```
 
 > [!IMPORTANT]
-> The default configuration creates a **private AKS cluster** (`should_enable_private_endpoint = true`). After deploying infrastructure, you must deploy the [VPN Gateway](vpn/) and connect before running `kubectl` commands or [002-setup](../002-setup/) scripts.
+> The default configuration creates a **private AKS cluster** (`should_enable_private_aks_cluster = true`). After deploying infrastructure, you must deploy the [VPN Gateway](vpn/) and connect before running `kubectl` commands or [002-setup](../002-setup/) scripts.
 
 ## ⚙️ Configuration
 
@@ -241,7 +241,7 @@ Standalone deployments extend the base infrastructure.
 Point-to-Site VPN for secure remote access to the private AKS cluster and Azure services.
 
 > [!IMPORTANT]
-> **Required for default configuration.** With `should_enable_private_endpoint = true`, you cannot run `kubectl` commands or 002-setup scripts without VPN connectivity.
+> **Required for default configuration.** With `should_enable_private_aks_cluster = true`, you cannot run `kubectl` commands or 002-setup scripts without VPN connectivity. To skip VPN, set `should_enable_private_aks_cluster = false` in your `terraform.tfvars`.
 
 ```bash
 cd vpn
