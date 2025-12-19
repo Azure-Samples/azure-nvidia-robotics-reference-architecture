@@ -12,7 +12,9 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 | 4 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 30 min |
 
 > [!IMPORTANT]
-> The default configuration deploys a **private AKS cluster** (`should_enable_private_endpoint = true`). The cluster API endpoint is not publicly accessible. You must deploy the VPN Gateway (step 3) and connect before running cluster setup scripts (step 4). Skip step 3 only if you set `should_enable_private_endpoint = false` in your Terraform configuration.
+> The default configuration deploys a **private AKS cluster**. The cluster API endpoint is not publicly accessible. You must deploy the VPN Gateway (step 3) and connect before running cluster setup scripts (step 4).
+>
+> **Skip step 3** if you set `should_enable_private_aks_cluster = false` in your Terraform configuration. See [Network Configuration Modes](001-iac/README.md#network-configuration-modes) for options.
 
 ## 🚀 Quick Path
 

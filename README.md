@@ -111,7 +111,7 @@ terraform init && terraform apply -var-file=terraform.tfvars
 See [VPN client setup](deploy/001-iac/vpn/README.md#-vpn-client-setup) for connecting from your local machine.
 
 > [!NOTE]
-> Skip this step if you set `should_enable_private_endpoint = false` for a public cluster. Public deployments require additional security configuration for AzureML and OSMO endpoints. See [Public Network Configuration](deploy/001-iac/README.md#public-network-configuration).
+> Skip this step if you set `should_enable_private_aks_cluster = false` for a public AKS control plane. See [Network Configuration Modes](deploy/001-iac/README.md#network-configuration-modes) for hybrid options that keep Azure services private while allowing public cluster access.
 
 ### 3. Configure Cluster
 

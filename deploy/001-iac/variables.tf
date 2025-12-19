@@ -326,6 +326,12 @@ variable "should_enable_private_endpoint" {
   default     = true
 }
 
+variable "should_enable_private_aks_cluster" {
+  type        = bool
+  description = "Whether the AKS cluster API endpoint is private. When true, requires VPN for kubectl access. Can be set independently from should_enable_private_endpoint to allow private Azure services with a public AKS control plane."
+  default     = true
+}
+
 /*
  *  Public Network Access Configuration - Optional
  */

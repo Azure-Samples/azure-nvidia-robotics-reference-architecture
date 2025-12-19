@@ -159,7 +159,7 @@ module "sil" {
     system_node_pool_enable_auto_scaling = var.system_node_pool_enable_auto_scaling
     system_node_pool_min_count           = var.system_node_pool_min_count
     system_node_pool_max_count           = var.system_node_pool_max_count
-    is_private_cluster                   = var.should_enable_private_endpoint
+    is_private_cluster                   = var.should_enable_private_aks_cluster
     system_node_pool_zones               = var.system_node_pool_zones
   }
 

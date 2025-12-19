@@ -87,8 +87,8 @@ verify_cluster_connectivity() {
     echo "For detailed instructions, see: ../001-iac/vpn/README.md"
     echo
     echo "Alternatively, redeploy infrastructure with:"
-    echo "  should_enable_private_endpoint = false"
-    echo "in your terraform.tfvars for a public cluster endpoint."
+    echo "  should_enable_private_aks_cluster = false"
+    echo "in your terraform.tfvars for a public AKS control plane."
     echo
     fatal "Cluster connectivity check failed"
   fi

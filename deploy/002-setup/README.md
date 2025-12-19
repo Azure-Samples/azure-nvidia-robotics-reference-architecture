@@ -5,7 +5,7 @@ AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 ## 📋 Prerequisites
 
 - Terraform infrastructure deployed (`cd ../001-iac && terraform apply`)
-- VPN connected (default private cluster configuration)
+- VPN connected (if using default private AKS cluster)
 - Azure CLI authenticated (`az login`)
 - kubectl, Helm 3.x, jq installed
 - OSMO CLI (`osmo`) for backend deployment
@@ -13,7 +13,7 @@ AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 > [!IMPORTANT]
 > The default infrastructure deploys a **private AKS cluster**. You must deploy the VPN Gateway and connect before running these scripts. See [VPN setup](../001-iac/vpn/README.md#-vpn-client-setup) for instructions. Without VPN, `kubectl` commands fail with `no such host` errors.
 >
-> To deploy a public cluster instead, set `should_enable_private_endpoint = false` in your Terraform configuration.
+> To skip VPN, set `should_enable_private_aks_cluster = false` in your Terraform configuration. See [Network Configuration Modes](../001-iac/README.md#network-configuration-modes).
 
 ### Azure RBAC Permissions
 

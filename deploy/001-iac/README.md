@@ -64,21 +64,48 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `should_enable_nat_gateway` | Deploy NAT Gateway for outbound connectivity | `true` |
-| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones (requires VPN for cluster access) | `true` |
+| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones for Azure services | `true` |
+| `should_enable_private_aks_cluster` | Make AKS API endpoint private (requires VPN for kubectl) | `true` |
 | `should_enable_public_network_access` | Allow public access to resources | `true` |
 | `should_deploy_postgresql` | Deploy PostgreSQL Flexible Server for OSMO | `true` |
 | `should_deploy_redis` | Deploy Azure Managed Redis for OSMO | `true` |
 
-> [!NOTE]
-> When `should_enable_private_endpoint = true` (default), the AKS cluster API endpoint is only accessible via private network. Deploy the [VPN Gateway](vpn/) to access the cluster from your local machine.
+### Network Configuration Modes
 
-### Public Network Configuration
+Three deployment modes are supported based on security requirements:
 
-To deploy with public internet-facing endpoints (no VPN required):
+#### Full Private (Default)
+
+All Azure services use private endpoints and AKS has a private control plane. Requires VPN for all access.
+
+```hcl
+# terraform.tfvars (default values)
+should_enable_private_endpoint    = true
+should_enable_private_aks_cluster = true
+```
+
+Deploy VPN Gateway after infrastructure: `cd vpn && terraform apply`
+
+#### Hybrid: Private Services, Public AKS
+
+Azure services (Storage, Key Vault, ACR, PostgreSQL, Redis) use private endpoints, but AKS control plane is publicly accessible. No VPN required for `kubectl` access.
 
 ```hcl
 # terraform.tfvars
-should_enable_private_endpoint = false
+should_enable_private_endpoint    = true
+should_enable_private_aks_cluster = false
+```
+
+This mode provides security for Azure resources while allowing cluster management without VPN.
+
+#### Full Public
+
+All endpoints are publicly accessible. Not recommended for production without additional hardening.
+
+```hcl
+# terraform.tfvars
+should_enable_private_endpoint    = false
+should_enable_private_aks_cluster = false
 ```
 
 > [!WARNING]
