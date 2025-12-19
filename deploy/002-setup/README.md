@@ -294,7 +294,7 @@ This indicates the AKS cluster has a private endpoint and your machine cannot re
 3. Connect to VPN using Azure VPN Client
 4. Verify connectivity: `kubectl cluster-info`
 
-**Alternative:** Redeploy infrastructure with `should_enable_private_endpoint = false` for a public cluster endpoint.
+**Alternative:** Redeploy infrastructure with `should_enable_private_aks_cluster = false` in your `terraform.tfvars` for a public AKS control plane. This allows `kubectl` access without VPN while keeping Azure services (Storage, Key Vault, ACR) private if `should_enable_private_endpoint = true`.
 
 ### Workload Identity
 
