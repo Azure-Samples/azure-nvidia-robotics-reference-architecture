@@ -3,7 +3,9 @@
 Point-to-Site and Site-to-Site VPN connectivity for secure remote access to the private AKS cluster and Azure services.
 
 > [!IMPORTANT]
-> **Required for default configuration.** With `should_enable_private_endpoint = true` (the default), you must deploy this VPN Gateway and connect before running `kubectl` commands or [002-setup](../../002-setup/) scripts. Without VPN, the private cluster endpoint is not accessible.
+> **Required for default configuration.** With `should_enable_private_aks_cluster = true` (the default), you must deploy this VPN Gateway and connect before running `kubectl` commands or [002-setup](../../002-setup/) scripts. Without VPN, the private cluster endpoint is not accessible.
+>
+> To skip VPN, set `should_enable_private_aks_cluster = false` in your `terraform.tfvars` for a public AKS control plane.
 
 ## 📋 Prerequisites
 

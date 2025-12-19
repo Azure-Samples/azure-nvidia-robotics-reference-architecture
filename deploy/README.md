@@ -66,7 +66,9 @@ For OSMO deployment, see [002-setup/README.md](002-setup/README.md) for authenti
 Point-to-Site VPN enabling secure remote access to the private AKS cluster and Azure services.
 
 > [!IMPORTANT]
-> With default settings (`should_enable_private_endpoint = true`), VPN is **required** before running any `kubectl` commands or 002-setup scripts. Without VPN, you cannot reach the private cluster endpoint.
+> With default settings (`should_enable_private_aks_cluster = true`), VPN is **required** before running any `kubectl` commands or 002-setup scripts. Without VPN, you cannot reach the private cluster endpoint.
+>
+> To skip VPN, set `should_enable_private_aks_cluster = false` in your `terraform.tfvars` for a public AKS control plane.
 
 Required for:
 
