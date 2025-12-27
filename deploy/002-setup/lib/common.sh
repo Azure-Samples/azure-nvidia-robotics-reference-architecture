@@ -17,6 +17,15 @@ require_tools() {
   [[ ${#missing[@]} -eq 0 ]] || fatal "Missing required tools: ${missing[*]}"
 }
 
+# Ensure Azure CLI extension is installed
+require_az_extension() {
+  local ext="${1:?extension name required}"
+  if ! az extension show --name "$ext" &>/dev/null; then
+    info "Installing Azure CLI extension '$ext'..."
+    az extension add --name "$ext" --yes || fatal "Failed to install Azure CLI extension '$ext'"
+  fi
+}
+
 # Read terraform outputs from state file
 read_terraform_outputs() {
   local tf_dir="${1:?terraform directory required}"

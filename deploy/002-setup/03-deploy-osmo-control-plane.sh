@@ -213,6 +213,17 @@ ingress_manifest="$SCRIPT_DIR/manifests/internal-lb-ingress.yaml"
 [[ -f "$ingress_manifest" ]] && kubectl apply -f "$ingress_manifest"
 
 #------------------------------------------------------------------------------
+# Configure Helm Repository
+#------------------------------------------------------------------------------
+
+if [[ "$use_acr" == "false" ]]; then
+  section "Configure Helm Repository"
+  info "Adding OSMO Helm repository..."
+  helm repo add osmo "$HELM_REPO_OSMO" 2>/dev/null || true
+  helm repo update osmo
+fi
+
+#------------------------------------------------------------------------------
 # Deploy OSMO Charts
 #------------------------------------------------------------------------------
 section "Deploy OSMO Charts"
