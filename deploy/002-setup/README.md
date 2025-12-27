@@ -10,6 +10,9 @@ AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 - kubectl, Helm 3.x, jq installed
 - OSMO CLI (`osmo`) for backend deployment
 
+> [!NOTE]
+> Scripts automatically install required Azure CLI extensions (`k8s-extension`, `ml`) if missing.
+
 > [!IMPORTANT]
 > The default infrastructure deploys a **private AKS cluster**. You must deploy the VPN Gateway and connect before running these scripts. See [VPN setup](../001-iac/vpn/README.md#-vpn-client-setup) for instructions. Without VPN, `kubectl` commands fail with `no such host` errors.
 >
@@ -207,7 +210,7 @@ kubectl get pods -n osmo-control-plane
 kubectl get pods -n osmo-operator
 
 # Workload identity (if enabled)
-kubectl get sa -n osmo-control-plane osmo-service -o yaml | grep azure.workload.identity
+kubectl get sa -n osmo-control-plane osmo-control-plane -o yaml | grep azure.workload.identity
 ```
 
 ## 🔌 Accessing OSMO
