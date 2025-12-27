@@ -135,6 +135,8 @@ kubectl cluster-info
 ./04-deploy-osmo-backend.sh
 ```
 
+See [Accessing OSMO](deploy/002-setup/README.md#-accessing-osmo) for port-forwarding and login instructions.
+
 ### 4. Submit Workloads
 
 **OSMO Training** – Submits to NVIDIA OSMO orchestrator:
