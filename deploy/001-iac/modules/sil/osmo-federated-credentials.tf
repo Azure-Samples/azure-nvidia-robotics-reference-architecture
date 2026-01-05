@@ -5,7 +5,7 @@
  * enabling workload identity authentication for Azure Blob Storage.
  *
  * ServiceAccounts federated (names match Helm chart naming conventions):
- * - service-osmo (control plane namespace) - osmo service chart
+ * - osmo-control-plane (control plane namespace) - osmo service chart
  * - router (control plane namespace) - osmo router chart
  * - osmo-operator-backend-listener (operator namespace) - backend-operator chart
  * - osmo-operator-backend-worker (operator namespace) - backend-operator chart
@@ -20,9 +20,9 @@ locals {
   // SA names match the actual names created by OSMO Helm charts
   osmo_federated_credentials = var.osmo_workload_identity != null && var.osmo_config.should_federate_identity ? {
     // Control plane namespace ServiceAccounts (created by osmo service/router charts)
-    "osmo-service" = {
+    "osmo-control-plane" = {
       namespace = var.osmo_config.control_plane_namespace
-      sa_name   = "service-osmo"
+      sa_name   = "osmo-control-plane"
     }
     "osmo-router" = {
       namespace = var.osmo_config.control_plane_namespace

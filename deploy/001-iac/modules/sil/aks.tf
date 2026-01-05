@@ -39,7 +39,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   automatic_upgrade_channel         = "patch"
   sku_tier                          = "Standard"
   private_cluster_enabled           = var.aks_config.is_private_cluster
-  private_dns_zone_id               = local.pe_enabled ? var.private_dns_zones["aks"].id : null
+  private_dns_zone_id               = var.aks_config.is_private_cluster && local.pe_enabled ? var.private_dns_zones["aks"].id : null
   local_account_disabled            = true
   azure_policy_enabled              = true
   oidc_issuer_enabled               = true

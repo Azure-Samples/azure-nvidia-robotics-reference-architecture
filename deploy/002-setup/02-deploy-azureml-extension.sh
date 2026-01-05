@@ -59,6 +59,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_tools az terraform kubectl jq envsubst
+require_az_extension k8s-extension
+require_az_extension ml
 
 #------------------------------------------------------------------------------
 # Gather Configuration
