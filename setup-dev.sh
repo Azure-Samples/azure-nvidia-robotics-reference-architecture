@@ -60,12 +60,25 @@ fi
 
 info "Using Python: $($PYTHON_CMD --version)"
 
+# Detect package manager - prefer uv for performance (10-100x faster)
+if command -v uv &>/dev/null; then
+  USE_UV=true
+  info "Using uv package manager (10-100x faster than pip)"
+else
+  USE_UV=false
+  info "Using pip (install uv for faster package management)"
+fi
+
 if [[ "${DISABLE_VENV}" == "true" ]]; then
   info "Virtual environment disabled, installing packages directly..."
 else
   if [[ ! -d "${VENV_DIR}" ]]; then
     info "Creating virtual environment at ${VENV_DIR}..."
-    $PYTHON_CMD -m venv "${VENV_DIR}"
+    if [[ "${USE_UV}" == "true" ]]; then
+      uv venv "${VENV_DIR}"
+    else
+      $PYTHON_CMD -m venv "${VENV_DIR}"
+    fi
   else
     info "Virtual environment already exists at ${VENV_DIR}"
   fi
@@ -74,16 +87,32 @@ else
 fi
 
 info "Upgrading pip..."
-pip install --upgrade pip --quiet
+if [[ "${USE_UV}" == "true" ]]; then
+  uv pip install --upgrade pip --quiet
+else
+  pip install --upgrade pip --quiet
+fi
 
 info "Installing root dependencies..."
-if ! pip install -r "${SCRIPT_DIR}/requirements.txt" --quiet 2>/dev/null; then
-  warn "Some packages failed to install (expected on macOS for Linux-only packages)"
+if [[ "${USE_UV}" == "true" ]]; then
+  if ! uv pip install -r "${SCRIPT_DIR}/requirements.txt" --quiet 2>/dev/null; then
+    warn "Some packages failed to install (expected on macOS for Linux-only packages)"
+  fi
+else
+  if ! pip install -r "${SCRIPT_DIR}/requirements.txt" --quiet 2>/dev/null; then
+    warn "Some packages failed to install (expected on macOS for Linux-only packages)"
+  fi
 fi
 
 info "Installing training dependencies..."
-if ! pip install -r "${SCRIPT_DIR}/src/training/requirements.txt" --quiet 2>/dev/null; then
-  warn "Some training packages failed to install"
+if [[ "${USE_UV}" == "true" ]]; then
+  if ! uv pip install -r "${SCRIPT_DIR}/src/training/requirements.txt" --quiet 2>/dev/null; then
+    warn "Some training packages failed to install"
+  fi
+else
+  if ! pip install -r "${SCRIPT_DIR}/src/training/requirements.txt" --quiet 2>/dev/null; then
+    warn "Some training packages failed to install"
+  fi
 fi
 
 section "IsaacLab Setup"

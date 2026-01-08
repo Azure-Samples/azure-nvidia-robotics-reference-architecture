@@ -22,16 +22,11 @@ fi
 
 export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
 
-if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
-  if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
-    "${python_cmd[@]}" -m ensurepip --upgrade
-  else
-    echo "Error: pip not available and ensurepip failed" >&2
-    exit 1
-  fi
-fi
+# shellcheck source=lib/pkg-installer.sh
+source "${SCRIPT_DIR}/lib/pkg-installer.sh"
 
-"${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+pip_install_cmd=$(get_pip_install_cmd "${python_cmd[*]}") || exit 1
+${pip_install_cmd} --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
 
 backend="${TRAINING_BACKEND:-skrl}"
 backend_lc=$(printf '%s' "$backend" | tr '[:upper:]' '[:lower:]')
