@@ -67,14 +67,6 @@ ensure_ml_extension() {
     fatal "Azure ML CLI extension not installed. Run: az extension add --name ml"
 }
 
-ensure_uv() {
-  if ! command -v uv &>/dev/null; then
-    info "Installing uv package manager..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-  fi
-}
-
 derive_model_name() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
 }
@@ -211,7 +203,6 @@ done
 
 require_tools az
 ensure_ml_extension
-ensure_uv
 
 [[ -n "$subscription_id" ]] || fatal "AZURE_SUBSCRIPTION_ID required"
 [[ -n "$resource_group" ]] || fatal "AZURE_RESOURCE_GROUP required"
