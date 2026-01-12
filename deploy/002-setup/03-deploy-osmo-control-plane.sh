@@ -243,7 +243,7 @@ helm_args=("${base_helm_args[@]}" -f "$service_values" --set "services.postgres.
 [[ -n "$osmo_identity_client_id" ]] && helm_args+=(-f "$service_identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
 
 if [[ "$use_acr" == "true" ]]; then
-  helm upgrade -i service "oci://${acr_login_server}/helm/osmo" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i service "oci://${acr_login_server}/helm/service" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 else
   helm upgrade -i service osmo/service "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 fi
@@ -264,7 +264,7 @@ info "Deploying osmo/web-ui..."
 helm_args=("${base_helm_args[@]}" -f "$ui_values")
 
 if [[ "$use_acr" == "true" ]]; then
-  helm upgrade -i ui "oci://${acr_login_server}/helm/ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i ui "oci://${acr_login_server}/helm/web-ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 else
   helm upgrade -i ui osmo/web-ui "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 fi
