@@ -27,6 +27,12 @@ param(
 $ErrorActionPreference = 'Stop'
 Disable-AzContextAutosave -Scope Process | Out-Null
 
+Import-Module Az.Accounts -ErrorAction Stop
+Import-Module Az.Aks -ErrorAction Stop
+if ($PostgresServerName -and $PostgresServerName -ne "") {
+    Import-Module Az.PostgreSql -ErrorAction Stop
+}
+
 try {
     Write-Output "=========================================="
     Write-Output "Start Azure Resources Runbook"
