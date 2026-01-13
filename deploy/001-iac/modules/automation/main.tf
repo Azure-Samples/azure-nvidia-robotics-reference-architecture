@@ -33,6 +33,21 @@ resource "azurerm_automation_account" "this" {
 }
 
 // ============================================================
+// PowerShell 7.2 Modules
+// ============================================================
+
+resource "azurerm_automation_powershell72_module" "az_postgresql" {
+  name                  = "Az.PostgreSql"
+  automation_account_id = azurerm_automation_account.this.id
+
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/Az.PostgreSql/1.4.0"
+  }
+
+  tags = var.tags
+}
+
+// ============================================================
 // Runbook
 // ============================================================
 
