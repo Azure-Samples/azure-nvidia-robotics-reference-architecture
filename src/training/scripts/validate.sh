@@ -25,7 +25,7 @@ export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
 # shellcheck source=lib/pkg-installer.sh
 source "${SCRIPT_DIR}/lib/pkg-installer.sh"
 
-pip_install_cmd=$(get_pip_install_cmd "${python_cmd[*]}") || exit 1
-${pip_install_cmd} --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+# Install requirements with Isaac Sim package protection
+install_requirements_safe "${TRAINING_DIR}/requirements.txt" "${python_cmd[*]}"
 
 exec "${python_cmd[@]}" -m training.scripts.policy_evaluation "$@"

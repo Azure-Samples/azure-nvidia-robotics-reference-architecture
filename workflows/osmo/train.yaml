@@ -61,6 +61,30 @@ workflow:
               exit 0
             fi
 
+            # Install uv for faster package management (standalone installer is more reliable)
+            if ! command -v uv &>/dev/null; then
+              echo "Installing uv package manager..."
+              if curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
+                export PATH="${HOME}/.local/bin:${PATH}"
+              fi
+            fi
+            # Configure uv for Isaac Lab's embedded Python environment
+            if command -v uv &>/dev/null; then
+              resolved_python="$(${PYTHON:-python} -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
+              resolved_env="$(${PYTHON:-python} -c 'import sys; print(sys.prefix)' 2>/dev/null || true)"
+              if [[ -n "${resolved_python}" && -x "${resolved_python}" ]]; then
+                export UV_PYTHON="${resolved_python}"
+                if [[ -n "${resolved_env}" && -d "${resolved_env}" ]]; then
+                  export UV_PROJECT_ENVIRONMENT="${resolved_env}"
+                  echo "uv configured with Python: ${resolved_python}, environment: ${resolved_env}"
+                else
+                  echo "uv configured with Python: ${resolved_python}"
+                fi
+              else
+                echo "Could not resolve Python executable; uv will use system discovery"
+              fi
+            fi
+
             export PYTHONPATH="${TRAINING_ROOT}:${PYTHONPATH:-}"
 
             MODE="train"
