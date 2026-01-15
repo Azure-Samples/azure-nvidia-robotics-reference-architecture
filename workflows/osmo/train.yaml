@@ -53,6 +53,59 @@ workflow:
             python_cmd_raw="${PYTHON:-python}"
             read -r -a python_cmd <<< "${python_cmd_raw}"
             python_exec=""
+            resolve_python_exec() {
+              local resolved_python_raw resolved_python resolved_python_alt_raw resolved_python_alt token
+              resolved_python_raw="$(${python_cmd[@]} -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
+              if [[ -z "${resolved_python_raw}" ]]; then
+                resolved_python_raw="$(${python_cmd[@]} 2>/dev/null || true)"
+              fi
+              resolved_python=""
+              for token in ${resolved_python_raw}; do
+                if [[ -x "${token}" ]]; then
+                  resolved_python="${token}"
+                  break
+                fi
+              done
+              if [[ -n "${resolved_python}" && "${resolved_python}" == *python.sh ]]; then
+                resolved_python_alt_raw="$(${resolved_python} -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
+                if [[ -n "${resolved_python_alt_raw}" ]]; then
+                  resolved_python_alt=""
+                  for token in ${resolved_python_alt_raw}; do
+                    if [[ -x "${token}" ]]; then
+                      resolved_python_alt="${token}"
+                      break
+                    fi
+                  done
+                  if [[ -n "${resolved_python_alt}" ]]; then
+                    resolved_python="${resolved_python_alt}"
+                  fi
+                fi
+              fi
+              printf '%s' "${resolved_python}"
+            }
+            configure_uv() {
+              local resolved_python resolved_env
+              if ! command -v uv &>/dev/null; then
+                return 0
+              fi
+              resolved_python="$(resolve_python_exec)"
+              resolved_env="$(${python_cmd[@]} -c 'import sys; print(sys.prefix)' 2>/dev/null || true)"
+              if [[ -n "${resolved_python}" ]]; then
+                python_exec="${resolved_python}"
+                if [[ -z "${resolved_env}" ]]; then
+                  resolved_env="$(${resolved_python} -c 'import sys; print(sys.prefix)' 2>/dev/null || true)"
+                fi
+                export UV_PYTHON="${resolved_python}"
+                if [[ -n "${resolved_env}" && -d "${resolved_env}" ]]; then
+                  export UV_PROJECT_ENVIRONMENT="${resolved_env}"
+                  echo "uv configured with Python: ${resolved_python}, environment: ${resolved_env}"
+                else
+                  echo "uv configured with Python: ${resolved_python}"
+                fi
+              else
+                echo "Could not resolve Python executable; uv will use system discovery"
+              fi
+            }
             run_python() {
               if [[ -n "${python_exec}" ]]; then
                 "${python_exec}" "$@"
@@ -80,50 +133,7 @@ workflow:
               fi
             fi
             # Configure uv for Isaac Lab's embedded Python environment
-            if command -v uv &>/dev/null; then
-              resolved_python_raw="$(${python_cmd[@]} -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
-              resolved_env="$(${python_cmd[@]} -c 'import sys; print(sys.prefix)' 2>/dev/null || true)"
-              if [[ -z "${resolved_python_raw}" ]]; then
-                resolved_python_raw="$(${python_cmd[@]} 2>/dev/null || true)"
-              fi
-              resolved_python=""
-              for token in ${resolved_python_raw}; do
-                if [[ -x "${token}" ]]; then
-                  resolved_python="${token}"
-                  break
-                fi
-              done
-              if [[ -n "${resolved_python}" && "${resolved_python}" == *python.sh ]]; then
-                resolved_python_alt_raw="$(${resolved_python} -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
-                if [[ -n "${resolved_python_alt_raw}" ]]; then
-                  resolved_python_alt=""
-                  for token in ${resolved_python_alt_raw}; do
-                    if [[ -x "${token}" ]]; then
-                      resolved_python_alt="${token}"
-                      break
-                    fi
-                  done
-                  if [[ -n "${resolved_python_alt}" ]]; then
-                    resolved_python="${resolved_python_alt}"
-                  fi
-                fi
-              fi
-              if [[ -n "${resolved_python}" ]]; then
-                python_exec="${resolved_python}"
-                if [[ -z "${resolved_env}" ]]; then
-                  resolved_env="$(${resolved_python} -c 'import sys; print(sys.prefix)' 2>/dev/null || true)"
-                fi
-                export UV_PYTHON="${resolved_python}"
-                if [[ -n "${resolved_env}" && -d "${resolved_env}" ]]; then
-                  export UV_PROJECT_ENVIRONMENT="${resolved_env}"
-                  echo "uv configured with Python: ${resolved_python}, environment: ${resolved_env}"
-                else
-                  echo "uv configured with Python: ${resolved_python}"
-                fi
-              else
-                echo "Could not resolve Python executable; uv will use system discovery"
-              fi
-            fi
+            configure_uv
 
             export PYTHONPATH="/isaac-sim/exts/omni.pip.compute/pip_prebundle:${TRAINING_ROOT}:${PYTHONPATH:-}"
 
