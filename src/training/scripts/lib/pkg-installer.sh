@@ -4,9 +4,10 @@ set -o errexit -o nounset
 
 # Isaac Sim bundled packages - DO NOT override these via uv/pip
 # These versions are validated by NVIDIA for Isaac Sim 5.0 compatibility
+# Format: "package:fallback_constraint" - fallback used when detection fails
 readonly ISAAC_SIM_PROTECTED_PACKAGES=(
-    "numpy"
-    "scipy"
+    "numpy:<2.0.0"
+    "scipy:<1.16.0"
 )
 
 # Cached resolved Python executable path
@@ -114,7 +115,10 @@ generate_isaac_constraints() {
     echo "  Using Python: ${resolved_python}" >&2
 
     # Query actual installed versions to create precise constraints
-    for pkg in "${ISAAC_SIM_PROTECTED_PACKAGES[@]}"; do
+    for pkg_entry in "${ISAAC_SIM_PROTECTED_PACKAGES[@]}"; do
+        local pkg="${pkg_entry%%:*}"
+        local fallback_constraint="${pkg_entry#*:}"
+
         local version
         # Use resolved Python directly, capture only stdout
         version="$("${resolved_python}" -c "
@@ -129,6 +133,9 @@ except Exception:
         if [[ -n "${version}" && "${version}" =~ ^[0-9]+\.[0-9]+ ]]; then
             echo "${pkg}==${version}" >> "${constraints_file}"
             echo "  Constraint: ${pkg}==${version}" >&2
+        elif [[ -n "${fallback_constraint}" ]]; then
+            echo "${pkg}${fallback_constraint}" >> "${constraints_file}"
+            echo "  Fallback constraint: ${pkg}${fallback_constraint} (version detection failed)" >&2
         else
             echo "  Warning: Could not detect ${pkg} version, skipping constraint" >&2
         fi
