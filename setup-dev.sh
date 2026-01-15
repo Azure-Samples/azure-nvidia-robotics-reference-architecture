@@ -42,78 +42,37 @@ section "Tool Verification"
 require_tools az terraform kubectl helm jq
 info "All required tools found"
 
+section "UV Package Manager Setup"
+
+if ! command -v uv &>/dev/null; then
+  info "Installing uv package manager..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+fi
+
+info "Using uv: $(uv --version)"
+
 section "Python Environment Setup"
 
 PYTHON_VERSION="$(cat "${SCRIPT_DIR}/.python-version")"
 info "Target Python version: ${PYTHON_VERSION}"
 
-if command -v pyenv &>/dev/null; then
-  info "Installing Python ${PYTHON_VERSION} via pyenv..."
-  pyenv install -s "${PYTHON_VERSION}"
-  PYTHON_CMD="python"
-elif command -v python3 &>/dev/null; then
-  warn "pyenv not found, using system python3"
-  PYTHON_CMD="python3"
-else
-  fatal "Neither pyenv nor python3 found. Please install Python 3.11+"
-fi
-
-info "Using Python: $($PYTHON_CMD --version)"
-
-# Detect package manager - prefer uv for performance (10-100x faster)
-if command -v uv &>/dev/null; then
-  USE_UV=true
-  info "Using uv package manager (10-100x faster than pip)"
-else
-  USE_UV=false
-  info "Using pip (install uv for faster package management)"
-fi
-
 if [[ "${DISABLE_VENV}" == "true" ]]; then
   info "Virtual environment disabled, installing packages directly..."
 else
   if [[ ! -d "${VENV_DIR}" ]]; then
-    info "Creating virtual environment at ${VENV_DIR}..."
-    if [[ "${USE_UV}" == "true" ]]; then
-      uv venv "${VENV_DIR}"
-    else
-      $PYTHON_CMD -m venv "${VENV_DIR}"
-    fi
+    info "Creating virtual environment at ${VENV_DIR} with Python ${PYTHON_VERSION}..."
+    uv venv "${VENV_DIR}" --python "${PYTHON_VERSION}"
   else
     info "Virtual environment already exists at ${VENV_DIR}"
   fi
-  info "Activating virtual environment..."
-  source "${VENV_DIR}/bin/activate"
 fi
 
-info "Upgrading pip..."
-if [[ "${USE_UV}" == "true" ]]; then
-  uv pip install --upgrade pip --quiet
-else
-  pip install --upgrade pip --quiet
-fi
+info "Syncing dependencies from pyproject.toml..."
+uv sync
 
-info "Installing root dependencies..."
-if [[ "${USE_UV}" == "true" ]]; then
-  if ! uv pip install -r "${SCRIPT_DIR}/requirements.txt" --quiet 2>/dev/null; then
-    warn "Some packages failed to install (expected on macOS for Linux-only packages)"
-  fi
-else
-  if ! pip install -r "${SCRIPT_DIR}/requirements.txt" --quiet 2>/dev/null; then
-    warn "Some packages failed to install (expected on macOS for Linux-only packages)"
-  fi
-fi
-
-info "Installing training dependencies..."
-if [[ "${USE_UV}" == "true" ]]; then
-  if ! uv pip install -r "${SCRIPT_DIR}/src/training/requirements.txt" --quiet 2>/dev/null; then
-    warn "Some training packages failed to install"
-  fi
-else
-  if ! pip install -r "${SCRIPT_DIR}/src/training/requirements.txt" --quiet 2>/dev/null; then
-    warn "Some training packages failed to install"
-  fi
-fi
+info "Locking dependencies..."
+uv lock
 
 section "IsaacLab Setup"
 
