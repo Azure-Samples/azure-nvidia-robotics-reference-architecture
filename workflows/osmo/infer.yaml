@@ -151,7 +151,8 @@ workflow:
 
             INFERENCE_FORMAT="${INFERENCE_FORMAT:-both}"
             VIDEO_DIR="${EXPORT_DIR}/videos"
-            mkdir -p "${VIDEO_DIR}"
+            METRICS_DIR="${EXPORT_DIR}/metrics"
+            mkdir -p "${VIDEO_DIR}" "${METRICS_DIR}"
 
             # Run inference with error tolerance (continue even if one format fails)
             ONNX_SUCCESS=0
@@ -165,6 +166,7 @@ workflow:
                   --num_envs "${NUM_ENVS:-4}" \
                   --max-steps "${MAX_STEPS:-500}" \
                   --video_length "${VIDEO_LENGTH:-200}" \
+                  --output-metrics "${METRICS_DIR}/onnx_metrics.json" \
                   --headless --video; then
                 ONNX_SUCCESS=1
                 echo "ONNX inference completed successfully"
@@ -181,6 +183,7 @@ workflow:
                   --num_envs "${NUM_ENVS:-4}" \
                   --max-steps "${MAX_STEPS:-500}" \
                   --video_length "${VIDEO_LENGTH:-200}" \
+                  --output-metrics "${METRICS_DIR}/jit_metrics.json" \
                   --headless --video; then
                 JIT_SUCCESS=1
                 echo "JIT inference completed successfully"
@@ -191,6 +194,7 @@ workflow:
 
             echo "Uploading artifacts to MLflow (Azure ML Studio)..."
             export EXPORT_DIR
+            export METRICS_DIR
             export BLOB_STORAGE_ACCOUNT
             export BLOB_CONTAINER
             export CHECKPOINT_URI
@@ -203,6 +207,7 @@ workflow:
             echo "[DEBUG] AZUREML_WORKSPACE_NAME=${AZUREML_WORKSPACE_NAME:-<not set>}"
             ${PYTHON_CMD} << 'UPLOAD_SCRIPT'
             """Upload inference artifacts using the same MLflow integration as train.py."""
+            import json
             import os
             import sys
             from pathlib import Path
@@ -221,12 +226,25 @@ workflow:
 
             task = os.environ.get("TASK", "unknown")
             export_dir = Path(os.environ.get("EXPORT_DIR", "/tmp/exported"))
+            metrics_dir = Path(os.environ.get("METRICS_DIR", export_dir / "metrics"))
             checkpoint_uri = os.environ.get("CHECKPOINT_URI", "")
             blob_account = os.environ.get("BLOB_STORAGE_ACCOUNT", "")
             blob_container = os.environ.get("BLOB_CONTAINER", "")
             onnx_success = os.environ.get("ONNX_SUCCESS", "0") == "1"
             jit_success = os.environ.get("JIT_SUCCESS", "0") == "1"
             timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+            # Load metrics from JSON files if available
+            onnx_metrics = {}
+            jit_metrics = {}
+            if (metrics_dir / "onnx_metrics.json").exists():
+                with open(metrics_dir / "onnx_metrics.json") as f:
+                    onnx_metrics = json.load(f)
+                print(f"[Metrics] Loaded ONNX metrics: {len(onnx_metrics)} fields")
+            if (metrics_dir / "jit_metrics.json").exists():
+                with open(metrics_dir / "jit_metrics.json") as f:
+                    jit_metrics = json.load(f)
+                print(f"[Metrics] Loaded JIT metrics: {len(jit_metrics)} fields")
 
             # Use the same bootstrap_azure_ml from training utils
             mlflow_logged = False
@@ -253,6 +271,45 @@ workflow:
                         "max_steps": os.environ.get("MAX_STEPS", "500"),
                         "video_length": os.environ.get("VIDEO_LENGTH", "200"),
                         "inference_format": os.environ.get("INFERENCE_FORMAT", "both"),
+                    })
+
+                    # Log metrics from inference runs
+                    if onnx_metrics:
+                        mlflow.log_metrics({
+                            "onnx/mean_episode_reward": onnx_metrics.get("mean_episode_reward", 0),
+                            "onnx/std_episode_reward": onnx_metrics.get("std_episode_reward", 0),
+                            "onnx/total_episodes": onnx_metrics.get("total_episodes", 0),
+                            "onnx/mean_inference_time_ms": onnx_metrics.get("mean_inference_time_ms", 0),
+                            "onnx/p95_inference_time_ms": onnx_metrics.get("p95_inference_time_ms", 0),
+                            "onnx/throughput_steps_per_sec": onnx_metrics.get("throughput_steps_per_sec", 0),
+                        })
+                        # Log full metrics JSON as artifact
+                        mlflow.log_artifact(str(metrics_dir / "onnx_metrics.json"), artifact_path="metrics")
+
+                    if jit_metrics:
+                        mlflow.log_metrics({
+                            "jit/mean_episode_reward": jit_metrics.get("mean_episode_reward", 0),
+                            "jit/std_episode_reward": jit_metrics.get("std_episode_reward", 0),
+                            "jit/total_episodes": jit_metrics.get("total_episodes", 0),
+                            "jit/mean_inference_time_ms": jit_metrics.get("mean_inference_time_ms", 0),
+                            "jit/p95_inference_time_ms": jit_metrics.get("p95_inference_time_ms", 0),
+                            "jit/throughput_steps_per_sec": jit_metrics.get("throughput_steps_per_sec", 0),
+                        })
+                        mlflow.log_artifact(str(metrics_dir / "jit_metrics.json"), artifact_path="metrics")
+
+                    # Log aggregate metrics (best of ONNX/JIT for dashboard)
+                    best_reward = max(
+                        onnx_metrics.get("mean_episode_reward", 0),
+                        jit_metrics.get("mean_episode_reward", 0)
+                    )
+                    total_episodes = (
+                        onnx_metrics.get("total_episodes", 0) +
+                        jit_metrics.get("total_episodes", 0)
+                    )
+                    mlflow.log_metrics({
+                        "mean_reward": best_reward,
+                        "eval_episodes": total_episodes,
+                        "success_rate": 1.0 if (onnx_success or jit_success) else 0.0,
                     })
 
                     # Log exported models

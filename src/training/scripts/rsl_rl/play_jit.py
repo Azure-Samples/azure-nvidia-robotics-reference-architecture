@@ -56,6 +56,12 @@ parser.add_argument(
     default=1000,
     help="Maximum number of simulation steps (0 for unlimited).",
 )
+parser.add_argument(
+    "--output-metrics",
+    type=str,
+    default=None,
+    help="Path to save metrics JSON file (enables structured output for dashboard).",
+)
 
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
@@ -296,6 +302,36 @@ def main(
     print(f"  Mean inference time: {np.mean(inference_times):.2f}ms")
     print(f"  Max inference time: {np.max(inference_times):.2f}ms")
     print(f"  Min inference time: {np.min(inference_times):.2f}ms")
+
+    # Save metrics to JSON if requested
+    if args_cli.output_metrics:
+        import json
+
+        metrics = {
+            "format": "jit",
+            "task": args_cli.task,
+            "num_envs": env_cfg.scene.num_envs,
+            "total_steps": timestep,
+            "total_episodes": len(episode_rewards),
+            "mean_episode_reward": float(np.mean(episode_rewards)) if episode_rewards else 0.0,
+            "std_episode_reward": float(np.std(episode_rewards)) if episode_rewards else 0.0,
+            "min_episode_reward": float(np.min(episode_rewards)) if episode_rewards else 0.0,
+            "max_episode_reward": float(np.max(episode_rewards)) if episode_rewards else 0.0,
+            "mean_inference_time_ms": float(np.mean(inference_times)),
+            "std_inference_time_ms": float(np.std(inference_times)),
+            "min_inference_time_ms": float(np.min(inference_times)),
+            "max_inference_time_ms": float(np.max(inference_times)),
+            "p50_inference_time_ms": float(np.percentile(inference_times, 50)),
+            "p95_inference_time_ms": float(np.percentile(inference_times, 95)),
+            "p99_inference_time_ms": float(np.percentile(inference_times, 99)),
+            "throughput_steps_per_sec": timestep / (sum(inference_times) / 1000) if inference_times else 0.0,
+            "total_reward": float(total_reward),
+        }
+        metrics_path = os.path.abspath(args_cli.output_metrics)
+        os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f, indent=2)
+        print(f"\n[INFO] Metrics saved to: {metrics_path}")
 
     env.close()
 

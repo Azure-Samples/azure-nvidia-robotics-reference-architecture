@@ -61,23 +61,6 @@ EOF
 # Helpers
 #------------------------------------------------------------------------------
 
-osmo-dev() {
-  local args=()
-  for arg in "$@"; do
-    if [[ "$arg" == ./* || "$arg" == ../* || "$arg" == ~* ]] && [[ -e "$arg" ]]; then
-      # Only convert if it looks like a relative path AND exists
-      args+=("$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")")
-    elif [[ "$arg" == /* ]]; then
-      # Absolute paths pass through as-is
-      args+=("$arg")
-    else
-      # Everything else (commands, flags, URLs) passes through unchanged
-      args+=("$arg")
-    fi
-  done
-  (cd /Users/allengreaves/projects/nvidia/OSMO && bazel run @osmo_workspace//src/cli -- "${args[@]}")
-}
-
 derive_model_name() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
 }
@@ -169,7 +152,7 @@ done
 # Validation
 #------------------------------------------------------------------------------
 
-require_tools osmo-dev rsync
+require_tools osmo rsync
 
 [[ -f "$workflow" ]] || fatal "Workflow template not found: $workflow"
 [[ -d "$training_path" ]] || fatal "Training directory not found: $training_path"
@@ -248,7 +231,7 @@ fi
 # Submit Workflow
 #------------------------------------------------------------------------------
 
-osmo-dev "${submit_args[@]}" || fatal "Failed to submit workflow"
+osmo "${submit_args[@]}" || fatal "Failed to submit workflow"
 
 info "Workflow submitted successfully"
 info "Dataset uploaded: $dataset_bucket/$dataset_name"
