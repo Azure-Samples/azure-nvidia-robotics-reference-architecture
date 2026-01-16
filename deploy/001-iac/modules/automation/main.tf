@@ -36,6 +36,17 @@ resource "azurerm_automation_account" "this" {
 // PowerShell 7.2 Modules
 // ============================================================
 
+resource "azurerm_automation_powershell72_module" "az_accounts" {
+  name                  = "Az.Accounts"
+  automation_account_id = azurerm_automation_account.this.id
+
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/Az.Accounts/5.2.0"
+  }
+
+  tags = var.tags
+}
+
 resource "azurerm_automation_powershell72_module" "az_postgresql" {
   name                  = "Az.PostgreSql"
   automation_account_id = azurerm_automation_account.this.id
@@ -45,6 +56,8 @@ resource "azurerm_automation_powershell72_module" "az_postgresql" {
   }
 
   tags = var.tags
+
+  depends_on = [azurerm_automation_powershell72_module.az_accounts]
 }
 
 // ============================================================
