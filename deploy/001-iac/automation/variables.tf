@@ -69,7 +69,7 @@ variable "schedule_config" {
   default = {
     start_time = "13:00"
     week_days  = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    timezone   = "UTC"
+    timezone   = "Etc/UTC"
   }
 }
 
