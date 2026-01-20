@@ -1,7 +1,7 @@
 numpy>=1.26.0,<2.0.0
 
 # Azure SDK
-azure-core==1.28.0
+azure-core==1.38.0
 azure-storage-blob==12.17.0
 azure-identity==1.13.0
 azure-ai-ml==1.19.0
