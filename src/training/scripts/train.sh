@@ -38,7 +38,7 @@ else
 fi
 
 backend="${TRAINING_BACKEND:-skrl}"
-backend_lc="${backend,,}"
+backend_lc=$(printf '%s' "$backend" | tr '[:upper:]' '[:lower:]')
 
 case "${backend_lc}" in
   rsl-rl|rsl_rl|rslrl)
