@@ -81,6 +81,7 @@ fi
 
 # Use uv pip install if uv is available, otherwise fall back to pip
 if command -v uv &> /dev/null; then
+  echo "uv detected, installing requirements with uv..."
   uv pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
 else
   if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
