@@ -20,18 +20,80 @@ else
   python_cmd=(python)
 fi
 
-export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
+python_exec="/isaac-sim/kit/python/bin/python3"
+if [[ ! -x "${python_exec}" ]]; then
+  python_exec="${python_cmd[0]}"
+fi
 
-if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
-  if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
-    "${python_cmd[@]}" -m ensurepip --upgrade
+configure_uv() {
+  local resolved_env
+  if ! command -v uv &>/dev/null; then
+    return 0
+  fi
+  if [[ -n "${python_exec}" ]]; then
+    resolved_env="$("${python_cmd[@]}" -c 'import sys; print(sys.prefix)' 2>/dev/null || true)"
+    export UV_PYTHON="${python_exec}"
+    if [[ -n "${resolved_env}" && -d "${resolved_env}" ]]; then
+      export UV_PROJECT_ENVIRONMENT="${resolved_env}"
+      echo "uv configured with Python: ${python_exec}, environment: ${resolved_env}"
+    else
+      echo "uv configured with Python: ${python_exec}"
+    fi
   else
-    echo "Error: pip not available and ensurepip failed" >&2
-    exit 1
+    echo "Python executable not set; uv will use system discovery"
+  fi
+}
+
+run_python() {
+  if [[ -n "${python_exec}" ]]; then
+    "${python_exec}" "$@"
+  else
+    "${python_cmd[@]}" "$@"
+  fi
+}
+
+if ! command -v uv &>/dev/null; then
+  echo "Installing uv package manager..."
+  if curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
+    export PATH="${HOME}/.local/bin:${PATH}"
   fi
 fi
 
-"${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+configure_uv
+
+prebundle_path="/isaac-sim/exts/omni.pip.compute/pip_prebundle"
+if [[ -d "${prebundle_path}" ]]; then
+  export PYTHONPATH="${prebundle_path}:${SRC_DIR}:${PYTHONPATH:-}"
+else
+  export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
+fi
+
+if command -v uv &>/dev/null && [[ -n "${UV_PYTHON:-}" ]]; then
+  uv pip uninstall -y scipy >/dev/null 2>&1 || true
+  uv pip install --upgrade "numpy>=1.26.0,<2.0.0" || {
+    echo "uv failed, falling back to pip..."
+    run_python -m pip install --upgrade "numpy>=1.26.0,<2.0.0" --quiet
+  }
+else
+  run_python -m pip uninstall -y scipy >/dev/null 2>&1 || true
+  run_python -m pip install --upgrade "numpy>=1.26.0,<2.0.0" --quiet
+fi
+
+# Use uv pip install if uv is available, otherwise fall back to pip
+if command -v uv &> /dev/null; then
+  echo "uv detected, installing requirements with uv..."
+  uv pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+else
+  if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
+    if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
+      "${python_cmd[@]}" -m ensurepip --upgrade
+    else
+      echo "Error: pip not available and ensurepip failed" >&2
+      exit 1
+    fi
+  fi
+  "${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+fi
 
 backend="${TRAINING_BACKEND:-skrl}"
 backend_lc=$(printf '%s' "$backend" | tr '[:upper:]' '[:lower:]')

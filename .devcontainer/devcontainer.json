@@ -83,7 +83,8 @@
 
 	// Container environment variables
 	"containerEnv": {
-		"BROWSER": "code --new-window"
+		"BROWSER": "code --new-window",
+		"UV_LINK_MODE": "copy"
 	},
 
 	"onCreateCommand": {
