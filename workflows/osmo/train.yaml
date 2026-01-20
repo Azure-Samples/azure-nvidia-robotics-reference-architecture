@@ -55,12 +55,15 @@ workflow:
             python_exec=""
             resolve_python_exec() {
               local resolved_python_raw resolved_python resolved_python_alt_raw resolved_python_alt token
+              local -a resolved_python_tokens=()
+              local -a resolved_python_alt_tokens=()
               resolved_python_raw="$(${python_cmd[@]} -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
               if [[ -z "${resolved_python_raw}" ]]; then
                 resolved_python_raw="$(${python_cmd[@]} 2>/dev/null || true)"
               fi
               resolved_python=""
-              for token in ${resolved_python_raw}; do
+              read -r -a resolved_python_tokens <<< "${resolved_python_raw}"
+              for token in "${resolved_python_tokens[@]}"; do
                 if [[ -x "${token}" ]]; then
                   resolved_python="${token}"
                   break
@@ -70,7 +73,8 @@ workflow:
                 resolved_python_alt_raw="$(${resolved_python} -c 'import sys; print(sys.executable)' 2>/dev/null || true)"
                 if [[ -n "${resolved_python_alt_raw}" ]]; then
                   resolved_python_alt=""
-                  for token in ${resolved_python_alt_raw}; do
+                  read -r -a resolved_python_alt_tokens <<< "${resolved_python_alt_raw}"
+                  for token in "${resolved_python_alt_tokens[@]}"; do
                     if [[ -x "${token}" ]]; then
                       resolved_python_alt="${token}"
                       break
