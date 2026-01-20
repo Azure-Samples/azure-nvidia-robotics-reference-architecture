@@ -50,38 +50,6 @@ workflow:
             PAYLOAD_ROOT="${PAYLOAD_ROOT:-/workspace/isaac_payload}"
             TRAINING_ROOT="${TRAINING_ROOT:-${PAYLOAD_ROOT}/src/training}"
 
-            python_cmd_raw="${PYTHON:-python}"
-            read -r -a python_cmd <<< "${python_cmd_raw}"
-            python_exec="/isaac-sim/kit/python/bin/python3"
-            if [[ ! -x "${python_exec}" ]]; then
-              python_exec="${python_cmd[0]}"
-            fi
-            configure_uv() {
-              local resolved_env
-              if ! command -v uv &>/dev/null; then
-                return 0
-              fi
-              if [[ -n "${python_exec}" ]]; then
-                resolved_env="$("${python_cmd[@]}" -c 'import sys; print(sys.prefix)' 2>/dev/null || true)"
-                export UV_PYTHON="${python_exec}"
-                if [[ -n "${resolved_env}" && -d "${resolved_env}" ]]; then
-                  export UV_PROJECT_ENVIRONMENT="${resolved_env}"
-                  echo "uv configured with Python: ${python_exec}, environment: ${resolved_env}"
-                else
-                  echo "uv configured with Python: ${python_exec}"
-                fi
-              else
-                echo "Python executable not set; uv will use system discovery"
-              fi
-            }
-            run_python() {
-              if [[ -n "${python_exec}" ]]; then
-                "${python_exec}" "$@"
-              else
-                "${python_cmd[@]}" "$@"
-              fi
-            }
-
             mkdir -p "${PAYLOAD_ROOT}"
             printf '%s' "${ENCODED_ARCHIVE}" | base64 -d > "${ARCHIVE_PATH}"
             unzip -oq "${ARCHIVE_PATH}" -d "${PAYLOAD_ROOT}"
@@ -91,31 +59,6 @@ workflow:
               sleep "${SLEEP_AFTER_UNPACK}"
               echo "Finished post-unpack sleep; exiting"
               exit 0
-            fi
-
-            # Install uv for faster package management (standalone installer is more reliable)
-            if ! command -v uv &>/dev/null; then
-              echo "Installing uv package manager..."
-              if curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
-                export PATH="${HOME}/.local/bin:${PATH}"
-              fi
-            fi
-            # Configure uv for Isaac Lab's embedded Python environment
-            configure_uv
-
-            export PYTHONPATH="/isaac-sim/exts/omni.pip.compute/pip_prebundle:${TRAINING_ROOT}:${PYTHONPATH:-}"
-
-            # Keep Isaac Sim prebundled SciPy; pin numpy<2
-            echo "Ensuring Isaac Sim prebundled scipy is used..."
-            if command -v uv &>/dev/null && [[ -n "${UV_PYTHON:-}" ]]; then
-              uv pip uninstall -y scipy >/dev/null 2>&1 || true
-              uv pip install --upgrade "numpy>=1.26.0,<2.0.0" || {
-                echo "uv failed, falling back to pip..."
-                run_python -m pip install --upgrade "numpy>=1.26.0,<2.0.0" --quiet
-              }
-            else
-              run_python -m pip uninstall -y scipy >/dev/null 2>&1 || true
-              run_python -m pip install --upgrade "numpy>=1.26.0,<2.0.0" --quiet
             fi
 
             MODE="train"
