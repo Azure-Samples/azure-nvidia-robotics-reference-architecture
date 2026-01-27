@@ -16,6 +16,7 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 |----------|---------|-------------------|
 | [train.yaml](train.yaml) | Distributed training (base64 inline) | `scripts/submit-osmo-training.sh` |
 | [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh` |
+| [lerobot-train.yaml](lerobot-train.yaml) | LeRobot imitation learning fine-tuning | See [LeRobot Workflow](#-lerobot-fine-tuning-workflow) |
 
 ## ⚖️ Workflow Comparison
 
@@ -164,3 +165,73 @@ Access the OSMO UI dashboard:
 
 - **VPN**: Open http://10.0.5.7 in your browser
 - **Port-forward**: Run `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` then open http://localhost:3000
+
+## 🤖 LeRobot Fine-tuning Workflow
+
+Fine-tune ACT and other imitation learning policies using [LeRobot](https://huggingface.co/docs/lerobot).
+
+### Credential Setup
+
+Before submitting the workflow, configure your credentials:
+
+```bash
+# Set WANDB API key for experiment tracking
+osmo credential set wandb --type GENERIC --payload wandb_api_key=<YOUR_WANDB_API_KEY>
+
+# Set HuggingFace token for dataset access and model publishing
+osmo credential set huggingface --type GENERIC --payload hf_token=<YOUR_HF_TOKEN>
+```
+
+### Running the Workflow
+
+**Basic Usage:**
+
+```bash
+osmo workflow submit lerobot-train.yaml \
+  --set dataset_repo_id=alizaidi/so101-multi-pick-merged \
+  --set job_name=act_so101_pick_test \
+  --set policy_repo_id=alizaidi/act_so101_multi_pick
+```
+
+**Full Example with All Options:**
+
+```bash
+osmo workflow submit lerobot-train.yaml \
+  --set dataset_repo_id=alizaidi/so101-multi-pick-merged \
+  --set policy_type=act \
+  --set output_dir=/workspace/outputs/train/act_so101_pick_test \
+  --set job_name=act_so101_pick_test \
+  --set policy_repo_id=alizaidi/act_so101_multi_pick \
+  --set wandb_enable=true \
+  --set wandb_project=lerobot-so101 \
+  --set training_steps=100000 \
+  --set batch_size=64
+```
+
+### LeRobot Configuration Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `image` | `pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime` | Base Docker image |
+| `dataset_repo_id` | (required) | HuggingFace Hub dataset ID |
+| `policy_type` | `act` | Policy architecture: `act`, `diffusion`, `vqbet`, `tdmpc` |
+| `output_dir` | `/workspace/outputs/train` | Output directory for checkpoints |
+| `job_name` | `lerobot-act-training` | Training job identifier |
+| `policy_repo_id` | (optional) | HuggingFace Hub repo for model upload |
+| `wandb_enable` | `true` | Enable WANDB experiment tracking |
+| `wandb_project` | `lerobot-training` | WANDB project name |
+| `training_steps` | (auto) | Total training steps |
+| `batch_size` | (auto) | Training batch size |
+| `eval_freq` | (auto) | Evaluation frequency (steps) |
+| `save_freq` | (auto) | Checkpoint save frequency (steps) |
+| `lerobot_version` | (latest) | Specific LeRobot version to install |
+
+### Monitoring LeRobot Training
+
+Once the workflow is running:
+
+1. **WANDB Dashboard**: View real-time training metrics at [wandb.ai](https://wandb.ai)
+2. **OSMO Logs**: `osmo workflow logs <workflow-id>`
+3. **OSMO Status**: `osmo workflow status <workflow-id>`
+
+If `policy_repo_id` is set, the trained model will be automatically pushed to HuggingFace Hub upon completion.
