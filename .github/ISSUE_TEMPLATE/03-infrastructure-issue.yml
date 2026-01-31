@@ -1,0 +1,82 @@
+name: 🏗️ Infrastructure Issue
+description: Report issues with Terraform or Azure resources
+title: "[Infra]: "
+labels: ["infrastructure", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Infrastructure Issue
+        For Terraform, Azure resources, networking, or AKS issues.
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      options:
+        - Terraform provisioning error
+        - Azure resource configuration
+        - Kubernetes/AKS issue
+        - Networking/DNS
+        - Authentication/Identity
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: terraform-version
+    attributes:
+      label: Terraform Version
+      placeholder: "1.9.8"
+    validations:
+      required: false
+
+  - type: input
+    id: azure-region
+    attributes:
+      label: Azure Region
+      placeholder: "eastus2"
+    validations:
+      required: false
+
+  - type: input
+    id: resource-module
+    attributes:
+      label: Resource/Module Affected
+      placeholder: "azurerm_kubernetes_cluster, module.robotics"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: Describe the infrastructure issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: terraform-output
+    attributes:
+      label: Terraform Plan/Apply Output
+      description: Paste relevant Terraform output
+      render: hcl
+    validations:
+      required: false
+
+  - type: textarea
+    id: config-snippet
+    attributes:
+      label: Relevant Configuration
+      description: Paste relevant Terraform/variable configuration (sanitize secrets!)
+      render: hcl
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have sanitized any secrets from the configuration
+          required: true

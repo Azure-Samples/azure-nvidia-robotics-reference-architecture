@@ -1,0 +1,88 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thank you for reporting a bug!
+        Please search [existing issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) before submitting.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is affected?
+      options:
+        - Infrastructure (Terraform/Azure)
+        - OSMO Control Plane (Helm/Kubernetes)
+        - Training Scripts (Python/SKRL/RSL-RL)
+        - Training Workflows (OSMO)
+        - Documentation
+        - Development Environment
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear and concise description of the bug
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to reproduce the behavior
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Provide relevant environment details
+      placeholder: |
+        - OS: Ubuntu 22.04 / Windows 11
+        - Python version: 3.10.x / 3.11.x
+        - Terraform version: 1.9.x
+        - Azure CLI version: 2.x
+        - Isaac Sim version: 4.5 / 5.0
+        - GPU: NVIDIA RTX 4090 / A100
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Error Output
+      description: Paste relevant logs or error messages
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true
+        - label: I have read the [documentation](README.md)
+          required: true
