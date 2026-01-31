@@ -110,7 +110,7 @@ Select the `.venv/bin/python` interpreter in VS Code for IntelliSense support
 
 ## 🪪 License
 
-This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## 🤝 Support
 
