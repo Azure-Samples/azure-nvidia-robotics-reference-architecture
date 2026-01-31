@@ -1,8 +1,26 @@
-# 🤖 Azure NVIDIA Robotics Reference Architecture
+---
+title: Azure Robotics Reference Architecture with NVIDIA OSMO
+description: Production-ready framework for orchestrating robotics and AI workloads on Microsoft Azure using NVIDIA Isaac Lab, Isaac Sim, and OSMO
+author: Microsoft
+ms.date: 2025-12-03
+ms.topic: overview
+keywords:
+  - azure
+  - nvidia
+  - osmo
+  - isaac lab
+  - isaac sim
+  - robotics
+  - reinforcement learning
+  - mlflow
+estimated_reading_time: 5
+---
+
+# Azure NVIDIA Robotics Reference Architecture
 
 Production-ready framework for orchestrating robotics and AI workloads on [Azure](https://azure.microsoft.com/) using [NVIDIA Isaac Lab](https://developer.nvidia.com/isaac/lab), [Isaac Sim](https://developer.nvidia.com/isaac/sim), and [OSMO](https://developer.nvidia.com/osmo).
 
-## 🚀 Features
+## Features
 
 | Capability | Description |
 |------------|-------------|
@@ -14,7 +32,7 @@ Production-ready framework for orchestrating robotics and AI workloads on [Azure
 | GPU Scheduling | [KAI Scheduler](deploy/002-setup/values/kai-scheduler.yaml) for efficient utilization |
 | Auto-scaling | Pay-per-use GPU compute on AKS Spot nodes |
 
-## 🏗️ Architecture
+## Architecture
 
 The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA GPU Operator and KAI Scheduler. Training workloads can be submitted via OSMO workflows (control plane and backend operator) and AzureML jobs (ML extension). Both platforms share common infrastructure: Azure Storage for checkpoints and data, Key Vault for secrets, and Azure Container Registry for container images. OSMO additionally uses PostgreSQL for workflow state and Redis for caching.
 
@@ -46,12 +64,10 @@ The infrastructure deploys an AKS cluster with GPU node pools running the NVIDIA
 | OSMO Control Plane | Workflow API, router, and web interface |
 | OSMO Backend Operator | Workflow execution on cluster |
 
-⚙️ = Optional component
-
 > [!NOTE]
 > Running both AzureML and OSMO on the same cluster? Create **separate GPU node pools** for each platform. AzureML uses [Volcano](https://volcano.sh/) while OSMO uses [KAI Scheduler](https://github.com/NVIDIA/KAI-Scheduler)—these schedulers don't share resource visibility. Without dedicated pools, jobs from one platform may fail when the other is using GPU resources. Configure node selectors and taints to isolate workloads.
 
-## 🌍 Real World Examples
+## Real World Examples
 
 OSMO orchestration on Azure enables production-scale robotics training across industries:
 
@@ -62,7 +78,7 @@ OSMO orchestration on Azure enables production-scale robotics training across in
 | Legged Robots | Locomotion optimization with MLflow tracking for sim-to-real transfer |
 | Collaborative Robots | Safe interaction policies with Azure Monitor logging for compliance |
 
-## 📋 Prerequisites
+## Prerequisites
 
 ### Required Tools
 
@@ -83,7 +99,7 @@ OSMO orchestration on Azure enables production-scale robotics training across in
   - Alternative: **Owner** (grants more permissions than required)
 - GPU VM quota for your target region (e.g., `Standard_NV36ads_A10_v5`)
 
-## 🏃 Quick Start
+## Quick Start
 
 ### 1. Deploy Infrastructure
 
@@ -184,7 +200,7 @@ See [Accessing OSMO](deploy/002-setup/README.md#-accessing-osmo) for port-forwar
 
 > **Tip**: Run any script with `--help` for all available options.
 
-## 🔐 Deployment Scenarios
+## Deployment Scenarios
 
 | Scenario | Storage Auth | Registry | Use Case |
 |----------|--------------|----------|----------|
@@ -194,7 +210,7 @@ See [Accessing OSMO](deploy/002-setup/README.md#-accessing-osmo) for port-forwar
 
 See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 .
@@ -212,7 +228,7 @@ See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
 └── docs/                               # Additional documentation
 ```
 
-## 📖 Documentation
+## Documentation
 
 | Guide | Description |
 |-------|-------------|
@@ -223,7 +239,7 @@ See [002-setup/README.md](deploy/002-setup/README.md) for detailed instructions.
 | [Workflows](workflows/README.md) | Job and workflow templates |
 | [MLflow Integration](docs/mlflow-integration.md) | Experiment tracking setup |
 
-## 💰 Cost Estimation
+## Cost Estimation
 
 Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) to estimate costs. Add these services based on the architecture:
 
@@ -242,12 +258,36 @@ Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculato
 
 GPU Spot VMs provide significant savings (60-90%) compared to on-demand pricing. Actual costs depend on training frequency, job duration, and data volumes.
 
-## 🪪 License
+## Contributing
 
-MIT License. See [LICENSE.md](LICENSE.md).
+We appreciate contributions! Check out [open issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) to get started.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [microsoft/edge-ai](https://github.com/microsoft/edge-ai) – Infrastructure components
 - [NVIDIA Isaac Lab](https://github.com/isaac-sim/IsaacLab) – RL framework
 - [NVIDIA OSMO](https://github.com/NVIDIA/OSMO) – Workflow orchestration
+
+## Responsible AI
+
+Microsoft encourages customers to review its Responsible AI Standard when developing AI-enabled systems to ensure ethical, safe, and inclusive AI practices. Learn more at [Microsoft's Responsible AI](https://www.microsoft.com/ai/responsible-ai).
+
+## Legal
+
+This project is licensed under the [MIT License](./LICENSE.md).
+
+**Security:** See [SECURITY.md](./SECURITY.md) for security policy and reporting vulnerabilities.
+
+## Trademark Notice
+
+> This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
+> trademarks or logos is subject to and must follow Microsoft's Trademark & Brand Guidelines. Use of Microsoft trademarks or logos in
+> modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or
+> logos are subject to those third-party's policies.
+
+---
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->
