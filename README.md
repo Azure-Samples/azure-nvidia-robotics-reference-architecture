@@ -43,7 +43,7 @@ This reference architecture integrates:
 - **Legged Robots** - Optimize locomotion policies with MLflow experiment tracking for sim-to-real transfer
 - **Collaborative Robots** - Create safe interaction policies with Azure Monitor logging and metrics, enabling compliance auditing and performance diagnostics at scale
 
-See [OSMO workflow examples](deploy/004-workflow/osmo/) for job configuration templates.
+See [OSMO workflow examples](workflows/osmo/) for job configuration templates.
 
 ## 🧑🏽‍💻 Prerequisites and Requirements
 
