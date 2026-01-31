@@ -2,7 +2,8 @@
   "ignores": [
     "**/node_modules/**",
     ".copilot-tracking/**",
-    "venv/**"
+    "venv/**",
+    "LICENSE.md"
   ],
   "config": {
     "default": true,
