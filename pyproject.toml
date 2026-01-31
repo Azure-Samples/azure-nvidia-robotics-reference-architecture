@@ -13,19 +13,19 @@ dependencies = [
     "pytest>=8.4.2",
     "tqdm>=4.67.1",
     # Core Isaac Lab dependencies
-    "numpy<2",
+    "numpy<3",
     "onnx>=1.18.0",
-    "prettytable==3.3.0",
+    "prettytable==3.17.0",
     "toml",
-    "hidapi==0.14.0.post2",
-    "gymnasium==1.2.0",
+    "hidapi==0.15.0",
+    "gymnasium==1.2.3",
     "trimesh",
-    "pyglet<2",
+    "pyglet<3",
     "transformers",
     "einops",
     "warp-lang",
-    "pillow==11.3.0",
-    "starlette==0.49.1",
+    "pillow==12.1.0",
+    "starlette==0.52.1",
     # Testing
     "pytest-mock",
     "junitparser",
@@ -37,7 +37,7 @@ dependencies = [
     "h5py",
     "tensorboard",
     "moviepy",
-    "packaging<24",
+    "packaging<27",
     "skrl>=1.4.3",
     # Isaac Lab Tasks
     "scikit-learn",
@@ -49,10 +49,10 @@ dependencies = [
     "mlflow",
     "psutil>=5.9.0",
     "pynvml>=11.5.0",
-    "azure-core==1.28.0",
-    "azure-storage-blob==12.17.0",
-    "pyperclip==1.8.0",
-    "rsl-rl-lib==3.0.1",
+    "azure-core==1.38.0",
+    "azure-storage-blob==12.28.0",
+    "pyperclip==1.11.0",
+    "rsl-rl-lib==3.3.0",
 ]
 
 [project.optional-dependencies]
@@ -63,7 +63,7 @@ training = [
     "mlflow",
     "psutil>=5.9.0",
     "pynvml>=11.5.0",
-    "rsl-rl-lib==3.0.1",
+    "rsl-rl-lib==3.3.0",
     "skrl>=1.4.3",
 ]
 
