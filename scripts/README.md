@@ -6,6 +6,8 @@ ms.date: 2025-12-14
 ms.topic: reference
 ---
 
+# Scripts
+
 Submission scripts for training and validation workflows on Azure ML and OSMO platforms. OSMO submissions can fall back to Terraform outputs from `deploy/001-iac` when available.
 
 ## 📜 Submission Scripts
