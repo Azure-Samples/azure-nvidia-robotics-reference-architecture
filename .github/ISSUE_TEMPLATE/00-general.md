@@ -63,4 +63,4 @@ Include any relevant information:
 **Before submitting:**
 
 - [ ] I have searched [existing issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) for duplicates
-- [ ] I have reviewed the [README](README.md) and [documentation](docs/)
+- [ ] I have reviewed the [README](../../README.md) and [documentation](../../docs/)

@@ -231,7 +231,7 @@ azureml_config = {
 
 ### 2. AzureML Job YAML Schema Fixes
 
-#### [deploy/004-workflow/azureml/jobs/isaaclab-validate.yaml](../deploy/004-workflow/azureml/jobs/isaaclab-validate.yaml)
+#### [workflows/azureml/validate.yaml](../workflows/azureml/validate.yaml)
 
 Fixed input schema to comply with AzureML command job requirements:
 
@@ -390,10 +390,10 @@ Submit jobs to AzureML managed compute (e.g., `gpu-cluster`) instead of the atta
 
 ## Files Changed Summary
 
-| File                                                      | Change Type                                                     |
-|-----------------------------------------------------------|-----------------------------------------------------------------|
-| `deploy/001-iac/main.tf`                                  | Added `should_install_extension`, `should_federate_ml_identity` |
-| `deploy/004-workflow/azureml/jobs/isaaclab-validate.yaml` | Fixed input schema, changed mount to download                   |
+| File                              | Change Type                                                     |
+|-----------------------------------|-----------------------------------------------------------------|
+| `deploy/001-iac/main.tf`          | Added `should_install_extension`, `should_federate_ml_identity` |
+| `workflows/azureml/validate.yaml` | Fixed input schema, changed mount to download                   |
 
 ## Related Resources
 
