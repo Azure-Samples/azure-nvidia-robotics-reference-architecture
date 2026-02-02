@@ -63,11 +63,11 @@ root_certificate_public_data = "MIIC5jCCAc6g..." # Base64-encoded cert
 
 ### Install Azure VPN Client
 
-| Platform           | Installation                                                                                                                            |
-|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| Windows            | [Microsoft Store](https://apps.microsoft.com/detail/9NP355QT2SQB)                                                                       |
-| macOS              | [App Store](https://apps.apple.com/us/app/azure-vpn-client/id1553936137)                                                                |
-| Ubuntu 20.04/22.04 | [Microsoft Docs](https://learn.microsoft.com/en-us/azure/vpn-gateway/point-to-site-entra-vpn-client-linux#install-the-azure-vpn-client) |
+| Platform           | Installation                                                                                                                      |
+|--------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Windows            | [Microsoft Store](https://apps.microsoft.com/detail/9NP355QT2SQB)                                                                 |
+| macOS              | [App Store](https://apps.apple.com/us/app/azure-vpn-client/id1553936137)                                                          |
+| Ubuntu 20.04/22.04 | [Microsoft Docs](https://learn.microsoft.com/azure/vpn-gateway/point-to-site-entra-vpn-client-linux#install-the-azure-vpn-client) |
 
 ### Download VPN Configuration
 

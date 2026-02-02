@@ -224,7 +224,7 @@ OSMO services are deployed to the `osmo-control-plane` namespace. Access method 
 When connected to VPN, OSMO services are accessible via the internal load balancer:
 
 | Service      | URL                   |
-|--------------|---------------------- |
+|--------------|-----------------------|
 | UI Dashboard | `http://10.0.5.7`     |
 | API Service  | `http://10.0.5.7/api` |
 

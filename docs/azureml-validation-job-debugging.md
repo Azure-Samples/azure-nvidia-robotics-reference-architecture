@@ -397,6 +397,6 @@ Submit jobs to AzureML managed compute (e.g., `gpu-cluster`) instead of the atta
 
 ## Related Resources
 
-- [AzureML Kubernetes Compute Troubleshooting](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-attach-kubernetes-anywhere)
-- [Workload Identity Federation](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview)
-- [Storage Account Shared Key Disabled](https://learn.microsoft.com/en-us/azure/storage/common/shared-key-authorization-prevent)
+- [AzureML Kubernetes Compute Troubleshooting](https://learn.microsoft.com/azure/machine-learning/how-to-attach-kubernetes-anywhere)
+- [Workload Identity Federation](https://learn.microsoft.com/azure/aks/workload-identity-overview)
+- [Storage Account Shared Key Disabled](https://learn.microsoft.com/azure/storage/common/shared-key-authorization-prevent)
