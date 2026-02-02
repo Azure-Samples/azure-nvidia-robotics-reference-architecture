@@ -8,12 +8,12 @@ Thank you for using the Azure NVIDIA Robotics Reference Architecture! This docum
 
 This is an open-source reference architecture maintained by Microsoft and community contributors. We provide community support through GitHub issue tracking with the following response commitments:
 
-| Priority Level | Description | Response Time Target |
-|----------------|-------------|----------------------|
-| Security Vulnerability | Security issues (see [SECURITY.md](SECURITY.md)) | 24 hours (via MSRC) |
-| Critical | Blocking issues preventing deployment | 1-2 business days |
-| Major | Significant issues affecting functionality | 3-5 business days |
-| General Issues & Questions | Bug reports, feature requests, questions | Best effort |
+| Priority Level             | Description                                      | Response Time Target |
+|----------------------------|--------------------------------------------------|----------------------|
+| Security Vulnerability     | Security issues (see [SECURITY.md](SECURITY.md)) | 24 hours (via MSRC)  |
+| Critical                   | Blocking issues preventing deployment            | 1-2 business days    |
+| Major                      | Significant issues affecting functionality       | 3-5 business days    |
+| General Issues & Questions | Bug reports, feature requests, questions         | Best effort          |
 
 **Note**: Response times indicate initial acknowledgment. Resolution time varies based on issue complexity and community availability.
 

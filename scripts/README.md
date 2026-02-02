@@ -6,18 +6,16 @@ ms.date: 2025-12-14
 ms.topic: reference
 ---
 
-# Scripts
-
 Submission scripts for training and validation workflows on Azure ML and OSMO platforms.
 
 ## 📜 Submission Scripts
 
-| Script | Purpose | Platform |
-|--------|---------|----------|
-| `submit-azureml-training.sh` | Package code and submit Azure ML training job | Azure ML |
-| `submit-azureml-validation.sh` | Submit model validation job | Azure ML |
-| `submit-osmo-training.sh` | Package code and submit OSMO workflow (base64) | OSMO |
-| `submit-osmo-dataset-training.sh` | Submit OSMO workflow using dataset folder injection | OSMO |
+| Script                            | Purpose                                             | Platform |
+|-----------------------------------|-----------------------------------------------------|----------|
+| `submit-azureml-training.sh`      | Package code and submit Azure ML training job       | Azure ML |
+| `submit-azureml-validation.sh`    | Submit model validation job                         | Azure ML |
+| `submit-osmo-training.sh`         | Package code and submit OSMO workflow (base64)      | OSMO     |
+| `submit-osmo-dataset-training.sh` | Submit OSMO workflow using dataset folder injection | OSMO     |
 
 ## 🚀 Quick Start
 
@@ -62,11 +60,11 @@ The `submit-osmo-dataset-training.sh` script uploads `src/training/` as a versio
 
 ### Dataset Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--dataset-bucket` | `training` | OSMO bucket for training code |
-| `--dataset-name` | `training-code` | Dataset name (auto-versioned) |
-| `--training-path` | `src/training` | Local folder to upload |
+| Parameter          | Default         | Description                   |
+|--------------------|-----------------|-------------------------------|
+| `--dataset-bucket` | `training`      | OSMO bucket for training code |
+| `--dataset-name`   | `training-code` | Dataset name (auto-versioned) |
+| `--training-path`  | `src/training`  | Local folder to upload        |
 
 The script stages files to exclude `__pycache__` and build artifacts via `.amlignore` patterns before upload.
 
@@ -74,20 +72,20 @@ The script stages files to exclude `__pycache__` and build artifacts via `.amlig
 
 Scripts resolve values in order: CLI arguments → environment variables → Terraform outputs.
 
-| Variable | Description |
-|----------|-------------|
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription |
-| `AZURE_RESOURCE_GROUP` | Resource group name |
-| `AZUREML_WORKSPACE_NAME` | ML workspace name |
-| `TASK` | IsaacLab task name |
-| `NUM_ENVS` | Number of parallel environments |
-| `OSMO_DATASET_BUCKET` | Dataset bucket for OSMO training |
-| `OSMO_DATASET_NAME` | Dataset name for OSMO training |
+| Variable                 | Description                      |
+|--------------------------|----------------------------------|
+| `AZURE_SUBSCRIPTION_ID`  | Azure subscription               |
+| `AZURE_RESOURCE_GROUP`   | Resource group name              |
+| `AZUREML_WORKSPACE_NAME` | ML workspace name                |
+| `TASK`                   | IsaacLab task name               |
+| `NUM_ENVS`               | Number of parallel environments  |
+| `OSMO_DATASET_BUCKET`    | Dataset bucket for OSMO training |
+| `OSMO_DATASET_NAME`      | Dataset name for OSMO training   |
 
 ## 📚 Library
 
-| File | Purpose |
-|------|---------|
+| File                       | Purpose                                        |
+|----------------------------|------------------------------------------------|
 | `lib/terraform-outputs.sh` | Shared functions for reading Terraform outputs |
 
 Source the library to use helper functions:
@@ -101,8 +99,8 @@ get_azureml_workspace  # Returns ML workspace name
 
 ## 🔗 Related Documentation
 
-| Resource | Description |
-|----------|-------------|
-| [workflows/](../workflows/) | YAML templates for training and validation jobs |
-| [workflows/osmo/](../workflows/osmo/) | OSMO workflow templates including dataset training |
-| [deploy/002-setup/](../deploy/002-setup/) | Cluster configuration and OSMO deployment |
+| Resource                                  | Description                                        |
+|-------------------------------------------|----------------------------------------------------|
+| [workflows/](../workflows/)               | YAML templates for training and validation jobs    |
+| [workflows/osmo/](../workflows/osmo/)     | OSMO workflow templates including dataset training |
+| [deploy/002-setup/](../deploy/002-setup/) | Cluster configuration and OSMO deployment          |

@@ -26,11 +26,11 @@ terraform apply -var="osmo_loadbalancer_ip=10.0.x.x"
 
 ## ⚙️ Configuration
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `osmo_loadbalancer_ip` | Internal LoadBalancer IP | (required) |
-| `osmo_private_dns_zone_name` | DNS zone name | `osmo.local` |
-| `osmo_hostname` | Hostname within zone | `dev` |
+| Variable                     | Description              | Default      |
+|------------------------------|--------------------------|--------------|
+| `osmo_loadbalancer_ip`       | Internal LoadBalancer IP | (required)   |
+| `osmo_private_dns_zone_name` | DNS zone name            | `osmo.local` |
+| `osmo_hostname`              | Hostname within zone     | `dev`        |
 
 ## 💡 How It Works
 

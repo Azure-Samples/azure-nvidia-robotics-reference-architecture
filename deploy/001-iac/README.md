@@ -4,17 +4,17 @@ Terraform configuration for the robotics reference architecture. Deploys Azure r
 
 ## 📋 Prerequisites
 
-| Tool | Version | Installation |
-|------|---------|--------------|
-| Azure CLI | Latest | `az login` |
-| Terraform | 1.5+ | `terraform version` |
+| Tool         | Version         | Installation                    |
+|--------------|-----------------|---------------------------------|
+| Azure CLI    | Latest          | `az login`                      |
+| Terraform    | 1.5+            | `terraform version`             |
 | GPU VM quota | Region-specific | e.g., `Standard_NV36ads_A10_v5` |
 
 ### Azure RBAC Permissions
 
-| Role | Scope |
-|------|-------|
-| Contributor | Subscription (new RG) or Resource Group (existing RG) |
+| Role                                    | Scope                                                 |
+|-----------------------------------------|-------------------------------------------------------|
+| Contributor                             | Subscription (new RG) or Resource Group (existing RG) |
 | Role Based Access Control Administrator | Subscription (new RG) or Resource Group (existing RG) |
 
 Terraform creates role assignments for managed identities, requiring `Microsoft.Authorization/roleAssignments/write` permission. The Contributor role explicitly blocks this action; the RBAC Administrator role provides it.
@@ -40,35 +40,35 @@ terraform init && terraform apply -var-file=terraform.tfvars
 
 ### Core Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `environment` | Deployment environment (dev, test, prod) | Yes |
-| `resource_prefix` | Resource naming prefix | Yes |
-| `location` | Azure region | Yes |
-| `instance` | Instance identifier | No (default: "001") |
-| `tags` | Resource group tags | No (default: {}) |
+| Variable          | Description                              | Required            |
+|-------------------|------------------------------------------|---------------------|
+| `environment`     | Deployment environment (dev, test, prod) | Yes                 |
+| `resource_prefix` | Resource naming prefix                   | Yes                 |
+| `location`        | Azure region                             | Yes                 |
+| `instance`        | Instance identifier                      | No (default: "001") |
+| `tags`            | Resource group tags                      | No (default: {})    |
 
 ### AKS System Node Pool
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `system_node_pool_vm_size` | VM size for AKS system node pool | `Standard_D8ds_v5` |
-| `system_node_pool_node_count` | Number of nodes for AKS system node pool | `1` |
-| `system_node_pool_zones` | Availability zones for system node pool | `null` |
-| `system_node_pool_enable_auto_scaling` | Enable auto-scaling for system node pool | `false` |
-| `system_node_pool_min_count` | Minimum nodes when auto-scaling enabled | `null` |
-| `system_node_pool_max_count` | Maximum nodes when auto-scaling enabled | `null` |
+| Variable                               | Description                              | Default            |
+|----------------------------------------|------------------------------------------|--------------------|
+| `system_node_pool_vm_size`             | VM size for AKS system node pool         | `Standard_D8ds_v5` |
+| `system_node_pool_node_count`          | Number of nodes for AKS system node pool | `1`                |
+| `system_node_pool_zones`               | Availability zones for system node pool  | `null`             |
+| `system_node_pool_enable_auto_scaling` | Enable auto-scaling for system node pool | `false`            |
+| `system_node_pool_min_count`           | Minimum nodes when auto-scaling enabled  | `null`             |
+| `system_node_pool_max_count`           | Maximum nodes when auto-scaling enabled  | `null`             |
 
 ### Feature Flags
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `should_enable_nat_gateway` | Deploy NAT Gateway for outbound connectivity | `true` |
-| `should_enable_private_endpoint` | Deploy private endpoints and DNS zones for Azure services | `true` |
-| `should_enable_private_aks_cluster` | Make AKS API endpoint private (requires VPN for kubectl) | `true` |
-| `should_enable_public_network_access` | Allow public access to resources | `true` |
-| `should_deploy_postgresql` | Deploy PostgreSQL Flexible Server for OSMO | `true` |
-| `should_deploy_redis` | Deploy Azure Managed Redis for OSMO | `true` |
+| Variable                              | Description                                               | Default |
+|---------------------------------------|-----------------------------------------------------------|---------|
+| `should_enable_nat_gateway`           | Deploy NAT Gateway for outbound connectivity              | `true`  |
+| `should_enable_private_endpoint`      | Deploy private endpoints and DNS zones for Azure services | `true`  |
+| `should_enable_private_aks_cluster`   | Make AKS API endpoint private (requires VPN for kubectl)  | `true`  |
+| `should_enable_public_network_access` | Allow public access to resources                          | `true`  |
+| `should_deploy_postgresql`            | Deploy PostgreSQL Flexible Server for OSMO                | `true`  |
+| `should_deploy_redis`                 | Deploy Azure Managed Redis for OSMO                       | `true`  |
 
 ### Network Configuration Modes
 
@@ -185,33 +185,33 @@ Root Module (001-iac/)
 
 ### Resources by Category
 
-| Category | Resources |
-|----------|-----------|
-| Networking | VNet, subnets (main, PE, AKS, GPU pools), NSG, NAT Gateway, DNS Private Resolver |
-| Security | Key Vault (RBAC mode), ML identity, OSMO identity |
-| Observability | Log Analytics, App Insights, Monitor Workspace, Grafana, DCE, AMPLS |
-| Storage | Storage Account (blob/file), Container Registry (Premium) |
-| Machine Learning | AzureML Workspace |
-| AKS | Cluster with Azure CNI Overlay, system pool, GPU node pools |
-| Private DNS | 11 core zones (Key Vault, Storage, ACR, ML, AKS, Monitor) |
-| OSMO Services | PostgreSQL Flexible Server (HA), Azure Managed Redis |
+| Category         | Resources                                                                        |
+|------------------|----------------------------------------------------------------------------------|
+| Networking       | VNet, subnets (main, PE, AKS, GPU pools), NSG, NAT Gateway, DNS Private Resolver |
+| Security         | Key Vault (RBAC mode), ML identity, OSMO identity                                |
+| Observability    | Log Analytics, App Insights, Monitor Workspace, Grafana, DCE, AMPLS              |
+| Storage          | Storage Account (blob/file), Container Registry (Premium)                        |
+| Machine Learning | AzureML Workspace                                                                |
+| AKS              | Cluster with Azure CNI Overlay, system pool, GPU node pools                      |
+| Private DNS      | 11 core zones (Key Vault, Storage, ACR, ML, AKS, Monitor)                        |
+| OSMO Services    | PostgreSQL Flexible Server (HA), Azure Managed Redis                             |
 
 ### Conditional Resources
 
-| Condition | Resources Created |
-|-----------|-------------------|
-| `should_enable_private_endpoint` | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS |
-| `should_enable_nat_gateway` | NAT Gateway, Public IP, subnet associations |
-| `should_deploy_postgresql` | PostgreSQL server, databases, delegated subnet, DNS zone |
-| `should_deploy_redis` | Redis cache, private endpoint (if PE enabled), DNS zone |
+| Condition                        | Resources Created                                        |
+|----------------------------------|----------------------------------------------------------|
+| `should_enable_private_endpoint` | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS    |
+| `should_enable_nat_gateway`      | NAT Gateway, Public IP, subnet associations              |
+| `should_deploy_postgresql`       | PostgreSQL server, databases, delegated subnet, DNS zone |
+| `should_deploy_redis`            | Redis cache, private endpoint (if PE enabled), DNS zone  |
 
 ## 📦 Modules
 
-| Module | Purpose |
-|--------|---------|
+| Module                        | Purpose                                                         |
+|-------------------------------|-----------------------------------------------------------------|
 | [platform](modules/platform/) | Networking, storage, Key Vault, ML workspace, PostgreSQL, Redis |
-| [sil](modules/sil/) | AKS cluster with GPU node pools |
-| [vpn](modules/vpn/) | VPN Gateway module (used by vpn/ standalone deployment) |
+| [sil](modules/sil/)           | AKS cluster with GPU node pools                                 |
+| [vpn](modules/vpn/)           | VPN Gateway module (used by vpn/ standalone deployment)         |
 
 ## 📤 Outputs
 
@@ -338,12 +338,12 @@ az resource list --resource-group <resource-group> --query "[].{name:name, type:
 
 Azure retains certain deleted resources in a soft-deleted state. Redeployment fails when Terraform attempts to create a resource with the same name as a soft-deleted one.
 
-| Resource | Soft Delete | Retention Period | Blocks Redeployment |
-|----------|-------------|------------------|---------------------|
-| Key Vault | Mandatory | 7-90 days (configurable) | Yes |
-| Azure ML Workspace | Mandatory | 14 days (fixed) | Yes |
-| Container Registry | Opt-in (preview) | 1-90 days (configurable) | No (disabled by default) |
-| Storage Account | Recovery only | 14 days | No (same-name creation allowed) |
+| Resource           | Soft Delete      | Retention Period         | Blocks Redeployment             |
+|--------------------|------------------|--------------------------|---------------------------------|
+| Key Vault          | Mandatory        | 7-90 days (configurable) | Yes                             |
+| Azure ML Workspace | Mandatory        | 14 days (fixed)          | Yes                             |
+| Container Registry | Opt-in (preview) | 1-90 days (configurable) | No (disabled by default)        |
+| Storage Account    | Recovery only    | 14 days                  | No (same-name creation allowed) |
 
 #### Purge Soft-Deleted Key Vault
 

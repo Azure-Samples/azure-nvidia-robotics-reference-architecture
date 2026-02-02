@@ -10,6 +10,7 @@ AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 - kubectl, Helm 3.x, jq installed
 - OSMO CLI (`osmo`) for backend deployment
 
+<!-- markdownlint-disable MD028 -->
 > [!NOTE]
 > Scripts automatically install required Azure CLI extensions (`k8s-extension`, `ml`) if missing.
 
@@ -17,17 +18,18 @@ AKS cluster configuration for robotics workloads with AzureML and NVIDIA OSMO.
 > The default infrastructure deploys a **private AKS cluster**. You must deploy the VPN Gateway and connect before running these scripts. See [VPN setup](../001-iac/vpn/README.md#-vpn-client-setup) for instructions. Without VPN, `kubectl` commands fail with `no such host` errors.
 >
 > To skip VPN, set `should_enable_private_aks_cluster = false` in your Terraform configuration. See [Network Configuration Modes](../001-iac/README.md#network-configuration-modes).
+<!-- markdownlint-enable MD028 -->
 
 ### Azure RBAC Permissions
 
 For least-privilege access:
 
-| Role | Scope | Purpose |
-|------|-------|---------|
-| Azure Kubernetes Service Cluster User Role | AKS Cluster | Get cluster credentials |
-| Contributor | Resource Group | Extension and FIC creation |
-| Key Vault Secrets User | Key Vault | Read PostgreSQL/Redis credentials |
-| Storage Blob Data Contributor | Storage Account | Create workflow containers |
+| Role                                       | Scope           | Purpose                           |
+|--------------------------------------------|-----------------|-----------------------------------|
+| Azure Kubernetes Service Cluster User Role | AKS Cluster     | Get cluster credentials           |
+| Contributor                                | Resource Group  | Extension and FIC creation        |
+| Key Vault Secrets User                     | Key Vault       | Read PostgreSQL/Redis credentials |
+| Storage Blob Data Contributor              | Storage Account | Create workflow containers        |
 
 ## 🚀 Quick Start
 
@@ -143,11 +145,11 @@ cd ../002-setup
 
 ## ⚖️ Scenario Comparison
 
-| | Access Keys | Workload Identity | Workload Identity + ACR |
-|---|:---:|:---:|:---:|
-| Storage Auth | Access Keys | Workload Identity | Workload Identity |
-| Registry | nvcr.io | nvcr.io | Private ACR |
-| Air-Gap | ✗ | ✗ | ✓ |
+|              | Access Keys | Workload Identity | Workload Identity + ACR |
+|--------------|:-----------:|:-----------------:|:-----------------------:|
+| Storage Auth | Access Keys | Workload Identity |    Workload Identity    |
+| Registry     |   nvcr.io   |      nvcr.io      |       Private ACR       |
+| Air-Gap      |      ✗      |         ✗         |            ✓            |
 
 ## 🔒 Security Considerations for Public Deployments
 
@@ -174,31 +176,31 @@ See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_
 
 ## 📜 Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `01-deploy-robotics-charts.sh` | GPU Operator, KAI Scheduler |
-| `02-deploy-azureml-extension.sh` | AzureML K8s extension, compute attach |
-| `03-deploy-osmo-control-plane.sh` | OSMO service, router, web-ui |
-| `04-deploy-osmo-backend.sh` | Backend operator, workflow storage |
+| Script                            | Purpose                               |
+|-----------------------------------|---------------------------------------|
+| `01-deploy-robotics-charts.sh`    | GPU Operator, KAI Scheduler           |
+| `02-deploy-azureml-extension.sh`  | AzureML K8s extension, compute attach |
+| `03-deploy-osmo-control-plane.sh` | OSMO service, router, web-ui          |
+| `04-deploy-osmo-backend.sh`       | Backend operator, workflow storage    |
 
 ## 🚩 Script Flags
 
-| Flag | Scripts | Description |
-|------|---------|-------------|
-| `--use-access-keys` | `04-deploy-osmo-backend.sh` | Storage account keys instead of workload identity |
-| `--use-acr` | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Pull from Terraform-deployed ACR |
-| `--acr-name NAME` | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Specify alternate ACR |
-| `--config-preview` | All | Print config and exit |
+| Flag                | Scripts                                                        | Description                                       |
+|---------------------|----------------------------------------------------------------|---------------------------------------------------|
+| `--use-access-keys` | `04-deploy-osmo-backend.sh`                                    | Storage account keys instead of workload identity |
+| `--use-acr`         | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Pull from Terraform-deployed ACR                  |
+| `--acr-name NAME`   | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Specify alternate ACR                             |
+| `--config-preview`  | All                                                            | Print config and exit                             |
 
 ## ⚙️ Configuration
 
 Scripts read from Terraform outputs in `../001-iac/`. Override with environment variables:
 
-| Variable | Description |
-|----------|-------------|
+| Variable                | Description        |
+|-------------------------|--------------------|
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription |
-| `AZURE_RESOURCE_GROUP` | Resource group |
-| `AKS_CLUSTER_NAME` | Cluster name |
+| `AZURE_RESOURCE_GROUP`  | Resource group     |
+| `AKS_CLUSTER_NAME`      | Cluster name       |
 
 ## ✅ Verification
 
@@ -221,10 +223,10 @@ OSMO services are deployed to the `osmo-control-plane` namespace. Access method 
 
 When connected to VPN, OSMO services are accessible via the internal load balancer:
 
-| Service | URL |
-|---------|-----|
-| UI Dashboard | http://10.0.5.7 |
-| API Service | http://10.0.5.7/api |
+| Service      | URL                   |
+|--------------|-----------------------|
+| UI Dashboard | `http://10.0.5.7`     |
+| API Service  | `http://10.0.5.7/api` |
 
 ```bash
 # Login to OSMO via internal load balancer
@@ -242,11 +244,11 @@ osmo backend list
 
 If `should_enable_private_aks_cluster = false` and you are not using VPN, use `kubectl port-forward`:
 
-| Service | Command | Local URL |
-|---------|---------|-----------|
-| UI Dashboard | `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` | http://localhost:3000 |
-| API Service | `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` | http://localhost:9000 |
-| Router | `kubectl port-forward svc/osmo-router 8080:80 -n osmo-control-plane` | http://localhost:8080 |
+| Service      | Command                                                               | Local URL               |
+|--------------|-----------------------------------------------------------------------|-------------------------|
+| UI Dashboard | `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane`      | `http://localhost:3000` |
+| API Service  | `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` | `http://localhost:9000` |
+| Router       | `kubectl port-forward svc/osmo-router 8080:80 -n osmo-control-plane`  | `http://localhost:8080` |
 
 ```bash
 # Terminal 1: Start port-forward for API service
@@ -322,7 +324,7 @@ kubectl describe sa osmo-service -n osmo-control-plane
 
 ## 📁 Directory Structure
 
-```
+```text
 002-setup/
 ├── 01-deploy-robotics-charts.sh
 ├── 02-deploy-azureml-extension.sh
@@ -338,11 +340,11 @@ kubectl describe sa osmo-service -n osmo-control-plane
 
 ## 🧩 Optional Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `optional/deploy-volcano-scheduler.sh` | Volcano (alternative to KAI) |
-| `optional/uninstall-volcano-scheduler.sh` | Remove Volcano scheduler |
-| `optional/add-user-to-platform.sh` | Add user to OSMO platform |
+| Script                                    | Purpose                      |
+|-------------------------------------------|------------------------------|
+| `optional/deploy-volcano-scheduler.sh`    | Volcano (alternative to KAI) |
+| `optional/uninstall-volcano-scheduler.sh` | Remove Volcano scheduler     |
+| `optional/add-user-to-platform.sh`        | Add user to OSMO platform    |
 
 ## 🗑️ Cleanup
 
@@ -350,12 +352,12 @@ Uninstall scripts in `cleanup/` remove cluster components in reverse deployment 
 
 ### Cleanup Scripts
 
-| Script | Removes |
-|--------|---------|
-| `cleanup/uninstall-osmo-backend.sh` | Backend operator, workflow namespaces |
-| `cleanup/uninstall-osmo-control-plane.sh` | OSMO service, router, web-ui |
-| `cleanup/uninstall-azureml-extension.sh` | ML extension, compute target, FICs |
-| `cleanup/uninstall-robotics-charts.sh` | GPU Operator, KAI Scheduler |
+| Script                                    | Removes                               |
+|-------------------------------------------|---------------------------------------|
+| `cleanup/uninstall-osmo-backend.sh`       | Backend operator, workflow namespaces |
+| `cleanup/uninstall-osmo-control-plane.sh` | OSMO service, router, web-ui          |
+| `cleanup/uninstall-azureml-extension.sh`  | ML extension, compute target, FICs    |
+| `cleanup/uninstall-robotics-charts.sh`    | GPU Operator, KAI Scheduler           |
 
 ### Uninstall Order
 
@@ -381,14 +383,14 @@ cd cleanup
 
 By default, uninstall scripts preserve data. Use flags for complete removal:
 
-| Script | Preservation Flag | Description |
-|--------|-------------------|-------------|
-| `uninstall-osmo-backend.sh` | `--delete-container` | Deletes blob container with workflow artifacts |
-| `uninstall-osmo-control-plane.sh` | `--delete-mek` | Removes encryption key ConfigMap |
-| `uninstall-osmo-control-plane.sh` | `--purge-postgres` | Drops OSMO tables from PostgreSQL |
-| `uninstall-osmo-control-plane.sh` | `--purge-redis` | Flushes OSMO keys from Redis |
-| `uninstall-robotics-charts.sh` | `--delete-namespaces` | Removes gpu-operator, kai-scheduler namespaces |
-| `uninstall-robotics-charts.sh` | `--delete-crds` | Removes GPU Operator CRDs |
+| Script                            | Preservation Flag     | Description                                    |
+|-----------------------------------|-----------------------|------------------------------------------------|
+| `uninstall-osmo-backend.sh`       | `--delete-container`  | Deletes blob container with workflow artifacts |
+| `uninstall-osmo-control-plane.sh` | `--delete-mek`        | Removes encryption key ConfigMap               |
+| `uninstall-osmo-control-plane.sh` | `--purge-postgres`    | Drops OSMO tables from PostgreSQL              |
+| `uninstall-osmo-control-plane.sh` | `--purge-redis`       | Flushes OSMO keys from Redis                   |
+| `uninstall-robotics-charts.sh`    | `--delete-namespaces` | Removes gpu-operator, kai-scheduler namespaces |
+| `uninstall-robotics-charts.sh`    | `--delete-crds`       | Removes GPU Operator CRDs                      |
 
 ### Full Component Cleanup
 

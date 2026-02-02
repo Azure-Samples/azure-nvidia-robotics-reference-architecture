@@ -1,4 +1,7 @@
+# Pull Request
+
 ## Description
+
 <!-- Brief description of changes. Link related issues using Closes #123 -->
 
 Closes #
@@ -34,8 +37,8 @@ Closes #
 
 ## Checklist
 
-- [ ] My code follows the [project conventions](.github/copilot-instructions.md)
-- [ ] Commit messages follow [conventional commit format](.github/instructions/commit-message.instructions.md)
+- [ ] My code follows the [project conventions](copilot-instructions.md)
+- [ ] Commit messages follow [conventional commit format](instructions/commit-message.instructions.md)
 - [ ] I have performed a self-review
 - [ ] Documentation updated as needed
 - [ ] No new linting warnings introduced

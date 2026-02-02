@@ -45,14 +45,14 @@ Include any relevant information:
 
 <!-- Fill in if relevant to your issue -->
 
-| Component | Version |
-|-----------|---------|
-| OS | Ubuntu 22.04 / Windows 11 |
-| Python | 3.10.x / 3.11.x |
-| Terraform | 1.9.x |
-| Azure CLI | 2.x |
-| Isaac Sim | 4.5 / 5.0 |
-| GPU | NVIDIA RTX / A100 |
+| Component | Version                   |
+|-----------|---------------------------|
+| OS        | Ubuntu 22.04 / Windows 11 |
+| Python    | 3.10.x / 3.11.x           |
+| Terraform | 1.9.x                     |
+| Azure CLI | 2.x                       |
+| Isaac Sim | 4.5 / 5.0                 |
+| GPU       | NVIDIA RTX / A100         |
 
 ## Additional Notes
 
@@ -63,4 +63,4 @@ Include any relevant information:
 **Before submitting:**
 
 - [ ] I have searched [existing issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) for duplicates
-- [ ] I have reviewed the [README](README.md) and [documentation](docs/)
+- [ ] I have reviewed the [README](../../README.md) and [documentation](../../docs/)

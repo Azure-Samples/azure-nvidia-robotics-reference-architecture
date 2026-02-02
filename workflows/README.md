@@ -6,8 +6,6 @@ ms.date: 2025-12-14
 ms.topic: reference
 ---
 
-# Workflows
-
 Workflow templates for submitting robotics training and validation jobs to Azure infrastructure.
 
 ## 📁 Directory Structure
@@ -27,13 +25,13 @@ workflows/
 
 ## ⚖️ Platform Comparison
 
-| Feature | AzureML | OSMO |
-|---------|---------|------|
-| Orchestration | Azure ML Job Service | OSMO Workflow Engine |
-| Scheduling | Azure ML Compute | KAI Scheduler / Volcano |
-| Multi-node | Azure ML distributed jobs | OSMO workflow DAGs |
-| Checkpointing | MLflow integration | MLflow + custom handlers |
-| Monitoring | Azure ML Studio | OSMO UI Dashboard |
+| Feature       | AzureML                   | OSMO                     |
+|---------------|---------------------------|--------------------------|
+| Orchestration | Azure ML Job Service      | OSMO Workflow Engine     |
+| Scheduling    | Azure ML Compute          | KAI Scheduler / Volcano  |
+| Multi-node    | Azure ML distributed jobs | OSMO workflow DAGs       |
+| Checkpointing | MLflow integration        | MLflow + custom handlers |
+| Monitoring    | Azure ML Studio           | OSMO UI Dashboard        |
 
 ## 🚀 Quick Start
 
@@ -61,12 +59,12 @@ workflows/
 
 The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO dataset instead of base64-encoding it inline.
 
-| Aspect | train.yaml | train-dataset.yaml |
-|--------|------------|--------------------|
+| Aspect         | train.yaml             | train-dataset.yaml    |
+|----------------|------------------------|-----------------------|
 | Payload method | Base64-encoded archive | Dataset folder upload |
-| Size limit | ~1MB | Unlimited |
-| Versioning | None | Automatic |
-| Reusability | Per-run | Across runs |
+| Size limit     | ~1MB                   | Unlimited             |
+| Versioning     | None                   | Automatic             |
+| Reusability    | Per-run                | Across runs           |
 
 ### Dataset Submission
 
@@ -83,31 +81,31 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
 
 ### Dataset Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--dataset-bucket` | `training` | OSMO bucket for training code |
-| `--dataset-name` | `training-code` | Dataset name (auto-versioned) |
-| `--training-path` | `src/training` | Local folder to upload |
+| Parameter          | Default         | Description                   |
+|--------------------|-----------------|-------------------------------|
+| `--dataset-bucket` | `training`      | OSMO bucket for training code |
+| `--dataset-name`   | `training-code` | Dataset name (auto-versioned) |
+| `--training-path`  | `src/training`  | Local folder to upload        |
 
 The training folder mounts at `/data/<dataset_name>/training` inside the container.
 
 ## 📋 Prerequisites
 
-| Requirement | Setup |
-|-------------|-------|
-| Infrastructure deployed | `deploy/001-iac/` |
-| Setup scripts completed | `deploy/002-setup/` |
-| Azure CLI authenticated | `az login` |
+| Requirement                   | Setup                    |
+|-------------------------------|--------------------------|
+| Infrastructure deployed       | `deploy/001-iac/`        |
+| Setup scripts completed       | `deploy/002-setup/`      |
+| Azure CLI authenticated       | `az login`               |
 | OSMO CLI (for OSMO workflows) | Installed and configured |
 
 ## ⚙️ Configuration
 
 Scripts resolve values in order:
 
-| Precedence | Source | Example |
-|------------|--------|---------|
-| 1 (highest) | CLI arguments | `--resource-group rg-custom` |
-| 2 | Environment variables | `AZURE_RESOURCE_GROUP=rg-custom` |
-| 3 (default) | Terraform outputs | `deploy/001-iac/` |
+| Precedence  | Source                | Example                          |
+|-------------|-----------------------|----------------------------------|
+| 1 (highest) | CLI arguments         | `--resource-group rg-custom`     |
+| 2           | Environment variables | `AZURE_RESOURCE_GROUP=rg-custom` |
+| 3 (default) | Terraform outputs     | `deploy/001-iac/`                |
 
 See individual workflow READMEs for detailed configuration options.

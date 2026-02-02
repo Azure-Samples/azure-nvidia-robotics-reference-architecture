@@ -29,12 +29,12 @@ Deployment takes 20-30 minutes for the VPN Gateway.
 
 ## ⚙️ Configuration
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `gateway_subnet_address_prefix` | GatewaySubnet CIDR (min /27) | `10.0.3.0/27` |
-| `vpn_gateway_config.sku` | Gateway SKU | `VpnGw1` |
-| `vpn_gateway_config.client_address_pool` | P2S client IP range | `["192.168.200.0/24"]` |
-| `aad_auth_config.enabled` | Enable Azure AD auth | `true` |
+| Variable                                 | Description                  | Default                |
+|------------------------------------------|------------------------------|------------------------|
+| `gateway_subnet_address_prefix`          | GatewaySubnet CIDR (min /27) | `10.0.3.0/27`          |
+| `vpn_gateway_config.sku`                 | Gateway SKU                  | `VpnGw1`               |
+| `vpn_gateway_config.client_address_pool` | P2S client IP range          | `["192.168.200.0/24"]` |
+| `aad_auth_config.enabled`                | Enable Azure AD auth         | `true`                 |
 
 ## 🔐 Authentication Options
 
@@ -63,11 +63,11 @@ root_certificate_public_data = "MIIC5jCCAc6g..." # Base64-encoded cert
 
 ### Install Azure VPN Client
 
-| Platform | Installation |
-|----------|--------------|
-| Windows | [Microsoft Store](https://apps.microsoft.com/detail/9NP355QT2SQB) |
-| macOS | [App Store](https://apps.apple.com/us/app/azure-vpn-client/id1553936137) |
-| Ubuntu 20.04/22.04 | [Microsoft Docs](https://learn.microsoft.com/en-us/azure/vpn-gateway/point-to-site-entra-vpn-client-linux#install-the-azure-vpn-client) |
+| Platform           | Installation                                                                                                                      |
+|--------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Windows            | [Microsoft Store](https://apps.microsoft.com/detail/9NP355QT2SQB)                                                                 |
+| macOS              | [App Store](https://apps.apple.com/us/app/azure-vpn-client/id1553936137)                                                          |
+| Ubuntu 20.04/22.04 | [Microsoft Docs](https://learn.microsoft.com/azure/vpn-gateway/point-to-site-entra-vpn-client-linux#install-the-azure-vpn-client) |
 
 ### Download VPN Configuration
 

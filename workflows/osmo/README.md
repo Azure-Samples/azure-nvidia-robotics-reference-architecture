@@ -6,32 +6,30 @@ ms.date: 2025-12-04
 ms.topic: reference
 ---
 
-# OSMO Workflows
-
 NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kubernetes Service.
 
 ## 📜 Available Templates
 
-| Template | Purpose | Submission Script |
-|----------|---------|-------------------|
-| [train.yaml](train.yaml) | Distributed training (base64 inline) | `scripts/submit-osmo-training.sh` |
+| Template                                 | Purpose                               | Submission Script                         |
+|------------------------------------------|---------------------------------------|-------------------------------------------|
+| [train.yaml](train.yaml)                 | Distributed training (base64 inline)  | `scripts/submit-osmo-training.sh`         |
 | [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh` |
 
 ## ⚖️ Workflow Comparison
 
-| Aspect | train.yaml | train-dataset.yaml |
-|--------|------------|--------------------|
-| Payload | Base64-encoded archive | Dataset folder upload |
-| Size limit | ~1MB | Unlimited |
-| Versioning | None | Automatic |
-| Reusability | Per-run | Across runs |
-| Setup | None | Bucket configured |
+| Aspect      | train.yaml             | train-dataset.yaml    |
+|-------------|------------------------|-----------------------|
+| Payload     | Base64-encoded archive | Dataset folder upload |
+| Size limit  | ~1MB                   | Unlimited             |
+| Versioning  | None                   | Automatic             |
+| Reusability | Per-run                | Across runs           |
+| Setup       | None                   | Bucket configured     |
 
 ## 🏋️ Training Workflow (`train.yaml`)
 
 Submits Isaac Lab distributed training through OSMO's workflow orchestration engine.
 
-### Features
+### Training Features
 
 * Multi-GPU distributed training coordination
 * KAI Scheduler / Volcano integration
@@ -42,14 +40,14 @@ Submits Isaac Lab distributed training through OSMO's workflow orchestration eng
 
 Parameters are passed as key=value pairs through the submission script:
 
-| Parameter | Description |
-|-----------|-------------|
+| Parameter               | Description           |
+|-------------------------|-----------------------|
 | `azure_subscription_id` | Azure subscription ID |
-| `azure_resource_group` | Resource group name |
-| `azure_workspace_name` | ML workspace name |
-| `task` | Isaac Lab task name |
-| `num_envs` | Parallel environments |
-| `max_iterations` | Training iterations |
+| `azure_resource_group`  | Resource group name   |
+| `azure_workspace_name`  | ML workspace name     |
+| `task`                  | Isaac Lab task name   |
+| `num_envs`              | Parallel environments |
+| `max_iterations`        | Training iterations   |
 
 ### Usage
 
@@ -67,7 +65,7 @@ Parameters are passed as key=value pairs through the submission script:
 
 Submits Isaac Lab training using OSMO dataset folder injection instead of base64-encoded archives.
 
-### Features
+### Dataset Features
 
 * Dataset versioning and reusability
 * No payload size limits
@@ -76,13 +74,13 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
 
 ### Dataset Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `dataset_bucket` | `training` | OSMO bucket for training code |
-| `dataset_name` | `training-code` | Dataset name in bucket |
-| `training_localpath` | (required) | Local path to src/training relative to workflow |
+| Parameter            | Default         | Description                                     |
+|----------------------|-----------------|-------------------------------------------------|
+| `dataset_bucket`     | `training`      | OSMO bucket for training code                   |
+| `dataset_name`       | `training-code` | Dataset name in bucket                          |
+| `training_localpath` | (required)      | Local path to src/training relative to workflow |
 
-### Usage
+### Dataset Usage
 
 ```bash
 # Default configuration
@@ -96,14 +94,14 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
 
 ## ⚙️ Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `AZURE_RESOURCE_GROUP` | Resource group name |
-| `WORKFLOW_TEMPLATE` | Path to workflow template |
-| `OSMO_CONFIG_DIR` | OSMO configuration directory |
-| `OSMO_DATASET_BUCKET` | Dataset bucket name (default: training) |
-| `OSMO_DATASET_NAME` | Dataset name (default: training-code) |
+| Variable                | Description                             |
+|-------------------------|-----------------------------------------|
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID                   |
+| `AZURE_RESOURCE_GROUP`  | Resource group name                     |
+| `WORKFLOW_TEMPLATE`     | Path to workflow template               |
+| `OSMO_CONFIG_DIR`       | OSMO configuration directory            |
+| `OSMO_DATASET_BUCKET`   | Dataset bucket name (default: training) |
+| `OSMO_DATASET_NAME`     | Dataset name (default: training-code)   |
 
 ## 📋 Prerequisites
 
@@ -120,10 +118,10 @@ OSMO services are deployed to the `osmo-control-plane` namespace. Access method 
 
 When connected to VPN, OSMO is accessible via the internal load balancer:
 
-| Service | URL |
-|---------|-----|
-| UI Dashboard | http://10.0.5.7 |
-| API Service | http://10.0.5.7/api |
+| Service      | URL                   |
+|--------------|-----------------------|
+| UI Dashboard | `http://10.0.5.7`     |
+| API Service  | `http://10.0.5.7/api` |
 
 ```bash
 osmo login http://10.0.5.7 --method=dev --username=testuser
@@ -137,11 +135,11 @@ osmo info
 
 If `should_enable_private_aks_cluster = false` and not using VPN:
 
-| Service | Port-Forward Command | Local URL |
-|---------|---------------------|----------|
-| UI Dashboard | `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` | http://localhost:3000 |
-| API Service | `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` | http://localhost:9000 |
-| Router | `kubectl port-forward svc/osmo-router 8080:80 -n osmo-control-plane` | http://localhost:8080 |
+| Service      | Port-Forward Command                                                  | Local URL               |
+|--------------|-----------------------------------------------------------------------|-------------------------|
+| UI Dashboard | `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane`      | `http://localhost:3000` |
+| API Service  | `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` | `http://localhost:9000` |
+| Router       | `kubectl port-forward svc/osmo-router 8080:80 -n osmo-control-plane`  | `http://localhost:8080` |
 
 ```bash
 # Start port-forward in background (or separate terminal)
@@ -162,5 +160,5 @@ osmo backend list
 
 Access the OSMO UI dashboard:
 
-- **VPN**: Open http://10.0.5.7 in your browser
-- **Port-forward**: Run `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` then open http://localhost:3000
+* **VPN**: Open `http://10.0.5.7` in your browser
+* **Port-forward**: Run `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` then open `http://localhost:3000`
