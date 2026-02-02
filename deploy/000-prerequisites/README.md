@@ -4,10 +4,10 @@ Azure CLI initialization and subscription setup for Terraform deployments.
 
 ## 📜 Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `az-sub-init.sh` | Azure login and `ARM_SUBSCRIPTION_ID` export |
-| `register-azure-providers.sh` | Register required Azure resource providers |
+| Script                        | Purpose                                      |
+|-------------------------------|----------------------------------------------|
+| `az-sub-init.sh`              | Azure login and `ARM_SUBSCRIPTION_ID` export |
+| `register-azure-providers.sh` | Register required Azure resource providers   |
 
 ## 🚀 Usage
 

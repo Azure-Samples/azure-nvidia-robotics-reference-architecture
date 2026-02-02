@@ -4,12 +4,12 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 
 ## 📋 Deployment Order
 
-| Step | Folder | Description | Time |
-|:----:|--------|-------------|------|
-| 1 | [000-prerequisites](000-prerequisites/) | Azure CLI login, subscription setup | 2 min |
-| 2 | [001-iac](001-iac/) | Terraform: AKS, ML workspace, storage, PostgreSQL, Redis | 30-40 min |
-| 3 | [001-iac/vpn](001-iac/vpn/) | VPN Gateway for private cluster access | 20-30 min |
-| 4 | [002-setup](002-setup/) | Cluster config: GPU Operator, OSMO, AzureML extension | 30 min |
+| Step | Folder                                  | Description                                              | Time      |
+|:----:|-----------------------------------------|----------------------------------------------------------|-----------|
+|  1   | [000-prerequisites](000-prerequisites/) | Azure CLI login, subscription setup                      | 2 min     |
+|  2   | [001-iac](001-iac/)                     | Terraform: AKS, ML workspace, storage, PostgreSQL, Redis | 30-40 min |
+|  3   | [001-iac/vpn](001-iac/vpn/)             | VPN Gateway for private cluster access                   | 20-30 min |
+|  4   | [002-setup](002-setup/)                 | Cluster config: GPU Operator, OSMO, AzureML extension    | 30 min    |
 
 > [!IMPORTANT]
 > The default configuration deploys a **private AKS cluster**. The cluster API endpoint is not publicly accessible. You must deploy the VPN Gateway (step 3) and connect before running cluster setup scripts (step 4).
@@ -85,11 +85,11 @@ See the [root README](../README.md) for architecture details.
 
 Remove deployed components in reverse order. Cluster components must be removed before infrastructure.
 
-| Step | Folder | Description | Time |
-|:----:|--------|-------------|------|
-| 1 | [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 10-15 min |
-| 2 | [001-iac/vpn](001-iac/vpn/) | Destroy VPN Gateway | 10-15 min |
-| 3 | [001-iac](001-iac/) | Terraform destroy or resource group deletion | 20-30 min |
+| Step | Folder                                  | Description                                   | Time      |
+|:----:|-----------------------------------------|-----------------------------------------------|-----------|
+|  1   | [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 10-15 min |
+|  2   | [001-iac/vpn](001-iac/vpn/)             | Destroy VPN Gateway                           | 10-15 min |
+|  3   | [001-iac](001-iac/)                     | Terraform destroy or resource group deletion  | 20-30 min |
 
 ### Partial Cleanup (Cluster Components Only)
 
@@ -137,6 +137,7 @@ az group delete --name <resource-group-name> --yes --no-wait
 ```
 
 This deletes all resources in the group immediately. Use when:
+
 - Terraform created the resource group
 - You want to remove everything without preserving state
 - Terraform state is corrupted or unavailable

@@ -5,7 +5,9 @@
 # Purpose: Wrapper for Link-Lang-Check.ps1 with GitHub Actions integration
 
 [CmdletBinding()]
-param()
+param(
+    [string[]]$Files
+)
 
 Import-Module (Join-Path $PSScriptRoot "Modules/LintingHelpers.psm1") -Force
 
@@ -22,7 +24,12 @@ if (-not (Test-Path $logsDir)) {
 
 Write-Host "🔍 Checking for URLs with language paths..." -ForegroundColor Cyan
 
-$jsonOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") 2>&1
+if ($Files -and $Files.Count -gt 0) {
+    $jsonOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") -Files $Files 2>&1
+}
+else {
+    $jsonOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") 2>&1
+}
 
 try {
     $results = $jsonOutput | ConvertFrom-Json

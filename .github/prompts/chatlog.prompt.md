@@ -37,7 +37,7 @@ Manage conversation details by creating and maintaining structured chatlog files
 * Create the `.copilot-tracking/chatlogs/` directory if it doesn't exist
 * Generate a new chatlog file with the following structure:
 
-```markdown
+````markdown
 # [Descriptive Title]
 
 **Date**: YYYY-MM-DD (e.g., November 19, 2025)
@@ -83,7 +83,7 @@ command here
 
 ## Related Documentation
 
-- [Link Title](URL)
+* [Link Title](URL)
 
 ## Follow-up Issues
 
@@ -96,7 +96,8 @@ command here
 
 1. [Key takeaway with brief explanation]
 2. [Another key takeaway]
-```
+
+````
 
 * Populate the chatlog with details from the current conversation context
 * Follow markdown linting rules strictly:
@@ -165,6 +166,7 @@ Ready to continue. What would you like to work on?
 ### Initial Response (mode=create)
 
 Format:
+
 ```text
 ✅ Created chatlog: .copilot-tracking/chatlogs/YYYYMMDD-brief-description-chatlog.md
 
@@ -191,6 +193,7 @@ Use the format specified in Phase 3 above, then proceed with the conversation.
 ### Final Summary (optional, at conversation end)
 
 Format:
+
 ```text
 📋 Chatlog Summary
 
@@ -201,7 +204,8 @@ Format:
 - [Section 2]: [brief description]
 
 **Key Additions**:
-- [Most important new insight/solution]
+* [Most important new insight/solution]
+
 ```
 
 ---

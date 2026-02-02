@@ -20,7 +20,8 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Fix
+    [switch]$Fix,
+    [string[]]$Files
 )
 
 function Get-GitTextFile {
@@ -183,7 +184,12 @@ try {
         Write-Information "Getting list of git-tracked text files..." -InformationAction Continue
     }
 
-    $files = Get-GitTextFile
+    if ($Files -and $Files.Count -gt 0) {
+        $files = $Files
+    }
+    else {
+        $files = Get-GitTextFile
+    }
 
     if ($Verbose) {
         Write-Information "Found $($files.Count) git-tracked text files" -InformationAction Continue

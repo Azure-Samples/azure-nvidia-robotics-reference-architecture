@@ -39,12 +39,12 @@ Documents follow this section order when applicable:
 
 ### Heading Levels
 
-| Level | Usage |
-|-------|-------|
-| H1 (`#`) | Document title only, one per file |
-| H2 (`##`) | Major sections |
-| H3 (`###`) | Subsections within H2 |
-| H4+ | Avoid; restructure content instead |
+| Level      | Usage                              |
+|------------|------------------------------------|
+| H1 (`#`)   | Document title only, one per file  |
+| H2 (`##`)  | Major sections                     |
+| H3 (`###`) | Subsections within H2              |
+| H4+        | Avoid; restructure content instead |
 
 ### README Section Emojis
 
@@ -98,9 +98,9 @@ Use tables for structured information. Tables are scannable and align related da
 - Prerequisites with versions
 
 ```markdown
-| Script | Purpose |
-|--------|---------|
-| `01-deploy-robotics-charts.sh` | GPU Operator, KAI Scheduler |
+| Script                           | Purpose                               |
+|----------------------------------|---------------------------------------|
+| `01-deploy-robotics-charts.sh`   | GPU Operator, KAI Scheduler           |
 | `02-deploy-azureml-extension.sh` | AzureML K8s extension, compute attach |
 ```
 
@@ -280,10 +280,10 @@ This pattern appears frequently in AI-generated content:
 **Use tables when structure matters:**
 
 ```markdown
-| Component | Requirement |
-|-----------|-------------|
-| Storage | Blob containers for checkpoints |
-| Compute | GPU nodes with sufficient memory |
+| Component  | Requirement                           |
+|------------|---------------------------------------|
+| Storage    | Blob containers for checkpoints       |
+| Compute    | GPU nodes with sufficient memory      |
 | Networking | Private endpoints with DNS resolution |
 ```
 
@@ -329,10 +329,10 @@ Required fields: `title`, `description`. Add `ms.date` for versioned content.
 
 ## File Naming
 
-| Type | Convention | Example |
-|------|------------|---------|
-| README | `README.md` (uppercase) | `deploy/README.md` |
-| Guides | kebab-case | `mlflow-integration.md` |
+| Type       | Convention                  | Example                               |
+|------------|-----------------------------|---------------------------------------|
+| README     | `README.md` (uppercase)     | `deploy/README.md`                    |
+| Guides     | kebab-case                  | `mlflow-integration.md`               |
 | References | kebab-case with type suffix | `azureml-validation-job-debugging.md` |
 
 ## Checklist

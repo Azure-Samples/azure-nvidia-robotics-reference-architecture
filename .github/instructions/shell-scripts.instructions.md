@@ -100,16 +100,19 @@ info "Operation complete"
 <!-- <important-conventions> -->
 
 **Arguments:**
+
 - Short: `-h`, `-t` | Long: `--help`, `--tf-dir`
 - Value options: `shift 2` | Flags: `shift`
 - Unknown options: `fatal "Unknown option: $1"`
 
 **Variables:**
+
 - Always quote: `"$var"`, `"${array[@]}"`
 - Defaults: `var="${ENV_VAR:-default}"`
 - Booleans: `true`/`false` strings, test with `[[ "$var" == "true" ]]`
 
 **Output:**
+
 - Progress: `info "message"`
 - Warnings: `warn "message"`
 - Fatal errors: `fatal "message"`
@@ -117,17 +120,20 @@ info "Operation complete"
 - Summaries: `print_kv "Key" "$value"`
 
 **Idempotent operations:**
+
 ```bash
 kubectl create ... --dry-run=client -o yaml | kubectl apply -f -
 helm repo add name url 2>/dev/null || true
 ```
 
 **Conditional output:**
+
 ```bash
 print_kv "Status" "$([[ $skip == true ]] && echo 'Skipped' || echo "$version")"
 ```
 
 **Array building:**
+
 ```bash
 args=(--version "$ver" --namespace "$ns")
 [[ -n "$extra" ]] && args+=(--set "$extra")
@@ -138,14 +144,14 @@ command "${args[@]}"
 
 ## Library Functions (lib/common.sh)
 
-| Function | Purpose |
-|----------|---------|
-| `info`, `warn`, `error`, `fatal` | Colored logging |
-| `require_tools tool1 tool2` | Validate CLI tools exist |
-| `read_terraform_outputs "$dir"` | Read terraform JSON |
-| `tf_get "$json" "path" "default"` | Extract optional value |
-| `tf_require "$json" "path" "desc"` | Extract required value |
-| `connect_aks "$rg" "$cluster"` | Get AKS credentials |
-| `ensure_namespace "$ns"` | Create namespace idempotently |
-| `section "Title"` | Print section header |
-| `print_kv "Key" "$val"` | Print key-value pair |
+| Function                           | Purpose                       |
+|------------------------------------|-------------------------------|
+| `info`, `warn`, `error`, `fatal`   | Colored logging               |
+| `require_tools tool1 tool2`        | Validate CLI tools exist      |
+| `read_terraform_outputs "$dir"`    | Read terraform JSON           |
+| `tf_get "$json" "path" "default"`  | Extract optional value        |
+| `tf_require "$json" "path" "desc"` | Extract required value        |
+| `connect_aks "$rg" "$cluster"`     | Get AKS credentials           |
+| `ensure_namespace "$ns"`           | Create namespace idempotently |
+| `section "Title"`                  | Print section header          |
+| `print_kv "Key" "$val"`            | Print key-value pair          |
