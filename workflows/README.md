@@ -127,8 +127,8 @@ The workflow accepts checkpoints from multiple sources:
 |--------------------|----------------|------------------------------|
 | `--checkpoint-uri` | (required)     | URI to training checkpoint   |
 | `--task`           | `Isaac-Ant-v0` | Isaac Lab task name          |
-| `--format`         | `both`         | Export format: `onnx`, `jit`, or `both` |
-| `--num-envs`       | `4`            | Number of simulation environments |
+| `--format`         | `both`         | `onnx`, `jit`, or `both` |
+| `--num-envs`       | `4`            | Number of  environments |
 | `--max-steps`      | `500`          | Maximum inference steps      |
 | `--video-length`   | `200`          | Video recording length       |
 
