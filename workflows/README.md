@@ -106,12 +106,12 @@ The inference workflow exports trained checkpoints to deployment-ready formats (
 
 The workflow accepts checkpoints from multiple sources:
 
-| Source         | URI Format                                             | Example                                                  |
-|----------------|--------------------------------------------------------|----------------------------------------------------------|
-| MLflow run     | `runs:/<run_id>/<artifact_path>`                       | `runs:/b906b426-078e-4539-b907-aecb3121a76d/checkpoints/final/model_99.pt` |
-| MLflow model   | `models:/<model_name>/<version>`                       | `models:/anymal-rough-terrain/1`                         |
-| Azure Blob     | `https://<account>.blob.core.windows.net/<container>/<path>` | `https://stosmorbt3dev001.blob.core.windows.net/azureml/checkpoints/model.pt` |
-| HTTP(S)        | Direct URL                                             | `https://example.com/models/policy.pt`                   |
+| Source       | URI Format                                                   | Example                                                                       |
+|--------------|--------------------------------------------------------------|-------------------------------------------------------------------------------|
+| MLflow run   | `runs:/<run_id>/<artifact_path>`                             | `runs:/b906b426-078e-4539-b907-aecb3121a76d/checkpoints/final/model_99.pt`    |
+| MLflow model | `models:/<model_name>/<version>`                             | `models:/anymal-rough-terrain/1`                                              |
+| Azure Blob   | `https://<account>.blob.core.windows.net/<container>/<path>` | `https://stosmorbt3dev001.blob.core.windows.net/azureml/checkpoints/model.pt` |
+| HTTP(S)      | Direct URL                                                   | `https://example.com/models/policy.pt`                                        |
 
 ### Basic Usage
 
@@ -123,14 +123,14 @@ The workflow accepts checkpoints from multiple sources:
 
 ### Inference Parameters
 
-| Parameter            | Default      | Description                                |
-|----------------------|--------------|--------------------------------------------|
-| `--checkpoint-uri`   | (required)   | URI to training checkpoint                 |
-| `--task`             | `Isaac-Ant-v0` | Isaac Lab task name                      |
-| `--format`           | `both`       | Export format: `onnx`, `jit`, or `both`    |
-| `--num-envs`         | `4`          | Number of simulation environments          |
-| `--max-steps`        | `500`        | Maximum inference steps                    |
-| `--video-length`     | `200`        | Video recording length in steps            |
+| Parameter          | Default        | Description                  |
+|--------------------|----------------|------------------------------|
+| `--checkpoint-uri` | (required)     | URI to training checkpoint   |
+| `--task`           | `Isaac-Ant-v0` | Isaac Lab task name          |
+| `--format`         | `both`         | Export format: `onnx`, `jit`, or `both` |
+| `--num-envs`       | `4`            | Number of simulation environments |
+| `--max-steps`      | `500`          | Maximum inference steps      |
+| `--video-length`   | `200`          | Video recording length       |
 
 ### Examples
 
