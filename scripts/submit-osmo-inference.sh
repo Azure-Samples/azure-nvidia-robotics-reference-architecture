@@ -10,6 +10,15 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || dirname "$SCRIPT_DIR")
 
+# Source .env file if present (for Azure credentials)
+ENV_FILE="${SCRIPT_DIR}/.env"
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+fi
+
 source "${SCRIPT_DIR}/lib/terraform-outputs.sh"
 read_terraform_outputs "${REPO_ROOT}/deploy/001-iac" 2>/dev/null || true
 
@@ -237,6 +246,9 @@ echo "Submitting inference workflow to OSMO..."
 echo "  Checkpoint: $CHECKPOINT_URI_VALUE"
 echo "  Task: $TASK_VALUE"
 echo "  Format: $INFERENCE_FORMAT_VALUE"
+echo "  Azure Subscription: ${AZURE_SUBSCRIPTION_ID_VALUE:-(not set)}"
+echo "  Azure Resource Group: ${AZURE_RESOURCE_GROUP_VALUE:-(not set)}"
+echo "  Azure ML Workspace: ${AZURE_WORKSPACE_NAME_VALUE:-(not set)}"
 
 if ! osmo "${submit_args[@]}"; then
   echo "Failed to submit workflow to OSMO" >&2

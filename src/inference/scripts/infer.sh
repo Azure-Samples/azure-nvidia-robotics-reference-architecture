@@ -250,9 +250,10 @@ run_onnx_inference() {
     return 1
   fi
 
-  if run_isaaclab "${SCRIPT_DIR}/play_onnx.py" \
+  if run_isaaclab "${SCRIPT_DIR}/play_policy.py" \
       --task "${TASK}" \
-      --onnx-model "${onnx_model}" \
+      --model "${onnx_model}" \
+      --format onnx \
       --num_envs "${NUM_ENVS}" \
       --max-steps "${MAX_STEPS}" \
       --video_length "${VIDEO_LENGTH}" \
@@ -277,9 +278,10 @@ run_jit_inference() {
     return 1
   fi
 
-  if run_isaaclab "${SCRIPT_DIR}/play_jit.py" \
+  if run_isaaclab "${SCRIPT_DIR}/play_policy.py" \
       --task "${TASK}" \
-      --jit-model "${jit_model}" \
+      --model "${jit_model}" \
+      --format jit \
       --num_envs "${NUM_ENVS}" \
       --max-steps "${MAX_STEPS}" \
       --video_length "${VIDEO_LENGTH}" \

@@ -1,8 +1,10 @@
-"""Script to play an exported JIT (TorchScript) policy in Isaac Sim environment.
+"""Script to play an exported policy (ONNX or TorchScript) in Isaac Sim environment.
 
-This script runs inference using a JIT-exported policy model against the same
+This script runs inference using an exported policy model against the same
 simulation environment used for training, enabling validation of the exported
 model before Azure ML deployment.
+
+Supports both ONNX and TorchScript (JIT) model formats.
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -19,7 +21,7 @@ from isaaclab.app import AppLauncher
 
 from common import cli_args  # isort: skip
 
-parser = argparse.ArgumentParser(description="Run inference using an exported JIT policy.")
+parser = argparse.ArgumentParser(description="Run inference using an exported ONNX or TorchScript policy.")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during inference.")
 parser.add_argument(
     "--video_length",
@@ -43,10 +45,17 @@ parser.add_argument(
 )
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument(
-    "--jit-model",
+    "--model",
     type=str,
     required=True,
-    help="Path to the exported JIT policy model (.pt).",
+    help="Path to the exported policy model (.onnx or .pt).",
+)
+parser.add_argument(
+    "--format",
+    type=str,
+    choices=["onnx", "jit"],
+    default=None,
+    help="Model format: 'onnx' or 'jit'. Auto-detected from file extension if not specified.",
 )
 parser.add_argument(
     "--real-time",
@@ -59,6 +68,12 @@ parser.add_argument(
     type=int,
     default=1000,
     help="Maximum number of simulation steps (0 for unlimited).",
+)
+parser.add_argument(
+    "--use-gpu",
+    action="store_true",
+    default=False,
+    help="Use CUDA execution provider for ONNX Runtime (ONNX only).",
 )
 parser.add_argument(
     "--output-metrics",
@@ -111,6 +126,26 @@ from tensordict import TensorDict
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
+
+
+def detect_model_format(model_path: str) -> str:
+    """Detect model format from file extension.
+
+    Args:
+        model_path: Path to the model file.
+
+    Returns:
+        Format string: 'onnx' or 'jit'.
+
+    Raises:
+        ValueError: If format cannot be determined from extension.
+    """
+    ext = Path(model_path).suffix.lower()
+    if ext == ".onnx":
+        return "onnx"
+    if ext == ".pt":
+        return "jit"
+    raise ValueError(f"Cannot determine model format from extension '{ext}'. Use --format to specify.")
 
 
 class RslRl3xCompatWrapper:
@@ -195,11 +230,75 @@ class JitPolicy:
         Returns:
             Action tensor of shape (num_envs, action_dim).
         """
-        # Handle TensorDict or dict observations from RslRlVecEnvWrapper
         if hasattr(obs, "__getitem__") and not isinstance(obs, torch.Tensor):
             obs = obs["policy"]
         with torch.inference_mode():
             return self.model(obs.to(self.device))
+
+
+class OnnxPolicy:
+    """Wrapper for ONNX policy inference compatible with IsaacLab environments."""
+
+    def __init__(self, onnx_path: str, device: str = "cpu", use_gpu: bool = False):
+        """Initialize ONNX inference session.
+
+        Args:
+            onnx_path: Path to the ONNX model file.
+            device: Target device for output tensors.
+            use_gpu: Whether to use CUDA execution provider.
+        """
+        import onnxruntime as ort
+
+        self.device = device
+
+        providers = ["CPUExecutionProvider"]
+        if use_gpu:
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+        print(f"[INFO] Loading ONNX model from: {onnx_path}")
+        self.session = ort.InferenceSession(onnx_path, providers=providers)
+
+        active_provider = self.session.get_providers()[0]
+        print(f"[INFO] ONNX Runtime using: {active_provider}")
+
+        self.input_name = self.session.get_inputs()[0].name
+        self.output_name = self.session.get_outputs()[0].name
+
+        input_shape = self.session.get_inputs()[0].shape
+        output_shape = self.session.get_outputs()[0].shape
+        print(f"[INFO] Input shape: {input_shape}, Output shape: {output_shape}")
+
+    def __call__(self, obs: torch.Tensor | dict) -> torch.Tensor:
+        """Run inference on observations.
+
+        Args:
+            obs: Observation tensor of shape (num_envs, obs_dim), dict, or TensorDict with 'policy' key.
+
+        Returns:
+            Action tensor of shape (num_envs, action_dim).
+        """
+        if hasattr(obs, "__getitem__") and not isinstance(obs, torch.Tensor):
+            obs = obs["policy"]
+        obs_np = obs.cpu().numpy().astype(np.float32)
+        actions_np = self.session.run([self.output_name], {self.input_name: obs_np})[0]
+        return torch.from_numpy(actions_np).to(self.device)
+
+
+def create_policy(model_path: str, model_format: str, device: str, use_gpu: bool):
+    """Create policy wrapper based on model format.
+
+    Args:
+        model_path: Path to the model file.
+        model_format: Format of the model ('onnx' or 'jit').
+        device: Target device for inference.
+        use_gpu: Whether to use GPU for ONNX inference.
+
+    Returns:
+        Policy wrapper instance.
+    """
+    if model_format == "onnx":
+        return OnnxPolicy(model_path, device=device, use_gpu=use_gpu)
+    return JitPolicy(model_path, device=device)
 
 
 @hydra_task_config(args_cli.task, args_cli.agent)
@@ -207,18 +306,21 @@ def main(
     env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
     agent_cfg: RslRlRunnerCfg,
 ):
-    """Play with JIT policy in Isaac Sim environment."""
+    """Play with exported policy in Isaac Sim environment."""
     agent_cfg: RslRlRunnerCfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
 
     env_cfg.seed = agent_cfg.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
-    jit_path = os.path.abspath(args_cli.jit_model)
-    if not os.path.exists(jit_path):
-        raise FileNotFoundError(f"JIT model not found: {jit_path}")
+    model_path = os.path.abspath(args_cli.model)
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model not found: {model_path}")
 
-    log_dir = os.path.dirname(jit_path)
+    model_format = args_cli.format if args_cli.format else detect_model_format(model_path)
+    print(f"[INFO] Using model format: {model_format.upper()}")
+
+    log_dir = os.path.dirname(model_path)
     env_cfg.log_dir = log_dir
 
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
@@ -228,19 +330,19 @@ def main(
 
     if args_cli.video:
         video_kwargs = {
-            "video_folder": os.path.join(log_dir, "videos", "jit_play"),
+            "video_folder": os.path.join(log_dir, "videos", f"{model_format}_play"),
             "step_trigger": lambda step: step == 0,
             "video_length": args_cli.video_length,
             "disable_logger": True,
         }
-        print("[INFO] Recording videos during JIT inference.")
+        print(f"[INFO] Recording videos during {model_format.upper()} inference.")
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
     env = RslRl3xCompatWrapper(env)
 
-    policy = JitPolicy(jit_path, device=env.unwrapped.device)
+    policy = create_policy(model_path, model_format, device=env.unwrapped.device, use_gpu=args_cli.use_gpu)
 
     dt = env.unwrapped.step_dt
 
@@ -252,7 +354,7 @@ def main(
 
     inference_times = []
 
-    print(f"\n[INFO] Starting JIT policy inference...")
+    print(f"\n[INFO] Starting {model_format.upper()} policy inference...")
     print(f"[INFO] Num envs: {env_cfg.scene.num_envs}")
     print(f"[INFO] Max steps: {args_cli.max_steps if args_cli.max_steps > 0 else 'unlimited'}")
     print("-" * 60)
@@ -297,7 +399,7 @@ def main(
             time.sleep(sleep_time)
 
     print("-" * 60)
-    print(f"\n[RESULTS] JIT Policy Inference Summary")
+    print(f"\n[RESULTS] {model_format.upper()} Policy Inference Summary")
     print(f"  Total steps: {timestep}")
     print(f"  Total episodes completed: {len(episode_rewards)}")
     if episode_rewards:
@@ -307,12 +409,11 @@ def main(
     print(f"  Max inference time: {np.max(inference_times):.2f}ms")
     print(f"  Min inference time: {np.min(inference_times):.2f}ms")
 
-    # Save metrics to JSON if requested
     if args_cli.output_metrics:
         import json
 
         metrics = {
-            "format": "jit",
+            "format": model_format,
             "task": args_cli.task,
             "num_envs": env_cfg.scene.num_envs,
             "total_steps": timestep,
@@ -331,6 +432,8 @@ def main(
             "throughput_steps_per_sec": timestep / (sum(inference_times) / 1000) if inference_times else 0.0,
             "total_reward": float(total_reward),
         }
+        if model_format == "onnx":
+            metrics["use_gpu"] = args_cli.use_gpu
         metrics_path = os.path.abspath(args_cli.output_metrics)
         os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
         with open(metrics_path, "w") as f:
