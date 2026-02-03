@@ -252,7 +252,7 @@ def export_policy(
     if export_onnx:
         print("Exporting ONNX model...")
         exporter = _OnnxPolicyExporter(actor, normalizer)
-        onnx_path = exporter.export(output_dir, "policy.onnx", arch.obs_dim)
+        onnx_path = exporter.export(output_dir, arch.obs_dim, "policy.onnx")
         exported["onnx"] = onnx_path
         print(f"  -> {onnx_path}")
 
