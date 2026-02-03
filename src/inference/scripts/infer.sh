@@ -27,12 +27,18 @@ if [[ ! -x "${python_exec}" ]]; then
   python_exec="${python_cmd[0]}"
 fi
 
+# run_python uses raw Python for pip/dependency operations
 run_python() {
   if [[ -n "${python_exec}" ]]; then
     "${python_exec}" "$@"
   else
     "${python_cmd[@]}" "$@"
   fi
+}
+
+# run_isaaclab uses isaaclab.sh -p for simulation scripts that need full env
+run_isaaclab() {
+  "${python_cmd[@]}" "$@"
 }
 
 TASK="${TASK:-Isaac-Ant-v0}"
@@ -122,7 +128,8 @@ if [[ -f "${TRAINING_REQS}" ]]; then
   run_python -m pip install --no-cache-dir -r "${TRAINING_REQS}" --quiet || true
 fi
 
-echo "Installing ONNX runtime..."
+echo "Installing ONNX runtime and export dependencies..."
+run_python -m pip install --no-cache-dir toml onnxscript onnx 2>/dev/null || true
 run_python -m pip install --no-cache-dir onnxruntime-gpu 2>/dev/null || \
   run_python -m pip install --no-cache-dir onnxruntime || true
 
@@ -140,11 +147,28 @@ download_checkpoint() {
 
   if [[ "${uri}" == runs:/* ]] || [[ "${uri}" == models:/* ]]; then
     echo "Detected MLflow artifact URI"
-    run_python -c "
+    run_python << MLFLOW_DOWNLOAD
+import os
 import mlflow
-local_path = mlflow.artifacts.download_artifacts(artifact_uri='${uri}', dst_path='${dst_dir}')
-print(local_path)
-"
+
+sub_id = os.environ.get("AZURE_SUBSCRIPTION_ID", "")
+rg = os.environ.get("AZURE_RESOURCE_GROUP", "")
+ws = os.environ.get("AZUREML_WORKSPACE_NAME", "")
+
+if sub_id and rg and ws:
+    tracking_uri = (
+        f"azureml://westus3.api.azureml.ms/mlflow/v1.0/subscriptions/{sub_id}"
+        f"/resourceGroups/{rg}/providers/Microsoft.MachineLearningServices"
+        f"/workspaces/{ws}"
+    )
+    print(f"Setting MLflow tracking URI: {tracking_uri}")
+    mlflow.set_tracking_uri(tracking_uri)
+else:
+    print("Warning: Azure ML environment variables not set, using default MLflow tracking")
+
+local_path = mlflow.artifacts.download_artifacts(artifact_uri="${uri}", dst_path="${dst_dir}")
+print(f"Downloaded to: {local_path}")
+MLFLOW_DOWNLOAD
   elif [[ "${uri}" == https://*.blob.core.windows.net/* ]]; then
     echo "Detected Azure Blob Storage URL"
     BLOB_STORAGE_ACCOUNT=$(echo "${uri}" | sed -n 's|https://\([^.]*\)\.blob\.core\.windows\.net/.*|\1|p')
@@ -226,7 +250,7 @@ run_onnx_inference() {
     return 1
   fi
 
-  if run_python "${SCRIPT_DIR}/play_onnx.py" \
+  if run_isaaclab "${SCRIPT_DIR}/play_onnx.py" \
       --task "${TASK}" \
       --onnx-model "${onnx_model}" \
       --num_envs "${NUM_ENVS}" \
@@ -253,7 +277,7 @@ run_jit_inference() {
     return 1
   fi
 
-  if run_python "${SCRIPT_DIR}/play_jit.py" \
+  if run_isaaclab "${SCRIPT_DIR}/play_jit.py" \
       --task "${TASK}" \
       --jit-model "${jit_model}" \
       --num_envs "${NUM_ENVS}" \
