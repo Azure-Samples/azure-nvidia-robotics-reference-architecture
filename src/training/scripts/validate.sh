@@ -22,15 +22,19 @@ fi
 
 export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
 
-if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
-  if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
-    "${python_cmd[@]}" -m ensurepip --upgrade
-  else
-    echo "Error: pip not available and ensurepip failed" >&2
-    exit 1
+# Use uv pip install if uv is available, otherwise fall back to pip
+if command -v uv &> /dev/null; then
+  uv pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+else
+  if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
+    if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
+      "${python_cmd[@]}" -m ensurepip --upgrade
+    else
+      echo "Error: pip not available and ensurepip failed" >&2
+      exit 1
+    fi
   fi
+  "${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
 fi
-
-"${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
 
 exec "${python_cmd[@]}" -m training.scripts.policy_evaluation "$@"

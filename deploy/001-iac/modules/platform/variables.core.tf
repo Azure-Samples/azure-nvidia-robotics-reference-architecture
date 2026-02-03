@@ -31,16 +31,10 @@ variable "resource_group" {
     name     = string
     location = string
   })
-  description = "Resource group object for all resources"
+  description = "Resource group object containing name, id, and location"
 }
 
 variable "resource_prefix" {
   type        = string
   description = "Prefix for all resources in this module"
-}
-
-variable "tags" {
-  type        = map(string)
-  description = "Tags to apply to all resources"
-  default     = {}
 }

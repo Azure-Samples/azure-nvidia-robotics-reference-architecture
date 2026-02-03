@@ -37,7 +37,6 @@ output "key_vault_name" {
 output "aks_cluster" {
   description = "AKS cluster for robotics workloads."
   value       = module.sil.aks_cluster
-  sensitive   = true
 }
 
 output "aks_oidc_issuer_url" {
@@ -62,16 +61,6 @@ output "azureml_workspace" {
 output "ml_workload_identity" {
   description = "ML workload identity for federated credentials."
   value       = module.platform.ml_workload_identity
-}
-
-output "ml_extension" {
-  description = "Azure ML Extension on AKS."
-  value       = module.sil.ml_extension
-}
-
-output "kubernetes_compute" {
-  description = "Kubernetes compute target registered in ML workspace."
-  value       = module.sil.kubernetes_compute
 }
 
 // ============================================================

@@ -25,6 +25,12 @@ variable "should_enable_private_endpoint" {
   default     = true
 }
 
+variable "should_enable_nat_gateway" {
+  type        = bool
+  description = "Whether NAT Gateway is enabled for outbound connectivity. When true, subnets disable default outbound access; when false, subnets use Azure default outbound access"
+  default     = true
+}
+
 /*
  * Cluster Admin Configuration
  */
@@ -53,21 +59,23 @@ variable "aks_subnet_config" {
 
 variable "aks_config" {
   type = object({
-    node_vm_size        = string
-    node_count          = number
-    enable_auto_scaling = bool
-    min_count           = optional(number)
-    max_count           = optional(number)
-    is_private_cluster  = bool
+    system_node_pool_vm_size             = string
+    system_node_pool_node_count          = number
+    system_node_pool_enable_auto_scaling = bool
+    system_node_pool_min_count           = optional(number)
+    system_node_pool_max_count           = optional(number)
+    is_private_cluster                   = bool
+    system_node_pool_zones               = optional(list(string))
   })
   description = "AKS cluster configuration for the system node pool"
   default = {
-    node_vm_size        = "Standard_D8ds_v5"
-    node_count          = 2
-    enable_auto_scaling = false
-    min_count           = null
-    max_count           = null
-    is_private_cluster  = true
+    system_node_pool_vm_size             = "Standard_D8ds_v5"
+    system_node_pool_node_count          = 2
+    system_node_pool_enable_auto_scaling = false
+    system_node_pool_min_count           = null
+    system_node_pool_max_count           = null
+    is_private_cluster                   = true
+    system_node_pool_zones               = null
   }
 }
 
@@ -104,78 +112,6 @@ variable "node_pools" {
 }
 
 /*
- * AzureML Extension Variables
- */
-
-variable "azureml_config" {
-  type = object({
-    // Core integration toggles
-    should_integrate_aks        = bool
-    should_install_extension    = optional(bool, false)
-    should_federate_ml_identity = optional(bool, true)
-
-    // Training and inference settings
-    enable_training                 = optional(bool, true)
-    enable_inference                = optional(bool, true)
-    inference_router_service_type   = optional(string, "LoadBalancer")
-    internal_load_balancer_provider = optional(string, "azure")
-    inference_router_ha             = optional(bool, false)
-    allow_insecure_connections      = optional(bool, true)
-    cluster_purpose                 = optional(string, "DevTest")
-
-    // Component installation toggles
-    // Set to true: Extension installs and manages the component
-    // Set to false: Use existing component already installed on cluster
-    install_nvidia_device_plugin = optional(bool, false)
-    install_dcgm_exporter        = optional(bool, false)
-    install_volcano              = optional(bool, true)
-    install_prom_op              = optional(bool, true)
-
-    // Workload scheduling tolerations
-    workload_tolerations = optional(list(object({
-      key      = optional(string)
-      operator = string
-      value    = optional(string)
-      effect   = optional(string)
-      })), [
-      { key = "nvidia.com/gpu", operator = "Exists", value = null, effect = "NoSchedule" },
-      { key = "kubernetes.azure.com/scalesetpriority", operator = "Equal", value = "spot", effect = "NoSchedule" }
-    ])
-
-    // Instance types for compute target
-    cluster_integration_instance_types = optional(map(object({
-      nodeSelector = optional(map(string))
-      resources = object({
-        limits   = object({ cpu = string, memory = string, gpu = optional(string) })
-        requests = object({ cpu = string, memory = string, gpu = optional(string) })
-      })
-    })))
-  })
-  description = "Azure Machine Learning AKS extension configuration including training, inference, and component settings"
-  default = {
-    should_integrate_aks            = true
-    should_install_extension        = true
-    should_federate_ml_identity     = true
-    enable_training                 = true
-    enable_inference                = true
-    inference_router_service_type   = "LoadBalancer"
-    internal_load_balancer_provider = "azure"
-    inference_router_ha             = false
-    allow_insecure_connections      = true
-    cluster_purpose                 = "DevTest"
-    install_nvidia_device_plugin    = false
-    install_dcgm_exporter           = false
-    install_volcano                 = true
-    install_prom_op                 = true
-    workload_tolerations = [
-      { key = "nvidia.com/gpu", operator = "Exists", value = null, effect = "NoSchedule" },
-      { key = "kubernetes.azure.com/scalesetpriority", operator = "Equal", value = "spot", effect = "NoSchedule" }
-    ]
-    cluster_integration_instance_types = null
-  }
-}
-
-/*
  * OSMO Workload Identity Variables
  */
 
@@ -205,3 +141,8 @@ variable "osmo_config" {
     workflows_namespace      = "osmo-workflows"
   }
 }
+
+/*
+ * Key Vault Variables
+ */
+

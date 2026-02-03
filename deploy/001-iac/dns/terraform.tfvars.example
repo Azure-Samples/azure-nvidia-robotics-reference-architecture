@@ -1,0 +1,20 @@
+// =============================================================================
+// DNS Terraform Variables Example
+// =============================================================================
+// Copy to terraform.tfvars and customize:  cp terraform.tfvars.example terraform.tfvars
+// Full variable reference: variables.tf
+// =============================================================================
+
+// Core Configuration (must match 001-iac deployment)
+environment     = "dev"
+location        = "westus3"
+resource_prefix = "yourprefix"
+instance        = "001"
+
+// OSMO Private DNS Configuration (REQUIRED)
+// Internal LoadBalancer IP for OSMO service (get from: kubectl get svc -n osmo-control-plane)
+osmo_loadbalancer_ip = "10.0.5.100"
+
+// OSMO Private DNS Configuration (Optional)
+// osmo_private_dns_zone_name = "osmo.local"
+// osmo_hostname              = "dev"

@@ -6,11 +6,9 @@ ms.date: 2025-12-14
 ms.topic: reference
 ---
 
-# Workflows
-
 Workflow templates for submitting robotics training and validation jobs to Azure infrastructure.
 
-## Directory Structure
+## 📁 Directory Structure
 
 ```text
 workflows/
@@ -27,17 +25,17 @@ workflows/
     └── train-dataset.yaml   # OSMO training (dataset folder upload)
 ```
 
-## Platform Comparison
+## ⚖️ Platform Comparison
 
-| Feature | AzureML | OSMO |
-|---------|---------|------|
-| Orchestration | Azure ML Job Service | OSMO Workflow Engine |
-| Scheduling | Azure ML Compute | KAI Scheduler / Volcano |
-| Multi-node | Azure ML distributed jobs | OSMO workflow DAGs |
-| Checkpointing | MLflow integration | MLflow + custom handlers |
-| Monitoring | Azure ML Studio | OSMO UI Dashboard |
+| Feature       | AzureML                   | OSMO                     |
+|---------------|---------------------------|--------------------------|
+| Orchestration | Azure ML Job Service      | OSMO Workflow Engine     |
+| Scheduling    | Azure ML Compute          | KAI Scheduler / Volcano  |
+| Multi-node    | Azure ML distributed jobs | OSMO workflow DAGs       |
+| Checkpointing | MLflow integration        | MLflow + custom handlers |
+| Monitoring    | Azure ML Studio           | OSMO UI Dashboard        |
 
-## Quick Start
+## 🚀 Quick Start
 
 ### AzureML Workflows
 
@@ -45,8 +43,8 @@ workflows/
 # Training job
 ./scripts/submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 
-# Validation job
-./scripts/submit-azureml-validation.sh --model-name anymal-c-velocity --model-version 1
+# Validation job (model name derived from task by default)
+./scripts/submit-azureml-validation.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 ```
 
 ### OSMO Workflows
@@ -59,16 +57,16 @@ workflows/
 ./scripts/submit-osmo-dataset-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 ```
 
-## OSMO Dataset Workflow
+## 💾 OSMO Dataset Workflow
 
 The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO dataset instead of base64-encoding it inline.
 
-| Aspect | train.yaml | train-dataset.yaml |
-|--------|------------|--------------------|
+| Aspect         | train.yaml             | train-dataset.yaml    |
+|----------------|------------------------|-----------------------|
 | Payload method | Base64-encoded archive | Dataset folder upload |
-| Size limit | ~1MB | Unlimited |
-| Versioning | None | Automatic |
-| Reusability | Per-run | Across runs |
+| Size limit     | ~1MB                   | Unlimited             |
+| Versioning     | None                   | Automatic             |
+| Reusability    | Per-run                | Across runs           |
 
 ### Dataset Submission
 
@@ -82,6 +80,16 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
   --dataset-name my-training-v1 \
   --task Isaac-Velocity-Rough-Anymal-C-v0
 ```
+
+### Dataset Parameters
+
+| Parameter          | Default         | Description                   |
+|--------------------|-----------------|-------------------------------|
+| `--dataset-bucket` | `training`      | OSMO bucket for training code |
+| `--dataset-name`   | `training-code` | Dataset name (auto-versioned) |
+| `--training-path`  | `src/training`  | Local folder to upload        |
+
+The training folder mounts at `/data/<dataset_name>/training` inside the container.
 
 ### OSMO Inference Workflow
 
@@ -110,23 +118,23 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
     --azure-workspace-name "aml-robotics"
 ```
 
-## Prerequisites
+## 📋 Prerequisites
 
-| Requirement | Setup |
-|-------------|-------|
-| Infrastructure deployed | `deploy/001-iac/` |
-| Setup scripts completed | `deploy/002-setup/` |
-| Azure CLI authenticated | `az login` |
+| Requirement                   | Setup                    |
+|-------------------------------|--------------------------|
+| Infrastructure deployed       | `deploy/001-iac/`        |
+| Setup scripts completed       | `deploy/002-setup/`      |
+| Azure CLI authenticated       | `az login`               |
 | OSMO CLI (for OSMO workflows) | Installed and configured |
 
-## Configuration
+## ⚙️ Configuration
 
 Scripts resolve values in order:
 
-| Precedence | Source | Example |
-|------------|--------|---------|
-| 1 (highest) | CLI arguments | `--azure-resource-group rg-custom` |
-| 2 | Environment variables | `AZURE_RESOURCE_GROUP=rg-custom` |
-| 3 (default) | Terraform outputs | `deploy/001-iac/` |
+| Precedence  | Source                | Example                          |
+|-------------|-----------------------|----------------------------------|
+| 1 (highest) | CLI arguments         | `--resource-group rg-custom`     |
+| 2           | Environment variables | `AZURE_RESOURCE_GROUP=rg-custom` |
+| 3 (default) | Terraform outputs     | `deploy/001-iac/`                |
 
 See individual workflow READMEs for detailed configuration options.

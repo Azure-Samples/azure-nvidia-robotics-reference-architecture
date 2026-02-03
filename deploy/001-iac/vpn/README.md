@@ -1,14 +1,19 @@
 # VPN Gateway
 
-Point-to-Site and Site-to-Site VPN connectivity for secure remote access to private endpoints.
+Point-to-Site and Site-to-Site VPN connectivity for secure remote access to the private AKS cluster and Azure services.
 
-## Prerequisites
+> [!IMPORTANT]
+> **Required for default configuration.** With `should_enable_private_aks_cluster = true` (the default), you must deploy this VPN Gateway and connect before running `kubectl` commands or [002-setup](../../002-setup/) scripts. Without VPN, the private cluster endpoint is not accessible.
+>
+> To skip VPN, set `should_enable_private_aks_cluster = false` in your `terraform.tfvars` for a public AKS control plane.
 
-- Platform infrastructure deployed (`cd ../001-iac && terraform apply`)
+## 📋 Prerequisites
+
+- Platform infrastructure deployed (`cd .. && terraform apply`)
 - Terraform 1.5+ installed
 - Core variables matching parent deployment (`environment`, `resource_prefix`, `location`)
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 cd deploy/001-iac/vpn
@@ -22,16 +27,16 @@ terraform init && terraform apply
 
 Deployment takes 20-30 minutes for the VPN Gateway.
 
-## Configuration
+## ⚙️ Configuration
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `gateway_subnet_address_prefix` | GatewaySubnet CIDR (min /27) | `10.0.3.0/27` |
-| `vpn_gateway_config.sku` | Gateway SKU | `VpnGw1` |
-| `vpn_gateway_config.client_address_pool` | P2S client IP range | `["192.168.200.0/24"]` |
-| `aad_auth_config.enabled` | Enable Azure AD auth | `true` |
+| Variable                                 | Description                  | Default                |
+|------------------------------------------|------------------------------|------------------------|
+| `gateway_subnet_address_prefix`          | GatewaySubnet CIDR (min /27) | `10.0.3.0/27`          |
+| `vpn_gateway_config.sku`                 | Gateway SKU                  | `VpnGw1`               |
+| `vpn_gateway_config.client_address_pool` | P2S client IP range          | `["192.168.200.0/24"]` |
+| `aad_auth_config.enabled`                | Enable Azure AD auth         | `true`                 |
 
-## Authentication Options
+## 🔐 Authentication Options
 
 ### Azure AD (Recommended)
 
@@ -54,14 +59,45 @@ aad_auth_config = {
 root_certificate_public_data = "MIIC5jCCAc6g..." # Base64-encoded cert
 ```
 
-## VPN Client Setup
+## 💻 VPN Client Setup
 
-1. Download the VPN client configuration from Azure Portal
-2. Install Azure VPN Client (Windows/macOS) or OpenVPN
-3. Import the downloaded profile
-4. Connect using Azure AD credentials or certificate
+### Install Azure VPN Client
 
-## Site-to-Site VPN
+| Platform           | Installation                                                                                                                      |
+|--------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Windows            | [Microsoft Store](https://apps.microsoft.com/detail/9NP355QT2SQB)                                                                 |
+| macOS              | [App Store](https://apps.apple.com/us/app/azure-vpn-client/id1553936137)                                                          |
+| Ubuntu 20.04/22.04 | [Microsoft Docs](https://learn.microsoft.com/azure/vpn-gateway/point-to-site-entra-vpn-client-linux#install-the-azure-vpn-client) |
+
+### Download VPN Configuration
+
+1. Open the [Azure Portal](https://portal.azure.com)
+2. Navigate to your Virtual Network Gateway resource:
+   - Search for "Virtual network gateways" in the portal search bar
+   - Select the gateway matching your deployment (e.g., `vgw-<resource_prefix>-<environment>-<instance>`)
+3. Select **Point-to-site configuration** from the left menu
+4. Click **Download VPN client** button
+5. Save and extract the downloaded ZIP file
+
+### Import Configuration
+
+1. Open the Azure VPN Client application
+2. Click the **+** (Import) button in the bottom left
+3. Navigate to the extracted ZIP folder
+4. Open the `AzureVPN` folder
+5. Select `azurevpnconfig_aad.xml` (for Azure AD authentication)
+6. Click **Save**
+
+### Connect
+
+1. Select the imported connection profile
+2. Click **Connect**
+3. Authenticate with your Azure AD credentials when prompted
+4. Verify connection status shows "Connected"
+
+Once connected, you can access private endpoints including OSMO UI, PostgreSQL, and Redis.
+
+## 🏢 Site-to-Site VPN
 
 Connect on-premises networks:
 
@@ -78,7 +114,7 @@ vpn_site_shared_keys = {
 }
 ```
 
-## Related
+## 🔗 Related
 
 - [Parent README](../README.md) - Main infrastructure documentation
 - [dns/README.md](../dns/README.md) - Private DNS for OSMO UI (requires VPN)

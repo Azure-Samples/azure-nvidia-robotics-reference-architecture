@@ -20,7 +20,7 @@ After successfully training an IsaacLab policy using `osmorobo-submit.sh`, the u
 
 When first submitting the validation job, AzureML rejected the job YAML with schema validation errors:
 
-```
+```text
 ValidationError: The value 'string' of input type is not valid for Command job.
 Supported types are ['uri_file', 'uri_folder', 'mlflow_model', 'custom_model', 'mltable', 'triton_model']
 ```
@@ -31,7 +31,7 @@ Supported types are ['uri_file', 'uri_folder', 'mlflow_model', 'custom_model', '
 
 After fixing the input types, a second error occurred:
 
-```
+```text
 ValidationError: Empty string is not allowed for input value
 ```
 
@@ -41,7 +41,7 @@ ValidationError: Empty string is not allowed for input value
 
 After fixing the YAML schema, the job submitted successfully but failed at runtime:
 
-```
+```text
 Error Code: ScriptExecution.StreamAccess.Authentication
 permission denied when access stream
 ```
@@ -190,7 +190,7 @@ kubectl logs -n azureml $POD -c data-capability
 
 **Key Finding**:
 
-```
+```text
 Failed to get symmetric key for getting AML token: 'failed to load certificate:
 stat /tmp/azureml/cr/j/.../sha1-.pfx: no such file or directory'
 ```
@@ -231,16 +231,16 @@ azureml_config = {
 
 ### 2. AzureML Job YAML Schema Fixes
 
-#### [deploy/004-workflow/azureml/jobs/isaaclab-validate.yaml](../deploy/004-workflow/azureml/jobs/isaaclab-validate.yaml)
+#### [workflows/azureml/validate.yaml](../workflows/azureml/validate.yaml)
 
 Fixed input schema to comply with AzureML command job requirements:
 
-| Change | Before | After |
-|--------|--------|-------|
-| Model input type | `type: mlflow_model` | `type: custom_model` |
-| Literal inputs | Had `type: string`, `type: integer` | Removed type declarations (simple key-value) |
-| Empty strings | `task: ""` | `task: auto` (sentinel value) |
-| Mount mode | `mode: ro_mount` | `mode: download` (attempted workaround) |
+| Change           | Before                              | After                                        |
+|------------------|-------------------------------------|----------------------------------------------|
+| Model input type | `type: mlflow_model`                | `type: custom_model`                         |
+| Literal inputs   | Had `type: string`, `type: integer` | Removed type declarations (simple key-value) |
+| Empty strings    | `task: ""`                          | `task: auto` (sentinel value)                |
+| Mount mode       | `mode: ro_mount`                    | `mode: download` (attempted workaround)      |
 
 **Rationale**: AzureML command jobs don't support typed literal inputs like pipeline jobs do.
 
@@ -294,7 +294,7 @@ kubectl label serviceaccount -n azureml default \
 
 **Error Code**: `ScriptExecution.StreamAccess.Authentication`
 
-```
+```text
 permission denied when access stream. Reason: None
 PermissionDenied(None)
 Error Message: Authentication failed when trying to access the stream.
@@ -302,19 +302,19 @@ Error Message: Authentication failed when trying to access the stream.
 
 **Root Cause Analysis**:
 
-| Factor | Status |
-|--------|--------|
-| Storage account `allowSharedKeyAccess` | `false` (security best practice) |
-| ML Identity has `Storage Blob Data Contributor` | ✅ Verified |
-| Federated Identity Credentials exist | ✅ Created |
-| AzureML Extension has `identityType=UserAssigned` | ✅ Configured |
-| Data-capability using workload identity | ❌ **Not working** |
+| Factor                                            | Status                           |
+|---------------------------------------------------|----------------------------------|
+| Storage account `allowSharedKeyAccess`            | `false` (security best practice) |
+| ML Identity has `Storage Blob Data Contributor`   | ✅ Verified                       |
+| Federated Identity Credentials exist              | ✅ Created                        |
+| AzureML Extension has `identityType=UserAssigned` | ✅ Configured                     |
+| Data-capability using workload identity           | ❌ **Not working**                |
 
 The AzureML extension's `data-capability` sidecar container is not properly authenticating to Azure Blob Storage using workload identity federation. Despite all the correct configurations being in place, the token exchange isn't happening.
 
 ### Evidence from Pod Logs
 
-```
+```text
 Failed to get symmetric key for getting AML token: 'failed to load certificate:
 stat /tmp/azureml/cr/j/.../sha1-.pfx: no such file or directory'
 ```
@@ -323,13 +323,13 @@ This suggests the data-capability container is still trying to use certificate-b
 
 ## Jobs Submitted (All Failed)
 
-| Job Name | Status | Error |
-|----------|--------|-------|
-| `sharp_pen_l66lnkmpfy` | Failed | Permission denied (before FIC creation) |
-| `tough_brick_y9qw8npw1m` | Failed | Permission denied (after FIC creation) |
-| `olden_table_61c5q9vx4k` | Failed | Permission denied (after SA annotation) |
-| `frosty_arch_jtzh3fky15` | Failed | Permission denied (after extension update) |
-| `blue_cabbage_qjqy4kv8y9` | Failed | Permission denied (with download mode) |
+| Job Name                  | Status | Error                                      |
+|---------------------------|--------|--------------------------------------------|
+| `sharp_pen_l66lnkmpfy`    | Failed | Permission denied (before FIC creation)    |
+| `tough_brick_y9qw8npw1m`  | Failed | Permission denied (after FIC creation)     |
+| `olden_table_61c5q9vx4k`  | Failed | Permission denied (after SA annotation)    |
+| `frosty_arch_jtzh3fky15`  | Failed | Permission denied (after extension update) |
+| `blue_cabbage_qjqy4kv8y9` | Failed | Permission denied (with download mode)     |
 
 ## Options to Resolve
 
@@ -390,13 +390,13 @@ Submit jobs to AzureML managed compute (e.g., `gpu-cluster`) instead of the atta
 
 ## Files Changed Summary
 
-| File | Change Type |
-|------|-------------|
-| `deploy/001-iac/main.tf` | Added `should_install_extension`, `should_federate_ml_identity` |
-| `deploy/004-workflow/azureml/jobs/isaaclab-validate.yaml` | Fixed input schema, changed mount to download |
+| File                              | Change Type                                                     |
+|-----------------------------------|-----------------------------------------------------------------|
+| `deploy/001-iac/main.tf`          | Added `should_install_extension`, `should_federate_ml_identity` |
+| `workflows/azureml/validate.yaml` | Fixed input schema, changed mount to download                   |
 
 ## Related Resources
 
-- [AzureML Kubernetes Compute Troubleshooting](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-attach-kubernetes-anywhere)
-- [Workload Identity Federation](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview)
-- [Storage Account Shared Key Disabled](https://learn.microsoft.com/en-us/azure/storage/common/shared-key-authorization-prevent)
+- [AzureML Kubernetes Compute Troubleshooting](https://learn.microsoft.com/azure/machine-learning/how-to-attach-kubernetes-anywhere)
+- [Workload Identity Federation](https://learn.microsoft.com/azure/aks/workload-identity-overview)
+- [Storage Account Shared Key Disabled](https://learn.microsoft.com/azure/storage/common/shared-key-authorization-prevent)

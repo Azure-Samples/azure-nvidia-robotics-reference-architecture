@@ -61,8 +61,6 @@ workflow:
               exit 0
             fi
 
-            export PYTHONPATH="${TRAINING_ROOT}:${PYTHONPATH:-}"
-
             MODE="train"
             if [[ "${RUN_AZURE_SMOKE_TEST:-0}" == "1" ]]; then
               MODE="smoke-test"

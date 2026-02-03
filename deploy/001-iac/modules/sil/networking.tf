@@ -16,10 +16,11 @@
 // ============================================================
 
 resource "azurerm_subnet" "aks" {
-  name                 = "snet-aks-${local.resource_name_suffix}"
-  resource_group_name  = var.resource_group.name
-  virtual_network_name = var.virtual_network.name
-  address_prefixes     = [var.aks_subnet_config.subnet_address_prefix_aks]
+  name                            = "snet-aks-${local.resource_name_suffix}"
+  resource_group_name             = var.resource_group.name
+  virtual_network_name            = var.virtual_network.name
+  address_prefixes                = [var.aks_subnet_config.subnet_address_prefix_aks]
+  default_outbound_access_enabled = !var.should_enable_nat_gateway
 }
 
 // ============================================================
@@ -29,10 +30,11 @@ resource "azurerm_subnet" "aks" {
 resource "azurerm_subnet" "gpu_node_pool" {
   for_each = var.node_pools
 
-  name                 = "snet-aks-${each.key}-${local.resource_name_suffix}"
-  resource_group_name  = var.resource_group.name
-  virtual_network_name = var.virtual_network.name
-  address_prefixes     = each.value.subnet_address_prefixes
+  name                            = "snet-aks-${each.key}-${local.resource_name_suffix}"
+  resource_group_name             = var.resource_group.name
+  virtual_network_name            = var.virtual_network.name
+  address_prefixes                = each.value.subnet_address_prefixes
+  default_outbound_access_enabled = !var.should_enable_nat_gateway
 }
 
 // ============================================================
@@ -56,12 +58,14 @@ resource "azurerm_subnet_network_security_group_association" "gpu_node_pool" {
 // ============================================================
 
 resource "azurerm_subnet_nat_gateway_association" "aks" {
+  count = var.should_enable_nat_gateway ? 1 : 0
+
   subnet_id      = azurerm_subnet.aks.id
   nat_gateway_id = var.nat_gateway.id
 }
 
 resource "azurerm_subnet_nat_gateway_association" "gpu_node_pool" {
-  for_each = var.node_pools
+  for_each = var.should_enable_nat_gateway ? var.node_pools : {}
 
   subnet_id      = azurerm_subnet.gpu_node_pool[each.key].id
   nat_gateway_id = var.nat_gateway.id

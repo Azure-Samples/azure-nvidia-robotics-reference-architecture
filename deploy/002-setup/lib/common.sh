@@ -17,6 +17,15 @@ require_tools() {
   [[ ${#missing[@]} -eq 0 ]] || fatal "Missing required tools: ${missing[*]}"
 }
 
+# Ensure Azure CLI extension is installed
+require_az_extension() {
+  local ext="${1:?extension name required}"
+  if ! az extension show --name "$ext" &>/dev/null; then
+    info "Installing Azure CLI extension '$ext'..."
+    az extension add --name "$ext" --yes || fatal "Failed to install Azure CLI extension '$ext'"
+  fi
+}
+
 # Read terraform outputs from state file
 read_terraform_outputs() {
   local tf_dir="${1:?terraform directory required}"
@@ -51,7 +60,48 @@ connect_aks() {
   local rg="${1:?resource group required}" name="${2:?cluster name required}"
   info "Connecting to AKS cluster $name..."
   az aks get-credentials --resource-group "$rg" --name "$name" --overwrite-existing
-  kubectl cluster-info &>/dev/null || fatal "Failed to connect to cluster"
+  verify_cluster_connectivity
+}
+
+# Verify kubectl can reach the cluster API server
+verify_cluster_connectivity() {
+  info "Verifying cluster connectivity..."
+  if ! kubectl cluster-info &>/dev/null; then
+    error "Cannot connect to Kubernetes cluster"
+    echo
+    echo "This typically means the AKS cluster has a private endpoint and your machine"
+    echo "cannot resolve the private DNS name. The error usually looks like:"
+    echo
+    echo "  dial tcp: lookup aks-xxx.privatelink.<region>.azmk8s.io: no such host"
+    echo
+    echo "To resolve this, you need to connect via VPN:"
+    echo
+    echo "  1. Deploy the VPN Gateway (if not already deployed):"
+    echo "     cd ../001-iac/vpn && terraform apply"
+    echo
+    echo "  2. Install Azure VPN Client:"
+    echo "     - Windows: Microsoft Store (search 'Azure VPN Client')"
+    echo "     - macOS:   App Store (search 'Azure VPN Client')"
+    echo "     - Linux:   https://learn.microsoft.com/azure/vpn-gateway/point-to-site-entra-vpn-client-linux"
+    echo
+    echo "  3. Download VPN configuration from Azure Portal:"
+    echo "     - Navigate to your Virtual Network Gateway"
+    echo "     - Select 'Point-to-site configuration'"
+    echo "     - Click 'Download VPN client'"
+    echo
+    echo "  4. Import the configuration in Azure VPN Client and connect"
+    echo
+    echo "  5. Re-run this script after VPN connection is established"
+    echo
+    echo "For detailed instructions, see: ../001-iac/vpn/README.md"
+    echo
+    echo "Alternatively, redeploy infrastructure with:"
+    echo "  should_enable_private_aks_cluster = false"
+    echo "in your terraform.tfvars for a public AKS control plane."
+    echo
+    fatal "Cluster connectivity check failed"
+  fi
+  info "Cluster connectivity verified"
 }
 
 # Ensure Kubernetes namespace exists
@@ -65,29 +115,6 @@ login_acr() {
   local acr="${1:?acr name required}"
   info "Logging into ACR $acr..."
   az acr login --name "$acr"
-}
-
-# Setup NGC Helm repository
-setup_ngc_repo() {
-  local token="${1:?ngc token required}" repo_name="${2:-osmo}"
-  info "Configuring NGC Helm repository..."
-  # shellcheck disable=SC2016
-  helm repo add "$repo_name" "https://helm.ngc.nvidia.com/nvidia/$repo_name" \
-    --username='$oauthtoken' --password="$token" 2>/dev/null || true
-  helm repo update >/dev/null
-}
-
-# Create NGC image pull secret
-create_ngc_secret() {
-  local ns="${1:?namespace required}" token="${2:?token required}" name="${3:-nvcr-secret}"
-  info "Creating NGC pull secret $name in namespace $ns..."
-  # shellcheck disable=SC2016
-  kubectl create secret docker-registry "$name" \
-    --namespace="$ns" \
-    --docker-server=nvcr.io \
-    --docker-username='$oauthtoken' \
-    --docker-password="$token" \
-    --dry-run=client -o yaml | kubectl apply -f -
 }
 
 # Auto-detect ACR name from terraform outputs
@@ -140,4 +167,24 @@ section() {
 # Print key-value pair for summaries
 print_kv() {
   printf '%-18s %s\n' "$1:" "$2"
+}
+
+# Apply SecretProviderClass for Azure Key Vault secrets sync
+# Usage: apply_secret_provider_class <namespace> <keyvault> <client_id> <tenant_id>
+apply_secret_provider_class() {
+  local namespace="${1:?namespace required}"
+  local keyvault="${2:?keyvault name required}"
+  local client_id="${3:?client_id required}"
+  local tenant_id="${4:?tenant_id required}"
+
+  local manifest_dir
+  manifest_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/manifests"
+
+  export NAMESPACE="$namespace"
+  export KEY_VAULT_NAME="$keyvault"
+  export OSMO_CLIENT_ID="$client_id"
+  export TENANT_ID="$tenant_id"
+
+  info "Applying SecretProviderClass to namespace $namespace..."
+  envsubst < "$manifest_dir/aks-secret-provider-class.yaml" | kubectl apply -f -
 }

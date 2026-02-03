@@ -27,6 +27,12 @@ variable "gateway_subnet_address_prefix" {
   }
 }
 
+variable "should_enable_nat_gateway" {
+  type        = bool
+  description = "Whether NAT Gateway is enabled for outbound connectivity. When true, disables default outbound access for GatewaySubnet"
+  default     = true
+}
+
 /*
  * VPN Gateway Configuration - Optional
  */

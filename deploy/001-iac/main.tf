@@ -29,6 +29,7 @@ resource "azurerm_resource_group" "this" {
   count    = var.should_create_resource_group ? 1 : 0
   name     = local.resource_group_name
   location = var.location
+  tags     = var.tags
 }
 
 // Defer resource group data source to support build systems without plan-time permissions
@@ -71,13 +72,13 @@ module "platform" {
   resource_prefix = var.resource_prefix
   location        = var.location
   instance        = var.instance
-  tags            = {}
   resource_group  = local.resource_group
 
   // Current user OID for role assignments (from Microsoft Graph)
   current_user_oid = local.current_user_oid
 
   // Networking configuration
+  should_enable_nat_gateway = var.should_enable_nat_gateway
   virtual_network_config = {
     address_space                  = var.virtual_network_config.address_space
     subnet_address_prefix_main     = var.virtual_network_config.subnet_address_prefix
@@ -96,15 +97,19 @@ module "platform" {
   should_deploy_postgresql = var.should_deploy_postgresql
   should_deploy_redis      = var.should_deploy_redis
   postgresql_config = {
-    sku_name        = var.postgresql_sku_name
-    storage_mb      = var.postgresql_storage_mb
-    version         = var.postgresql_version
-    subnet_prefixes = var.postgresql_subnet_address_prefixes
-    databases       = var.postgresql_databases
+    sku_name                  = var.postgresql_sku_name
+    storage_mb                = var.postgresql_storage_mb
+    version                   = var.postgresql_version
+    subnet_prefixes           = var.postgresql_subnet_address_prefixes
+    databases                 = var.postgresql_databases
+    zone                      = var.postgresql_zone
+    high_availability_enabled = var.postgresql_high_availability.enabled
+    standby_availability_zone = var.postgresql_high_availability.standby_availability_zone
   }
   redis_config = {
-    sku_name          = var.redis_sku_name
-    clustering_policy = var.redis_clustering_policy
+    sku_name                  = var.redis_sku_name
+    clustering_policy         = var.redis_clustering_policy
+    high_availability_enabled = var.redis_high_availability_enabled
   }
 
   // OSMO workload identity
@@ -123,26 +128,23 @@ module "sil" {
   // Core variables
   environment     = var.environment
   resource_prefix = var.resource_prefix
-  location        = var.location
   instance        = var.instance
-  tags            = {}
   resource_group  = local.resource_group
 
   // Current user OID for cluster admin role assignments (from Microsoft Graph)
   current_user_oid = local.current_user_oid
 
   // Dependencies from platform module (passed as typed objects)
-  virtual_network          = module.platform.virtual_network
-  subnets                  = module.platform.subnets
-  network_security_group   = module.platform.network_security_group
-  nat_gateway              = module.platform.nat_gateway
-  log_analytics_workspace  = module.platform.log_analytics_workspace
-  monitor_workspace        = module.platform.monitor_workspace
-  data_collection_endpoint = module.platform.data_collection_endpoint
-  container_registry       = module.platform.container_registry
-  azureml_workspace        = module.platform.azureml_workspace
-  ml_workload_identity     = module.platform.ml_workload_identity
-  private_dns_zones        = module.platform.private_dns_zones
+  virtual_network           = module.platform.virtual_network
+  subnets                   = module.platform.subnets
+  network_security_group    = module.platform.network_security_group
+  nat_gateway               = module.platform.nat_gateway
+  should_enable_nat_gateway = var.should_enable_nat_gateway
+  log_analytics_workspace   = module.platform.log_analytics_workspace
+  monitor_workspace         = module.platform.monitor_workspace
+  data_collection_endpoint  = module.platform.data_collection_endpoint
+  container_registry        = module.platform.container_registry
+  private_dns_zones         = module.platform.private_dns_zones
 
   // AKS subnet configuration - uses module defaults when null
   aks_subnet_config = {
@@ -150,29 +152,18 @@ module "sil" {
     subnet_address_prefix_aks_pod = try(var.subnet_address_prefixes_aks_pod[0], null)
   }
 
-  // AKS configuration
+  // AKS system node pool configuration
   aks_config = {
-    node_vm_size        = var.node_vm_size
-    node_count          = var.node_count
-    enable_auto_scaling = var.enable_auto_scaling
-    min_count           = var.min_count
-    max_count           = var.max_count
-    is_private_cluster  = var.should_enable_private_endpoint
+    system_node_pool_vm_size             = var.system_node_pool_vm_size
+    system_node_pool_node_count          = var.system_node_pool_node_count
+    system_node_pool_enable_auto_scaling = var.system_node_pool_enable_auto_scaling
+    system_node_pool_min_count           = var.system_node_pool_min_count
+    system_node_pool_max_count           = var.system_node_pool_max_count
+    is_private_cluster                   = var.should_enable_private_aks_cluster
+    system_node_pool_zones               = var.system_node_pool_zones
   }
 
   node_pools = var.node_pools
-
-  // AzureML extension configuration
-  azureml_config = {
-    should_integrate_aks               = var.should_integrate_aks_cluster
-    should_install_extension           = var.should_integrate_aks_cluster
-    should_federate_ml_identity        = var.should_integrate_aks_cluster
-    aks_cluster_purpose                = var.aks_cluster_purpose
-    inference_router_service_type      = var.inference_router_service_type
-    internal_load_balancer_provider    = "azure"
-    workload_tolerations               = var.workload_tolerations
-    cluster_integration_instance_types = var.cluster_integration_instance_types
-  }
 
   // OSMO workload identity
   osmo_workload_identity = module.platform.osmo_workload_identity

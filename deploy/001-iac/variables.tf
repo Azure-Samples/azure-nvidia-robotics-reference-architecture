@@ -34,6 +34,12 @@ variable "instance" {
   default     = "001"
 }
 
+variable "tags" {
+  type        = map(string)
+  description = "Tags to apply to all resources"
+  default     = {}
+}
+
 /*
  * Infrastructure Creation Flags - Optional
  */
@@ -88,7 +94,7 @@ variable "postgresql_databases" {
 
 variable "postgresql_subnet_address_prefixes" {
   type        = list(string)
-  description = "Address prefixes for the PostgreSQL delegated subnet."
+  description = "Address prefixes for the PostgreSQL delegated subnet"
   default     = ["10.0.12.0/24"]
 }
 
@@ -108,6 +114,24 @@ variable "postgresql_version" {
   type        = string
   description = "PostgreSQL server version"
   default     = "16"
+}
+
+variable "postgresql_zone" {
+  type        = string
+  description = "Primary availability zone for PostgreSQL. Set to null for Azure auto-selection"
+  default     = null
+}
+
+variable "postgresql_high_availability" {
+  type = object({
+    enabled                   = bool
+    standby_availability_zone = optional(string)
+  })
+  description = "PostgreSQL high availability configuration. Set enabled=false to deploy without HA"
+  default = {
+    enabled                   = false
+    standby_availability_zone = null
+  }
 }
 
 /*
@@ -135,6 +159,12 @@ variable "redis_clustering_policy" {
     condition     = contains(["OSSCluster", "EnterpriseCluster"], var.redis_clustering_policy)
     error_message = "Clustering policy must be either OSSCluster or EnterpriseCluster."
   }
+}
+
+variable "redis_high_availability_enabled" {
+  type        = bool
+  description = "Enable high availability for Redis. Increases cost but provides zone redundancy"
+  default     = false
 }
 
 /*
@@ -173,6 +203,12 @@ variable "resource_group_name" {
  * Networking Configuration - Optional
  */
 
+variable "should_enable_nat_gateway" {
+  type        = bool
+  description = "Whether to deploy NAT Gateway for explicit outbound connectivity. When true, subnets use NAT Gateway; when false, subnets use Azure default outbound access"
+  default     = true
+}
+
 variable "virtual_network_config" {
   type = object({
     address_space                  = string
@@ -206,36 +242,42 @@ variable "subnet_address_prefixes_aks_pod" {
 }
 
 /*
- * AKS Cluster Configuration - Optional
+ * AKS System Node Pool Configuration - Optional
  */
 
-variable "node_vm_size" {
+variable "system_node_pool_vm_size" {
   type        = string
-  description = "VM size for the agent pool in the AKS cluster. Default is Standard_D8ds_v5"
+  description = "VM size for the AKS system node pool"
   default     = "Standard_D8ds_v5"
 }
 
-variable "node_count" {
+variable "system_node_pool_node_count" {
   type        = number
-  description = "Number of nodes for the agent pool in the AKS cluster"
+  description = "Number of nodes for the AKS system node pool"
   default     = 1
 }
 
-variable "enable_auto_scaling" {
+variable "system_node_pool_enable_auto_scaling" {
   type        = bool
-  description = "Should enable auto-scaler for the default node pool"
+  description = "Enable auto-scaling for the AKS system node pool"
   default     = false
 }
 
-variable "min_count" {
+variable "system_node_pool_min_count" {
   type        = number
-  description = "The minimum number of nodes which should exist in the default node pool. Valid values are between 0 and 1000"
+  description = "Minimum node count for AKS system node pool when auto-scaling is enabled (0-1000)"
   default     = null
 }
 
-variable "max_count" {
+variable "system_node_pool_max_count" {
   type        = number
-  description = "The maximum number of nodes which should exist in the default node pool. Valid values are between 0 and 1000"
+  description = "Maximum node count for AKS system node pool when auto-scaling is enabled (0-1000)"
+  default     = null
+}
+
+variable "system_node_pool_zones" {
+  type        = list(string)
+  description = "Availability zones for AKS system node pool. Set to null or empty for regional deployment (no zone constraint)"
   default     = null
 }
 
@@ -275,82 +317,18 @@ variable "node_pools" {
 }
 
 /*
- * AKS Integration Configuration - Optional
- */
-
-variable "should_integrate_aks_cluster" {
-  type        = bool
-  description = "Whether to integrate an AKS cluster as a compute target with the workspace"
-  default     = true
-}
-
-variable "aks_cluster_purpose" {
-  type        = string
-  description = "Purpose of AKS cluster: DevTest, DenseProd, or FastProd"
-  default     = "DevTest"
-  validation {
-    condition     = contains(["DevTest", "DenseProd", "FastProd"], var.aks_cluster_purpose)
-    error_message = "aks_cluster_purpose must be one of: DevTest, DenseProd, or FastProd."
-  }
-}
-
-variable "workload_tolerations" {
-  type = list(object({
-    key      = string
-    operator = string
-    value    = optional(string)
-    effect   = string
-  }))
-  description = "Tolerations for AzureML workloads (training/inference) to schedule on nodes with taints"
-  default = [
-    {
-      key      = "nvidia.com/gpu"
-      operator = "Exists"
-      effect   = "NoSchedule"
-    },
-    {
-      key      = "kubernetes.azure.com/scalesetpriority"
-      operator = "Equal"
-      value    = "spot"
-      effect   = "NoSchedule"
-    }
-  ]
-}
-
-variable "cluster_integration_instance_types" {
-  type = map(object({
-    nodeSelector = optional(map(string))
-    resources = optional(object({
-      requests = optional(map(any))
-      limits   = optional(map(any))
-    }))
-  }))
-  description = "Instance types configuration for Kubernetes compute. Key is the instance type name, value contains nodeSelector and resource specifications"
-  default = {
-    gpuinstancetype = {
-      nodeSelector = null
-      resources = {
-        limits = {
-          cpu              = "8"
-          memory           = "32Gi"
-          "nvidia.com/gpu" = 1
-        }
-        requests = {
-          cpu    = "1"
-          memory = "1Gi"
-        }
-      }
-    }
-  }
-}
-
-/*
  * Private Endpoints Configuration - Optional
  */
 
 variable "should_enable_private_endpoint" {
   type        = bool
   description = "Whether to enable private endpoints across resources for secure connectivity"
+  default     = true
+}
+
+variable "should_enable_private_aks_cluster" {
+  type        = bool
+  description = "Whether the AKS cluster API endpoint is private. When true, requires VPN for kubectl access. Can be set independently from should_enable_private_endpoint to allow private Azure services with a public AKS control plane."
   default     = true
 }
 
@@ -362,18 +340,4 @@ variable "should_enable_public_network_access" {
   type        = bool
   description = "Whether to enable public network access to the Azure ML workspace"
   default     = true
-}
-
-/*
- * Inference Router Configuration - Optional
- */
-
-variable "inference_router_service_type" {
-  type        = string
-  description = "Service type for inference router: LoadBalancer, NodePort, or ClusterIP"
-  default     = "NodePort"
-  validation {
-    condition     = contains(["LoadBalancer", "NodePort", "ClusterIP"], var.inference_router_service_type)
-    error_message = "inference_router_service_type must be one of: LoadBalancer, NodePort, or ClusterIP."
-  }
 }

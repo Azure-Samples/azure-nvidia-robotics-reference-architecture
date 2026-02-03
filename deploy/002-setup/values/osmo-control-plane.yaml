@@ -2,7 +2,6 @@
 global:
   osmoImageLocation: nvcr.io/nvidia/osmo
   osmoImageTag: 6.0.0
-  imagePullSecret: nvcr-secret
   serviceAccountName: osmo-control-plane
 
   logs:

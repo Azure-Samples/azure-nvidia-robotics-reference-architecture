@@ -39,10 +39,11 @@ locals {
 // ============================================================
 
 resource "azurerm_subnet" "gateway" {
-  name                 = "GatewaySubnet"
-  resource_group_name  = var.resource_group.name
-  virtual_network_name = var.virtual_network.name
-  address_prefixes     = [var.gateway_subnet_address_prefix]
+  name                            = "GatewaySubnet"
+  resource_group_name             = var.resource_group.name
+  virtual_network_name            = var.virtual_network.name
+  address_prefixes                = [var.gateway_subnet_address_prefix]
+  default_outbound_access_enabled = !var.should_enable_nat_gateway
 }
 
 // ============================================================

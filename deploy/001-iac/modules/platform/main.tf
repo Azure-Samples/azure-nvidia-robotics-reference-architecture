@@ -35,9 +35,4 @@ locals {
     monitor_ods       = "privatelink.ods.opinsights.azure.com"
     monitor_agent     = "privatelink.agentsvc.azure-automation.net"
   }
-
-  tags = merge(var.tags, {
-    module      = "platform"
-    environment = var.environment
-  })
 }

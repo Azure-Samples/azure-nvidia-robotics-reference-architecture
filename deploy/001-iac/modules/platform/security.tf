@@ -22,7 +22,6 @@ resource "azurerm_key_vault" "main" {
   soft_delete_retention_days    = 7
   purge_protection_enabled      = var.should_enable_purge_protection
   public_network_access_enabled = var.should_enable_public_network_access
-  tags                          = local.tags
 
   network_acls {
     bypass = "AzureServices"
@@ -39,7 +38,6 @@ resource "azurerm_user_assigned_identity" "ml" {
   name                = "id-ml-${local.resource_name_suffix}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 // ============================================================
@@ -51,7 +49,6 @@ resource "azurerm_user_assigned_identity" "osmo" {
   name                = "id-osmo-${local.resource_name_suffix}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  tags                = local.tags
 }
 
 // ============================================================
@@ -65,7 +62,6 @@ resource "azurerm_private_endpoint" "key_vault" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = azurerm_subnet.private_endpoints[0].id
-  tags                = local.tags
 
   private_service_connection {
     name                           = "psc-kv-${local.resource_name_suffix}"
