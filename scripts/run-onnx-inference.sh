@@ -5,10 +5,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
 
 # Default paths
-ONNX_MODEL="${ONNX_MODEL:-logs/rsl_rl/ant/2025-11-19_21-47-59/exported/policy.onnx}"
+ONNX_MODEL="${ONNX_MODEL:-logs/rsl_rl/ant/exported/policy.onnx}"
 TASK="${TASK:-Isaac-Ant-v0}"
 NUM_ENVS="${NUM_ENVS:-16}"
 MAX_STEPS="${MAX_STEPS:-500}"
@@ -60,13 +61,14 @@ echo "=============================================="
 if [[ ! -f "$ONNX_MODEL" ]]; then
     echo "ERROR: ONNX model not found at: $ONNX_MODEL"
     echo "Run the export script first:"
-    echo "  .venv/bin/python deploy/export_policy.py --checkpoint logs/rsl_rl/ant/2025-11-19_21-47-59/model_2250.pt"
+    echo "  .venv/bin/python src/inference/scripts/export_policy.py --checkpoint logs/rsl_rl/ant/YYYY-MM-DD_HH-MM-SS/model_XXXX.pt"
     exit 1
 fi
 
 # Run with Isaac Sim Python
-~/.local/share/ov/pkg/isaac-sim-4.5.0/python.sh \
-    src/training/scripts/rsl_rl/play_onnx.py \
+ISAAC_SIM_PYTHON="${ISAAC_SIM_PYTHON:-$HOME/.local/share/ov/pkg/isaac-sim-4.5.0/python.sh}"
+"$ISAAC_SIM_PYTHON" \
+    src/inference/scripts/play_onnx.py \
     --task "$TASK" \
     --num_envs "$NUM_ENVS" \
     --onnx-model "$ONNX_MODEL" \

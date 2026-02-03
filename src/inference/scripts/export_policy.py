@@ -9,6 +9,7 @@ Auto-detects observation and action dimensions from checkpoint weights.
 import argparse
 import copy
 import os
+import sys
 from dataclasses import dataclass
 
 import torch
@@ -29,8 +30,8 @@ class PolicyArchitecture:
         return f"MLP({' -> '.join(map(str, layers))})"
 
 
-class _TorchPolicyExporter(nn.Module):
-    """Wraps actor network with normalizer for JIT export."""
+class _BasePolicyExporter(nn.Module):
+    """Base class wrapping actor network with normalizer for export."""
 
     def __init__(self, actor: nn.Module, normalizer: nn.Module | None = None):
         super().__init__()
@@ -39,6 +40,10 @@ class _TorchPolicyExporter(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.actor(self.normalizer(x))
+
+
+class _TorchPolicyExporter(_BasePolicyExporter):
+    """Exports actor network to JIT (TorchScript) format."""
 
     def export(self, path: str, filename: str = "policy.pt") -> str:
         os.makedirs(path, exist_ok=True)
@@ -50,18 +55,10 @@ class _TorchPolicyExporter(nn.Module):
         return filepath
 
 
-class _OnnxPolicyExporter(nn.Module):
-    """Wraps actor network with normalizer for ONNX export."""
+class _OnnxPolicyExporter(_BasePolicyExporter):
+    """Exports actor network to ONNX format."""
 
-    def __init__(self, actor: nn.Module, normalizer: nn.Module | None = None):
-        super().__init__()
-        self.actor = copy.deepcopy(actor)
-        self.normalizer = copy.deepcopy(normalizer) if normalizer else nn.Identity()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.actor(self.normalizer(x))
-
-    def export(self, path: str, filename: str = "policy.onnx", obs_dim: int = 60) -> str:
+    def export(self, path: str, obs_dim: int, filename: str = "policy.onnx") -> str:
         os.makedirs(path, exist_ok=True)
         filepath = os.path.join(path, filename)
         self.to("cpu")
@@ -303,7 +300,7 @@ if __name__ == "__main__":
         print(f"  Observation dim: {arch.obs_dim}")
         print(f"  Action dim: {arch.action_dim}")
         print(f"  Hidden dims: {arch.hidden_dims}")
-        exit(0)
+        sys.exit()
 
     output_dir = args.output_dir or os.path.join(os.path.dirname(args.checkpoint), "exported")
 

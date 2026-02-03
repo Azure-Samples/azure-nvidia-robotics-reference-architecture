@@ -169,8 +169,8 @@ if [[ ! -d "$REPO_ROOT/src/training" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$REPO_ROOT/deploy/export_policy.py" ]]; then
-  echo "Export script deploy/export_policy.py not found under $REPO_ROOT" >&2
+if [[ ! -f "$REPO_ROOT/src/inference/scripts/export_policy.py" ]]; then
+  echo "Export script src/inference/scripts/export_policy.py not found under $REPO_ROOT" >&2
   exit 1
 fi
 
@@ -178,7 +178,7 @@ mkdir -p "$TMP_DIR"
 rm -f "$ARCHIVE_PATH" "$B64_PATH"
 
 pushd "$REPO_ROOT" >/dev/null
-if ! zip -qr "$ARCHIVE_PATH" src/training deploy/export_policy.py; then
+if ! zip -qr "$ARCHIVE_PATH" src/training src/inference src/common; then
   echo "Failed to create inference archive" >&2
   popd >/dev/null
   exit 1

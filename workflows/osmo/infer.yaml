@@ -50,18 +50,18 @@ workflow:
 
             ARCHIVE_PATH="${TEMP_ARCHIVE:-/tmp/isaac_payload.zip}"
             export PAYLOAD_ROOT="${PAYLOAD_ROOT:-/workspace/isaac_payload}"
-            # TRAINING_ROOT should be the parent of the 'training' package so Python can import 'training.utils'
-            export TRAINING_ROOT="${TRAINING_ROOT:-${PAYLOAD_ROOT}/src}"
-            export DEPLOY_ROOT="${DEPLOY_ROOT:-${PAYLOAD_ROOT}/deploy}"
+            # SRC_ROOT contains training, inference, and common modules
+            export SRC_ROOT="${SRC_ROOT:-${PAYLOAD_ROOT}/src}"
+            export INFERENCE_ROOT="${INFERENCE_ROOT:-${SRC_ROOT}/inference}"
 
             mkdir -p "${PAYLOAD_ROOT}"
             printf '%s' "${ENCODED_ARCHIVE}" | base64 -d > "${ARCHIVE_PATH}"
             unzip -oq "${ARCHIVE_PATH}" -d "${PAYLOAD_ROOT}"
 
-            export PYTHONPATH="${TRAINING_ROOT}:${PYTHONPATH:-}"
+            export PYTHONPATH="${SRC_ROOT}:${PYTHONPATH:-}"
 
             PYTHON_CMD="${PYTHON:-python}"
-            ${PYTHON_CMD} -m pip install --no-cache-dir -r "${TRAINING_ROOT}/training/requirements.txt"
+            ${PYTHON_CMD} -m pip install --no-cache-dir -r "${SRC_ROOT}/training/requirements.txt"
             # onnxruntime required for ONNX inference but not in base image
             ${PYTHON_CMD} -m pip install --no-cache-dir onnxruntime-gpu || ${PYTHON_CMD} -m pip install --no-cache-dir onnxruntime
 
@@ -145,7 +145,7 @@ workflow:
 
             EXPORT_DIR="${CHECKPOINT_DIR}/exported"
             echo "Exporting policy to ${EXPORT_DIR}..."
-            ${PYTHON_CMD} "${DEPLOY_ROOT}/export_policy.py" \
+            ${PYTHON_CMD} "${INFERENCE_ROOT}/scripts/export_policy.py" \
                 --checkpoint "${CHECKPOINT_FILE}" \
                 --output-dir "${EXPORT_DIR}"
 
@@ -160,7 +160,7 @@ workflow:
 
             if [[ "${INFERENCE_FORMAT}" == "onnx" ]] || [[ "${INFERENCE_FORMAT}" == "both" ]]; then
               echo "Running ONNX inference..."
-              if ${PYTHON_CMD} "${TRAINING_ROOT}/training/scripts/rsl_rl/play_onnx.py" \
+              if ${PYTHON_CMD} "${INFERENCE_ROOT}/scripts/play_onnx.py" \
                   --task "${TASK}" \
                   --onnx-model "${EXPORT_DIR}/policy.onnx" \
                   --num_envs "${NUM_ENVS:-4}" \
@@ -177,7 +177,7 @@ workflow:
 
             if [[ "${INFERENCE_FORMAT}" == "jit" ]] || [[ "${INFERENCE_FORMAT}" == "both" ]]; then
               echo "Running JIT inference..."
-              if ${PYTHON_CMD} "${TRAINING_ROOT}/training/scripts/rsl_rl/play_jit.py" \
+              if ${PYTHON_CMD} "${INFERENCE_ROOT}/scripts/play_jit.py" \
                   --task "${TASK}" \
                   --jit-model "${EXPORT_DIR}/policy.pt" \
                   --num_envs "${NUM_ENVS:-4}" \
@@ -200,7 +200,7 @@ workflow:
             export CHECKPOINT_URI
             export ONNX_SUCCESS
             export JIT_SUCCESS
-            echo "[DEBUG] TRAINING_ROOT=${TRAINING_ROOT}"
+            echo "[DEBUG] SRC_ROOT=${SRC_ROOT}"
             echo "[DEBUG] PYTHONPATH=${PYTHONPATH}"
             echo "[DEBUG] AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-<not set>}"
             echo "[DEBUG] AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP:-<not set>}"
@@ -215,13 +215,13 @@ workflow:
             from urllib.parse import urlparse
 
             # Ensure training module is importable - must happen before any training imports
-            training_root = os.environ.get("TRAINING_ROOT", "")
-            print(f"[DEBUG] Python TRAINING_ROOT={training_root}")
+            src_root = os.environ.get("SRC_ROOT", "")
+            print(f"[DEBUG] Python SRC_ROOT={src_root}")
             print(f"[DEBUG] Python sys.path before: {sys.path[:3]}...")
-            if training_root:
+            if src_root:
                 # Insert at position 0 to ensure it takes precedence
-                if training_root not in sys.path:
-                    sys.path.insert(0, training_root)
+                if src_root not in sys.path:
+                    sys.path.insert(0, src_root)
                 print(f"[DEBUG] Python sys.path after: {sys.path[:3]}...")
 
             task = os.environ.get("TASK", "unknown")
