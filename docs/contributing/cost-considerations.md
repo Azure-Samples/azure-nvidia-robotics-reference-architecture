@@ -104,7 +104,7 @@ az consumption budget create \
 
 ## Regional Pricing
 
-GPU VM costs vary by region. Use [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) to estimate costs for your target region.
+GPU VM costs vary by region. Use [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) to estimate costs for your target region.
 
 | Region      | Standard_NC24ads_A100_v4 Hourly Cost |
 |-------------|--------------------------------------|

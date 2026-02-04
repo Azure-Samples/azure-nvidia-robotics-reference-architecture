@@ -206,14 +206,14 @@ For more information, see the [Code of Conduct FAQ](https://opensource.microsoft
 
 Search existing resources before asking questions:
 
-* **Issues:** Search [GitHub Issues](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/issues) for similar questions or problems
-* **Discussions:** Check [GitHub Discussions](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/discussions) for community Q&A
+* **Issues:** Search [GitHub Issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) for similar questions or problems
+* **Discussions:** Check [GitHub Discussions](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/discussions) for community Q&A
 * **Documentation:** Review [docs/](../docs/) for troubleshooting guides
 * **Troubleshooting:** See [azureml-validation-job-debugging.md](../docs/azureml-validation-job-debugging.md) for common deployment and workflow issues
 
 If you cannot find an answer:
 
-1. Open a [new discussion](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/discussions/new) in the Q&A category
+1. Open a [new discussion](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/discussions/new) in the Q&A category
 2. Provide context: What you are trying to accomplish, what you have tried, error messages or unexpected behavior
 3. Include relevant details: Azure region, Terraform version, deployment step, error logs
 
@@ -235,7 +235,7 @@ Visit <https://cla.opensource.microsoft.com> to sign the CLA electronically. Whe
 
 Before creating a bug report:
 
-* Search [existing issues](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/issues) for similar deployment errors or problems
+* Search [existing issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) for similar deployment errors or problems
 * Verify you are using tested versions: Terraform >= 1.9.8, Azure CLI >= 2.65.0
 * Check Azure resource quotas and limits: `az vm list-usage --location <region>`
 * Confirm network mode (private/hybrid/public) matches documented requirements
@@ -243,7 +243,7 @@ Before creating a bug report:
 
 #### How to Submit a Bug Report
 
-Create a [new issue](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/issues/new) with:
+Create a [new issue](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new) with:
 
 * **Title format:** `[Component][Subcomponent] Brief description`
   * Examples: `[Terraform][Platform Module] Private endpoint creation fails`, `[AzureML Extension] GPU pod scheduling timeout`
@@ -338,14 +338,14 @@ Deployment script creates VNet and subnet but appears to skip role assignment fo
 Before suggesting an enhancement:
 
 * Determine if the enhancement is broadly applicable (blueprint improvement) or organization-specific (belongs in a fork)
-* Search [existing issues](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/issues) and [pull requests](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/pulls) for similar proposals
+* Search [existing issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) and [pull requests](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/pulls) for similar proposals
 * Consider cost implications if adding new Azure services or increasing resource scale
 * Verify compatibility with all three network modes (private/hybrid/public) or document known limitations
 * Check if enhancement aligns with reference architecture goals (generalized deployment patterns vs. specific use cases)
 
 #### How to Submit an Enhancement
 
-Create a [new issue](https://github.com/microsoft/azure-nvidia-robotics-reference-architecture/issues/new) with:
+Create a [new issue](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new) with:
 
 * **Clear title** describing the enhancement
 * **Problem statement:** What limitation or gap does this enhancement address?
@@ -762,6 +762,6 @@ For the complete security checklist, dependency update process, and scanning req
 
 ## 📚 Attribution
 
-This contributing guide is based on [microsoft/robotics-ai's CONTRIBUTING.md](https://github.com/microsoft/robotics-ai/blob/main/CONTRIBUTING.md), adapted for reference architecture contributions and Azure + NVIDIA robotics infrastructure.
+This contributing guide is adapted for reference architecture contributions and Azure + NVIDIA robotics infrastructure.
 
 Copyright (c) Microsoft Corporation. Licensed under the MIT License.

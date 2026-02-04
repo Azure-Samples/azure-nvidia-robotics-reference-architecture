@@ -32,5 +32,5 @@ This directory contains detailed guidance for specific contribution workflows. S
 ## Related Documentation
 
 - [Main CONTRIBUTING.md](../../.github/CONTRIBUTING.md) - Prerequisites, workflow, commit messages
-- [Code of Conduct](../../CODE_OF_CONDUCT.md)
+- [Code of Conduct](../../.github/CODE_OF_CONDUCT.md)
 - [Security Policy](../../SECURITY.md)
