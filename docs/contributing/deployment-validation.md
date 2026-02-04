@@ -29,8 +29,7 @@ shellcheck deploy/**/*.sh scripts/**/*.sh
 
 # Documentation validation
 npm install
-npm run validate:frontmatter
-npm run lint:markdown
+npm run lint:md
 ```
 
 **When to use:** Every contribution (documentation, code, infrastructure).
@@ -133,7 +132,7 @@ Copy this template to PR description:
 - [ ] terraform fmt -check
 - [ ] terraform validate
 - [ ] shellcheck (if applicable)
-- [ ] npm run lint:markdown (if docs changed)
+- [ ] npm run lint:md (if docs changed)
 
 **Plan Validation (Terraform changes):**
 - [ ] terraform plan executed

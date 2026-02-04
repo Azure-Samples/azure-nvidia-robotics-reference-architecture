@@ -192,11 +192,8 @@ shellcheck deploy/**/*.sh scripts/**/*.sh
 # Install dependencies (first time only)
 npm install
 
-# Validate YAML frontmatter (required for documentation changes)
-npm run validate:frontmatter
-
 # Lint markdown (required for documentation changes)
-npm run lint:markdown
+npm run lint:md
 ```
 
 ## 📜 Code of Conduct
@@ -379,7 +376,7 @@ This reference architecture validates through deployment rather than automated t
 
 | Contribution Type           | Expected Validation                                                                 |
 | --------------------------- | ----------------------------------------------------------------------------------- |
-| Documentation               | Read-through, link check (`npm run lint:markdown`)                                  |
+| Documentation               | Read-through, link check (`npm run lint:md`)                                        |
 | Shell scripts               | ShellCheck validation, test in local/minimal environment                            |
 | Terraform modules           | `terraform fmt`, `terraform validate`, `terraform plan` output attached to PR       |
 | Full infrastructure changes | Deployment testing in dev subscription with cost estimate and teardown confirmation |
@@ -415,8 +412,7 @@ Documentation contributions improve the architecture for the entire robotics and
 
 Before submitting documentation changes:
 
-* Run `npm run validate:frontmatter` to verify YAML front matter schema
-* Run `npm run lint:markdown` to check formatting and style
+* Run `npm run lint:md` to check formatting and style
 * Verify internal links with `npm run lint:links` (if available)
 * Test code samples in deployment environment
 * Review against [docs-style-and-conventions.instructions.md](instructions/docs-style-and-conventions.instructions.md)
@@ -530,11 +526,8 @@ keywords:
 **Validation:**
 
 ```bash
-# Validate frontmatter schema
-npm run validate:frontmatter
-
 # Lint markdown formatting
-npm run lint:markdown
+npm run lint:md
 
 # Check internal links
 npm run lint:links
@@ -590,7 +583,7 @@ This reference architecture validates through deployment rather than automated t
 terraform fmt -check -recursive deploy/
 terraform validate deploy/001-iac/
 shellcheck deploy/**/*.sh scripts/**/*.sh
-npm run lint:markdown
+npm run lint:md
 ```
 
 For complete validation procedures, testing templates, and cost optimization strategies, see [Deployment Validation Guide](../docs/contributing/deployment-validation.md).
