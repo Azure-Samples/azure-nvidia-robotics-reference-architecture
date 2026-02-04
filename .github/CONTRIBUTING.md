@@ -43,7 +43,7 @@ Contributions can include:
   * [Improving The Documentation](#improving-the-documentation)
 * [Commit Messages](#-commit-messages)
 * [Markdown Style](#-markdown-style)
-* [Infrastructure as Code Style](#️-infrastructure-as-code-style)
+* [Infrastructure as Code Style](#-infrastructure-as-code-style)
 * [Deployment Validation](#-deployment-validation)
 * [Pull Request Process](#-pull-request-process)
 * [Cost Considerations](#-cost-considerations)
@@ -270,9 +270,9 @@ Create a [new issue](https://github.com/Azure-Samples/azure-nvidia-robotics-refe
   * Resources deployed and hourly cost: `az consumption usage list`
   * Example: "Deployed 3x Standard_NC24ads_A100_v4 VMs running at ~$9/hour"
 
-#### Bug Report Example
+<details>
+<summary><strong>Bug Report Example</strong> (click to expand)</summary>
 
-````markdown
 **Title:** [Terraform][SIL Module] AKS cluster creation fails with subnet authorization error
 
 **Environment:**
@@ -329,7 +329,8 @@ Reproduced the issue with prerequisite resources (VNet, Key Vault, Storage Accou
 **Additional Context:**
 
 Deployment script creates VNet and subnet but appears to skip role assignment for AKS managed identity on subnet. Manually assigning `Network Contributor` role on subnet allows deployment to succeed.
-````
+
+</details>
 
 ### Suggesting Enhancements
 
