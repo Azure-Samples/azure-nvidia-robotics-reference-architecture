@@ -35,11 +35,12 @@ if ($PostgresServerName -and $PostgresServerName -ne "") {
 Disable-AzContextAutosave -Scope Process | Out-Null
 
 try {
+    $postgresDisplay = if ($PostgresServerName -and $PostgresServerName -ne "") { $PostgresServerName } else { '(not configured)' }
     Write-Output "=========================================="
     Write-Output "Start Azure Resources Runbook"
     Write-Output "=========================================="
     Write-Output "Resource Group: $ResourceGroupName"
-    Write-Output "PostgreSQL:     $($PostgresServerName ? $PostgresServerName : '(not configured)')"
+    Write-Output "PostgreSQL:     $postgresDisplay"
     Write-Output "AKS Cluster:    $AksClusterName"
     Write-Output ""
 
