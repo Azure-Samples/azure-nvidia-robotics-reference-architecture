@@ -15,38 +15,38 @@ Use structured titles to maintain consistency and enable automation.
 
 ### Convention Tiers
 
-| Format | Use Case | Example |
-|--------|----------|---------|
-| `type(scope):` | Code changes | `feat(ci): Add pytest workflow` |
-| `[Task]:` | Work items | `[Task]: Achieve OpenSSF badge` |
-| `[Policy]:` | Governance | `[Policy]: Define code of conduct` |
-| `[Docs]:` | Doc planning | `[Docs]: Publish security policy` |
-| `[Infra]:` | Infrastructure | `[Infra]: Sign release tags` |
+| Format         | Use Case       | Example                            |
+|----------------|----------------|------------------------------------|
+| `type(scope):` | Code changes   | `feat(ci): Add pytest workflow`    |
+| `[Task]:`      | Work items     | `[Task]: Achieve OpenSSF badge`    |
+| `[Policy]:`    | Governance     | `[Policy]: Define code of conduct` |
+| `[Docs]:`      | Doc planning   | `[Docs]: Publish security policy`  |
+| `[Infra]:`     | Infrastructure | `[Infra]: Sign release tags`       |
 
 ### Conventional Commits Types
 
-| Type | Description |
-|------|-------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `docs` | Documentation only |
+| Type       | Description                             |
+|------------|-----------------------------------------|
+| `feat`     | New feature or capability               |
+| `fix`      | Bug fix                                 |
+| `docs`     | Documentation only                      |
 | `refactor` | Code change that neither fixes nor adds |
-| `test` | Adding or correcting tests |
-| `ci` | CI configuration changes |
-| `chore` | Maintenance tasks |
+| `test`     | Adding or correcting tests              |
+| `ci`       | CI configuration changes                |
+| `chore`    | Maintenance tasks                       |
 
 ### Repository Scopes
 
-| Scope | Area |
-|-------|------|
-| `terraform` | Infrastructure as Code |
-| `scripts` | Shell and Python scripts |
-| `training` | ML training code |
-| `workflows` | AzureML/Osmo workflows |
-| `ci` | GitHub Actions |
-| `deploy` | Deployment artifacts |
-| `docs` | Documentation |
-| `security` | Security-related changes |
+| Scope       | Area                     |
+|-------------|--------------------------|
+| `terraform` | Infrastructure as Code   |
+| `scripts`   | Shell and Python scripts |
+| `training`  | ML training code         |
+| `workflows` | AzureML/Osmo workflows   |
+| `ci`        | GitHub Actions           |
+| `deploy`    | Deployment artifacts     |
+| `docs`      | Documentation            |
+| `security`  | Security-related changes |
 
 ### Title Examples
 
