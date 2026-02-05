@@ -97,8 +97,8 @@ if ($ChangedFilesOnly) {
         Select-Object -ExpandProperty FullName
 }
 
-Write-Host "Found $($filesToAnalyze.Count) file(s) to analyze"
-if ($filesToAnalyze.Count -gt 0) {
+Write-Host "Found $(@($filesToAnalyze).Count) file(s) to analyze"
+if (@($filesToAnalyze).Count -gt 0) {
     $filesToAnalyze | ForEach-Object { Write-Host "  - $_" }
 }
 Write-Host '::endgroup::'
@@ -108,7 +108,7 @@ $allResults = @()
 $errorCount = 0
 $warningCount = 0
 
-if ($filesToAnalyze.Count -gt 0) {
+if (@($filesToAnalyze).Count -gt 0) {
     Write-Host '::group::PSScriptAnalyzer Results'
 
     foreach ($file in $filesToAnalyze) {
@@ -167,7 +167,7 @@ if ($OutputPath) {
 
     $exportData = @{
         timestamp = (Get-Date).ToString('o')
-        totalFiles = $filesToAnalyze.Count
+        totalFiles = @($filesToAnalyze).Count
         errorCount = $errorCount
         warningCount = $warningCount
         results = $allResults | ForEach-Object {
@@ -189,7 +189,7 @@ if ($OutputPath) {
 # Summary
 Write-Host ''
 Write-Host "PSScriptAnalyzer Summary:"
-Write-Host "  Files analyzed: $($filesToAnalyze.Count)"
+Write-Host "  Files analyzed: $(@($filesToAnalyze).Count)"
 Write-Host "  Errors: $errorCount"
 Write-Host "  Warnings: $warningCount"
 
@@ -197,7 +197,7 @@ Write-Host "  Warnings: $warningCount"
 if (Get-Command -Name 'Set-GitHubOutput' -ErrorAction SilentlyContinue) {
     Set-GitHubOutput -Name 'error-count' -Value $errorCount
     Set-GitHubOutput -Name 'warning-count' -Value $warningCount
-    Set-GitHubOutput -Name 'files-analyzed' -Value $filesToAnalyze.Count
+    Set-GitHubOutput -Name 'files-analyzed' -Value @($filesToAnalyze).Count
 }
 
 # Write step summary if in GitHub Actions
@@ -207,7 +207,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
 
 | Metric | Count |
 |--------|-------|
-| Files Analyzed | $($filesToAnalyze.Count) |
+| Files Analyzed | $(@($filesToAnalyze).Count) |
 | Errors | $errorCount |
 | Warnings | $warningCount |
 
