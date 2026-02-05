@@ -25,6 +25,7 @@
 			"minikube": "none"
 		},
 		"ghcr.io/rio/features/k9s:1": {},
+		"ghcr.io/devcontainers/features/powershell:1": {}
 	},
 	"customizations": {
 		"vscode": {
@@ -89,6 +90,7 @@
 
 	"onCreateCommand": {
 		"setup-dev": "./setup-dev.sh --disable-venv",
+		"npm-install": "npm install",
 		"apt": "sudo apt update && sudo apt install -y shellcheck jq unzip",
 		"tflint": "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash",
 		"update-bashrc": "echo 'export PATH=\"${containerWorkspaceFolder}/scripts:$PATH\"' | sudo tee -a  ~/.bashrc",
