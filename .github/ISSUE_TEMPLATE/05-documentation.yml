@@ -1,8 +1,13 @@
 name: 📚 Documentation
 description: Report documentation issues or request improvements
-title: "[Docs]: "
+title: "docs: "
 labels: ["documentation", "needs-triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Title format**: `docs: Brief description` or `docs(scope): Brief description`
+        **Scopes**: deploy, training, workflows, README
   - type: textarea
     id: location
     attributes:
