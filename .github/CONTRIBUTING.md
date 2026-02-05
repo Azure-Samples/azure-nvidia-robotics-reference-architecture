@@ -43,7 +43,7 @@ Contributions can include:
   * [Improving The Documentation](#improving-the-documentation)
 * [Commit Messages](#-commit-messages)
 * [Markdown Style](#-markdown-style)
-* [Infrastructure as Code Style](#-infrastructure-as-code-style)
+* [Infrastructure as Code Style](#infrastructure-as-code-style)
 * [Deployment Validation](#-deployment-validation)
 * [Pull Request Process](#-pull-request-process)
 * [Cost Considerations](#-cost-considerations)
@@ -271,9 +271,9 @@ Create a [new issue](https://github.com/Azure-Samples/azure-nvidia-robotics-refe
   * Example: "Deployed 3x Standard_NC24ads_A100_v4 VMs running at ~$9/hour"
 
 <details>
-<summary><strong>Bug Report Example</strong> (click to expand)</summary>
+<summary>**Bug Report Example** (click to expand)</summary>
 
-**Title:** [Terraform][SIL Module] AKS cluster creation fails with subnet authorization error
+**Title:** \[Terraform\]\[SIL Module\] AKS cluster creation fails with subnet authorization error
 
 **Environment:**
 
@@ -536,7 +536,7 @@ npm run lint:links
 
 For complete Markdown guidance, see [docs-style-and-conventions.instructions.md](instructions/docs-style-and-conventions.instructions.md).
 
-## 🏗️ Infrastructure as Code Style
+## Infrastructure as Code Style
 
 Infrastructure code follows strict conventions for consistency, security, and maintainability.
 

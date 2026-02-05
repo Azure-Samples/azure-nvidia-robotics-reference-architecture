@@ -76,7 +76,7 @@ $filesToAnalyze = @()
 if ($ChangedFilesOnly) {
     Write-Host "Analyzing changed files only (base: $BaseBranch)"
     if (Get-Command -Name 'Get-ChangedFilesFromGit' -ErrorAction SilentlyContinue) {
-        $filesToAnalyze = Get-ChangedFilesFromGit -BaseBranch $BaseBranch -FileExtensions @('*.ps1', '*.psm1', '*.psd1')
+        $filesToAnalyze = @(Get-ChangedFilesFromGit -BaseBranch $BaseBranch -FileExtensions @('*.ps1', '*.psm1', '*.psd1'))
     } else {
         # Fallback if module not available
         $mergeBase = git merge-base HEAD $BaseBranch 2>$null
