@@ -91,12 +91,12 @@ The training folder mounts at `/data/<dataset_name>/training` inside the contain
 
 ## 📋 Prerequisites
 
-| Requirement                   | Setup                    |
-|-------------------------------|--------------------------|
-| Infrastructure deployed       | `deploy/001-iac/`        |
-| Setup scripts completed       | `deploy/002-setup/`      |
-| Azure CLI authenticated       | `az login`               |
-| OSMO CLI (for OSMO workflows) | Installed and configured |
+| Requirement                         | Setup                    |
+|-------------------------------------|--------------------------|
+| Infrastructure deployed             | `deploy/001-iac/`        |
+| Setup scripts completed             | `deploy/002-setup/`      |
+| Azure CLI authenticated             | `az login`               |
+| OSMO CLI (for OSMO workflows)       | Installed and configured |
 
 ## ⚙️ Configuration
 
