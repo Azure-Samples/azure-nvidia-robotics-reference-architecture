@@ -1,6 +1,6 @@
 name: ✨ Feature Request
 description: Propose a new feature or enhancement
-title: "[Feature]: "
+title: "feat(scope): "
 labels: ["enhancement", "needs-triage"]
 body:
   - type: markdown
@@ -8,6 +8,9 @@ body:
       value: |
         ## Feature Request
         Please describe the feature you'd like to see.
+
+        **Title format**: `feat(scope): Brief description` or `[Task]: Brief description` for planning
+        **Scopes**: terraform, scripts, training, workflows, ci, deploy, docs, security
 
   - type: dropdown
     id: component

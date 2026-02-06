@@ -8,6 +8,15 @@ labels: ["needs-triage"]
 <!--
 Thank you for contributing to the Azure NVIDIA Robotics Reference Architecture!
 Please fill out the sections below to help us understand your issue.
+
+**Title format**: Use one of these prefixes:
+- `feat(scope):` for new features
+- `fix(scope):` for bug fixes
+- `docs:` for documentation
+- `[Task]:` for planning items
+- `[Policy]:` for policy discussions
+
+**Scopes**: terraform, scripts, training, workflows, ci, deploy, docs, security
 -->
 
 ## Summary
