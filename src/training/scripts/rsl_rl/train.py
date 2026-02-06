@@ -18,15 +18,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-# Add the scripts directory to the path for cli_args import
-_SCRIPTS_DIR = Path(__file__).resolve().parent
+# Add the src directory to the path for common module import
+_SRC_DIR = Path(__file__).resolve().parents[3]  # src/ directory
 _TRAINING_DIR = Path(__file__).resolve().parents[2]  # src/training directory
-sys.path.insert(0, str(_SCRIPTS_DIR))
+sys.path.insert(0, str(_SRC_DIR))
 sys.path.insert(0, str(_TRAINING_DIR))
 
 from isaaclab.app import AppLauncher
 
-import cli_args
+from common import cli_args
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
