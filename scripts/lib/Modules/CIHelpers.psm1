@@ -1,4 +1,4 @@
-﻿# Copyright (c) Microsoft Corporation.
+# Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
 
 # CIHelpers.psm1
@@ -300,8 +300,9 @@ function Write-CIStepSummary {
             $Content | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
         }
         'azdo' {
+            $safeContent = $Content -replace '##vso\[', '`##vso[' -replace '##\[', '`##['
             Write-Host "##[section]Step Summary"
-            Write-Host $Content
+            Write-Host $safeContent
         }
         default {
             Write-Verbose "Step summary: $Content"

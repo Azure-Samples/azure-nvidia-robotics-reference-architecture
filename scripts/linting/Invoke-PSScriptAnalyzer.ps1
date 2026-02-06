@@ -76,7 +76,7 @@ $filesToAnalyze = @()
 if ($ChangedFilesOnly) {
     Write-Host "Analyzing changed files only (base: $BaseBranch)"
     if (Get-Command -Name 'Get-ChangedFilesFromGit' -ErrorAction SilentlyContinue) {
-        $filesToAnalyze = Get-ChangedFilesFromGit -BaseBranch $BaseBranch -FileExtensions @('*.ps1', '*.psm1', '*.psd1')
+        $filesToAnalyze = @(Get-ChangedFilesFromGit -BaseBranch $BaseBranch -FileExtensions @('*.ps1', '*.psm1', '*.psd1'))
     } else {
         # Fallback if module not available
         $mergeBase = git merge-base HEAD $BaseBranch 2>$null
@@ -85,16 +85,16 @@ if ($ChangedFilesOnly) {
         }
         $changedFiles = git diff --name-only --diff-filter=d $mergeBase HEAD 2>$null
         if ($changedFiles) {
-            $filesToAnalyze = $changedFiles | Where-Object { $_ -match '\.(ps1|psm1|psd1)$' } | ForEach-Object {
+            $filesToAnalyze = @($changedFiles | Where-Object { $_ -match '\.(ps1|psm1|psd1)$' } | ForEach-Object {
                 Join-Path $repoRoot $_
-            } | Where-Object { Test-Path $_ }
+            } | Where-Object { Test-Path $_ })
         }
     }
 } else {
     Write-Host 'Analyzing all PowerShell files in repository'
-    $filesToAnalyze = Get-ChildItem -Path $repoRoot -Include '*.ps1', '*.psm1', '*.psd1' -Recurse -File |
+    $filesToAnalyze = @(Get-ChildItem -Path $repoRoot -Include '*.ps1', '*.psm1', '*.psd1' -Recurse -File |
         Where-Object { $_.FullName -notmatch '[\\/](\.git|node_modules|vendor)[\\/]' } |
-        Select-Object -ExpandProperty FullName
+        Select-Object -ExpandProperty FullName)
 }
 
 Write-Host "Found $(@($filesToAnalyze).Count) file(s) to analyze"
