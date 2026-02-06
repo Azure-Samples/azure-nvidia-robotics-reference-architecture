@@ -248,9 +248,9 @@ function Write-GitHubAnnotation {
     }
     else {
         $prefix = switch ($Type) {
-            'error' { '❌' }
-            'warning' { '⚠️' }
-            'notice' { 'ℹ️' }
+            'error' { 'ERROR' }
+            'warning' { 'WARN' }
+            'notice' { 'INFO' }
         }
         Write-Host "$prefix $Message"
     }

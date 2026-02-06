@@ -25,6 +25,7 @@
 			"minikube": "none"
 		},
 		"ghcr.io/rio/features/k9s:1": {},
+		"ghcr.io/devcontainers/features/powershell:1": {}
 	},
 	"customizations": {
 		"vscode": {
@@ -89,9 +90,10 @@
 
 	"onCreateCommand": {
 		"setup-dev": "./setup-dev.sh --disable-venv",
+		"npm-install": "npm install",
 		"apt": "sudo apt update && sudo apt install -y shellcheck jq unzip",
 		"tflint": "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash",
-		"update-bashrc": "echo 'export PATH=\"${containerWorkspaceFolder}/scripts:$PATH\"' | sudo tee -a  ~/.bashrc",
+		"update-bashrc": "echo 'export PATH=\"${containerWorkspaceFolder}/scripts:${containerWorkspaceFolder}/node_modules/.bin:$PATH\"' | sudo tee -a  ~/.bashrc",
 		"osmo-cli": "curl -fsSL https://raw.githubusercontent.com/NVIDIA/OSMO/refs/heads/main/install.sh | bash || true",
 		"ngc-cli": "wget -qO /tmp/ngccli.zip https://ngc.nvidia.com/downloads/ngccli_linux.zip && sudo unzip -o /tmp/ngccli.zip -d /usr/local/bin && rm /tmp/ngccli.zip && sudo chmod u+x /usr/local/bin/ngc || true",
 		"az-ml": "az extension add -n ml --yes || true"

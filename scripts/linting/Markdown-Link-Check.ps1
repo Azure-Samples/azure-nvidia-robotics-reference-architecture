@@ -242,13 +242,13 @@ try {
 
                         if (-not $Quiet) {
                             if ($status -eq 'alive') {
-                                Write-Host "  ✓ $url" -ForegroundColor Green
+                                Write-Host "  [OK] $url" -ForegroundColor Green
                             }
                             elseif ($status -eq 'ignored') {
                                 Write-Host "  / $url (ignored)" -ForegroundColor Yellow
                             }
                             elseif ($status -eq 'dead') {
-                                Write-Host "  ✖ $url → Status: $statusCode" -ForegroundColor Red
+                                Write-Host "  [FAIL] $url -> Status: $statusCode" -ForegroundColor Red
                             }
                         }
 
@@ -307,7 +307,7 @@ $results | ConvertTo-Json -Depth 10 | Set-Content -Path $resultsPath -Encoding U
 
 if ($failedFiles.Count -gt 0) {
     $summaryContent = @"
-## ❌ Markdown Link Check Failed
+## Markdown Link Check Failed
 
 **Files with broken links:** $($failedFiles.Count) / $totalFiles
 **Total broken links:** $($brokenLinks.Count)
@@ -342,13 +342,13 @@ For more information, see the [markdown-link-check documentation](https://github
 }
 else {
     $summaryContent = @"
-## ✅ Markdown Link Check Passed
+## Markdown Link Check Passed
 
 **Files checked:** $totalFiles
 **Total links checked:** $totalLinks
 **Broken links:** 0
 
-Great job! All markdown links are valid. 🎉
+Great job! All markdown links are valid.
 "@
 
     Write-GitHubStepSummary -Content $summaryContent

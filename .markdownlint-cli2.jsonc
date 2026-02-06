@@ -2,7 +2,9 @@
   "ignores": [
     "**/node_modules/**",
     ".copilot-tracking/**",
-    "venv/**"
+    "venv/**",
+    ".venv/**",
+    "external/**"
   ],
   "config": {
     "default": true,

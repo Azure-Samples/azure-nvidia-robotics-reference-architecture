@@ -9,7 +9,7 @@
 
     "editor.insertSpaces": true,
 
-    "markdownlint.configFile": ".markdownlint.json",
+    "markdownlint.configFile": ".markdownlint-cli2.jsonc",
     "markdownlint.lintWorkspaceGlobs": [
         "**/*.{md,mkd,mdwn,mdown,markdown,markdn,mdtxt,mdtext,workbook}",
         "!**/.copilot-tracking/**",
