@@ -1,0 +1,331 @@
+workflow:
+  name: lerobot-azure-data-training
+  timeout:
+    exec_timeout: 6h
+  resources:
+    default:
+      gpu: 1
+      cpu: 8
+      memory: 48Gi
+      storage: 80Gi
+  tasks:
+    - name: lerobot-train
+      image: "{{ image }}"
+      command:
+        - /bin/bash
+        - /tmp/entry.sh
+      credentials:
+        wandb:
+          WANDB_API_KEY: wandb_api_key
+        huggingface:
+          HF_TOKEN: hf_token
+      environment:
+        STORAGE_ACCOUNT: "{{ storage_account }}"
+        STORAGE_CONTAINER: "{{ storage_container }}"
+        BLOB_PREFIX: "{{ blob_prefix }}"
+        DATASET_REPO_ID: "{{ dataset_repo_id }}"
+        DATASET_ROOT: "{{ dataset_root }}"
+        POLICY_TYPE: "{{ policy_type }}"
+        OUTPUT_DIR: "{{ output_dir }}"
+        JOB_NAME: "{{ job_name }}"
+        POLICY_REPO_ID: "{{ policy_repo_id }}"
+        WANDB_ENABLE: "{{ wandb_enable }}"
+        WANDB_PROJECT: "{{ wandb_project }}"
+        TRAINING_STEPS: "{{ training_steps }}"
+        BATCH_SIZE: "{{ batch_size }}"
+        EVAL_FREQ: "{{ eval_freq }}"
+        SAVE_FREQ: "{{ save_freq }}"
+      files:
+        - path: /tmp/entry.sh
+          contents: |
+            #!/bin/bash
+            set -euo pipefail
+
+            echo "=== LeRobot Training from Azure Blob Storage ==="
+            echo "Storage Account: ${STORAGE_ACCOUNT}"
+            echo "Container: ${STORAGE_CONTAINER}"
+            echo "Blob Prefix: ${BLOB_PREFIX}"
+            echo "Dataset Repo ID: ${DATASET_REPO_ID}"
+            echo "Policy Type: ${POLICY_TYPE}"
+            echo "Job Name: ${JOB_NAME}"
+
+            # Install system build tools (needed for evdev/pynput compilation)
+            echo "Installing build tools..."
+            apt-get update -qq && apt-get install -y -qq gcc build-essential ffmpeg > /dev/null 2>&1
+
+            # Install dependencies
+            echo "Installing Python dependencies..."
+            pip install --quiet --no-cache-dir uv 2>/dev/null || true
+
+            if command -v uv &>/dev/null; then
+              uv pip install lerobot wandb huggingface-hub azure-storage-blob azure-identity --system
+            else
+              pip install --quiet --no-cache-dir lerobot wandb huggingface-hub azure-storage-blob azure-identity
+            fi
+
+            # Authenticate with HuggingFace Hub
+            echo "Authenticating with HuggingFace Hub..."
+            if [[ -n "${HF_TOKEN:-}" ]]; then
+              python3 -c "from huggingface_hub import login; login(token='${HF_TOKEN}', add_to_git_credential=False)"
+            else
+              echo "Warning: HF_TOKEN not set, skipping HuggingFace authentication"
+            fi
+
+            # Configure WANDB
+            if [[ "${WANDB_ENABLE:-true}" == "true" ]]; then
+              echo "WANDB authentication configured via environment"
+            fi
+
+            # Download dataset from Azure Blob Storage
+            echo "Downloading dataset from Azure Blob Storage..."
+            DATASET_DIR="${DATASET_ROOT}/${DATASET_REPO_ID}"
+            mkdir -p "${DATASET_DIR}"
+
+            python3 << 'DOWNLOAD_SCRIPT'
+            import os
+            from azure.storage.blob import BlobServiceClient
+            from azure.identity import DefaultAzureCredential
+
+            account = os.environ["STORAGE_ACCOUNT"]
+            container = os.environ["STORAGE_CONTAINER"]
+            prefix = os.environ["BLOB_PREFIX"].rstrip("/") + "/"
+            dest_dir = os.path.join(os.environ["DATASET_ROOT"], os.environ["DATASET_REPO_ID"])
+
+            credential = DefaultAzureCredential()
+            client = BlobServiceClient(
+                account_url=f"https://{account}.blob.core.windows.net",
+                credential=credential,
+            )
+            container_client = client.get_container_client(container)
+
+            downloaded = 0
+            for blob in container_client.list_blobs(name_starts_with=prefix):
+                # Skip cache files
+                rel = blob.name[len(prefix):]
+                if ".cache/" in rel or rel.endswith(".lock") or rel.endswith(".metadata"):
+                    continue
+
+                local_path = os.path.join(dest_dir, rel)
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+
+                with open(local_path, "wb") as f:
+                    stream = container_client.download_blob(blob.name)
+                    f.write(stream.readall())
+                downloaded += 1
+
+            print(f"Downloaded {downloaded} files to {dest_dir}")
+
+            # Verify dataset structure
+            info_path = os.path.join(dest_dir, "meta", "info.json")
+            if os.path.exists(info_path):
+                import json
+                with open(info_path) as f:
+                    info = json.load(f)
+                print(f"Dataset: {info.get('robot_type', 'unknown')} robot, "
+                      f"{info.get('total_episodes', '?')} episodes, "
+                      f"{info.get('total_frames', '?')} frames")
+
+                # Ensure stats.json includes entries for video/image features
+                # LeRobot make_dataset expects ImageNet stats for image features
+                stats_path = os.path.join(dest_dir, "meta", "stats.json")
+                if os.path.exists(stats_path):
+                    with open(stats_path) as f:
+                        stats = json.load(f)
+
+                    features = info.get("features", {})
+                    updated = False
+                    for key, feat in features.items():
+                        if feat.get("dtype") in ("video", "image") and key not in stats:
+                            h, w, c = feat["shape"]
+                            # ImageNet normalization stats
+                            stats[key] = {
+                                "mean": [[[0.485]], [[0.456]], [[0.406]]],
+                                "std": [[[0.229]], [[0.224]], [[0.225]]],
+                                "min": [[[0.0]], [[0.0]], [[0.0]]],
+                                "max": [[[1.0]], [[1.0]], [[1.0]]],
+                            }
+                            updated = True
+                            print(f"Added ImageNet stats for feature: {key}")
+
+                    if updated:
+                        with open(stats_path, "w") as f:
+                            json.dump(stats, f, indent=4)
+            else:
+                print("Warning: meta/info.json not found")
+            DOWNLOAD_SCRIPT
+
+            echo "Dataset downloaded to: ${DATASET_DIR}"
+            ls -la "${DATASET_DIR}/"
+
+            # Patch stats.json to include entries for video/image features
+            # LeRobot's factory.py expects camera keys to exist in stats
+            python3 << 'PATCH_STATS'
+            import json, os
+            dataset_dir = os.path.join(os.environ["DATASET_ROOT"], os.environ["DATASET_REPO_ID"])
+            info_path = os.path.join(dataset_dir, "meta", "info.json")
+            stats_path = os.path.join(dataset_dir, "meta", "stats.json")
+            with open(info_path) as f:
+                info = json.load(f)
+            with open(stats_path) as f:
+                stats = json.load(f)
+            for key, feat in info.get("features", {}).items():
+                if feat.get("dtype") in ("video", "image") and key not in stats:
+                    stats[key] = {
+                        "mean": [[[0.485]], [[0.456]], [[0.406]]],
+                        "std": [[[0.229]], [[0.224]], [[0.225]]],
+                        "min": [[[0.0]], [[0.0]], [[0.0]]],
+                        "max": [[[1.0]], [[1.0]], [[1.0]]],
+                    }
+                    print(f"Added placeholder stats for {key}")
+            with open(stats_path, "w") as f:
+                json.dump(stats, f, indent=4)
+            PATCH_STATS
+
+            # Fix video timestamps in episode metadata
+            # Some datasets have cumulative from/to timestamps in episode metadata
+            # but per-episode timestamps in the actual video files (each starting at 0).
+            # This resets from_timestamp to 0 and to_timestamp to length/fps.
+            # Also realigns parquet frame timestamps to match the video's exact PTS grid.
+            python3 << 'FIX_VIDEO_TIMESTAMPS'
+            import os, json
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+
+            dataset_dir = os.path.join(os.environ["DATASET_ROOT"], os.environ["DATASET_REPO_ID"])
+            info_path = os.path.join(dataset_dir, "meta", "info.json")
+            with open(info_path) as f:
+                info = json.load(f)
+
+            fps = info["fps"]
+            video_keys = [
+                k for k, v in info.get("features", {}).items()
+                if v.get("dtype") in ("video", "image")
+            ]
+
+            if not video_keys:
+                print("No video features, skipping timestamp fix")
+            else:
+                # Fix episode metadata: reset from/to timestamps to per-episode
+                episodes_dir = os.path.join(dataset_dir, "meta", "episodes")
+                for root, _dirs, files in os.walk(episodes_dir):
+                    for fname in files:
+                        if not fname.endswith(".parquet"):
+                            continue
+                        fpath = os.path.join(root, fname)
+                        table = pq.read_table(fpath)
+                        columns = {c: table[c].to_pylist() for c in table.column_names}
+                        modified = False
+                        for vk in video_keys:
+                            from_col = f"videos/{vk}/from_timestamp"
+                            to_col = f"videos/{vk}/to_timestamp"
+                            if from_col not in columns or to_col not in columns:
+                                continue
+                            lengths = columns["length"]
+                            for i in range(len(lengths)):
+                                new_from = 0.0
+                                new_to = lengths[i] / fps
+                                if abs(columns[from_col][i] - new_from) > 0.01 or abs(columns[to_col][i] - new_to) > 0.01:
+                                    columns[from_col][i] = new_from
+                                    columns[to_col][i] = new_to
+                                    modified = True
+                        if modified:
+                            new_table = pa.table({c: columns[c] for c in table.column_names})
+                            pq.write_table(new_table, fpath)
+                            print(f"Fixed cumulative video timestamps in {os.path.basename(fpath)}")
+                        else:
+                            print("Video timestamps already per-episode, no fix needed")
+
+                # Realign parquet data timestamps to the 1/fps grid
+                # Robot sensor timestamps can drift from the video's exact PTS values
+                data_dir = os.path.join(dataset_dir, "data")
+                fixed_data = 0
+                for root, _dirs, files in os.walk(data_dir):
+                    for fname in files:
+                        if not fname.endswith(".parquet"):
+                            continue
+                        fpath = os.path.join(root, fname)
+                        table = pq.read_table(fpath)
+                        ts = table["timestamp"].to_pylist()
+                        if not ts:
+                            continue
+                        aligned_ts = [i / fps for i in range(len(ts))]
+                        max_drift = max(abs(a - b) for a, b in zip(ts, aligned_ts))
+                        if max_drift > 0.02:
+                            col_idx = table.column_names.index("timestamp")
+                            new_col = pa.array(aligned_ts, type=pa.float64())
+                            table = table.set_column(col_idx, "timestamp", new_col)
+                            pq.write_table(table, fpath)
+                            fixed_data += 1
+                            print(f"Realigned timestamps in {os.path.relpath(fpath, dataset_dir)} (drift was {max_drift*1000:.0f}ms)")
+                if fixed_data:
+                    print(f"Realigned timestamps in {fixed_data} data files")
+                else:
+                    print("Data timestamps already aligned, no fix needed")
+            FIX_VIDEO_TIMESTAMPS
+
+            # Auto-detect HF username for policy.repo_id
+            if [[ -z "${POLICY_REPO_ID:-}" ]]; then
+              hf_user=$(python3 -c "from huggingface_hub import whoami; print(whoami()['name'])" 2>/dev/null || echo "")
+              if [[ -n "$hf_user" ]]; then
+                POLICY_REPO_ID="${hf_user}/${JOB_NAME}"
+                echo "Auto-derived policy.repo_id: ${POLICY_REPO_ID}"
+              fi
+            fi
+
+            # Build training arguments
+            # dataset.root must point to the directory containing meta/info.json
+            FULL_DATASET_PATH="${DATASET_ROOT}/${DATASET_REPO_ID}"
+            train_args=(
+              --dataset.repo_id="${DATASET_REPO_ID}"
+              --dataset.root="${FULL_DATASET_PATH}"
+              --dataset.use_imagenet_stats=false
+              --dataset.video_backend=pyav
+              --tolerance_s=0.04
+              --policy.type="${POLICY_TYPE}"
+              --output_dir="${OUTPUT_DIR}"
+              --job_name="${JOB_NAME}"
+              --policy.device=cuda
+            )
+
+            # Logging
+            if [[ "${WANDB_ENABLE:-true}" == "true" ]]; then
+              train_args+=(--wandb.enable=true)
+              [[ -n "${WANDB_PROJECT:-}" ]] && train_args+=(--wandb.project="${WANDB_PROJECT}")
+            else
+              train_args+=(--wandb.enable=false)
+            fi
+
+            [[ -n "${POLICY_REPO_ID:-}" ]] && train_args+=(--policy.repo_id="${POLICY_REPO_ID}")
+            [[ -n "${TRAINING_STEPS:-}" ]] && train_args+=(--steps="${TRAINING_STEPS}")
+            [[ -n "${BATCH_SIZE:-}" ]] && train_args+=(--batch_size="${BATCH_SIZE}")
+            [[ -n "${EVAL_FREQ:-}" ]] && train_args+=(--eval_freq="${EVAL_FREQ}")
+            [[ -n "${SAVE_FREQ:-}" ]] && train_args+=(--save_freq="${SAVE_FREQ}")
+
+            echo "Starting LeRobot training..."
+            echo "Command: lerobot-train ${train_args[*]}"
+
+            lerobot-train "${train_args[@]}" || {
+              echo "Training failed with exit code $?"
+              exit 1
+            }
+
+            echo "=== Training Complete ==="
+            ls -la "${OUTPUT_DIR}/" 2>/dev/null || true
+
+default-values:
+  image: pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime
+  storage_account: ""
+  storage_container: datasets
+  blob_prefix: ""
+  dataset_repo_id: ""
+  dataset_root: /workspace/data
+  policy_type: act
+  output_dir: /workspace/outputs/train
+  job_name: lerobot-azure-training
+  policy_repo_id: ""
+  wandb_enable: "true"
+  wandb_project: lerobot-training
+  training_steps: ""
+  batch_size: ""
+  eval_freq: ""
+  save_freq: "2500"

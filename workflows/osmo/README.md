@@ -10,15 +10,18 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 
 ## 📜 Available Templates
 
-| Template                                 | Purpose                               | Submission Script                         |
-|------------------------------------------|---------------------------------------|-------------------------------------------|
-| [train.yaml](train.yaml)                 | Distributed training (base64 inline)  | `scripts/submit-osmo-training.sh`         |
-| [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh` |
+| Template                                                 | Purpose                               | Submission Script                                |
+| -------------------------------------------------------- | ------------------------------------- | ------------------------------------------------ |
+| [train.yaml](train.yaml)                                 | Distributed training (base64 inline)  | `scripts/submit-osmo-training.sh`                |
+| [train-dataset.yaml](train-dataset.yaml)                 | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh`        |
+| [lerobot-train.yaml](lerobot-train.yaml)                 | LeRobot behavioral cloning            | `scripts/submit-osmo-lerobot-training.sh`        |
+| [lerobot-train-dataset.yaml](lerobot-train-dataset.yaml) | LeRobot training (OSMO dataset mount) | `scripts/submit-osmo-lerobot-training.sh -w ...` |
+| [lerobot-infer.yaml](lerobot-infer.yaml)                 | LeRobot inference/evaluation          | `scripts/submit-osmo-lerobot-inference.sh`       |
 
 ## ⚖️ Workflow Comparison
 
 | Aspect      | train.yaml             | train-dataset.yaml    |
-|-------------|------------------------|-----------------------|
+| ----------- | ---------------------- | --------------------- |
 | Payload     | Base64-encoded archive | Dataset folder upload |
 | Size limit  | ~1MB                   | Unlimited             |
 | Versioning  | None                   | Automatic             |
@@ -41,7 +44,7 @@ Submits Isaac Lab distributed training through OSMO's workflow orchestration eng
 Parameters are passed as key=value pairs through the submission script:
 
 | Parameter               | Description           |
-|-------------------------|-----------------------|
+| ----------------------- | --------------------- |
 | `azure_subscription_id` | Azure subscription ID |
 | `azure_resource_group`  | Resource group name   |
 | `azure_workspace_name`  | ML workspace name     |
@@ -75,7 +78,7 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
 ### Dataset Parameters
 
 | Parameter            | Default         | Description                                     |
-|----------------------|-----------------|-------------------------------------------------|
+| -------------------- | --------------- | ----------------------------------------------- |
 | `dataset_bucket`     | `training`      | OSMO bucket for training code                   |
 | `dataset_name`       | `training-code` | Dataset name in bucket                          |
 | `training_localpath` | (required)      | Local path to src/training relative to workflow |
@@ -92,10 +95,140 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
   --dataset-name my-training-code
 ```
 
+## 🤖 LeRobot Training Workflow (`lerobot-train.yaml`)
+
+Submits LeRobot behavioral cloning training for ACT and Diffusion policy architectures. Uses HuggingFace Hub datasets and installs LeRobot dynamically at runtime via `uv pip install`.
+
+### LeRobot Features
+
+* ACT and Diffusion policy architectures
+* HuggingFace Hub dataset integration
+* WANDB or Azure MLflow logging backends
+* Automatic checkpoint registration to Azure ML
+* No source payload packaging required
+
+### LeRobot Parameters
+
+| Parameter         | Default                                         | Description                                |
+| ----------------- | ----------------------------------------------- | ------------------------------------------ |
+| `dataset_repo_id` | (required)                                      | HuggingFace dataset (e.g., `user/dataset`) |
+| `policy_type`     | `act`                                           | Policy architecture: `act`, `diffusion`    |
+| `job_name`        | `lerobot-act-training`                          | Unique job identifier                      |
+| `image`           | `pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime` | Container image                            |
+| `training_steps`  | (LeRobot default)                               | Total training iterations                  |
+| `batch_size`      | (LeRobot default)                               | Training batch size                        |
+| `save_freq`       | `5000`                                          | Checkpoint save frequency                  |
+| `wandb_enable`    | `true`                                          | Enable WANDB logging                       |
+| `mlflow_enable`   | `false`                                         | Enable Azure ML MLflow logging             |
+
+### LeRobot Usage
+
+```bash
+# ACT training with WANDB logging
+./scripts/submit-osmo-lerobot-training.sh \
+  -d lerobot/aloha_sim_insertion_human
+
+# Diffusion policy with MLflow logging
+./scripts/submit-osmo-lerobot-training.sh \
+  -d user/custom-dataset \
+  -p diffusion \
+  --mlflow-enable \
+  -r my-diffusion-model
+
+# Fine-tune from existing policy
+./scripts/submit-osmo-lerobot-training.sh \
+  -d user/dataset \
+  --policy-repo-id user/pretrained-act \
+  --training-steps 50000
+```
+
+### Credential Configuration
+
+The workflow uses OSMO credential injection for HuggingFace and WANDB authentication:
+
+```bash
+# Set HuggingFace token (required for private datasets)
+osmo credential set hf_token --generic --value "hf_..."
+
+# Set WANDB API key (required when wandb_enable=true)
+osmo credential set wandb_api_key --generic --value "..."
+```
+
+## 📦 LeRobot Dataset Training Workflow (`lerobot-train-dataset.yaml`)
+
+Trains LeRobot policies using OSMO dataset mounts instead of HuggingFace Hub downloads. Supports Azure Blob Storage datasets uploaded via OSMO's dataset bucket system.
+
+### Dataset Training Features
+
+* OSMO dataset versioning and reuse across runs
+* Azure Blob Storage integration via `azure://` URLs
+* Falls back to HuggingFace Hub if no dataset mount is available
+* All features from `lerobot-train.yaml`
+
+### Dataset Training Parameters
+
+| Parameter           | Default            | Description                            |
+| ------------------- | ------------------ | -------------------------------------- |
+| `dataset_bucket`    | `lerobot-datasets` | OSMO bucket for training data          |
+| `dataset_name`      | `training-data`    | Dataset name in bucket                 |
+| `dataset_localpath` | (required)         | Local path to dataset relative to YAML |
+
+### Dataset Training Usage
+
+```bash
+# Train with local dataset uploaded via OSMO
+./scripts/submit-osmo-lerobot-training.sh \
+  -w workflows/osmo/lerobot-train-dataset.yaml \
+  -d user/fallback-dataset \
+  --dataset-bucket my-bucket \
+  --dataset-name my-lerobot-data
+```
+
+## 🔬 LeRobot Inference Workflow (`lerobot-infer.yaml`)
+
+Evaluates trained LeRobot policies from HuggingFace Hub repositories. Downloads the policy checkpoint, runs evaluation, and optionally registers the model to Azure ML.
+
+### Inference Features
+
+* Policy download from HuggingFace Hub
+* Model artifact extraction and validation
+* Optional Azure ML model registration
+* ACT and Diffusion policy support
+
+### Inference Parameters
+
+| Parameter         | Default    | Description                             |
+| ----------------- | ---------- | --------------------------------------- |
+| `policy_repo_id`  | (required) | HuggingFace policy repository           |
+| `policy_type`     | `act`      | Policy architecture: `act`, `diffusion` |
+| `eval_episodes`   | `10`       | Number of evaluation episodes           |
+| `eval_batch_size` | `10`       | Evaluation batch size                   |
+| `register_model`  | (none)     | Model name for Azure ML registration    |
+| `record_video`    | `false`    | Record evaluation videos                |
+
+### Inference Usage
+
+```bash
+# Evaluate a trained policy
+./scripts/submit-osmo-lerobot-inference.sh \
+  --policy-repo-id user/trained-act-policy
+
+# Evaluate with Azure ML model registration
+./scripts/submit-osmo-lerobot-inference.sh \
+  --policy-repo-id user/trained-act-policy \
+  -r my-evaluated-model
+
+# Diffusion policy with more episodes
+./scripts/submit-osmo-lerobot-inference.sh \
+  --policy-repo-id user/diffusion-policy \
+  -p diffusion \
+  --eval-episodes 50
+```
+
 ## ⚙️ Environment Variables
 
 | Variable                | Description                             |
-|-------------------------|-----------------------------------------|
+| ----------------------- | --------------------------------------- |
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID                   |
 | `AZURE_RESOURCE_GROUP`  | Resource group name                     |
 | `WORKFLOW_TEMPLATE`     | Path to workflow template               |
@@ -119,7 +252,7 @@ OSMO services are deployed to the `osmo-control-plane` namespace. Access method 
 When connected to VPN, OSMO is accessible via the internal load balancer:
 
 | Service      | URL                   |
-|--------------|-----------------------|
+| ------------ | --------------------- |
 | UI Dashboard | `http://10.0.5.7`     |
 | API Service  | `http://10.0.5.7/api` |
 
@@ -136,7 +269,7 @@ osmo info
 If `should_enable_private_aks_cluster = false` and not using VPN:
 
 | Service      | Port-Forward Command                                                  | Local URL               |
-|--------------|-----------------------------------------------------------------------|-------------------------|
+| ------------ | --------------------------------------------------------------------- | ----------------------- |
 | UI Dashboard | `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane`      | `http://localhost:3000` |
 | API Service  | `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` | `http://localhost:9000` |
 | Router       | `kubectl port-forward svc/osmo-router 8080:80 -n osmo-control-plane`  | `http://localhost:8080` |
