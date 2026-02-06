@@ -4,7 +4,7 @@
   "private": true,
   "description": "Azure NVIDIA Robotics Reference Architecture",
   "scripts": {
-    "beads:init": "npx bd init",
+    "beads:init": "bd init",
     "spell-check": "cspell \"**/*.{md,ts,js,json,yaml,yml,py,sh}\"",
     "spell-check:fix": "cspell \"**/*.{md,ts,js,json,yaml,yml,py,sh}\" --show-suggestions",
     "lint:md": "markdownlint-cli2 \"**/*.md\"",
