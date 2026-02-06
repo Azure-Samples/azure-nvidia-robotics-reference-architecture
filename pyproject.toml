@@ -1,6 +1,6 @@
 [project]
 name = "azure-nvidia-robotics-reference-architecture"
-version = "0.1.0"
+version = "0.0.0"
 description = "Azure NVIDIA Robotics Reference Architecture for Isaac Lab training"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,7 +49,7 @@ dependencies = [
     "mlflow",
     "psutil>=5.9.0",
     "pynvml>=11.5.0",
-    "azure-core==1.28.0",
+    "azure-core==1.38.0",
     "azure-storage-blob==12.17.0",
     "pyperclip==1.8.0",
     "rsl-rl-lib==3.0.1",
