@@ -1,0 +1,115 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "az-robotics-reference-beads-devcontainer",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/devcontainers/features/azure-cli:1": {
+			"extensions": "connectedk8s,k8s-extension,azure-iot-ops,amg,eventgrid,ml"
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/terraform:1": {
+			"installTerraformDocs": true
+		},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+ 			// "version": "latest" uses https://dl.k8s.io/release/stable.txt which experiences outages during heavy load.
+			// Update this back to "latest" or continue to upgrade the version periodically.
+			"version": "1.33.2",
+			"helm": "latest",
+			"minikube": "none"
+		},
+		"ghcr.io/rio/features/k9s:1": {},
+		"ghcr.io/devcontainers/features/powershell:1": {}
+	},
+	"customizations": {
+		"vscode": {
+            "mcp": {
+				"servers": {
+					"beads": {
+						"type": "stdio",
+						"command": "uvx",
+						"args": ["-n", "beads-mcp"]
+					}
+				}
+			},
+			"settings": {
+				"terminal.integrated.profiles.linux": {
+					"bash": {
+						"path": "/bin/bash"
+					}
+				},
+				"[python]": {
+					"editor.defaultFormatter": "charliermarsh.ruff",
+					"editor.codeActionsOnSave": {
+						"source.fixAll": "explicit",
+						"source.organizeImports": "explicit"
+					}
+				}
+			},
+			"extensions": [
+				"charliermarsh.ruff",
+				"darkriszty.markdown-table-prettify",
+				"DavidAnson.vscode-markdownlint",
+				"eamodio.gitlens",
+				"EditorConfig.EditorConfig",
+				"foxundermoon.shell-format",
+				"GitHub.vscode-pull-request-github",
+				"hashicorp.terraform",
+				"ms-azuretools.vscode-azureterraform",
+				"ms-azuretools.vscode-docker",
+				"ms-python.debugpy",
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-vscode-remote.vscode-remote-extensionpack",
+				"ms-vscode.azurecli",
+				"streetsidesoftware.code-spell-checker",
+				"streetsidesoftware.code-spell-checker-cspell-bundled-dictionaries",
+				"timonwong.shellcheck",
+				"yzhang.markdown-all-in-one",
+				"ms-azuretools.vscode-azure-github-copilot",
+				"ms-kubernetes-tools.vscode-kubernetes-tools",
+				"github.vscode-github-actions",
+				"bierner.markdown-mermaid",
+				"ms-azuretools.vscode-azurefunctions",
+				"ms-azuretools.vscode-azureresourcegroups",
+				"ms-azuretools.vscode-containers",
+				"tamasfe.even-better-toml",
+				"redhat.vscode-yaml",
+				"ms-toolsai.vscode-ai",
+				"GitHub.copilot@prerelease",
+				"GitHub.copilot-chat@prerelease"
+			]
+		}
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [8080],
+
+	// Container environment variables
+	"containerEnv": {
+		"BROWSER": "code --new-window",
+		"UV_LINK_MODE": "copy"
+	},
+
+	"onCreateCommand": {
+		"setup-dev": "./setup-dev.sh --disable-venv",
+		"npm-install": "npm install",
+		"apt": "sudo apt update && sudo apt install -y shellcheck jq unzip",
+		"tflint": "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash",
+		"update-bashrc": "echo 'export PATH=\"${containerWorkspaceFolder}/scripts:$PATH\"' | sudo tee -a  ~/.bashrc",
+		"osmo-cli": "curl -fsSL https://raw.githubusercontent.com/NVIDIA/OSMO/refs/heads/main/install.sh | bash || true",
+		"ngc-cli": "wget -qO /tmp/ngccli.zip https://ngc.nvidia.com/downloads/ngccli_linux.zip && sudo unzip -o /tmp/ngccli.zip -d /usr/local/bin && rm /tmp/ngccli.zip && sudo chmod u+x /usr/local/bin/ngc || true",
+		"az-ml": "az extension add -n ml --yes || true"
+	},
+
+	// DONT USE 'postCreateCommand', it ruins your global .gitconfig https://github.com/devcontainers/cli/issues/787
+
+	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+	"remoteUser": "vscode"
+}
