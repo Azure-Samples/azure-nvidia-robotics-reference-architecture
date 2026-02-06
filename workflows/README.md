@@ -25,13 +25,13 @@ workflows/
 
 ## ⚖️ Platform Comparison
 
-| Feature       | AzureML                   | OSMO                     |
-|---------------|---------------------------|--------------------------|
-| Orchestration | Azure ML Job Service      | OSMO Workflow Engine     |
-| Scheduling    | Azure ML Compute          | KAI Scheduler / Volcano  |
-| Multi-node    | Azure ML distributed jobs | OSMO workflow DAGs       |
-| Checkpointing | MLflow integration        | MLflow + custom handlers |
-| Monitoring    | Azure ML Studio           | OSMO UI Dashboard        |
+| Feature        | AzureML                   | OSMO                     |
+|----------------|---------------------------|--------------------------|
+| Orchestration  | Azure ML Job Service      | OSMO Workflow Engine     |
+| Scheduling     | Azure ML Compute          | KAI Scheduler / Volcano  |
+| Multi-node     | Azure ML distributed jobs | OSMO workflow DAGs       |
+| Checkpointing  | MLflow integration        | MLflow + custom handlers |
+| Monitoring     | Azure ML Studio           | OSMO UI Dashboard        |
 
 ## 🚀 Quick Start
 
@@ -59,12 +59,12 @@ workflows/
 
 The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO dataset instead of base64-encoding it inline.
 
-| Aspect         | train.yaml             | train-dataset.yaml    |
-|----------------|------------------------|-----------------------|
-| Payload method | Base64-encoded archive | Dataset folder upload |
-| Size limit     | ~1MB                   | Unlimited             |
-| Versioning     | None                   | Automatic             |
-| Reusability    | Per-run                | Across runs           |
+| Aspect         | train.yaml             | train-dataset.yaml        |
+|----------------|------------------------|---------------------------|
+| Payload method | Base64-encoded archive | Dataset folder upload     |
+| Size limit     | ~1MB                   | Unlimited                 |
+| Versioning     | None                   | Automatic                 |
+| Reusability    | Per-run                | Across runs               |
 
 ### Dataset Submission
 
@@ -81,11 +81,11 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
 
 ### Dataset Parameters
 
-| Parameter          | Default         | Description                   |
-|--------------------|-----------------|-------------------------------|
-| `--dataset-bucket` | `training`      | OSMO bucket for training code |
-| `--dataset-name`   | `training-code` | Dataset name (auto-versioned) |
-| `--training-path`  | `src/training`  | Local folder to upload        |
+| Parameter          | Default         | Description                    |
+|--------------------|-----------------|--------------------------------|
+| `--dataset-bucket` | `training`      | OSMO bucket for training code  |
+| `--dataset-name`   | `training-code` | Dataset name (auto-versioned)  |
+| `--training-path`  | `src/training`  | Local folder to upload         |
 
 The training folder mounts at `/data/<dataset_name>/training` inside the container.
 
