@@ -11,6 +11,10 @@ ms.topic: concept
 
 Full deployment testing incurs Azure costs. This guide provides cost transparency and optimization strategies.
 
+> [!NOTE]
+> Cost estimates in this document were captured on 2026-02-03 and are subject to change.
+> Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) for current rates.
+
 ## Testing Budget
 
 ### Full Deployment Cost Estimate
