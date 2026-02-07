@@ -1,7 +1,6 @@
 {
   "workflow_data": {
     "credential": {
-      "access_key_id": "${STORAGE_ACCESS_KEY_ID}",
       "endpoint": "${WORKFLOW_DATA_ENDPOINT}",
       "region": "${AZURE_REGION}"
     },
@@ -9,14 +8,12 @@
   },
   "workflow_log": {
     "credential": {
-      "access_key_id": "${STORAGE_ACCESS_KEY_ID}",
       "endpoint": "${WORKFLOW_LOG_ENDPOINT}",
       "region": "${AZURE_REGION}"
     }
   },
   "workflow_app": {
     "credential": {
-      "access_key_id": "${STORAGE_ACCESS_KEY_ID}",
       "endpoint": "${WORKFLOW_APP_ENDPOINT}",
       "region": "${AZURE_REGION}"
     }
@@ -30,8 +27,6 @@
       "ghcr.io",
       "${ACR_LOGIN_SERVER}"
     ],
-    "disable_data_validation": [
-      "azure"
-    ]
+    "disable_data_validation": []
   }
 }
