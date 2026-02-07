@@ -133,25 +133,39 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          milestone=$(gh api "repos/$GITHUB_REPOSITORY/milestones?per_page=100&state=open" \
-            --jq ".[] | select(.title == \"$TAG_NAME\") | .number" 2>/dev/null) || true
-
-          if [ -z "$milestone" ]; then
-            echo "::warning::No open milestone found matching $TAG_NAME"
+          if ! result=$(gh api --paginate "repos/$GITHUB_REPOSITORY/milestones?per_page=100&state=all" \
+            --jq ".[] | select(.title == \"$TAG_NAME\") | \"\(.number) \(.state)\""); then
+            echo "::warning::API call failed while querying milestones for $TAG_NAME"
             exit 0
           fi
 
-          open_issues=$(gh api "repos/$GITHUB_REPOSITORY/milestones/$milestone" \
-            --jq '.open_issues' 2>/dev/null) || true
+          if [ -z "$result" ]; then
+            echo "::warning::No milestone found matching $TAG_NAME"
+            exit 0
+          fi
+
+          ms_number=$(echo "$result" | awk '{print $1}')
+          ms_state=$(echo "$result" | awk '{print $2}')
+
+          if [ "$ms_state" = "closed" ]; then
+            echo "Milestone $TAG_NAME (#$ms_number) already closed"
+            exit 0
+          fi
+
+          if ! open_issues=$(gh api "repos/$GITHUB_REPOSITORY/milestones/$ms_number" \
+            --jq '.open_issues'); then
+            echo "::warning::API call failed while querying milestone details for $TAG_NAME (#$ms_number)"
+            exit 0
+          fi
 
           if [ "${open_issues:-0}" -gt 0 ]; then
             echo "::warning::Milestone $TAG_NAME has $open_issues open issue(s) — triage after closure"
           fi
 
-          gh api "repos/$GITHUB_REPOSITORY/milestones/$milestone" \
+          gh api "repos/$GITHUB_REPOSITORY/milestones/$ms_number" \
             --method PATCH -f state=closed || {
-            echo "::warning::Failed to close milestone $TAG_NAME (#$milestone)"
+            echo "::warning::Failed to close milestone $TAG_NAME (#$ms_number)"
             exit 0
           }
 
-          echo "Closed milestone $TAG_NAME (#$milestone)"
+          echo "Closed milestone $TAG_NAME (#$ms_number)"
