@@ -108,6 +108,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      issues: write
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2  # v2.10.2
@@ -126,3 +127,31 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: gh release edit "$TAG_NAME" --draft=false --repo "$GITHUB_REPOSITORY"
+
+      - name: Close released milestone
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          milestone=$(gh api "repos/$GITHUB_REPOSITORY/milestones?per_page=100&state=open" \
+            --jq ".[] | select(.title == \"$TAG_NAME\") | .number" 2>/dev/null) || true
+
+          if [ -z "$milestone" ]; then
+            echo "::warning::No open milestone found matching $TAG_NAME"
+            exit 0
+          fi
+
+          open_issues=$(gh api "repos/$GITHUB_REPOSITORY/milestones/$milestone" \
+            --jq '.open_issues' 2>/dev/null) || true
+
+          if [ "${open_issues:-0}" -gt 0 ]; then
+            echo "::warning::Milestone $TAG_NAME has $open_issues open issue(s) — triage after closure"
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/milestones/$milestone" \
+            --method PATCH -f state=closed || {
+            echo "::warning::Failed to close milestone $TAG_NAME (#$milestone)"
+            exit 0
+          }
+
+          echo "Closed milestone $TAG_NAME (#$milestone)"
