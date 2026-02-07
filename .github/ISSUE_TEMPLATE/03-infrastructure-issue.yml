@@ -1,6 +1,6 @@
 name: 🏗️ Infrastructure Issue
 description: Report issues with Terraform or Azure resources
-title: "[Infra]: "
+title: "fix(terraform): "
 labels: ["infrastructure", "needs-triage"]
 body:
   - type: markdown
@@ -8,6 +8,8 @@ body:
       value: |
         ## Infrastructure Issue
         For Terraform, Azure resources, networking, or AKS issues.
+
+        **Title format**: `fix(terraform): Brief description` for bugs, `feat(terraform): Brief description` for new resources, or `[Infra]: Brief description` for planning
 
   - type: dropdown
     id: issue-type

@@ -4,11 +4,15 @@
 
 import argparse
 import sys
+from pathlib import Path
+
+# Add src/ to path for common module
+_SRC_DIR = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(_SRC_DIR))
 
 from isaaclab.app import AppLauncher
 
-# local imports
-import cli_args  # isort: skip
+from common import cli_args  # isort: skip
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Run inference from a trained RSL-RL checkpoint.")

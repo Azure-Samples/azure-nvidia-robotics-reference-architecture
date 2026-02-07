@@ -153,7 +153,7 @@ mkdir -p "$TMP_DIR"
 rm -f "$ARCHIVE_PATH" "$B64_PATH"
 
 # Exclude __pycache__, .pyc, and build artifacts to reduce payload size
-(cd "$REPO_ROOT" && zip -qr "$ARCHIVE_PATH" src/training \
+(cd "$REPO_ROOT" && zip -qr "$ARCHIVE_PATH" src/training src/common \
   -x "**/__pycache__/*" \
   -x "*.pyc" \
   -x "*.pyo" \

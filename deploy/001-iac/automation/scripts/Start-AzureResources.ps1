@@ -39,7 +39,7 @@ try {
     Write-Output "Start Azure Resources Runbook"
     Write-Output "=========================================="
     Write-Output "Resource Group: $ResourceGroupName"
-    Write-Output "PostgreSQL:     $($PostgresServerName ? $PostgresServerName : '(not configured)')"
+    Write-Output "PostgreSQL:     $(if ($PostgresServerName) { $PostgresServerName } else { '(not configured)' })"
     Write-Output "AKS Cluster:    $AksClusterName"
     Write-Output ""
 
