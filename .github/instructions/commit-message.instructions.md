@@ -37,6 +37,7 @@ Scopes MUST be one of the following:
 - `(scripts)`
 - `(src)`
 - `(deploy)`
+- `(build)`
 
 ## Description
 

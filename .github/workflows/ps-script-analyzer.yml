@@ -43,16 +43,14 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $params = @{}
-
+          $args = @()
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $params['ChangedFilesOnly'] = $true
+            $args += '-ChangedFilesOnly'
           }
           if ('${{ inputs.soft-fail }}' -eq 'true') {
-            $params['SoftFail'] = $true
+            $args += '-SoftFail'
           }
-
-          & scripts/linting/Invoke-PSScriptAnalyzer.ps1 @params
+          & scripts/linting/Invoke-PSScriptAnalyzer.ps1 @args
 
       - name: Upload PSScriptAnalyzer results
         if: always()
