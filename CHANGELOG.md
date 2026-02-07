@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **Note:** This file is automatically maintained by [release-please](https://github.com/googleapis/release-please). Do not edit manually.
 
+## [0.1.1](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.1.0...v0.1.1) (2026-02-07)
+
+
+### 📚 Documentation
+
+* create comprehensive CONTRIBUTING.md ([#119](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/119)) ([9c60073](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/9c600734b139099e7f6f0976a2791de13a19096c))
+* **scripts:** document submit script CLI arguments ([#123](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/123)) ([adabdd5](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/adabdd51e8db0e734d0875a070bc4ded338ec8a6))
+* **src:** expand Google-style docstrings for training utils env module ([#131](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/131)) ([29ab4f8](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/29ab4f802fd023a3b1ec6318b449ab60356b28fa))
+
+
+### 🔧 Miscellaneous
+
+* **deps:** bump protobuf from 6.33.3 to 6.33.5 ([#51](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/51)) ([cab59e6](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/cab59e620678d3056180ffc152bfd0789891f4ac))
+
 ## [0.1.0](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.0.1...v0.1.0) (2026-02-07)
 
 
