@@ -211,8 +211,8 @@ class SystemMetricsCollector:
     """Collect system-level CPU, memory, GPU, and disk metrics.
 
     All returned metric keys use the ``system/`` prefix. GPU metrics
-    are optional and silently omitted when ``pynvml`` is unavailable or
-    no NVIDIA devices are detected.
+    are optional and omitted when ``pynvml`` is unavailable or
+    initialization fails; a warning is logged in that case.
 
     Attributes:
         _collect_disk: Whether disk metrics are included in collection.
@@ -225,8 +225,8 @@ class SystemMetricsCollector:
         """Initialize system metrics collector.
 
         When *collect_gpu* is enabled, GPU monitoring is initialized via
-        ``pynvml``. If ``pynvml`` is unavailable or no NVIDIA devices are
-        detected, GPU metrics are silently disabled and a warning is logged.
+        ``pynvml``. If ``pynvml`` is unavailable or initialization raises
+        an exception, GPU metrics are disabled and a warning is logged.
 
         Args:
             collect_gpu: Enable GPU metrics collection. Requires ``pynvml``.
@@ -244,7 +244,7 @@ class SystemMetricsCollector:
 
         Discovers NVIDIA devices and stores their handles for subsequent
         metric collection. Logs device count on success. On failure
-        (missing ``pynvml``, driver issues, or zero devices), sets
+        (missing ``pynvml`` or driver issues), sets
         ``_gpu_available`` to ``False`` and logs a warning.
         """
         try:
@@ -264,8 +264,8 @@ class SystemMetricsCollector:
 
         Aggregates CPU, memory, GPU, and disk metrics into a single
         dictionary. GPU entries are omitted when GPU monitoring is
-        unavailable. Disk entries are omitted when *collect_disk* is
-        disabled.
+        unavailable. Disk entries are omitted when disk collection is
+        disabled via the ``collect_disk`` initialization flag.
 
         Returns:
             Dictionary of metric names to float values. All keys use
@@ -292,7 +292,8 @@ class SystemMetricsCollector:
             Dictionary with ``system/cpu_utilization_percentage``,
             ``system/memory_used_megabytes``,
             ``system/memory_available_megabytes``, and
-            ``system/memory_percent`` keys. Empty on failure.
+            ``system/memory_percent`` keys. Empty when runtime
+            collection encounters an error.
         """
         import psutil
 
@@ -356,7 +357,8 @@ class SystemMetricsCollector:
         Returns:
             Dictionary with ``system/disk_used_gigabytes``,
             ``system/disk_available_gigabytes``, and
-            ``system/disk_percent`` keys. Empty on failure.
+            ``system/disk_percent`` keys. Empty when runtime
+            collection encounters an error.
         """
         import psutil
 
