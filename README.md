@@ -49,7 +49,7 @@ See [OSMO workflow examples](workflows/osmo/) for job configuration templates.
 
 ### Required Tools
 
-- [pyenv](https://github.com/pyenv/pyenv)
+- [uv](https://docs.astral.sh/uv/) - Python package manager and environment tool
 - Python 3.11 (required by Isaac Sim 5.X)
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (v2.50+)
 - [Terraform](https://www.terraform.io/downloads) (v1.5+)
