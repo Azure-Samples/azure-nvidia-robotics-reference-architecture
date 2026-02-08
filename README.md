@@ -52,7 +52,7 @@ See [OSMO workflow examples](workflows/osmo/) for job configuration templates.
 - [uv](https://docs.astral.sh/uv/) - Python package manager and environment tool
 - Python 3.11 (required by Isaac Sim 5.X)
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (v2.50+)
-- [Terraform](https://www.terraform.io/downloads) (v1.5+)
+- [Terraform](https://developer.hashicorp.com/terraform/install) (v1.5+)
 - [NVIDIA OSMO CLI](https://developer.nvidia.com/osmo) (latest)
 - [Docker](https://docs.docker.com/get-docker/) with NVIDIA Container Toolkit
 - [hve-core](https://github.com/microsoft/hve-core) - Copilot-assisted development workflows ([install guide](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md))
