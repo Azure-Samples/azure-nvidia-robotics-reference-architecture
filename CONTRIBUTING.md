@@ -77,7 +77,7 @@ All contributions require appropriate tests. This policy supports code quality a
 
 ### Running Tests
 
-Run the full test suite:
+Once a `tests/` directory exists, run the full test suite:
 
 ```bash
 pytest tests/
@@ -92,7 +92,8 @@ uv run pytest tests/
 Run tests with coverage reporting:
 
 ```bash
-pytest tests/ --cov=src --cov-report=term-missing
+coverage run -m pytest tests/
+coverage report -m
 ```
 
 ### Test Organization
@@ -107,7 +108,7 @@ Tests mirror the source directory structure under `tests/`:
 
 ### Test Categories
 
-| Marker        | Description                        | CI Behavior                   |
+| Marker        | Description                        | Planned CI Behavior           |
 |---------------|------------------------------------|-------------------------------|
 | *(default)*   | Unit tests, fast, no external deps | Always runs                   |
 | `slow`        | Tests exceeding 5 seconds          | Runs on main, optional on PRs |
@@ -130,15 +131,15 @@ Coverage thresholds increase with each milestone:
 | v0.5.0    | 60%              |
 | v0.6.0    | 80%              |
 
-CI enforces the current milestone's minimum. PRs that reduce coverage below the threshold fail validation.
+These coverage levels are contribution targets for local test runs. CI enforcement of coverage thresholds is planned for a future milestone.
 
 ### Configuration
 
-Pytest configuration is in `pyproject.toml` under `[tool.pytest.ini_options]`. Coverage configuration is in `pyproject.toml` under `[tool.coverage.run]` and `[tool.coverage.report]`.
+Pytest and coverage are not yet centrally configured in `pyproject.toml`. When adding tests, follow standard pytest conventions (a `tests/` directory with shared fixtures as needed) and align with existing tests in this repository.
 
 ### Shell and Infrastructure Tests
 
-Shell scripts use [BATS-core](https://github.com/bats-core/bats-core) for testing and PowerShell modules use [Pester v5](https://pester.dev/). Terraform modules use the native `terraform test` framework. Each area's README contains framework-specific details.
+Use [BATS-core](https://github.com/bats-core/bats-core) for shell script tests, [Pester v5](https://pester.dev/) for PowerShell tests, and the native `terraform test` framework for Terraform modules. When adding tests, include framework-specific details in the README for each area.
 
 ## Code of Conduct
 
