@@ -192,7 +192,7 @@ See the [Pull Request Process](pull-request-process.md) guide for the complete w
 Full deployment testing incurs Azure costs. Plan accordingly and destroy resources promptly.
 
 > [!NOTE]
-> Cost estimates in this section were captured on 2026-02-03 and are subject to change.
+> Cost estimates are approximate and subject to change.
 > Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) for current rates.
 
 ### Testing Budget Summary

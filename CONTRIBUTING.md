@@ -3,7 +3,7 @@ title: Contributing
 description: How to contribute to the Azure NVIDIA Robotics Reference Architecture
 author: Microsoft Robotics-AI Team
 ms.date: 2026-02-08
-ms.topic: guide
+ms.topic: how-to
 keywords:
   - contributing
   - development workflow
@@ -11,11 +11,9 @@ keywords:
   - code review
 ---
 
-Thank you for your interest in contributing to this project. ❤️
+Contributions are welcome across infrastructure code, deployment automation, documentation, training scripts, and ML workflows. Read the relevant sections below before making your contribution.
 
-All types of contributions are encouraged and valued: infrastructure code, deployment automation, documentation, training scripts, and ML workflows. Read the relevant sections below before making your contribution.
-
-> If you like the project but don't have time to contribute, consider starring the repository or sharing it with colleagues working in robotics and AI.
+If you are new to the project, start with issues labeled `good first issue` or documentation updates before making larger changes.
 
 ## Getting Started
 
@@ -23,7 +21,7 @@ All types of contributions are encouraged and valued: infrastructure code, deplo
 2. Review the [Prerequisites](docs/contributing/prerequisites.md) for required tools and Azure access
 3. Fork the repository and clone your fork locally
 4. Review the [README](README.md) for project overview and architecture
-5. Create a feature branch following [conventional commit](docs/contributing/README.md#-commit-messages) naming
+5. Create a descriptive feature branch (for example, `feature/...` or `fix/...`) and follow [Conventional Commits](docs/contributing/README.md#-commit-messages) for commit messages
 6. Run [validation](#build-and-validation) before submitting
 
 ## Contributing Guides

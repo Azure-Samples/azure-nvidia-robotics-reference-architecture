@@ -195,7 +195,7 @@ Documentation contributions improve the architecture for the entire robotics and
 Before submitting documentation changes:
 
 * Run `npm run lint:md` to check formatting and style
-* Verify internal links with `npm run lint:links` (if available)
+* Verify internal links with `npm run lint:links`
 * Test code samples in deployment environment
 * Review against [docs-style-and-conventions.instructions.md](../../.github/instructions/docs-style-and-conventions.instructions.md)
 
