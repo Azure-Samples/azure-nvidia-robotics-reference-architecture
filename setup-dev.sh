@@ -88,6 +88,16 @@ else
   info "IsaacLab cloned successfully"
 fi
 
+section "hve-core Check"
+
+if [[ ! -d "${SCRIPT_DIR}/../hve-core" ]]; then
+  warn "hve-core not found at ${SCRIPT_DIR}/../hve-core"
+  warn "Install for Copilot workflows: https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md"
+  warn "Or install the VS Code Extension: ise-hve-essentials.hve-core"
+else
+  info "hve-core found at ${SCRIPT_DIR}/../hve-core"
+fi
+
 section "Setup Complete"
 
 echo

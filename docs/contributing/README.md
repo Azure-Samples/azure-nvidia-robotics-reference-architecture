@@ -10,12 +10,13 @@ This directory contains detailed guidance for specific contribution workflows. S
 
 ## Available Guides
 
-| Guide                                             | Description                                                      |
-|---------------------------------------------------|------------------------------------------------------------------|
-| [Deployment Validation](deployment-validation.md) | 4-level validation model, testing templates, cost optimization   |
-| [Cost Considerations](cost-considerations.md)     | Testing budgets, cost tracking, regional pricing                 |
-| [Security Review](security-review.md)             | Security checklist, credential handling, dependency updates      |
-| [Infrastructure Style](infrastructure-style.md)   | Terraform conventions, shell script standards, copyright headers |
+| Guide                                                 | Description                                                      |
+|-------------------------------------------------------|------------------------------------------------------------------|
+| [Deployment Validation](deployment-validation.md)     | 4-level validation model, testing templates, cost optimization   |
+| [Cost Considerations](cost-considerations.md)         | Testing budgets, cost tracking, regional pricing                 |
+| [Security Review](security-review.md)                 | Security checklist, credential handling, dependency updates      |
+| [Infrastructure Style](infrastructure-style.md)       | Terraform conventions, shell script standards, copyright headers |
+| [Developer Environment](../../README.md#-quick-start) | hve-core setup, VS Code configuration, Copilot workflows         |
 
 ## Quick Reference
 

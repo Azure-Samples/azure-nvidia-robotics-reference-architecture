@@ -32,6 +32,7 @@ Contributions can include:
 ## 📚 Table of Contents
 
 * [Prerequisites](#-prerequisites)
+* [Copilot & hve-core Tooling](#-copilot--hve-core-tooling)
 * [Build and Validation Requirements](#-build-and-validation-requirements)
 * [Code of Conduct](#-code-of-conduct)
 * [I Have a Question](#-i-have-a-question)
@@ -65,15 +66,16 @@ Detailed documentation for specialized topics:
 
 Install these tools before contributing:
 
-| Tool         | Minimum Version | Installation                                                              |
-| ------------ | --------------- | ------------------------------------------------------------------------- |
-| Terraform    | 1.9.8           | <https://developer.hashicorp.com/terraform/install>                       |
-| Azure CLI    | 2.65.0          | <https://learn.microsoft.com/cli/azure/install-azure-cli>                 |
-| kubectl      | 1.31            | <https://kubernetes.io/docs/tasks/tools/>                                 |
-| Helm         | 3.16            | <https://helm.sh/docs/intro/install/>                                     |
-| Node.js/npm  | 20+ LTS         | <https://nodejs.org/>                                                     |
-| Python       | 3.11+           | <https://www.python.org/downloads/>                                       |
-| shellcheck   | 0.10+           | <https://www.shellcheck.net/>                                             |
+| Tool        | Minimum Version | Installation                                                                                     |
+| ----------- | --------------- | ------------------------------------------------------------------------------------------------ |
+| Terraform   | 1.9.8           | <https://developer.hashicorp.com/terraform/install>                                              |
+| Azure CLI   | 2.65.0          | <https://learn.microsoft.com/cli/azure/install-azure-cli>                                        |
+| kubectl     | 1.31            | <https://kubernetes.io/docs/tasks/tools/>                                                        |
+| Helm        | 3.16            | <https://helm.sh/docs/intro/install/>                                                            |
+| Node.js/npm | 20+ LTS         | <https://nodejs.org/>                                                                            |
+| Python      | 3.11+           | <https://www.python.org/downloads/>                                                              |
+| shellcheck  | 0.10+           | <https://www.shellcheck.net/>                                                                    |
+| hve-core    | latest          | [Install Guide](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md) |
 
 ### Azure Access Requirements
 
@@ -133,6 +135,44 @@ Full deployment validation incurs Azure costs. Understand cost structure before 
 * Quick validation (deploy + verify + destroy): ~$25-50
 * Extended development session (8 hours): ~$50-100
 * Monthly development (40 hours): ~$200-300
+
+## 🤖 Copilot & hve-core Tooling
+
+This project uses [microsoft/hve-core](https://github.com/microsoft/hve-core) for Copilot-assisted development workflows. hve-core provides curated agents, prompts, and instruction files that activate automatically in VS Code.
+
+### Installation Methods
+
+| Method                                                                                               | Use Case                                  |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=ise-hve-essentials.hve-core) | Zero config, automatic updates            |
+| [Peer Clone](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md)        | Full repo access, developer customization |
+
+See the [full install guide](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md) for additional methods.
+
+### Release Channels
+
+| Channel     | Versions              | Includes                              |
+| ----------- | --------------------- | ------------------------------------- |
+| Stable      | Even minor (2.0, 2.2) | `stable` maturity artifacts only      |
+| Pre-release | Odd minor (2.1, 2.3)  | `stable` + `preview` + `experimental` |
+
+### What Loads Automatically
+
+`.vscode/settings.json` configures paths to hve-core Copilot artifacts:
+
+| Artifact Type | Setting                           |
+| ------------- | --------------------------------- |
+| Chat modes    | `chat.modeFilesLocations`         |
+| Instructions  | `chat.instructionsFilesLocations` |
+| Prompts       | `chat.promptFilesLocations`       |
+
+Without hve-core installed, these paths resolve silently to nothing. Copilot still functions, but shared team conventions and workflow prompts are unavailable.
+
+### Verify Installation
+
+1. Open VS Code in the project workspace
+2. Open Copilot Chat
+3. Confirm agents appear in the agent picker (task-planner, task-researcher, prompt-builder)
 
 ## 🔨 Build and Validation Requirements
 
@@ -571,12 +611,12 @@ This reference architecture validates through deployment rather than automated t
 
 ### Validation Levels
 
-| Level                   | What                                                                        | When to Use                    | Cost    |
-| ----------------------- | --------------------------------------------------------------------------- | ------------------------------ | ------- |
-| **Level 1: Static**     | `terraform fmt`, `terraform validate`, `shellcheck`, `npm run lint:md`      | Every contribution             | $0      |
-| **Level 2: Plan**       | `terraform plan` with documented output                                     | Terraform changes              | $0      |
-| **Level 3: Deployment** | Full deployment in dev subscription                                         | Major infrastructure changes   | $25-50  |
-| **Level 4: Workflow**   | Training job execution                                                      | Script/workflow changes        | $5-30   |
+| Level                   | What                                                                   | When to Use                  | Cost   |
+| ----------------------- | ---------------------------------------------------------------------- | ---------------------------- | ------ |
+| **Level 1: Static**     | `terraform fmt`, `terraform validate`, `shellcheck`, `npm run lint:md` | Every contribution           | $0     |
+| **Level 2: Plan**       | `terraform plan` with documented output                                | Terraform changes            | $0     |
+| **Level 3: Deployment** | Full deployment in dev subscription                                    | Major infrastructure changes | $25-50 |
+| **Level 4: Workflow**   | Training job execution                                                 | Script/workflow changes      | $5-30  |
 
 **Static validation is required for all PRs:**
 

@@ -7,7 +7,17 @@ Thank you for your interest in contributing to this project. This guide outlines
 1. Fork the repository
 2. Clone your fork locally
 3. Review the [README](README.md) for project setup
-4. Create a feature branch for your changes
+4. Install [hve-core](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md) for Copilot-assisted workflows
+5. Create a branch from `main` with a prefix matching your change type:
+
+   | Prefix      | Use For                      | Example                            |
+   |-------------|------------------------------|------------------------------------|
+   | `feat/`     | New features or capabilities | `feat/private-endpoint-support`    |
+   | `fix/`      | Bug fixes                    | `fix/gpu-scheduling-timeout`       |
+   | `docs/`     | Documentation changes        | `docs/hve-core-onboarding`         |
+   | `refactor/` | Code restructuring           | `refactor/consolidate-helm-values` |
+   | `ci/`       | CI/CD pipeline changes       | `ci/add-codeql-scanning`           |
+   | `chore/`    | Maintenance and housekeeping | `chore/update-dependencies`        |
 
 ## Issue Title Conventions
 
