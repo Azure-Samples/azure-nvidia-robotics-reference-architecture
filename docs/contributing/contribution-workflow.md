@@ -41,30 +41,15 @@ Before creating a bug report:
 
 Create a [new issue](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new) with:
 
-* **Title format:** `[Component][Subcomponent] Brief description`
-  * Examples: `[Terraform][Platform Module] Private endpoint creation fails`, `[AzureML Extension] GPU pod scheduling timeout`
-* **Environment details:**
-  * Azure region
-  * Network mode (private/hybrid/public)
-  * Terraform version
-  * Azure CLI version
-  * Relevant VM SKUs (GPU node pool)
-* **Expected vs. actual behavior:**
-  * What should happen
-  * What actually happened
-* **Deployment logs:**
-  * `terraform apply` output (sanitize sensitive values)
-  * Azure CLI error messages
-  * Kubernetes pod logs if applicable: `kubectl logs <pod-name> -n <namespace>`
-* **Azure resource state:**
-  * `az resource show --ids <resource-id>` output for affected resources
-  * Resource provisioning state: `az resource list --resource-group <rg> --query "[].{name:name, provisioningState:provisioningState}"`
-* **Reproduction steps:**
-  * Numbered list of commands from initial setup
-  * Configuration files used (sanitize sensitive values)
-* **Cost impact (if relevant):**
-  * Resources deployed and hourly cost: `az consumption usage list`
-  * Example: "Deployed 3x Standard_NC24ads_A100_v4 VMs running at ~$9/hour"
+| Field                | Details                                                                 |
+|----------------------|-------------------------------------------------------------------------|
+| Title format         | `[Component][Subcomponent] Brief description`                           |
+| Environment details  | Azure region, network mode, Terraform/CLI versions, GPU VM SKUs         |
+| Expected vs. actual  | What should happen and what actually happened                           |
+| Deployment logs      | `terraform apply` output, CLI errors, pod logs; sanitize secrets        |
+| Azure resource state | `az resource show` output, provisioning state query                     |
+| Reproduction steps   | Numbered commands from setup, config files (sanitize sensitive values)  |
+| Cost impact          | Resources deployed and hourly cost (if relevant)                        |
 
 <details>
 <summary>Bug Report Example (click to expand)</summary>

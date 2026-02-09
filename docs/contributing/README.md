@@ -27,7 +27,7 @@ Contributions can include:
 * Workflow templates (AzureML, OSMO)
 * Bug fixes and issue resolution
 
-## Contributing Guides
+## 📖 Contributing Guides
 
 | Guide                                             | Description                                                      |
 |---------------------------------------------------|------------------------------------------------------------------|
@@ -130,11 +130,11 @@ Use ATX-style headers, tables for structured data, GitHub alert syntax for callo
 
 For complete Markdown guidance, see [docs-style-and-conventions.instructions.md](../../.github/instructions/docs-style-and-conventions.instructions.md).
 
-## Infrastructure as Code Style
+## 🏗️ Infrastructure as Code Style
 
 Infrastructure code follows strict conventions for consistency, security, and maintainability.
 
-**Key Terraform Conventions:**
+### Key Terraform Conventions
 
 * Format with `terraform fmt -recursive deploy/` before committing
 * Use descriptive snake_case variables with prefixes (`enable_`, `is_`, `aks_`)
@@ -142,13 +142,13 @@ Infrastructure code follows strict conventions for consistency, security, and ma
 * Prefer managed identities over service principals
 * Store secrets in Key Vault, never in code
 
-**Key Shell Script Conventions:**
+### Key Shell Script Conventions
 
 * Begin scripts with `#!/usr/bin/env bash` and `set -euo pipefail`
 * Include header documentation with prerequisites, environment variables, and usage
 * Validate with `shellcheck` before committing
 
-**Copyright Headers:**
+### Copyright Headers
 
 All source files require the Microsoft copyright header:
 
@@ -195,7 +195,7 @@ Full deployment testing incurs Azure costs. Plan accordingly and destroy resourc
 > Cost estimates in this section were captured on 2026-02-03 and are subject to change.
 > Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) for current rates.
 
-**Testing Budget Summary:**
+### Testing Budget Summary
 
 | Contribution Type   | Typical Cost | Testing Approach          |
 | ------------------- | ------------ | ------------------------- |
@@ -204,12 +204,12 @@ Full deployment testing incurs Azure costs. Plan accordingly and destroy resourc
 | Training scripts    | $15-30       | Single training job       |
 | Full infrastructure | $25-50       | Complete deployment cycle |
 
-**Key Cost Drivers:**
+### Key Cost Drivers
 
 * GPU VMs: ~$3.06/hour per Standard_NC24ads_A100_v4 node
 * Managed services: ~$50-100/month combined (Storage, Key Vault, PostgreSQL, Redis)
 
-**Minimize costs with:**
+### Cost Minimization
 
 ```bash
 # Single GPU node, public network mode
@@ -225,7 +225,7 @@ For component cost breakdowns, budgeting commands, and regional pricing, see [Co
 
 Security-sensitive contributions require additional review to ensure Azure best practices.
 
-**Security Review Required For:**
+### Security Review Scope
 
 * RBAC and permissions changes
 * Private endpoints and networking configuration
@@ -233,14 +233,14 @@ Security-sensitive contributions require additional review to ensure Azure best 
 * Network policies and firewall rules
 * Workload identity configuration
 
-**Key Requirements:**
+### Key Requirements
 
 * Managed identities over service principals
 * Secrets in Key Vault, never in code
 * Least privilege RBAC assignments
 * Security scanning before PR submission
 
-**Reporting Security Issues:**
+### Reporting Security Issues
 
 **DO NOT** report vulnerabilities through public GitHub issues. Report to Microsoft Security Response Center (MSRC). See [SECURITY.md](../../SECURITY.md).
 

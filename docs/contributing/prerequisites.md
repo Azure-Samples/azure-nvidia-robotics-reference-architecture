@@ -35,19 +35,19 @@ Install these tools before contributing:
 
 Deploying this architecture requires Azure subscription access with specific permissions and quotas:
 
-**Subscription Roles:**
+### Subscription Roles
 
 * `Contributor` role for resource group creation and management
 * `User Access Administrator` role for managed identity assignment
 
-**GPU Quota:**
+### GPU Quota
 
 * Request GPU VM quota in your target region before deployment
 * Architecture uses `Standard_NC24ads_A100_v4` (24 vCPU, 220 GB RAM, 1x A100 80GB GPU)
 * Check quota: `az vm list-usage --location <region> --query "[?name.value=='standardNCadsA100v4Family']"`
 * Request increase through Azure Portal → Quotas → Compute
 
-**Regional Availability:**
+### Regional Availability
 
 * Verify GPU VM availability in target region: <https://azure.microsoft.com/global-infrastructure/services/?products=virtual-machines>
 * Architecture validated in `eastus`, `westus2`, `westeurope` <!-- cspell:disable-line -->
@@ -64,27 +64,27 @@ Training workflows use NVIDIA GPU Operator and Isaac Lab, which require NGC cred
 
 Full deployment validation incurs Azure costs. Understand cost structure before deploying:
 
-**GPU Virtual Machines:**
+### GPU Virtual Machines
 
 * `Standard_NC24ads_A100_v4`: ~$3.06/hour per VM (pay-as-you-go)
 * 8-hour validation session: ~$25
 * 40-hour work week: ~$125
 
-**Managed Services:**
+### Managed Services
 
 * AKS control plane: ~$0.10/hour (~$73/month)
 * Log Analytics workspace: ~$2.76/GB ingested
 * Storage accounts: ~$0.02/GB (block blob, hot tier)
 * Azure Container Registry: Basic tier ~$5/month
 
-**Cost Optimization:**
+### Cost Optimization
 
 * Use `terraform destroy` immediately after validation
 * Automate cleanup with `-auto-approve` flag
 * Monitor costs: Azure Portal → Cost Management + Billing
 * Set budget alerts to prevent overruns
 
-**Estimated Costs:**
+### Estimated Costs
 
 * Quick validation (deploy + verify + destroy): ~$25-50
 * Extended development session (8 hours): ~$50-100

@@ -13,7 +13,7 @@ keywords:
 
 Thank you for your interest in contributing to this project. ❤️
 
-All types of contributions are encouraged and valued — infrastructure code, deployment automation, documentation, training scripts, and ML workflows. Read the relevant sections below before making your contribution.
+All types of contributions are encouraged and valued: infrastructure code, deployment automation, documentation, training scripts, and ML workflows. Read the relevant sections below before making your contribution.
 
 > If you like the project but don't have time to contribute, consider starring the repository or sharing it with colleagues working in robotics and AI.
 

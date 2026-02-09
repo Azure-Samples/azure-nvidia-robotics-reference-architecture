@@ -26,7 +26,7 @@ This reference architecture uses a deployment-based validation model rather than
 
 ## Review Process
 
-**Reviewer Assignment:**
+### Reviewer Assignment
 
 Maintainers assign reviewers based on contribution type:
 
@@ -39,13 +39,13 @@ Maintainers assign reviewers based on contribution type:
 | Documentation        | Any maintainer                |
 | Security changes     | Security Contributor          |
 
-**Review Cycles:**
+### Review Cycles
 
 * First review: Focus on architecture, security, cost implications
 * Subsequent reviews: Address specific feedback
 * Final review: Verify all validation documentation complete
 
-**Approval Criteria:**
+### Approval Criteria
 
 * [ ] Follows style guides (commit messages, markdown, infrastructure)
 * [ ] Appropriate validation level completed
@@ -60,25 +60,25 @@ This reference architecture uses a rolling update model rather than semantic ver
 
 ### Update Types
 
-**Documentation Updates:**
+#### Documentation Updates
 
 * Continuous improvements to READMEs, guides, and troubleshooting docs
 * No announcement needed for minor clarifications
 * Significant new guides announced via repository discussions
 
-**Enhancement Updates:**
+#### Enhancement Updates
 
 * New capabilities (e.g., new network mode, new Azure service integration)
 * Announced via GitHub Releases with usage examples
 * Backward compatible when possible
 
-**Breaking Changes:**
+#### Breaking Changes
 
 * Infrastructure modifications that require resource recreation
 * Terraform variable/output changes
 * Deployment script interface changes
 
-**Breaking Change Communication:**
+#### Breaking Change Communication
 
 * GitHub Release with `[BREAKING]` prefix
 * Migration guide in release notes
@@ -87,7 +87,7 @@ This reference architecture uses a rolling update model rather than semantic ver
 
 ### Component Updates
 
-**Dependency Management:**
+#### Dependency Management
 
 Update dependencies regularly for security patches and feature improvements:
 
@@ -103,7 +103,7 @@ helm search repo nvidia-gpu-operator --versions
 pip install -r requirements.txt --upgrade
 ```
 
-**Migration Approach:**
+#### Migration Approach
 
 When pulling upstream updates:
 
