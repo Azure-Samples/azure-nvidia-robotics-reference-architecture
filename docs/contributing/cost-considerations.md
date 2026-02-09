@@ -7,7 +7,7 @@ ms.topic: concept
 ---
 
 > [!NOTE]
-> This guide expands on the [Cost Considerations](../../.github/CONTRIBUTING.md#-cost-considerations) section of the main contributing guide.
+> This guide expands on the [Cost Considerations](README.md#-cost-considerations) section of the main contributing guide.
 
 Full deployment testing incurs Azure costs. This guide provides cost transparency and optimization strategies.
 
@@ -121,6 +121,6 @@ GPU VM costs vary by region. Use [Azure Pricing Calculator](https://azure.micros
 
 ## Related Documentation
 
-* [Main CONTRIBUTING.md](../../.github/CONTRIBUTING.md) - Prerequisites, workflow, commit messages
+* [Contributing Guide](README.md) - Prerequisites, workflow, commit messages
 * [Deployment Validation](deployment-validation.md) - Validation levels and testing templates
 * [Security Review](security-review.md) - Security checklist and reporting
