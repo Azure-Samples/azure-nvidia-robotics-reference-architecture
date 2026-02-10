@@ -96,11 +96,11 @@ The inference workflow exports trained checkpoints to deployment-ready formats (
 
 ### Supported Model Formats
 
-| Format      | Extension | Use Case                                      |
-|-------------|-----------|-----------------------------------------------|
-| ONNX        | `.onnx`   | Cross-platform deployment, ONNX Runtime       |
-| TorchScript | `.pt`     | PyTorch-native deployment, JIT compilation    |
-| Both        | —         | Export and validate both formats (default)    |
+| Format      | Extension | Use Case                                   |
+|-------------|-----------|--------------------------------------------|
+| ONNX        | `.onnx`   | Cross-platform deployment, ONNX Runtime    |
+| TorchScript | `.pt`     | PyTorch-native deployment, JIT compilation |
+| Both        | —         | Export and validate both formats (default) |
 
 ### Checkpoint URI Formats
 
@@ -189,14 +189,14 @@ runs:/b906b426-078e-4539-b907-aecb3121a76d/checkpoints/final/model_99.pt
 
 The inference workflow produces:
 
-| Artifact                      | Description                              |
-|-------------------------------|------------------------------------------|
-| `exported/policy.onnx`        | ONNX-exported policy model               |
-| `exported/policy.pt`          | TorchScript-exported policy model        |
-| `metrics/onnx_metrics.json`   | ONNX inference performance metrics       |
-| `metrics/jit_metrics.json`    | TorchScript inference performance metrics|
-| `videos/onnx_play/`           | ONNX inference video recordings          |
-| `videos/jit_play/`            | TorchScript inference video recordings   |
+| Artifact                    | Description                               |
+|-----------------------------|-------------------------------------------|
+| `exported/policy.onnx`      | ONNX-exported policy model                |
+| `exported/policy.pt`        | TorchScript-exported policy model         |
+| `metrics/onnx_metrics.json` | ONNX inference performance metrics        |
+| `metrics/jit_metrics.json`  | TorchScript inference performance metrics |
+| `videos/onnx_play/`         | ONNX inference video recordings           |
+| `videos/jit_play/`          | TorchScript inference video recordings    |
 
 ## 📋 Prerequisites
 

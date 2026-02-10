@@ -1,6 +1,6 @@
 name: 🤖 Training Issue
 description: Report issues with RL training scripts or workflows
-title: "[Training]: "
+title: "fix(training): "
 labels: ["training", "needs-triage"]
 body:
   - type: markdown
@@ -8,6 +8,8 @@ body:
       value: |
         ## Training Issue
         For Isaac Lab, SKRL, RSL-RL, or MLflow training issues.
+
+        **Title format**: `fix(training): Brief description` for bugs, `feat(training): Brief description` for new features
 
   - type: dropdown
     id: framework

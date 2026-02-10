@@ -52,3 +52,121 @@ jobs:
     uses: ./.github/workflows/markdown-link-check.yml
     permissions:
       contents: read
+
+  # Automated release PR management via release-please
+  release-please:
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}
+    needs:
+      - spell-check
+      - markdown-lint
+      - table-format
+      - psscriptanalyzer
+      - link-lang-check
+      - markdown-link-check
+    name: Release Please
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-please-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
+      patch: ${{ steps.release.outputs.patch }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e  # v2.10.2
+        with:
+          egress-policy: audit
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.0.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38  # v4.4.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: release-please-manifest.json
+
+  # Promote draft release to published
+  publish-release:
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [release-please]
+    name: Publish Release
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-please-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e  # v2.10.2
+        with:
+          egress-policy: audit
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.0.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: gh release edit "$TAG_NAME" --draft=false --repo "$GITHUB_REPOSITORY"
+
+      - name: Close released milestone
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          if ! result=$(gh api --paginate "repos/$GITHUB_REPOSITORY/milestones?per_page=100&state=all" \
+            --jq ".[] | select(.title == \"$TAG_NAME\") | \"\(.number) \(.state)\""); then
+            echo "::warning::API call failed while querying milestones for $TAG_NAME"
+            exit 0
+          fi
+
+          if [ -z "$result" ]; then
+            echo "::warning::No milestone found matching $TAG_NAME"
+            exit 0
+          fi
+
+          ms_number=$(echo "$result" | awk '{print $1}')
+          ms_state=$(echo "$result" | awk '{print $2}')
+
+          if [ "$ms_state" = "closed" ]; then
+            echo "Milestone $TAG_NAME (#$ms_number) already closed"
+            exit 0
+          fi
+
+          if ! open_issues=$(gh api "repos/$GITHUB_REPOSITORY/milestones/$ms_number" \
+            --jq '.open_issues'); then
+            echo "::warning::API call failed while querying milestone details for $TAG_NAME (#$ms_number)"
+            exit 0
+          fi
+
+          if [ "${open_issues:-0}" -gt 0 ]; then
+            echo "::warning::Milestone $TAG_NAME has $open_issues open issue(s) — triage after closure"
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/milestones/$ms_number" \
+            --method PATCH -f state=closed || {
+            echo "::warning::Failed to close milestone $TAG_NAME (#$ms_number)"
+            exit 0
+          }
+
+          echo "Closed milestone $TAG_NAME (#$ms_number)"
