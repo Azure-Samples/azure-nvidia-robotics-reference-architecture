@@ -141,9 +141,9 @@ All contributions require appropriate tests. This policy supports code quality a
 
 ### Policy
 
-* New features require accompanying unit tests.
-* Bug fixes require regression tests that reproduce the fixed behavior.
-* Refactoring changes must not reduce test coverage.
+- New features require accompanying unit tests.
+- Bug fixes require regression tests that reproduce the fixed behavior.
+- Refactoring changes must not reduce test coverage.
 
 ### Running Tests
 
