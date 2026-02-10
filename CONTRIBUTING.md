@@ -1,28 +1,75 @@
 ---
-title: Contributing to Azure NVIDIA Robotics Reference Architecture
-description: Contribution guidelines covering development setup, conventions, testing requirements, and code of conduct
-ms.date: 2026-02-07
+title: Contributing
+description: How to contribute to the Azure NVIDIA Robotics Reference Architecture
+author: Microsoft Robotics-AI Team
+ms.date: 2026-02-08
 ms.topic: how-to
+keywords:
+  - contributing
+  - development workflow
+  - pull requests
+  - code review
 ---
 
-Thank you for your interest in contributing to this project. This guide outlines how to contribute effectively.
+Contributions are welcome across infrastructure code, deployment automation, documentation, training scripts, and ML workflows. Read the relevant sections below before making your contribution.
+
+If you are new to the project, start with issues labeled `good first issue` or documentation updates before making larger changes.
 
 ## Getting Started
 
-1. Fork the repository
-2. Clone your fork locally
-3. Review the [README](README.md) for project setup
-4. Install [hve-core](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md) for Copilot-assisted workflows
-5. Create a branch from `main` with a prefix matching your change type:
+1. Read the [Contributing Guide](docs/contributing/README.md) for prerequisites, workflow, and conventions
+2. Review the [Prerequisites](docs/contributing/prerequisites.md) for required tools and Azure access
+3. Fork the repository and clone your fork locally
+4. Review the [README](README.md) for project overview and architecture
+5. Create a descriptive feature branch (for example, `feature/...` or `fix/...`) and follow [Conventional Commits](docs/contributing/README.md#-commit-messages) for commit messages
+6. Run [validation](#build-and-validation) before submitting
 
-   | Prefix      | Use For                      | Example                            |
-   |-------------|------------------------------|------------------------------------|
-   | `feat/`     | New features or capabilities | `feat/private-endpoint-support`    |
-   | `fix/`      | Bug fixes                    | `fix/gpu-scheduling-timeout`       |
-   | `docs/`     | Documentation changes        | `docs/hve-core-onboarding`         |
-   | `refactor/` | Code restructuring           | `refactor/consolidate-helm-values` |
-   | `ci/`       | CI/CD pipeline changes       | `ci/add-codeql-scanning`           |
-   | `chore/`    | Maintenance and housekeeping | `chore/update-dependencies`        |
+## Contributing Guides
+
+Detailed documentation lives in [`docs/contributing/`](docs/contributing/):
+
+| Guide                                                                   | Description                                                    |
+|-------------------------------------------------------------------------|----------------------------------------------------------------|
+| [Contributing Guide](docs/contributing/README.md)                       | Main hub — prerequisites, workflow, commit messages, style     |
+| [Prerequisites](docs/contributing/prerequisites.md)                     | Required tools, Azure access, NGC credentials, build commands  |
+| [Contribution Workflow](docs/contributing/contribution-workflow.md)     | Bug reports, feature requests, first contributions             |
+| [Pull Request Process](docs/contributing/pull-request-process.md)       | PR workflow, reviewers, approval criteria                      |
+| [Infrastructure Style](docs/contributing/infrastructure-style.md)       | Terraform conventions, shell scripts, copyright headers        |
+| [Deployment Validation](docs/contributing/deployment-validation.md)     | Validation levels, testing templates, cost optimization        |
+| [Cost Considerations](docs/contributing/cost-considerations.md)         | Component costs, budgeting, regional pricing                   |
+| [Security Review](docs/contributing/security-review.md)                 | Security checklist, credential handling, dependency updates    |
+
+## I Have a Question
+
+Search existing resources before asking:
+
+- Search [GitHub Issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues) for similar questions or problems
+- Check [GitHub Discussions](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/discussions) for community Q&A
+- Review the [docs/](docs/) directory for troubleshooting guides
+
+If you cannot find an answer, open a [new discussion](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/discussions/new) in the Q&A category. Provide context about what you are trying to accomplish, what you have tried, and any error messages. For bugs or feature requests, use [GitHub Issues](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new) instead.
+
+## Development Environment
+
+Run the setup script to configure your local development environment:
+
+```bash
+./setup-dev.sh
+```
+
+This installs npm dependencies for linting, spell checking, and link validation. See the [Prerequisites](docs/contributing/prerequisites.md) guide for required tools and version requirements.
+
+## Build and Validation
+
+Run these commands to validate changes before submitting a PR:
+
+```bash
+npm run lint:md        # Markdownlint
+npm run lint:links     # Markdown link validation
+npm run spell-check    # cspell
+```
+
+For Terraform and shell script validation, see the [Prerequisites](docs/contributing/prerequisites.md#build-and-validation-requirements) guide.
 
 ## Issue Title Conventions
 
@@ -75,15 +122,28 @@ test(training): Add pytest fixtures
 [Policy]: Define input validation requirements
 ```
 
+## Release Process
+
+This project uses [release-please](https://github.com/googleapis/release-please) for automated version management. All commits to `main` must follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+- `feat:` commits trigger a **minor** version bump
+- `fix:` commits trigger a **patch** version bump
+- `docs:`, `chore:`, `refactor:` commits appear in the changelog without a version bump
+- Commits with `BREAKING CHANGE:` footer trigger a **major** version bump
+
+After merging to `main`, release-please automatically creates a release PR with updated `CHANGELOG.md` and version bumps. Merging that PR creates a GitHub Release and git tag.
+
+For commit message format details, see [commit-message.instructions.md](.github/instructions/commit-message.instructions.md).
+
 ## Testing Requirements
 
 All contributions require appropriate tests. This policy supports code quality and the project's [OpenSSF Best Practices](https://www.bestpractices.dev/) goals.
 
 ### Policy
 
-* New features require accompanying unit tests.
-* Bug fixes require regression tests that reproduce the fixed behavior.
-* Refactoring changes must not reduce test coverage.
+- New features require accompanying unit tests.
+- Bug fixes require regression tests that reproduce the fixed behavior.
+- Refactoring changes must not reduce test coverage.
 
 ### Running Tests
 
@@ -153,8 +213,22 @@ Use [BATS-core](https://github.com/bats-core/bats-core) for shell script tests, 
 
 ## Code of Conduct
 
-This project follows the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+This project adopts the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). See [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) for details, or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions.
+
+## Reporting Security Issues
+
+**Do not** report security vulnerabilities through public GitHub issues. See [SECURITY.md](SECURITY.md) for reporting instructions.
+
+## Support
+
+For questions and community discussion, see [SUPPORT.md](SUPPORT.md).
 
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+
+## Attribution
+
+This contributing guide is adapted for reference architecture contributions and Azure + NVIDIA robotics infrastructure.
+
+Copyright (c) Microsoft Corporation. Licensed under the MIT License.
