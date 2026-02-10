@@ -7,7 +7,7 @@ ms.topic: how-to
 ---
 
 > [!NOTE]
-> This guide expands on the [Security Review Process](../../.github/CONTRIBUTING.md#-security-review-process) section of the main contributing guide.
+> This guide expands on the [Security Review Process](README.md#-security-review-process) section of the main contributing guide.
 
 Security-sensitive contributions require additional review to ensure Azure security best practices.
 
@@ -101,7 +101,7 @@ Security patch PRs are encouraged and receive expedited review:
 
 ## Related Documentation
 
-* [Main CONTRIBUTING.md](../../.github/CONTRIBUTING.md) - Prerequisites, workflow, commit messages
+* [Contributing Guide](README.md) - Prerequisites, workflow, commit messages
 * [SECURITY.md](../../SECURITY.md) - Security vulnerability reporting
 * [Deployment Validation](deployment-validation.md) - Validation levels and testing
 * [Infrastructure Style](infrastructure-style.md) - Secure coding patterns

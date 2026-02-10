@@ -7,7 +7,7 @@ ms.topic: how-to
 ---
 
 > [!NOTE]
-> This guide expands on the [Deployment Validation](../../.github/CONTRIBUTING.md#-deployment-validation) section of the main contributing guide.
+> This guide expands on the [Deployment Validation](README.md#-deployment-validation) section of the main contributing guide.
 
 This reference architecture validates through deployment rather than automated unit or integration tests. Validation approach depends on contribution scope and cost constraints.
 
@@ -233,6 +233,6 @@ GPU VM costs vary by region. Use [Azure Pricing Calculator](https://azure.micros
 
 ## Related Documentation
 
-* [Main CONTRIBUTING.md](../../.github/CONTRIBUTING.md) - Prerequisites, workflow, commit messages
+* [Contributing Guide](README.md) - Prerequisites, workflow, commit messages
 * [Cost Considerations](cost-considerations.md) - Detailed cost tracking and budgeting
 * [Infrastructure Style](infrastructure-style.md) - Terraform and shell conventions
