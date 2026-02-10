@@ -135,6 +135,82 @@ After merging to `main`, release-please automatically creates a release PR with 
 
 For commit message format details, see [commit-message.instructions.md](.github/instructions/commit-message.instructions.md).
 
+## Testing Requirements
+
+All contributions require appropriate tests. This policy supports code quality and the project's [OpenSSF Best Practices](https://www.bestpractices.dev/) goals.
+
+### Policy
+
+* New features require accompanying unit tests.
+* Bug fixes require regression tests that reproduce the fixed behavior.
+* Refactoring changes must not reduce test coverage.
+
+### Running Tests
+
+Once a `tests/` directory exists, run the full test suite:
+
+```bash
+pytest tests/
+```
+
+Run tests within the devcontainer:
+
+```bash
+uv run pytest tests/
+```
+
+Run tests with coverage reporting:
+
+```bash
+coverage run -m pytest tests/
+coverage report -m
+```
+
+### Test Organization
+
+Tests mirror the source directory structure under `tests/`:
+
+| Source Path                     | Test Path                     |
+|---------------------------------|-------------------------------|
+| `src/training/utils/env.py`     | `tests/unit/test_env.py`      |
+| `src/training/utils/metrics.py` | `tests/unit/test_metrics.py`  |
+| `src/common/cli_args.py`        | `tests/unit/test_cli_args.py` |
+
+### Test Categories
+
+| Marker        | Description                        | Planned CI Behavior           |
+|---------------|------------------------------------|-------------------------------|
+| *(default)*   | Unit tests, fast, no external deps | Always runs                   |
+| `slow`        | Tests exceeding 5 seconds          | Runs on main, optional on PRs |
+| `integration` | Requires external services         | Runs on main only             |
+| `gpu`         | Requires CUDA runtime              | Excluded from standard CI     |
+
+Skip categories selectively:
+
+```bash
+pytest tests/ -m "not slow and not gpu"
+```
+
+### Coverage Targets
+
+Coverage thresholds increase with each milestone:
+
+| Milestone | Minimum Coverage |
+|-----------|------------------|
+| v0.4.0    | 40%              |
+| v0.5.0    | 60%              |
+| v0.6.0    | 80%              |
+
+These coverage levels are contribution targets for local test runs. CI enforcement of coverage thresholds is planned for a future milestone.
+
+### Configuration
+
+Pytest and coverage are not yet centrally configured in `pyproject.toml`. When adding tests, follow standard pytest conventions (a `tests/` directory with shared fixtures as needed) and align with existing tests in this repository.
+
+### Shell and Infrastructure Tests
+
+Use [BATS-core](https://github.com/bats-core/bats-core) for shell script tests, [Pester v5](https://pester.dev/) for PowerShell tests, and the native `terraform test` framework for Terraform modules. When adding tests, include framework-specific details in the README for each area.
+
 ## Code of Conduct
 
 This project adopts the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). See [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) for details, or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions.
