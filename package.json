@@ -4,7 +4,6 @@
   "private": true,
   "description": "Azure NVIDIA Robotics Reference Architecture",
   "scripts": {
-    "beads:init": "bd init",
     "spell-check": "cspell \"**/*.{md,ts,js,json,yaml,yml,py,sh}\"",
     "spell-check:fix": "cspell \"**/*.{md,ts,js,json,yaml,yml,py,sh}\" --show-suggestions",
     "lint:md": "markdownlint-cli2 \"**/*.md\"",
@@ -15,7 +14,6 @@
     "format:tables": "markdown-table-formatter \"**/*.md\""
   },
   "devDependencies": {
-    "@beads/bd": "0.49.4",
     "cspell": "9.4.0",
     "markdown-link-check": "3.14.2",
     "markdown-table-formatter": "1.6.0",
