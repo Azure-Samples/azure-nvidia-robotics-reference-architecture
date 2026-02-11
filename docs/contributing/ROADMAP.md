@@ -1,6 +1,6 @@
 ---
 title: "Azure NVIDIA Robotics Reference Architecture Roadmap"
-description: "12-month roadmap covering documentation, testing, CI/CD, governance, security, and OpenSSF compliance."
+description: "Project roadmap covering documentation, testing, CI/CD, governance, security, and OpenSSF compliance through Q4 2026."
 author: wberry
 ms.date: 2026-02-10
 ms.topic: reference
@@ -14,8 +14,9 @@ keywords:
 estimated_reading_time: 8
 ---
 
-This 12-month roadmap covers planned work for the Azure NVIDIA Robotics Reference Architecture from Q1 2026 through Q1 2027.
-Six priority areas align to milestones v0.2.0 through v0.7.0, progressing from documentation maturity through security hardening.
+This roadmap covers planned work for the Azure NVIDIA Robotics Reference Architecture through Q4 2026.
+Six priority areas align to milestones v0.2.0 through v0.7.0, progressing from documentation through security hardening.
+An additional v0.8.0 milestone covers dependency update automation.
 Each area lists concrete deliverables with linked issues and explicit items we will not pursue.
 
 > [!NOTE]
@@ -27,12 +28,12 @@ Each area lists concrete deliverables with linked issues and explicit items we w
 ## Current State
 
 The project reached v0.1.0 on 2026-02-07 with 30 commits on main and 24 merged pull requests.
-Seven milestones are planned through v0.7.0, spanning foundation work through security hardening.
+Seven milestones are planned through v0.8.0, spanning foundation work through security hardening.
 OpenSSF Best Practices Passing criteria are approximately 85% met (43 Met, 7 Partial, 12 Gap, 6 N/A).
 
 ## Priorities
 
-### Documentation Maturity (v0.2.0, Q1 2026)
+### Documentation and Contributing (v0.2.0, Q1 2026)
 
 Complete the contributing guide suite and establish maintenance policies.
 This milestone closes the remaining documentation gaps identified during the OpenSSF Passing assessment.
@@ -51,7 +52,7 @@ This milestone closes the remaining documentation gaps identified during the Ope
 * API reference documentation (this is a reference architecture, not a library)
 * Automated documentation generation from source code
 
-### Developer Tooling and Linting (v0.3.0, Q1-Q2 2026)
+### Core Scripts and Utilities (v0.3.0, Q2 2026)
 
 Standardize linting infrastructure across shell, Python, and markdown.
 Shared modules reduce duplication and enforce consistent quality gates.
@@ -91,7 +92,7 @@ Baseline test suites validate training utilities and CI helper modules.
 * End-to-end deployment tests (cost-prohibitive in CI)
 * GPU-dependent tests in CI pipelines
 
-### CI/CD and Automation (v0.5.0, Q2 2026)
+### CI/CD and Workflows (v0.5.0, Q2 2026)
 
 Expand CI pipelines with Python linting, security scanning, and workflow orchestration.
 CodeQL and Bandit scanning catch vulnerabilities before merge.
@@ -111,7 +112,7 @@ CodeQL and Bandit scanning catch vulnerabilities before merge.
 * Deployment automation requiring Azure credentials in CI
 * External registry or package releases
 
-### Governance and Compliance (v0.6.0, Q2-Q3 2026)
+### Governance and OpenSSF (v0.6.0, Q2 2026)
 
 Formalize project governance and complete OpenSSF Passing badge criteria.
 N/A justifications document criteria that do not apply to this project.
@@ -135,7 +136,7 @@ N/A justifications document criteria that do not apply to this project.
 * External security audit engagements
 * Paid compliance tooling subscriptions
 
-### Security Hardening (v0.7.0, Q3 2026)
+### Security and Hardening (v0.7.0, Q2 2026)
 
 Implement release integrity, input validation, and threat modeling.
 OpenSSF Scorecard integration provides continuous security measurement.
@@ -179,27 +180,24 @@ OpenSSF Scorecard integration provides continuous security measurement.
 
 ```text
 Q1 2026 (Jan-Mar) — Foundation
-├── Documentation: Complete v0.2.0 docs backlog (roadmap, security, maintenance policies)
-├── Developer Tooling: Verified downloads, linting standardization, frontmatter validation
-└── Release: v0.2.0, v0.3.0
+├── Documentation: Complete v0.2.0 contributing guide suite (roadmap, security, maintenance policies)
+└── Release: v0.2.0 (due 2026-02-13)
 
-Q2 2026 (Apr-Jun) — Quality
-├── Testing: pytest + Pester infrastructure, coverage reporting, CI integration
-├── CI/CD: Ruff, Bandit, CodeQL PR triggers, workflow orchestration
-├── Governance: Governance model, roles, DCO/CLA, OpenSSF N/A documentation
-└── Release: v0.4.0, v0.5.0, v0.6.0
+Q2 2026 (Apr-Jun) — Quality, Governance, and Security
+├── Core Scripts: Verified downloads, linting standardization, frontmatter validation (v0.3.0, due Apr 14)
+├── Testing: pytest + Pester infrastructure, coverage reporting, CI integration (v0.4.0, due Apr 30)
+├── CI/CD: Ruff, Bandit, CodeQL PR triggers, workflow orchestration (v0.5.0, due May 14)
+├── Governance: Governance model, roles, DCO/CLA, OpenSSF N/A documentation (v0.6.0, due May 31)
+├── Security: OpenSSF Scorecard, release signing, threat model, hardening guidance (v0.7.0, due Jun 14)
+├── Dependencies: Dependency update automation (v0.8.0, due Jun 30)
+└── Release: v0.3.0, v0.4.0, v0.5.0, v0.6.0, v0.7.0, v0.8.0
 
-Q3 2026 (Jul-Sep) — Security
-├── Security: OpenSSF Scorecard, release signing, threat model, hardening guidance
-├── Compliance: Register for OpenSSF Passing badge
-└── Release: v0.7.0
-
-Q4 2026 (Oct-Dec) — Maturity
+Q3 2026 (Jul-Sep) — Maturity
 ├── OpenSSF: Complete Silver attestation
 ├── Platform: Azure and NVIDIA integration updates (OSMO workload identity)
 └── Community: External contributor onboarding, maintainer documentation
 
-Q1 2027 (Jan-Mar) — Growth
+Q4 2026 (Oct-Dec) — Growth
 ├── Architecture: Additional ML workflow patterns, multi-region considerations
 ├── Community: Conference presentations, partner integrations
 └── Roadmap: Publish updated 2027-2028 roadmap
