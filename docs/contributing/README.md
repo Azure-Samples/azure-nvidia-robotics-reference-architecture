@@ -2,7 +2,7 @@
 title: Contributing to Azure NVIDIA Robotics Reference Architecture
 description: Guide for contributing including prerequisites, deployment validation, and style conventions
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-08
+ms.date: 2026-02-11
 ms.topic: how-to
 keywords:
   - azure

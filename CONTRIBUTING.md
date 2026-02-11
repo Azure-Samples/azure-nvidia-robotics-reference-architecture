@@ -2,7 +2,7 @@
 title: Contributing
 description: How to contribute to the Azure NVIDIA Robotics Reference Architecture
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-08
+ms.date: 2026-02-11
 ms.topic: how-to
 keywords:
   - contributing

@@ -12,8 +12,7 @@ keywords:
   - code review
 ---
 
-> [!NOTE]
-> This guide expands on the [Documentation Maintenance](README.md#-contributing-guides) section of the main contributing guide.
+This guide expands on the [Documentation Maintenance](README.md#-contributing-guides) section of the main contributing guide.
 
 Documentation accuracy directly affects deployment success and contributor confidence. This policy defines when documentation updates are required, who owns review, and how freshness is maintained. It satisfies the OpenSSF Best Practices Silver `documentation_current` criterion.
 
