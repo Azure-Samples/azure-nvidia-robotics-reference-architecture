@@ -33,6 +33,12 @@ Supports ACT and Diffusion policy architectures with HuggingFace Hub datasets.
 REQUIRED:
     -d, --dataset-repo-id ID     HuggingFace dataset repository (e.g., user/dataset)
 
+DATA SOURCE:
+        --from-blob               Use Azure Blob Storage as data source
+        --storage-account NAME    Azure Storage account name
+        --storage-container NAME  Blob container name (default: datasets)
+        --blob-prefix PREFIX      Blob path prefix for dataset
+
 TRAINING OPTIONS:
     -w, --workflow PATH           Workflow template (default: workflows/osmo/lerobot-train.yaml)
     -p, --policy-type TYPE        Policy architecture: act, diffusion (default: act)
@@ -56,7 +62,7 @@ LOGGING OPTIONS:
         --experiment-name NAME    MLflow experiment name
 
 CHECKPOINT REGISTRATION:
-    -r, --register-checkpoint NAME  Model name for Azure ML registration (requires --mlflow-enable)
+    -r, --register-checkpoint NAME  Model name for Azure ML registration
 
 AZURE CONTEXT:
         --azure-subscription-id ID    Azure subscription ID
@@ -85,6 +91,14 @@ EXAMPLES:
       -d user/dataset \
       --policy-repo-id user/pretrained-act \
       --training-steps 50000
+
+    # Train from Azure Blob Storage with AML registration
+    submit-osmo-lerobot-training.sh \
+      -d hve-robo/hve-robo-cell \
+      --from-blob \
+      --storage-account stosmorbt3dev001 \
+      --blob-prefix hve-robo/hve-robo-cell \
+      -r my-act-model
 EOF
 }
 
@@ -100,6 +114,11 @@ output_dir="${OUTPUT_DIR:-/workspace/outputs/train}"
 image="${IMAGE:-pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime}"
 policy_repo_id="${POLICY_REPO_ID:-}"
 lerobot_version="${LEROBOT_VERSION:-}"
+
+from_blob=false
+storage_account="${BLOB_STORAGE_ACCOUNT:-${AZURE_STORAGE_ACCOUNT_NAME:-}}"
+storage_container="${BLOB_STORAGE_CONTAINER:-datasets}"
+blob_prefix="${BLOB_PREFIX:-}"
 
 training_steps="${TRAINING_STEPS:-}"
 batch_size="${BATCH_SIZE:-}"
@@ -133,6 +152,10 @@ while [[ $# -gt 0 ]]; do
     -i|--image)                   image="$2"; shift 2 ;;
     --policy-repo-id)             policy_repo_id="$2"; shift 2 ;;
     --lerobot-version)            lerobot_version="$2"; shift 2 ;;
+    --from-blob)                  from_blob=true; shift ;;
+    --storage-account)            storage_account="$2"; shift 2 ;;
+    --storage-container)          storage_container="$2"; shift 2 ;;
+    --blob-prefix)                blob_prefix="$2"; shift 2 ;;
     --training-steps)             training_steps="$2"; shift 2 ;;
     --batch-size)                 batch_size="$2"; shift 2 ;;
     --eval-freq)                  eval_freq="$2"; shift 2 ;;
@@ -158,6 +181,17 @@ done
 require_tools osmo
 
 [[ -z "$dataset_repo_id" ]] && fatal "--dataset-repo-id is required"
+
+# Auto-select azure-data workflow when --from-blob is specified
+if [[ "$from_blob" == "true" ]]; then
+  # Use azure-data workflow unless explicitly overridden
+  if [[ "$workflow" == "$REPO_ROOT/workflows/osmo/lerobot-train.yaml" ]]; then
+    workflow="$REPO_ROOT/workflows/osmo/lerobot-train-azure-data.yaml"
+  fi
+  [[ -z "$storage_account" ]] && fatal "--storage-account is required with --from-blob"
+  [[ -z "$blob_prefix" ]] && blob_prefix="$dataset_repo_id"
+fi
+
 [[ -f "$workflow" ]] || fatal "Workflow template not found: $workflow"
 
 case "$policy_type" in
@@ -169,6 +203,12 @@ if [[ "$mlflow_enable" == "true" ]]; then
   [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for MLflow logging"
   [[ -z "$resource_group" ]] && fatal "Azure resource group required for MLflow logging"
   [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for MLflow logging"
+fi
+
+if [[ -n "$register_checkpoint" ]]; then
+  [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for checkpoint registration"
+  [[ -z "$resource_group" ]] && fatal "Azure resource group required for checkpoint registration"
+  [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for checkpoint registration"
 fi
 
 #------------------------------------------------------------------------------
@@ -187,6 +227,15 @@ submit_args=(
   "mlflow_enable=$mlflow_enable"
   "save_freq=$save_freq"
 )
+
+# Blob storage parameters for azure-data workflow
+if [[ "$from_blob" == "true" ]]; then
+  submit_args+=(
+    "storage_account=$storage_account"
+    "storage_container=$storage_container"
+    "blob_prefix=$blob_prefix"
+  )
+fi
 
 [[ -n "$policy_repo_id" ]]      && submit_args+=("policy_repo_id=$policy_repo_id")
 [[ -n "$lerobot_version" ]]     && submit_args+=("lerobot_version=$lerobot_version")
@@ -215,6 +264,7 @@ info "  Policy: $policy_type"
 info "  Job Name: $job_name"
 info "  Image: $image"
 info "  Logging: $logging_backend"
+[[ "$from_blob" == "true" ]] && info "  Data Source: Azure Blob ($storage_account/$storage_container/$blob_prefix)"
 [[ -n "$policy_repo_id" ]] && info "  Fine-tune from: $policy_repo_id"
 [[ -n "$register_checkpoint" ]] && info "  Register model: $register_checkpoint"
 
