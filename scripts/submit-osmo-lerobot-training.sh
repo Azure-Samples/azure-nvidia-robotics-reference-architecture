@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Submit LeRobot behavioral cloning training workflow to OSMO
-# Supports ACT and Diffusion policy architectures with WANDB or Azure MLflow logging
+# Supports ACT and Diffusion policy architectures with Azure ML MLflow logging
 set -o errexit -o nounset
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +28,7 @@ show_help() {
 Usage: submit-osmo-lerobot-training.sh [OPTIONS] [-- osmo-submit-flags]
 
 Submit a LeRobot behavioral cloning training workflow to OSMO.
-Supports ACT and Diffusion policy architectures with HuggingFace Hub datasets.
+Supports ACT and Diffusion policy architectures with Azure ML MLflow logging.
 
 REQUIRED:
     -d, --dataset-repo-id ID     HuggingFace dataset repository (e.g., user/dataset)
@@ -49,17 +49,20 @@ TRAINING OPTIONS:
         --lerobot-version VER     Specific LeRobot version or "latest" (default: latest)
 
 TRAINING HYPERPARAMETERS:
-        --training-steps N        Total training iterations
-        --batch-size N            Training batch size
+        --training-steps N        Total training iterations (default: 100000)
+        --batch-size N            Training batch size (default: 32)
+        --learning-rate LR        Optimizer learning rate (default: 1e-4)
+        --lr-warmup-steps N       Learning rate warmup steps (default: 1000)
         --eval-freq N             Evaluation frequency
         --save-freq N             Checkpoint save frequency (default: 5000)
 
-LOGGING OPTIONS:
-        --wandb-enable            Enable WANDB logging (default)
-        --no-wandb                Disable WANDB logging
-        --wandb-project NAME      WANDB project name (default: lerobot-training)
-        --mlflow-enable           Enable Azure ML MLflow logging
+VALIDATION:
+        --val-split RATIO         Validation split ratio (default: 0.1 = 10%%)
+        --no-val-split            Disable train/val splitting
+
+LOGGING:
         --experiment-name NAME    MLflow experiment name
+        --no-system-metrics       Disable GPU/CPU/memory metrics logging
 
 CHECKPOINT REGISTRATION:
     -r, --register-checkpoint NAME  Model name for Azure ML registration
@@ -76,28 +79,30 @@ Values resolved: CLI > Environment variables > Terraform outputs
 Additional arguments after -- are forwarded to osmo workflow submit.
 
 EXAMPLES:
-    # Basic ACT training with WANDB logging
+    # ACT training with MLflow logging (defaults)
     submit-osmo-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
 
-    # Diffusion policy with MLflow
+    # Diffusion policy with custom learning rate
     submit-osmo-lerobot-training.sh \
       -d user/custom-dataset \
       -p diffusion \
-      --mlflow-enable \
+      --learning-rate 5e-5 \
       -r my-diffusion-model
 
-    # Fine-tune from existing policy
+    # Fine-tune with smaller batch size
     submit-osmo-lerobot-training.sh \
       -d user/dataset \
       --policy-repo-id user/pretrained-act \
+      --batch-size 16 \
       --training-steps 50000
 
-    # Train from Azure Blob Storage with AML registration
+    # Train from Azure Blob Storage without validation split
     submit-osmo-lerobot-training.sh \
       -d hve-robo/hve-robo-cell \
       --from-blob \
       --storage-account stosmorbt3dev001 \
       --blob-prefix hve-robo/hve-robo-cell \
+      --no-val-split \
       -r my-act-model
 EOF
 }
@@ -120,20 +125,28 @@ storage_account="${BLOB_STORAGE_ACCOUNT:-${AZURE_STORAGE_ACCOUNT_NAME:-}}"
 storage_container="${BLOB_STORAGE_CONTAINER:-datasets}"
 blob_prefix="${BLOB_PREFIX:-}"
 
-training_steps="${TRAINING_STEPS:-}"
-batch_size="${BATCH_SIZE:-}"
+training_steps="${TRAINING_STEPS:-100000}"
+batch_size="${BATCH_SIZE:-32}"
+learning_rate="${LEARNING_RATE:-1e-4}"
+lr_warmup_steps="${LR_WARMUP_STEPS:-1000}"
 eval_freq="${EVAL_FREQ:-}"
 save_freq="${SAVE_FREQ:-5000}"
 
-wandb_enable="${WANDB_ENABLE:-true}"
-wandb_project="${WANDB_PROJECT:-lerobot-training}"
-mlflow_enable="${MLFLOW_ENABLE:-false}"
+val_split="${VAL_SPLIT:-0.1}"
+val_split_enabled=true
+system_metrics="${SYSTEM_METRICS:-true}"
+
 experiment_name="${EXPERIMENT_NAME:-}"
 register_checkpoint="${REGISTER_CHECKPOINT:-}"
 
 subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
 resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
 workspace_name="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
+
+TMP_DIR="$SCRIPT_DIR/.tmp"
+ARCHIVE_PATH="$TMP_DIR/osmo-lerobot-training.zip"
+B64_PATH="$TMP_DIR/osmo-lerobot-training.b64"
+payload_root="${PAYLOAD_ROOT:-/workspace/lerobot_payload}"
 
 forward_args=()
 
@@ -158,12 +171,13 @@ while [[ $# -gt 0 ]]; do
     --blob-prefix)                blob_prefix="$2"; shift 2 ;;
     --training-steps)             training_steps="$2"; shift 2 ;;
     --batch-size)                 batch_size="$2"; shift 2 ;;
+    --learning-rate)              learning_rate="$2"; shift 2 ;;
+    --lr-warmup-steps)            lr_warmup_steps="$2"; shift 2 ;;
     --eval-freq)                  eval_freq="$2"; shift 2 ;;
     --save-freq)                  save_freq="$2"; shift 2 ;;
-    --wandb-enable)               wandb_enable="true"; shift ;;
-    --no-wandb)                   wandb_enable="false"; shift ;;
-    --wandb-project)              wandb_project="$2"; shift 2 ;;
-    --mlflow-enable)              mlflow_enable="true"; shift ;;
+    --val-split)                  val_split="$2"; shift 2 ;;
+    --no-val-split)               val_split_enabled=false; shift ;;
+    --no-system-metrics)          system_metrics="false"; shift ;;
     --experiment-name)            experiment_name="$2"; shift 2 ;;
     -r|--register-checkpoint)     register_checkpoint="$2"; shift 2 ;;
     --azure-subscription-id)      subscription_id="$2"; shift 2 ;;
@@ -178,16 +192,13 @@ done
 # Validation
 #------------------------------------------------------------------------------
 
-require_tools osmo
+require_tools osmo zip base64
 
 [[ -z "$dataset_repo_id" ]] && fatal "--dataset-repo-id is required"
+[[ -d "$REPO_ROOT/src/training" ]] || fatal "Directory src/training not found"
 
-# Auto-select azure-data workflow when --from-blob is specified
+# Validate blob parameters when --from-blob is specified
 if [[ "$from_blob" == "true" ]]; then
-  # Use azure-data workflow unless explicitly overridden
-  if [[ "$workflow" == "$REPO_ROOT/workflows/osmo/lerobot-train.yaml" ]]; then
-    workflow="$REPO_ROOT/workflows/osmo/lerobot-train-azure-data.yaml"
-  fi
   [[ -z "$storage_account" ]] && fatal "--storage-account is required with --from-blob"
   [[ -z "$blob_prefix" ]] && blob_prefix="$dataset_repo_id"
 fi
@@ -199,17 +210,43 @@ case "$policy_type" in
   *) fatal "Unsupported policy type: $policy_type (use: act, diffusion)" ;;
 esac
 
-if [[ "$mlflow_enable" == "true" ]]; then
-  [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for MLflow logging"
-  [[ -z "$resource_group" ]] && fatal "Azure resource group required for MLflow logging"
-  [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for MLflow logging"
+[[ -z "$subscription_id" ]] && fatal "Azure subscription ID required (set AZURE_SUBSCRIPTION_ID or deploy infra)"
+[[ -z "$resource_group" ]] && fatal "Azure resource group required (set AZURE_RESOURCE_GROUP or deploy infra)"
+[[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required (set AZUREML_WORKSPACE_NAME or deploy infra)"
+
+[[ "$val_split_enabled" == "false" ]] && val_split="0"
+
+#------------------------------------------------------------------------------
+# Package Training Payload
+#------------------------------------------------------------------------------
+
+info "Packaging training payload..."
+mkdir -p "$TMP_DIR"
+rm -f "$ARCHIVE_PATH" "$B64_PATH"
+
+(cd "$REPO_ROOT" && zip -qr "$ARCHIVE_PATH" src/training src/common \
+  -x "**/__pycache__/*" \
+  -x "*.pyc" \
+  -x "*.pyo" \
+  -x "**/.pytest_cache/*" \
+  -x "**/.mypy_cache/*" \
+  -x "**/*.egg-info/*") || fatal "Failed to create training archive"
+
+[[ -f "$ARCHIVE_PATH" ]] || fatal "Archive not created: $ARCHIVE_PATH"
+
+if base64 --help 2>&1 | grep -q '\-\-input'; then
+  base64 --input "$ARCHIVE_PATH" | tr -d '\n' > "$B64_PATH"
+else
+  base64 -i "$ARCHIVE_PATH" | tr -d '\n' > "$B64_PATH"
 fi
 
-if [[ -n "$register_checkpoint" ]]; then
-  [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for checkpoint registration"
-  [[ -z "$resource_group" ]] && fatal "Azure resource group required for checkpoint registration"
-  [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for checkpoint registration"
-fi
+[[ -s "$B64_PATH" ]] || fatal "Failed to encode archive"
+
+archive_size=$(wc -c < "$ARCHIVE_PATH" | tr -d ' ')
+b64_size=$(wc -c < "$B64_PATH" | tr -d ' ')
+info "Payload: ${archive_size} bytes (${b64_size} bytes base64)"
+
+encoded_payload=$(<"$B64_PATH")
 
 #------------------------------------------------------------------------------
 # Build Submission Command
@@ -218,29 +255,26 @@ fi
 submit_args=(
   workflow submit "$workflow"
   --set-string "image=$image"
+  "encoded_archive=$encoded_payload"
+  "payload_root=$payload_root"
   "dataset_repo_id=$dataset_repo_id"
   "policy_type=$policy_type"
   "job_name=$job_name"
   "output_dir=$output_dir"
-  "wandb_enable=$wandb_enable"
-  "wandb_project=$wandb_project"
-  "mlflow_enable=$mlflow_enable"
+  "training_steps=$training_steps"
+  "batch_size=$batch_size"
+  "learning_rate=$learning_rate"
+  "lr_warmup_steps=$lr_warmup_steps"
   "save_freq=$save_freq"
+  "val_split=$val_split"
+  "system_metrics=$system_metrics"
+  "storage_account=$storage_account"
+  "storage_container=$storage_container"
+  "blob_prefix=$blob_prefix"
 )
-
-# Blob storage parameters for azure-data workflow
-if [[ "$from_blob" == "true" ]]; then
-  submit_args+=(
-    "storage_account=$storage_account"
-    "storage_container=$storage_container"
-    "blob_prefix=$blob_prefix"
-  )
-fi
 
 [[ -n "$policy_repo_id" ]]      && submit_args+=("policy_repo_id=$policy_repo_id")
 [[ -n "$lerobot_version" ]]     && submit_args+=("lerobot_version=$lerobot_version")
-[[ -n "$training_steps" ]]      && submit_args+=("training_steps=$training_steps")
-[[ -n "$batch_size" ]]          && submit_args+=("batch_size=$batch_size")
 [[ -n "$eval_freq" ]]           && submit_args+=("eval_freq=$eval_freq")
 [[ -n "$experiment_name" ]]     && submit_args+=("experiment_name=$experiment_name")
 [[ -n "$register_checkpoint" ]] && submit_args+=("register_checkpoint=$register_checkpoint")
@@ -255,15 +289,18 @@ fi
 # Submit Workflow
 #------------------------------------------------------------------------------
 
-logging_backend="WANDB"
-[[ "$mlflow_enable" == "true" ]] && logging_backend="Azure MLflow"
-
 info "Submitting LeRobot training workflow to OSMO..."
 info "  Dataset: $dataset_repo_id"
 info "  Policy: $policy_type"
 info "  Job Name: $job_name"
 info "  Image: $image"
-info "  Logging: $logging_backend"
+info "  Logging: Azure MLflow"
+info "  Training Steps: $training_steps"
+info "  Batch Size: $batch_size"
+info "  Learning Rate: $learning_rate"
+info "  Val Split: $val_split"
+info "  System Metrics: $system_metrics"
+info "  Payload: ${archive_size} bytes"
 [[ "$from_blob" == "true" ]] && info "  Data Source: Azure Blob ($storage_account/$storage_container/$blob_prefix)"
 [[ -n "$policy_repo_id" ]] && info "  Fine-tune from: $policy_repo_id"
 [[ -n "$register_checkpoint" ]] && info "  Register model: $register_checkpoint"
