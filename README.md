@@ -125,6 +125,15 @@ These paths resolve when hve-core is installed as a peer directory or via the VS
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
+## 🔒 Security
+
+<!-- cspell:words deployers -->
+
+Review security guidance before deploying this reference architecture:
+
+- [SECURITY.md](SECURITY.md) - vulnerability reporting and security considerations for deployers
+- [Security Guide](docs/security-guide.md) - detailed security configuration inventory, deployment responsibilities, and checklist
+
 ## 🤝 Support
 
 For issues and questions:
