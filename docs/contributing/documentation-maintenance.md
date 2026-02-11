@@ -31,17 +31,17 @@ When a code PR introduces any of these changes, the author must update affected 
 
 ## Ownership
 
-Documentation ownership maps areas to responsible teams. The `.github/CODEOWNERS` file enforces reviewer assignment automatically.
+Documentation ownership maps areas to responsible teams. The `.github/CODEOWNERS` file configures automatic review requests for code owners.
 
 | Area                                           | Owner                                                       |
 |------------------------------------------------|-------------------------------------------------------------|
 | `/docs/**/*.md`                                | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
-| `/deploy/**/README.md`                         | Infrastructure contributors                                 |
-| `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md` | Repository maintainers                                      |
-| Root `README.md`                               | Repository maintainers                                      |
+| `/deploy/**/README.md`                         | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
+| `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md` | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
+| Root `README.md`                               | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
 
 > [!TIP]
-> Full role definitions and governance structure are planned for v0.6.0 (issues #98 and #99). Current ownership uses the `@Azure-Samples/edge-ai-core-dev` team for all documentation review.
+> Full role definitions and governance structure are planned for v0.6.0 (issues #98 and #99). Current CODEOWNERS configuration uses the `@Azure-Samples/edge-ai-core-dev` team as code owners for all documentation paths.
 
 ## Review Process
 
