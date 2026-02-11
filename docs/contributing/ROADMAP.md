@@ -1,6 +1,6 @@
 ---
 title: "Azure NVIDIA Robotics Reference Architecture Roadmap"
-description: "Project roadmap covering documentation, testing, CI/CD, governance, security, and OpenSSF compliance through Q4 2026."
+description: "Project roadmap covering documentation, testing, CI/CD, governance, security, and OpenSSF compliance through Q1 2027."
 author: wberry
 ms.date: 2026-02-10
 ms.topic: reference
@@ -14,7 +14,7 @@ keywords:
 estimated_reading_time: 8
 ---
 
-This roadmap covers planned work for the Azure NVIDIA Robotics Reference Architecture through Q4 2026.
+This roadmap covers planned work for the Azure NVIDIA Robotics Reference Architecture through Q1 2027.
 Six priority areas align to milestones v0.2.0 through v0.7.0, progressing from documentation through security hardening.
 An additional v0.8.0 milestone covers dependency update automation.
 Each area lists concrete deliverables with linked issues and explicit items we will not pursue.
@@ -201,6 +201,11 @@ Q4 2026 (Oct-Dec) — Growth
 ├── Architecture: Additional ML workflow patterns, multi-region considerations
 ├── Community: Conference presentations, partner integrations
 └── Roadmap: Publish updated 2027-2028 roadmap
+
+Q1 2027 (Jan-Mar) — Sustainability
+├── OpenSSF: Begin Gold-level assessment and gap analysis
+├── Architecture: Production deployment guides, performance benchmarking
+└── Community: Adoption case studies, contributor growth initiatives
 ```
 
 ## How to Influence the Roadmap
@@ -213,6 +218,7 @@ Q4 2026 (Oct-Dec) — Growth
 
 ## Version History
 
-| Date       | Version | Notes                    |
-|------------|---------|--------------------------|
-| 2026-02-10 | 1.0     | Initial 12-month roadmap |
+| Date       | Version | Notes                                                    |
+|------------|---------|----------------------------------------------------------|
+| 2026-02-10 | 1.0     | Initial 12-month roadmap                                 |
+| 2026-02-10 | 1.1     | Extend timeline to Q1 2027 for OpenSSF 12-month coverage |
