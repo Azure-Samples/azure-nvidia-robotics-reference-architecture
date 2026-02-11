@@ -29,12 +29,12 @@ production-ready security posture.
 
 ### Network Security
 
-| Configuration          | Default                       | Reference                                                                          |
-|------------------------|-------------------------------|------------------------------------------------------------------------------------|
+| Configuration          | Default                                 | Reference                                                                          |
+|------------------------|-----------------------------------------|------------------------------------------------------------------------------------|
 | Private AKS cluster    | Enabled by default (Terraform variable) | [AKS private cluster](https://learn.microsoft.com/azure/aks/private-clusters)      |
-| Azure CNI networking   | Enabled                       | [Azure CNI overview](https://learn.microsoft.com/azure/aks/configure-azure-cni)    |
-| Network policy support | Enabled                       | [AKS network policies](https://learn.microsoft.com/azure/aks/use-network-policies) |
-| NAT Gateway for egress | Configured                    | [AKS outbound connectivity](https://learn.microsoft.com/azure/aks/nat-gateway)     |
+| Azure CNI networking   | Enabled                                 | [Azure CNI overview](https://learn.microsoft.com/azure/aks/configure-azure-cni)    |
+| Network policy support | Enabled                                 | [AKS network policies](https://learn.microsoft.com/azure/aks/use-network-policies) |
+| NAT Gateway for egress | Configured                              | [AKS outbound connectivity](https://learn.microsoft.com/azure/aks/nat-gateway)     |
 
 ### Identity and Access
 
@@ -53,10 +53,10 @@ production-ready security posture.
 
 ### Kubernetes Security
 
-| Configuration | Default                    | Reference                                                                               |
-|---------------|----------------------------|-----------------------------------------------------------------------------------------|
-| RBAC          | Enabled                    | [AKS RBAC](https://learn.microsoft.com/azure/aks/manage-azure-rbac)                     |
-| Pod security  | Default namespace policies | [Pod security standards](https://learn.microsoft.com/azure/aks/use-pod-security-on-aks) |
+| Configuration | Default                    | Reference                                                               |
+|---------------|----------------------------|-------------------------------------------------------------------------|
+| RBAC          | Enabled                    | [AKS RBAC](https://learn.microsoft.com/azure/aks/manage-azure-rbac)     |
+| Pod security  | Default namespace policies | [Pod security standards](https://learn.microsoft.com/azure/aks/use-psa) |
 
 ## Your Deployment Responsibilities
 
