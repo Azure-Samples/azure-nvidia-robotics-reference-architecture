@@ -31,7 +31,7 @@ This reference architecture uses a deployment-based validation model rather than
 Maintainers assign reviewers based on contribution type:
 
 | Contribution Type    | Primary Reviewer              |
-| -------------------- | ----------------------------- |
+|----------------------|-------------------------------|
 | Terraform modules    | Cloud Infrastructure Engineer |
 | Kubernetes manifests | DevOps/SRE Engineer           |
 | Training scripts     | ML Engineer                   |

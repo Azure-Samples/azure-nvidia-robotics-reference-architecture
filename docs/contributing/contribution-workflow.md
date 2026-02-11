@@ -41,15 +41,15 @@ Before creating a bug report:
 
 Create a [new issue](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new) with:
 
-| Field                | Details                                                                 |
-|----------------------|-------------------------------------------------------------------------|
-| Title format         | `[Component][Subcomponent] Brief description`                           |
-| Environment details  | Azure region, network mode, Terraform/CLI versions, GPU VM SKUs         |
-| Expected vs. actual  | What should happen and what actually happened                           |
-| Deployment logs      | `terraform apply` output, CLI errors, pod logs; sanitize secrets        |
-| Azure resource state | `az resource show` output, provisioning state query                     |
-| Reproduction steps   | Numbered commands from setup, config files (sanitize sensitive values)  |
-| Cost impact          | Resources deployed and hourly cost (if relevant)                        |
+| Field                | Details                                                                |
+|----------------------|------------------------------------------------------------------------|
+| Title format         | `[Component][Subcomponent] Brief description`                          |
+| Environment details  | Azure region, network mode, Terraform/CLI versions, GPU VM SKUs        |
+| Expected vs. actual  | What should happen and what actually happened                          |
+| Deployment logs      | `terraform apply` output, CLI errors, pod logs; sanitize secrets       |
+| Azure resource state | `az resource show` output, provisioning state query                    |
+| Reproduction steps   | Numbered commands from setup, config files (sanitize sensitive values) |
+| Cost impact          | Resources deployed and hourly cost (if relevant)                       |
 
 <details>
 <summary>Bug Report Example (click to expand)</summary>
@@ -157,7 +157,7 @@ This reference architecture validates through deployment rather than automated t
 ### Validation Expectations
 
 | Contribution Type           | Expected Validation                                                                 |
-| --------------------------- | ----------------------------------------------------------------------------------- |
+|-----------------------------|-------------------------------------------------------------------------------------|
 | Documentation               | Read-through, link check (`npm run lint:md`)                                        |
 | Shell scripts               | ShellCheck validation, test in local/minimal environment                            |
 | Terraform modules           | `terraform fmt`, `terraform validate`, `terraform plan` output attached to PR       |

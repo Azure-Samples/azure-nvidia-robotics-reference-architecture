@@ -54,7 +54,7 @@ Contributions can include:
 Install required tools and configure Azure access before contributing. See [Prerequisites and Build Validation](prerequisites.md) for complete details including Azure access requirements, NVIDIA NGC setup, and build validation commands.
 
 | Tool       | Minimum Version |
-| ---------- | --------------- |
+|------------|-----------------|
 | Terraform  | 1.9.8           |
 | Azure CLI  | 2.65.0          |
 | kubectl    | 1.31            |
@@ -166,7 +166,7 @@ This reference architecture validates through deployment rather than automated t
 ### Validation Levels
 
 | Level                   | What                                                                   | When to Use                  | Cost   |
-| ----------------------- | ---------------------------------------------------------------------- | ---------------------------- | ------ |
+|-------------------------|------------------------------------------------------------------------|------------------------------|--------|
 | **Level 1: Static**     | `terraform fmt`, `terraform validate`, `shellcheck`, `npm run lint:md` | Every contribution           | $0     |
 | **Level 2: Plan**       | `terraform plan` with documented output                                | Terraform changes            | $0     |
 | **Level 3: Deployment** | Full deployment in dev subscription                                    | Major infrastructure changes | $25-50 |
@@ -198,7 +198,7 @@ Full deployment testing incurs Azure costs. Plan accordingly and destroy resourc
 ### Testing Budget Summary
 
 | Contribution Type   | Typical Cost | Testing Approach          |
-| ------------------- | ------------ | ------------------------- |
+|---------------------|--------------|---------------------------|
 | Documentation       | $0           | Linting only              |
 | Terraform modules   | $10-25       | Plan + short deployment   |
 | Training scripts    | $15-30       | Single training job       |
