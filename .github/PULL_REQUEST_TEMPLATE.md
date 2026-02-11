@@ -35,10 +35,17 @@ Closes #
 - [ ] OSMO workflow submitted successfully
 - [ ] Smoke tests passed (`smoke_test_azure.py`)
 
+## Documentation Impact
+<!-- Select one -->
+
+- [ ] No documentation changes needed
+- [ ] Documentation updated in this PR
+- [ ] Documentation issue filed
+
 ## Checklist
 
 - [ ] My code follows the [project conventions](copilot-instructions.md)
 - [ ] Commit messages follow [conventional commit format](instructions/commit-message.instructions.md)
 - [ ] I have performed a self-review
-- [ ] Documentation updated as needed
+- [ ] Documentation impact assessed above
 - [ ] No new linting warnings introduced
