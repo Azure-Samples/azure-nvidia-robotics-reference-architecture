@@ -2,10 +2,16 @@
 # Shared functions for 002-setup deployment scripts
 # Follows k3s/Docker/Homebrew conventions for user-facing scripts
 
-# Logging functions with color support
-info()  { printf '\033[1;34m[INFO]\033[0m  %s\n' "$*"; }
-warn()  { printf '\033[1;33m[WARN]\033[0m  %s\n' "$*" >&2; }
-error() { printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; }
+# Logging functions with color support (NO_COLOR standard: https://no-color.org)
+if [[ -z "${NO_COLOR+x}" ]]; then
+  info()  { printf '\033[1;34m[INFO]\033[0m  %s\n' "$*"; }
+  warn()  { printf '\033[1;33m[WARN]\033[0m  %s\n' "$*" >&2; }
+  error() { printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; }
+else
+  info()  { printf '[INFO]  %s\n' "$*"; }
+  warn()  { printf '[WARN]  %s\n' "$*" >&2; }
+  error() { printf '[ERROR] %s\n' "$*" >&2; }
+fi
 fatal() { error "$@"; exit 1; }
 
 # Check for required tools

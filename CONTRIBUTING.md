@@ -2,7 +2,7 @@
 title: Contributing
 description: How to contribute to the Azure NVIDIA Robotics Reference Architecture
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-08
+ms.date: 2026-02-11
 ms.topic: how-to
 keywords:
   - contributing
@@ -28,16 +28,18 @@ If you are new to the project, start with issues labeled `good first issue` or d
 
 Detailed documentation lives in [`docs/contributing/`](docs/contributing/):
 
-| Guide                                                                   | Description                                                    |
-|-------------------------------------------------------------------------|----------------------------------------------------------------|
-| [Contributing Guide](docs/contributing/README.md)                       | Main hub — prerequisites, workflow, commit messages, style     |
-| [Prerequisites](docs/contributing/prerequisites.md)                     | Required tools, Azure access, NGC credentials, build commands  |
-| [Contribution Workflow](docs/contributing/contribution-workflow.md)     | Bug reports, feature requests, first contributions             |
-| [Pull Request Process](docs/contributing/pull-request-process.md)       | PR workflow, reviewers, approval criteria                      |
-| [Infrastructure Style](docs/contributing/infrastructure-style.md)       | Terraform conventions, shell scripts, copyright headers        |
-| [Deployment Validation](docs/contributing/deployment-validation.md)     | Validation levels, testing templates, cost optimization        |
-| [Cost Considerations](docs/contributing/cost-considerations.md)         | Component costs, budgeting, regional pricing                   |
-| [Security Review](docs/contributing/security-review.md)                 | Security checklist, credential handling, dependency updates    |
+| Guide                                                                       | Description                                                    |
+|-----------------------------------------------------------------------------|----------------------------------------------------------------|
+| [Contributing Guide](docs/contributing/README.md)                           | Main hub — prerequisites, workflow, commit messages, style     |
+| [Prerequisites](docs/contributing/prerequisites.md)                         | Required tools, Azure access, NGC credentials, build commands  |
+| [Contribution Workflow](docs/contributing/contribution-workflow.md)         | Bug reports, feature requests, first contributions             |
+| [Pull Request Process](docs/contributing/pull-request-process.md)           | PR workflow, reviewers, approval criteria                      |
+| [Infrastructure Style](docs/contributing/infrastructure-style.md)           | Terraform conventions, shell scripts, copyright headers        |
+| [Deployment Validation](docs/contributing/deployment-validation.md)         | Validation levels, testing templates, cost optimization        |
+| [Cost Considerations](docs/contributing/cost-considerations.md)             | Component costs, budgeting, regional pricing                   |
+| [Security Review](docs/contributing/security-review.md)                     | Security checklist, credential handling, dependency updates    |
+| [Accessibility](docs/contributing/accessibility.md)                         | Accessibility scope, documentation and CLI output guidelines   |
+| [Documentation Maintenance](docs/contributing/documentation-maintenance.md) | Documentation update triggers, ownership, freshness policy     |
 
 ## I Have a Question
 
@@ -58,6 +60,73 @@ Run the setup script to configure your local development environment:
 ```
 
 This installs npm dependencies for linting, spell checking, and link validation. See the [Prerequisites](docs/contributing/prerequisites.md) guide for required tools and version requirements.
+
+## Cleanup and Uninstall
+
+Reverse the changes made by `setup-dev.sh` and remove deployed Azure resources.
+
+### Remove Python Environment
+
+The setup script creates a virtual environment at `.venv/` and syncs dependencies from `pyproject.toml`.
+
+```bash
+# Deactivate if currently active
+command -v deactivate &>/dev/null && deactivate
+
+# Remove the virtual environment
+rm -rf .venv
+```
+
+### Remove External Dependencies
+
+The setup script clones IsaacLab for IntelliSense support.
+
+```bash
+# Remove IsaacLab clone
+rm -rf external/IsaacLab
+
+# Remove Node.js linting dependencies (if installed separately via npm install)
+rm -rf node_modules
+```
+
+### Clear Package Caches (Optional)
+
+Free disk space by clearing uv and npm caches. This affects all projects using these tools, not just this repository.
+
+```bash
+# Clear uv download and build cache
+uv cache clean
+
+# Clear npm cache
+npm cache clean --force
+```
+
+### Destroy Azure Infrastructure
+
+Remove all deployed Azure resources:
+
+```bash
+cd deploy/001-iac
+terraform destroy -var-file=terraform.tfvars
+```
+
+> [!WARNING]
+> `terraform destroy` permanently deletes all deployed Azure resources including AKS clusters, storage accounts, Key Vault, and networking. Back up training data and model checkpoints before running this command.
+
+For automation deployments:
+
+```bash
+cd deploy/001-iac/automation
+terraform destroy -var-file=terraform.tfvars
+```
+
+Verify no orphaned resources remain:
+
+```bash
+az group list --query "[?starts_with(name, 'your-prefix')].name" -o tsv
+```
+
+See [Cost Considerations](docs/contributing/cost-considerations.md) for component costs and cleanup timing.
 
 ## Build and Validation
 
@@ -210,6 +279,10 @@ Pytest and coverage are not yet centrally configured in `pyproject.toml`. When a
 ### Shell and Infrastructure Tests
 
 Use [BATS-core](https://github.com/bats-core/bats-core) for shell script tests, [Pester v5](https://pester.dev/) for PowerShell tests, and the native `terraform test` framework for Terraform modules. When adding tests, include framework-specific details in the README for each area.
+
+## Documentation Maintenance
+
+Documentation stays current through update triggers, ownership rules, and freshness reviews. See the [Documentation Maintenance](docs/contributing/documentation-maintenance.md) guide for the complete policy including review criteria, PR requirements, and release lifecycle.
 
 ## Code of Conduct
 

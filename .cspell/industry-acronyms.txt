@@ -24,7 +24,10 @@ msrc
 NNPI
 NUMA
 ONVIF
+OpenSSF
 OSPF
+openssf
+OpenSSF
 OWASP
 rbac
 RAGRS

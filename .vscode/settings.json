@@ -1,14 +1,31 @@
 {
     "json.schemaDownload.enable": true,
-
     "files.eol": "\n",
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
-
+    "files.exclude": {
+        "datasets/**": true,
+        "**/.mypy_cache": true,
+        "**/node_modules": true,
+        "**/__pycache__": true
+    },
+    "files.watcherExclude": {
+        "datasets/**": true,
+        "**/.mypy_cache/**": true,
+        "**/node_modules/**": true,
+        "**/__pycache__/**": true
+    },
+    "search.exclude": {
+        "datasets/**": true,
+        "**/.mypy_cache": true,
+        "**/node_modules": true,
+        "**/__pycache__": true,
+        "**/*.hdf5": true,
+        "uv.lock": true,
+        "package-lock.json": true
+    },
     "diffEditor.ignoreTrimWhitespace": false,
-
     "editor.insertSpaces": true,
-
     "markdownlint.configFile": ".markdownlint-cli2.jsonc",
     "markdownlint.lintWorkspaceGlobs": [
         "**/*.{md,mkd,mdwn,mdown,markdown,markdn,mdtxt,mdtext,workbook}",
@@ -19,13 +36,18 @@
         "!**/.git",
         "!**/vendor"
     ],
-
     "[markdown]": {
         "editor.formatOnSave": true,
         "editor.wordWrap": "on",
         "editor.detectIndentation": false,
     },
-
+    "[json]": {
+        "editor.quickSuggestions": {
+            "strings": true
+        },
+        "editor.suggest.insertMode": "replace",
+        "editor.formatOnSave": true,
+    },
     "[terraform-vars]": {
         "editor.defaultFormatter": "hashicorp.terraform",
         "editor.formatOnSave": true,
@@ -34,12 +56,10 @@
             "source.formatAll.terraform": "explicit"
         },
     },
-
     "[terraform-test]": {
         "editor.formatOnSave": true,
         "editor.tabSize": 2,
     },
-
     "[terraform]": {
         "editor.defaultFormatter": "hashicorp.terraform",
         "editor.formatOnSave": true,
@@ -48,25 +68,23 @@
             "source.formatAll.terraform": "explicit"
         },
     },
-
     "[bicep]": {
         "editor.formatOnSave": true,
         "editor.tabSize": 2,
     },
-
     "[shellscript]": {
         "editor.formatOnSave": true,
         "editor.tabSize": 2,
     },
-
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter",
         "editor.formatOnSave": true,
         "editor.tabSize": 4,
     },
-
-    "black-formatter.args": ["--line-length", "120"],
-
+    "black-formatter.args": [
+        "--line-length",
+        "120"
+    ],
     "python.analysis.extraPaths": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/external/IsaacLab/source/isaaclab",
@@ -75,7 +93,6 @@
         "${workspaceFolder}/external/IsaacLab/source/isaaclab_rl",
         "${workspaceFolder}/external/IsaacLab/scripts"
     ],
-
     "[powershell]": {
         "debug.saveBeforeStart": "nonUntitledEditorsInActiveGroup",
         "editor.semanticHighlighting.enabled": false,
@@ -83,10 +100,8 @@
         "editor.formatOnSave": true,
         "editor.tabSize": 4,
     },
-
     "shellcheck.enableQuickFix": true,
     "shellcheck.run": "onSave",
-
     "yaml.schemas": {
         "https://raw.githubusercontent.com/microsoft/azure-pipelines-vscode/master/service-schema.json": "*-pipelines.yml"
     },
@@ -99,7 +114,6 @@
         "tag:yaml.org,2002:python/name:pymdownx.superfences.fence_code_format",
         "tag:yaml.org,2002:python/object/apply:pymdownx.slugs.slugify mapping"
     ],
-
     "github.copilot.chat.agent.thinkingTool": true,
     "github.copilot.chat.codesearch.enabled": true,
     "github.copilot.chat.commitMessageGeneration.instructions": [
@@ -107,18 +121,12 @@
             "file": "./.github/instructions/commit-message.instructions.md"
         }
     ],
-
-    /*
-        Git clone microsoft/edge-ai next to this project's folder
-    */
-
     "chat.modeFilesLocations": {
         ".github/chatmodes": true,
         "/Users/vscode/repos/chatmodes": true,
         "../hve-core/.github/chatmodes": true,
         "../hve-core/copilot/beads/chatmodes": true,
     },
-
     "chat.instructionsFilesLocations": {
         ".github/instructions": true,
         "/Users/vscode/repos/instructions": true,
@@ -127,7 +135,6 @@
         "../hve-core/.github/instructions": true,
         "../hve-core/copilot/beads/instructions": true,
     },
-
     "chat.promptFilesLocations": {
         ".github/prompts": true,
         "/Users/vscode/repos/prompts": true,

@@ -74,7 +74,7 @@ jobs:
 
   # Automated release PR management via release-please
   release-please:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}
+    if: "${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
     needs:
       - spell-check
       - markdown-lint

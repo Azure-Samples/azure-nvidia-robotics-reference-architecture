@@ -31,7 +31,7 @@ This reference architecture uses a deployment-based validation model rather than
 Maintainers assign reviewers based on contribution type:
 
 | Contribution Type    | Primary Reviewer              |
-| -------------------- | ----------------------------- |
+|----------------------|-------------------------------|
 | Terraform modules    | Cloud Infrastructure Engineer |
 | Kubernetes manifests | DevOps/SRE Engineer           |
 | Training scripts     | ML Engineer                   |
@@ -53,41 +53,42 @@ Maintainers assign reviewers based on contribution type:
 * [ ] No security vulnerabilities introduced
 * [ ] Cost implications documented (if applicable)
 * [ ] Breaking changes clearly communicated
+* [ ] Accessibility guidelines followed (alt text, semantic headings, descriptive links)
 
 ## Update Process
 
 This reference architecture uses a rolling update model rather than semantic versioning. Users fork and adapt the blueprint for their own use.
 
-### Update Types
+## Update Types
 
-#### Documentation Updates
+### Documentation Updates
 
 * Continuous improvements to READMEs, guides, and troubleshooting docs
 * No announcement needed for minor clarifications
 * Significant new guides announced via repository discussions
 
-#### Enhancement Updates
+### Enhancement Updates
 
 * New capabilities (e.g., new network mode, new Azure service integration)
 * Announced via GitHub Releases with usage examples
 * Backward compatible when possible
 
-#### Breaking Changes
+### Breaking Changes
 
 * Infrastructure modifications that require resource recreation
 * Terraform variable/output changes
 * Deployment script interface changes
 
-#### Breaking Change Communication
+### Breaking Change Communication
 
 * GitHub Release with `[BREAKING]` prefix
 * Migration guide in release notes
 * Updated deployment documentation
 * Announcement in repository discussions
 
-### Component Updates
+## Component Updates
 
-#### Dependency Management
+### Dependency Management
 
 Update dependencies regularly for security patches and feature improvements:
 
@@ -103,7 +104,7 @@ helm search repo nvidia-gpu-operator --versions
 pip install -r requirements.txt --upgrade
 ```
 
-#### Migration Approach
+### Migration Approach
 
 When pulling upstream updates:
 
@@ -120,7 +121,7 @@ git merge upstream/main
 # Merge to your main branch after validation
 ```
 
-### Staying Updated
+## Staying Updated
 
 * Watch repository for releases
 * Review release notes before pulling updates

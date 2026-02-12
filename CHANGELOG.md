@@ -15,6 +15,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **Note:** This file is automatically maintained by [release-please](https://github.com/googleapis/release-please). Do not edit manually.
 
+## [0.2.0](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.1.0...v0.2.0) (2026-02-12)
+
+
+### ✨ Features
+
+* **build:** add automatic milestone closure on release publish ([#148](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/148)) ([18c72e5](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/18c72e56f53afef39eb0db16ad6246f6ddc43827))
+
+
+### 🐛 Bug Fixes
+
+* **build:** restore release-please skip guard on release PR merge ([#147](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/147)) ([d8ade84](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/d8ade846074d9b184959715775184b2dc3284af4))
+* **workflows:** quote if expression to resolve YAML syntax error ([#172](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/172)) ([b3120a6](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/b3120a6b07253fb494da20d1e2acdf9f1bc6a627))
+
+
+### 📚 Documentation
+
+* add deployer-facing security considerations ([#161](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/161)) ([1f5c110](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/1f5c1101efe80d3564e8eb5204cd52f75dba116c))
+* add hve-core onboarding to README and contributing guides ([#153](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/153)) ([8fb63bb](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/8fb63bbc0c2543a1cf24a15fbbe7020dd4c16c47))
+* add testing requirements to CONTRIBUTING.md ([#150](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/150)) ([0116c4f](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/0116c4f9e6c45e29327bb6e0f59af140237462fa))
+* **contributing:** add accessibility best practices statement ([#166](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/166)) ([2d5f239](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/2d5f2399bcb39bff8c5ae276cfe77524297c4e48))
+* **contributing:** publish 12-month roadmap ([#159](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/159)) ([f158463](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/f158463fcca6d2eeaab48c88da3a242ed6b2df7d))
+* create comprehensive CONTRIBUTING.md ([#119](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/119)) ([9c60073](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/9c600734b139099e7f6f0976a2791de13a19096c))
+* define documentation maintenance policy ([#162](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/162)) ([bd750ed](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/bd750ed2a7943680b5ee0ab24e9e77899d2b9c0c))
+* **deploy:** standardize installation and uninstallation terminology in README files ([#168](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/168)) ([43427f3](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/43427f323aaaa30888742875949497106543a9b7))
+* **docs:** add test execution and cleanup instructions ([#167](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/167)) ([d83b20e](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/d83b20e1714da98d67ea11145def056a710ff7e2))
+* **docs:** decompose and relocate detailed contributing guide ([#156](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/156)) ([3783400](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/3783400811df619cc4b9b150048ccea032fa9351))
+* **scripts:** document submit script CLI arguments ([#123](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/123)) ([adabdd5](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/adabdd51e8db0e734d0875a070bc4ded338ec8a6))
+* **src:** add docstrings to training utils context module ([#157](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/157)) ([b6312f5](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/b6312f5942b32bf4f0f94625baec100279c674b9))
+* **src:** add Google-style docstrings to metrics module ([#151](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/151)) ([311886c](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/311886c5740ba4d5ab98a215998514772c9bb965))
+* **src:** expand Google-style docstrings for training utils env module ([#131](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/131)) ([29ab4f8](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/29ab4f802fd023a3b1ec6318b449ab60356b28fa))
+
+
+### 🔧 Miscellaneous
+
+* **deps:** bump protobuf from 6.33.3 to 6.33.5 ([#51](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/51)) ([cab59e6](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/cab59e620678d3056180ffc152bfd0789891f4ac))
+* **deps:** bump the github-actions group with 4 updates ([#155](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/155)) ([f73898f](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/f73898f9b6f9b919a819633cdc7b200f41eb145b))
+* **deps:** bump the python-dependencies group across 1 directory with 11 updates ([#134](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/134)) ([09331ea](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/09331ea3757681f1fca2acf9eca61043718cb409))
+
 ## [0.1.0](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.0.1...v0.1.0) (2026-02-07)
 
 

@@ -39,3 +39,62 @@ We prefer all communications to be in English.
 Microsoft follows the principle of [Coordinated Vulnerability Disclosure](https://aka.ms/security.md/cvd).
 
 <!-- END MICROSOFT SECURITY.MD BLOCK -->
+
+## Security Considerations for Deployers
+
+> [!IMPORTANT]
+> This reference architecture is provided under the [MIT License](LICENSE) and offered
+> "AS IS" without warranty of any kind. The security guidance in this document is
+> informational only and does not constitute professional security advice. You are
+> solely responsible for evaluating the security of your own deployment, including
+> all configuration, operational practices, and compliance requirements. The project
+> maintainers accept no liability for security incidents arising from the use of
+> this architecture.
+
+This reference architecture includes certain security configurations as a starting
+point. These configurations are not a substitute for a security assessment tailored
+to your environment.
+
+### What This Architecture Includes
+
+| Included Configuration      | Description                                    | Your Responsibility                                                 |
+|-----------------------------|------------------------------------------------|---------------------------------------------------------------------|
+| Private AKS cluster option  | Enabled by default via Terraform variable      | Evaluate whether private mode meets your network requirements       |
+| Managed identities          | User-assigned identity for AKS                 | Review identity permissions and scope for your workloads            |
+| Azure Key Vault integration | Key Vault CSI driver configured                | Manage secret lifecycle, rotation, and access policies              |
+| Kubernetes network policies | Azure CNI with network policy support enabled  | Define and maintain policies appropriate for your workloads         |
+| Workload identity           | Federated credential configuration for OSMO    | Verify audience restrictions and token scoping for your environment |
+
+### What This Architecture Does Not Include
+
+| Not Included                | Why                                                                | Where to Start                                                                                                                  |
+|-----------------------------|--------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| Production hardening        | Requirements vary by organization and compliance framework         | [AKS baseline architecture](https://learn.microsoft.com/azure/architecture/reference-architectures/containers/aks/baseline-aks) |
+| Compliance certification    | Compliance is organization-specific and requires formal assessment | [Azure compliance documentation](https://learn.microsoft.com/azure/compliance/)                                                 |
+| Web Application Firewall    | WAF configuration depends on ingress patterns and threat model     | [Azure WAF documentation](https://learn.microsoft.com/azure/web-application-firewall/)                                          |
+| DDoS protection             | DDoS requirements depend on public exposure and SLA needs          | [Azure DDoS Protection](https://learn.microsoft.com/azure/ddos-protection/)                                                     |
+| Penetration testing         | Pen testing is an operational responsibility                       | [Azure penetration testing rules](https://learn.microsoft.com/azure/security/fundamentals/pen-testing)                          |
+| Remote Terraform state      | State backend choice depends on team size and workflow             | [Terraform Azure backend](https://developer.hashicorp.com/terraform/language/backend/azurerm)                                   |
+| Secret rotation automation  | Rotation schedules are organization-specific                       | [Key Vault rotation](https://learn.microsoft.com/azure/key-vault/keys/how-to-configure-key-rotation)                            |
+| Audit logging configuration | Logging requirements vary by compliance framework                  | [Azure Monitor](https://learn.microsoft.com/azure/azure-monitor/)                                                               |
+
+### Your Responsibilities
+
+You are responsible for all security decisions in your deployment:
+
+- Conduct a security assessment appropriate for your environment and compliance requirements
+- Review and customize all Terraform variables, network configurations, and RBAC assignments
+- Implement production hardening controls beyond what this reference architecture includes
+- Manage secrets, credentials, and access policies throughout the deployment lifecycle
+- Monitor your deployment for security events and respond to incidents
+- Keep dependencies and base images updated with security patches
+
+Refer to official [Azure security documentation](https://learn.microsoft.com/azure/security/) for authoritative, current guidance.
+
+## Additional Resources
+
+<!-- cspell:words deployers -->
+
+- [Security Guide for Deployers](docs/security-guide.md) - detailed security configuration inventory and deployment checklist
+- [Azure security documentation](https://learn.microsoft.com/azure/security/) - authoritative security guidance for Azure services
+- [AKS baseline architecture](https://learn.microsoft.com/azure/architecture/reference-architectures/containers/aks/baseline-aks) - production-ready AKS security patterns

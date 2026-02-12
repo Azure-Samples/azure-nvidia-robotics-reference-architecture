@@ -98,6 +98,55 @@ The workspace `.vscode/settings.json` also configures Copilot Chat to load instr
 
 These paths resolve when hve-core is installed as a peer directory or via the VS Code Extension. Without hve-core, Copilot still functions but shared conventions, prompts, and chat modes are unavailable.
 
+## 🧪 Running Tests
+
+Once a `tests/` directory exists, run the test suite:
+
+```bash
+uv run pytest tests/
+```
+
+Run tests selectively by category:
+
+```bash
+# Unit tests only (fast, no external dependencies)
+uv run pytest tests/ -m "not slow and not gpu"
+```
+
+See the [Testing Requirements](CONTRIBUTING.md#testing-requirements) section in CONTRIBUTING.md for test organization, markers, and coverage targets.
+
+## 🧹 Cleanup and Uninstall
+
+Reverse the changes made by `setup-dev.sh` and tear down deployed infrastructure.
+
+### Remove Development Environment
+
+```bash
+# Remove Python virtual environment
+rm -rf .venv
+
+# Remove cloned IsaacLab repository
+rm -rf external/IsaacLab
+
+# Remove Node.js linting dependencies (if installed separately via npm install)
+rm -rf node_modules
+
+# Remove uv cache (optional, frees disk space)
+uv cache clean
+```
+
+### Destroy Azure Infrastructure
+
+```bash
+cd deploy/001-iac
+terraform destroy -var-file=terraform.tfvars
+```
+
+> [!WARNING]
+> `terraform destroy` permanently deletes all deployed Azure resources including storage, AKS clusters, and Key Vault. Ensure training data and model checkpoints are backed up before destroying infrastructure.
+
+See [Cost Considerations](docs/contributing/cost-considerations.md) for details on resource costs and cleanup timing.
+
 ## 🧱 Repository Structure
 
 ```text
@@ -125,11 +174,24 @@ These paths resolve when hve-core is installed as a peer directory or via the VS
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
+## 🔒 Security
+
+<!-- cspell:words deployers -->
+
+Review security guidance before deploying this reference architecture:
+
+- [SECURITY.md](SECURITY.md) - vulnerability reporting and security considerations for deployers
+- [Security Guide](docs/security-guide.md) - detailed security configuration inventory, deployment responsibilities, and checklist
+
 ## 🤝 Support
 
 For issues and questions:
 
 - Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
+
+## 🗺️ Roadmap
+
+See the [project roadmap](docs/contributing/ROADMAP.md) for priorities, timelines, and success metrics covering Q1 2026 through Q1 2027.
 
 ## 🙏 Acknowledgments
 

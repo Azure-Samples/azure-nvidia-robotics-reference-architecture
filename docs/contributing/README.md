@@ -2,7 +2,7 @@
 title: Contributing to Azure NVIDIA Robotics Reference Architecture
 description: Guide for contributing including prerequisites, deployment validation, and style conventions
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-08
+ms.date: 2026-02-11
 ms.topic: how-to
 keywords:
   - azure
@@ -29,32 +29,37 @@ Contributions can include:
 
 ## 📖 Contributing Guides
 
-| Guide                                             | Description                                                      |
-|---------------------------------------------------|------------------------------------------------------------------|
-| [Prerequisites](prerequisites.md)                 | Required tools, Azure access, NGC credentials, build commands    |
-| [Contribution Workflow](contribution-workflow.md) | Bug reports, feature requests, first contributions               |
-| [Pull Request Process](pull-request-process.md)   | PR workflow, review process, update procedures                   |
-| [Infrastructure Style](infrastructure-style.md)   | Terraform conventions, shell script standards, copyright headers |
-| [Deployment Validation](deployment-validation.md) | Validation levels, testing templates, cost optimization          |
-| [Cost Considerations](cost-considerations.md)     | Component costs, budgeting, regional pricing                     |
-| [Security Review](security-review.md)             | Security checklist, credential handling, dependency updates      |
+| Guide                                                     | Description                                                      |
+|-----------------------------------------------------------|------------------------------------------------------------------|
+| [Prerequisites](prerequisites.md)                         | Required tools, Azure access, NGC credentials, build commands    |
+| [Contribution Workflow](contribution-workflow.md)         | Bug reports, feature requests, first contributions               |
+| [Pull Request Process](pull-request-process.md)           | PR workflow, review process, update procedures                   |
+| [Infrastructure Style](infrastructure-style.md)           | Terraform conventions, shell script standards, copyright headers |
+| [Deployment Validation](deployment-validation.md)         | Validation levels, testing templates, cost optimization          |
+| [Cost Considerations](cost-considerations.md)             | Component costs, budgeting, regional pricing                     |
+| [Security Review](security-review.md)                     | Security checklist, credential handling, dependency updates      |
+| [Accessibility](accessibility.md)                         | Accessibility scope, documentation and CLI output guidelines     |
+| [Documentation Maintenance](documentation-maintenance.md) | Update triggers, ownership, review criteria, freshness policy    |
+| [Roadmap](ROADMAP.md)                                     | 12-month project roadmap, priorities, and success metrics        |
 
 ### Quick Reference
 
-| Changing...             | Read...                                                                                                 |
-|-------------------------|---------------------------------------------------------------------------------------------------------|
-| Terraform modules       | [Infrastructure Style](infrastructure-style.md), then [Deployment Validation](deployment-validation.md) |
-| Shell scripts           | [Infrastructure Style](infrastructure-style.md)                                                         |
-| Training workflows      | [Deployment Validation](deployment-validation.md) (Level 4)                                             |
-| Security-sensitive code | [Security Review](security-review.md)                                                                   |
-| Any PR                  | [Cost Considerations](cost-considerations.md) for testing budget                                        |
+| Changing...                | Read...                                                                                                 |
+|----------------------------|---------------------------------------------------------------------------------------------------------|
+| Terraform modules          | [Infrastructure Style](infrastructure-style.md), then [Deployment Validation](deployment-validation.md) |
+| Shell scripts              | [Infrastructure Style](infrastructure-style.md)                                                         |
+| Training workflows         | [Deployment Validation](deployment-validation.md) (Level 4)                                             |
+| Security-sensitive code    | [Security Review](security-review.md)                                                                   |
+| Any PR                     | [Cost Considerations](cost-considerations.md) for testing budget                                        |
+| Accessibility requirements | Follow [Accessibility](accessibility.md) for docs and CLI output                                        |
+| Documentation policy       | [Documentation Maintenance](documentation-maintenance.md)                                               |
 
 ## 📋 Prerequisites
 
 Install required tools and configure Azure access before contributing. See [Prerequisites and Build Validation](prerequisites.md) for complete details including Azure access requirements, NVIDIA NGC setup, and build validation commands.
 
 | Tool       | Minimum Version |
-| ---------- | --------------- |
+|------------|-----------------|
 | Terraform  | 1.9.8           |
 | Azure CLI  | 2.65.0          |
 | kubectl    | 1.31            |
@@ -166,13 +171,13 @@ This reference architecture validates through deployment rather than automated t
 ### Validation Levels
 
 | Level                   | What                                                                   | When to Use                  | Cost   |
-| ----------------------- | ---------------------------------------------------------------------- | ---------------------------- | ------ |
+|-------------------------|------------------------------------------------------------------------|------------------------------|--------|
 | **Level 1: Static**     | `terraform fmt`, `terraform validate`, `shellcheck`, `npm run lint:md` | Every contribution           | $0     |
 | **Level 2: Plan**       | `terraform plan` with documented output                                | Terraform changes            | $0     |
 | **Level 3: Deployment** | Full deployment in dev subscription                                    | Major infrastructure changes | $25-50 |
 | **Level 4: Workflow**   | Training job execution                                                 | Script/workflow changes      | $5-30  |
 
-**Static validation is required for all PRs:**
+Static validation is required for all PRs:
 
 ```bash
 terraform fmt -check -recursive deploy/
@@ -198,7 +203,7 @@ Full deployment testing incurs Azure costs. Plan accordingly and destroy resourc
 ### Testing Budget Summary
 
 | Contribution Type   | Typical Cost | Testing Approach          |
-| ------------------- | ------------ | ------------------------- |
+|---------------------|--------------|---------------------------|
 | Documentation       | $0           | Linting only              |
 | Terraform modules   | $10-25       | Plan + short deployment   |
 | Training scripts    | $15-30       | Single training job       |
@@ -245,6 +250,24 @@ Security-sensitive contributions require additional review to ensure Azure best 
 **DO NOT** report vulnerabilities through public GitHub issues. Report to Microsoft Security Response Center (MSRC). See [SECURITY.md](../../SECURITY.md).
 
 For the complete security checklist, dependency update process, and scanning requirements, see [Security Review Guide](security-review.md).
+
+## ♿ Accessibility
+
+All contributions follow the project's [Accessibility Best Practices](accessibility.md).
+
+Documentation standards:
+
+* Provide descriptive alt text for every image
+* Follow heading hierarchy without skipping levels
+* Use descriptive link text instead of raw URLs
+* Use tables and lists for structured data
+
+CLI output standards:
+
+* Support the [NO_COLOR](https://no-color.org) standard in shell scripts
+* Shared color functions in `deploy/002-setup/lib/common.sh` check `NO_COLOR` before emitting ANSI escape sequences
+
+See [Accessibility](accessibility.md) for full guidelines.
 
 ## 📚 Attribution
 
