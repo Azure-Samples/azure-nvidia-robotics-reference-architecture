@@ -95,15 +95,13 @@ See the [root README](../README.md) for architecture details.
 
 ## 🗑️ Cleanup
 
-Clean up deployed components in reverse order. Cluster components must be removed before infrastructure.
+Remove deployed cluster components. Use [Destroy Infrastructure](#destroy-infrastructure) for VPN and Terraform removal.
 
-| Step | Folder                                  | Description                                   | Time      |
-|:----:|-----------------------------------------|-----------------------------------------------|-----------|
-|  1   | [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 10-15 min |
-|  2   | [001-iac/vpn](001-iac/vpn/)             | Destroy VPN Gateway                           | 10-15 min |
-|  3   | [001-iac](001-iac/)                     | Terraform destroy or resource group deletion  | 20-30 min |
+| Folder                                  | Description                                   | Time      |
+|-----------------------------------------|-----------------------------------------------|-----------|
+| [002-setup/cleanup](002-setup/cleanup/) | Uninstall Helm charts, extensions, namespaces | 10-15 min |
 
-### Partial Cleanup (Cluster Components Only)
+### Cleanup Steps (Cluster Components)
 
 Clean up OSMO, AzureML, and GPU components while preserving Azure infrastructure:
 
@@ -121,7 +119,7 @@ See [002-setup/README.md](002-setup/README.md#cleanup) for script options and da
 
 ### Destroy Infrastructure
 
-Destroy all Azure resources. Choose based on how infrastructure was created.
+Destroy all Azure resources after cleanup. This removes VPN and Terraform-managed infrastructure.
 
 **Option A: Terraform Destroy** (recommended if using Terraform state)
 
