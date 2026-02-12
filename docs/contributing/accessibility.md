@@ -1,9 +1,12 @@
 ---
 title: Accessibility Best Practices
 description: Standards for accessible documentation and CLI output in this project
+author: Microsoft Robotics-AI Team
 ms.date: 2026-02-11
 ms.topic: reference
 ---
+
+This document defines accessibility requirements for documentation and CLI output in this repository. Use it when authoring Markdown files or shell scripts that produce user-facing text.
 
 ## Scope
 
@@ -54,7 +57,7 @@ NO_COLOR=1 ./deploy/002-setup/01-deploy-robotics-charts.sh
 Shared color functions in `deploy/002-setup/lib/common.sh` check `NO_COLOR` before emitting escape sequences:
 
 ```bash
-if [[ -z "${NO_COLOR:-}" ]]; then
+if [[ -z "${NO_COLOR+x}" ]]; then
   info()  { printf '\033[1;34m[INFO]\033[0m  %s\n' "$*"; }
   warn()  { printf '\033[1;33m[WARN]\033[0m  %s\n' "$*" >&2; }
   error() { printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; }
