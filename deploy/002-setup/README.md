@@ -330,7 +330,7 @@ kubectl describe sa osmo-service -n osmo-control-plane
 ├── 02-deploy-azureml-extension.sh
 ├── 03-deploy-osmo-control-plane.sh
 ├── 04-deploy-osmo-backend.sh
-├── cleanup/                    # Uninstall scripts
+├── cleanup/                    # Cleanup scripts
 ├── config/                     # OSMO configuration templates
 ├── lib/                        # Shared functions
 ├── manifests/                  # Kubernetes manifests
@@ -343,12 +343,12 @@ kubectl describe sa osmo-service -n osmo-control-plane
 | Script                                    | Purpose                      |
 |-------------------------------------------|------------------------------|
 | `optional/deploy-volcano-scheduler.sh`    | Volcano (alternative to KAI) |
-| `optional/uninstall-volcano-scheduler.sh` | Remove Volcano scheduler     |
+| `optional/uninstall-volcano-scheduler.sh` | Uninstall Volcano scheduler  |
 | `optional/add-user-to-platform.sh`        | Add user to OSMO platform    |
 
 ## 🗑️ Cleanup
 
-Uninstall scripts in `cleanup/` remove cluster components in reverse deployment order.
+Cleanup scripts in `cleanup/` uninstall cluster components in reverse deployment order.
 
 ### Cleanup Scripts
 
@@ -359,9 +359,9 @@ Uninstall scripts in `cleanup/` remove cluster components in reverse deployment 
 | `cleanup/uninstall-azureml-extension.sh`  | ML extension, compute target, FICs    |
 | `cleanup/uninstall-robotics-charts.sh`    | GPU Operator, KAI Scheduler           |
 
-### Uninstall Order
+### Cleanup Order
 
-Run scripts in this order to avoid dependency issues:
+Run uninstall scripts in this order to avoid dependency issues:
 
 ```bash
 cd cleanup
@@ -394,7 +394,7 @@ By default, uninstall scripts preserve data. Use flags for complete removal:
 
 ### Full Component Cleanup
 
-Remove everything including data:
+Clean up everything including data:
 
 ```bash
 cd cleanup
@@ -406,7 +406,7 @@ cd cleanup
 
 ### Selective Cleanup
 
-Remove only specific components:
+Clean up only specific components:
 
 ```bash
 # OSMO only (preserve AzureML and GPU infrastructure)

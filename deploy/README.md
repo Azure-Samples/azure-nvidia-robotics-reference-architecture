@@ -1,6 +1,18 @@
 # Deploy
 
-Infrastructure deployment and cluster configuration for the robotics reference architecture.
+Infrastructure deployment and cluster configuration for the robotics reference architecture. See [Terminology Glossary](#-terminology-glossary) for standard deployment terms.
+
+## 📖 Terminology Glossary
+
+| Term | Definition |
+| --- | --- |
+| Deploy | Provision Azure infrastructure or install cluster components using Terraform or deployment scripts. |
+| Setup | Post-deploy configuration and access steps for the cluster and workloads. |
+| Install | Install local client tools or CLIs (for example, Azure VPN Client). |
+| Cleanup | Remove cluster components while keeping Azure infrastructure intact. |
+| Uninstall | Run uninstall scripts that remove deployed cluster components. |
+| Destroy | Delete Azure infrastructure (Terraform destroy or resource group deletion). |
+| Teardown | Avoid in docs; use Destroy for infrastructure removal. |
 
 ## 📋 Deployment Order
 
@@ -83,7 +95,7 @@ See the [root README](../README.md) for architecture details.
 
 ## 🗑️ Cleanup
 
-Remove deployed components in reverse order. Cluster components must be removed before infrastructure.
+Clean up deployed components in reverse order. Cluster components must be removed before infrastructure.
 
 | Step | Folder                                  | Description                                   | Time      |
 |:----:|-----------------------------------------|-----------------------------------------------|-----------|
@@ -93,7 +105,7 @@ Remove deployed components in reverse order. Cluster components must be removed 
 
 ### Partial Cleanup (Cluster Components Only)
 
-Remove OSMO, AzureML, and GPU components while preserving Azure infrastructure:
+Clean up OSMO, AzureML, and GPU components while preserving Azure infrastructure:
 
 ```bash
 cd 002-setup/cleanup
@@ -107,14 +119,14 @@ cd 002-setup/cleanup
 
 See [002-setup/README.md](002-setup/README.md#cleanup) for script options and data preservation.
 
-### Full Teardown
+### Destroy Infrastructure
 
-Remove all Azure resources. Choose based on how infrastructure was created.
+Destroy all Azure resources. Choose based on how infrastructure was created.
 
 **Option A: Terraform Destroy** (recommended if using Terraform state)
 
 ```bash
-# Remove cluster components first
+# Clean up cluster components first
 cd 002-setup/cleanup
 ./uninstall-osmo-backend.sh --delete-container
 ./uninstall-osmo-control-plane.sh --purge-postgres --purge-redis --delete-mek
