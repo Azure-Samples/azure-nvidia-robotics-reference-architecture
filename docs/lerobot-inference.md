@@ -1,4 +1,16 @@
-# LeRobot ACT Policy Inference
+---
+title: LeRobot ACT Policy Inference
+description: Run a trained ACT policy locally or on a UR10E robot via ROS2
+author: Microsoft Robotics-AI Team
+ms.date: 2026-02-12
+ms.topic: how-to
+keywords:
+  - lerobot
+  - act
+  - inference
+  - ros2
+  - ur10e
+---
 
 Run a trained ACT (Action Chunking with Transformers) policy locally against dataset observations or on a live UR10E robot via ROS2.
 

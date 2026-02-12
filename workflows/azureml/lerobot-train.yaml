@@ -31,19 +31,19 @@ environment: azureml:lerobot-training-env:latest
 compute: azureml:cpu-cluster
 
 inputs:
-  dataset_repo_id: ""
+  dataset_repo_id: none
   policy_type: act
   job_name: lerobot-act-training
   output_dir: /workspace/outputs/train
-  policy_repo_id: ""
-  lerobot_version: ""
-  training_steps: ""
-  batch_size: ""
-  eval_freq: ""
+  policy_repo_id: none
+  lerobot_version: none
+  training_steps: none
+  batch_size: none
+  eval_freq: none
   save_freq: "5000"
   wandb_enable: "true"
   wandb_project: lerobot-training
-  register_checkpoint: ""
+  register_checkpoint: none
   subscription_id: placeholder
   resource_group: placeholder
   workspace_name: placeholder

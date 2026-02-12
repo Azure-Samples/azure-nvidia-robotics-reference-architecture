@@ -103,7 +103,7 @@ def _init_system_collector() -> Any | None:
                     metrics["system/disk_used_gigabytes"] = disk.used / (1024**3)
                     metrics["system/disk_percent"] = disk.percent
                 except Exception:
-                    pass
+                    pass  # Non-critical: skip CPU/memory metrics if collection fails
 
                 if self._gpu_available:
                     import pynvml
@@ -118,7 +118,7 @@ def _init_system_collector() -> Any | None:
                             power = pynvml.nvmlDeviceGetPowerUsage(handle)
                             metrics[f"system/gpu_{i}_power_watts"] = power / 1000
                         except Exception:
-                            pass
+                            pass  # Non-critical: skip individual GPU metrics on transient NVML errors
                 return metrics
 
         collector = _FallbackCollector()
@@ -218,7 +218,7 @@ def run_training(cmd: list[str], source: str = "osmo-lerobot-training") -> int:
                     try:
                         metrics.update(system_collector.collect_metrics())
                     except Exception:
-                        pass
+                        pass  # Non-critical: system metrics failure must not interrupt training
 
                 mlflow.log_metrics(metrics, step=step)
 
@@ -231,7 +231,7 @@ def run_training(cmd: list[str], source: str = "osmo-lerobot-training") -> int:
                 try:
                     mlflow.log_metric("val/loss", float(val_match.group(1)))
                 except Exception:
-                    pass
+                    pass  # Non-critical: validation metric logging failure must not interrupt training
 
         process.wait()
 

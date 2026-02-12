@@ -20,9 +20,6 @@ import numpy as np
 import torch
 
 from .robot_types import (
-    IMAGE_CHANNELS,
-    IMAGE_HEIGHT,
-    IMAGE_WIDTH,
     NUM_JOINTS,
     JointPositionCommand,
     RobotObservation,

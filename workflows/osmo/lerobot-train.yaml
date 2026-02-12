@@ -110,6 +110,10 @@ workflow:
             ARCHIVE_PATH="/tmp/lerobot_payload.zip"
             PAYLOAD_ROOT="${PAYLOAD_ROOT:-/workspace/lerobot_payload}"
             mkdir -p "${PAYLOAD_ROOT}"
+            if [[ -z "${ENCODED_ARCHIVE:-}" ]]; then
+              echo "ERROR: ENCODED_ARCHIVE is not set or empty; training payload is required." >&2
+              exit 1
+            fi
             printf '%s' "${ENCODED_ARCHIVE}" | base64 -d > "${ARCHIVE_PATH}"
             unzip -oq "${ARCHIVE_PATH}" -d "${PAYLOAD_ROOT}"
             export PYTHONPATH="${PAYLOAD_ROOT}/src:${PYTHONPATH:-}"

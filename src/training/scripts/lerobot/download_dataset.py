@@ -43,7 +43,10 @@ def download_dataset(
 
     prefix = blob_prefix.rstrip("/") + "/"
 
-    credential = DefaultAzureCredential()
+    credential = DefaultAzureCredential(
+        managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"),
+        authority=os.environ.get("AZURE_AUTHORITY_HOST"),
+    )
     client = BlobServiceClient(
         account_url=f"https://{storage_account}.blob.core.windows.net",
         credential=credential,

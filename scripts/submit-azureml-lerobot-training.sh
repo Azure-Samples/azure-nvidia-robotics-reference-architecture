@@ -6,7 +6,9 @@ set -o errexit -o nounset
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || dirname "$SCRIPT_DIR")"
 
+# shellcheck source=../deploy/002-setup/lib/common.sh
 source "$REPO_ROOT/deploy/002-setup/lib/common.sh"
+# shellcheck source=lib/terraform-outputs.sh
 source "$SCRIPT_DIR/lib/terraform-outputs.sh"
 read_terraform_outputs "$REPO_ROOT/deploy/001-iac" 2>/dev/null || true
 
@@ -70,11 +72,41 @@ AZURE CONTEXT:
         --display-name NAME       Display name override
         --stream                  Stream logs after submission
 
+ADVANCED:
+        --mlflow-token-retries N  MLflow token refresh retries (default: 3)
+        --mlflow-http-timeout N   MLflow HTTP request timeout in seconds (default: 60)
+
 GENERAL:
     -h, --help                    Show this help message
 
 Values resolved: CLI > Environment variables > Terraform outputs
 Additional arguments after -- are forwarded to az ml job create.
+
+EXAMPLES:
+    # ACT training with defaults
+    submit-azureml-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
+
+    # Diffusion policy with custom hyperparameters
+    submit-azureml-lerobot-training.sh \
+      -d user/custom-dataset \
+      -p diffusion \
+      --training-steps 50000 \
+      --batch-size 16
+
+    # Register trained model and stream logs
+    submit-azureml-lerobot-training.sh \
+      -d user/dataset \
+      -r my-act-model \
+      --stream
+
+    # Fine-tune from pre-trained policy
+    submit-azureml-lerobot-training.sh \
+      -d user/dataset \
+      --policy-repo-id user/pretrained-act \
+      --training-steps 10000
+
+    # Register environment only (no job submission)
+    submit-azureml-lerobot-training.sh -d placeholder --assets-only
 EOF
 }
 
@@ -88,7 +120,7 @@ ensure_ml_extension() {
 }
 
 register_environment() {
-  local name="$1" version="$2" image="$3" rg="$4" ws="$5"
+  local name="$1" version="$2" image="$3" rg="$4" ws="$5" sub="$6"
   local env_file
   env_file=$(mktemp)
 
@@ -102,7 +134,9 @@ EOF
   info "Publishing AzureML environment ${name}:${version}"
   az ml environment create --file "$env_file" \
     --name "$name" --version "$version" \
-    --resource-group "$rg" --workspace-name "$ws" >/dev/null
+    --resource-group "$rg" --workspace-name "$ws" \
+    --subscription "$sub" >/dev/null 2>&1 || \
+    warn "Environment ${name}:${version} already exists or registration failed; continuing"
   rm -f "$env_file"
 }
 
@@ -208,7 +242,7 @@ esac
 #------------------------------------------------------------------------------
 
 register_environment "$environment_name" "$environment_version" "$image" \
-  "$resource_group" "$workspace_name"
+  "$resource_group" "$workspace_name" "$subscription_id"
 
 info "Environment: ${environment_name}:${environment_version}"
 
@@ -306,14 +340,15 @@ else:
 if not checkpoint_path:
     print(\"No checkpoints found\"); sys.exit(0)
 
+policy_type = os.environ.get(\"POLICY_TYPE\", \"act\")
 credential = DefaultAzureCredential()
 client = MLClient(credential, os.environ[\"AZURE_SUBSCRIPTION_ID\"], os.environ[\"AZURE_RESOURCE_GROUP\"], os.environ[\"AZUREML_WORKSPACE_NAME\"])
 model = Model(
     path=str(checkpoint_path),
     name=os.environ[\"REGISTER_CHECKPOINT\"],
-    description=f\"LeRobot {os.environ.get(\"POLICY_TYPE\", \"act\")} policy\",
+    description=\"LeRobot %s policy\" % policy_type,
     type=AssetTypes.CUSTOM_MODEL,
-    tags={\"framework\": \"lerobot\", \"policy_type\": os.environ.get(\"POLICY_TYPE\", \"act\"), \"source\": \"azureml-job\"},
+    tags={\"framework\": \"lerobot\", \"policy_type\": policy_type, \"source\": \"azureml-job\"},
 )
 registered = client.models.create_or_update(model)
 print(f\"Model registered: {registered.name} v{registered.version}\")

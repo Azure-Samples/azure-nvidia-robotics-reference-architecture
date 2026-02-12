@@ -128,8 +128,8 @@ def upload_new_checkpoints(
                 except Exception as exc:
                     print(f"[MLflow] Failed to log artifacts for {ckpt_dir.name}: {exc}")
 
-                if _register_model_via_aml(pretrained_dir, ckpt_dir.name, source=source):
-                    uploaded.add(ckpt_dir.name)
+                uploaded.add(ckpt_dir.name)
+                _register_model_via_aml(pretrained_dir, ckpt_dir.name, source=source)
 
 
 def register_final_checkpoint() -> int:

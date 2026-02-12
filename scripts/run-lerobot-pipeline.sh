@@ -174,7 +174,7 @@ done
 # Validation
 #------------------------------------------------------------------------------
 
-require_tools osmo
+require_tools osmo jq
 
 [[ -z "$dataset_repo_id" ]] && fatal "--dataset-repo-id is required"
 if [[ "$skip_wait" == "false" && "$skip_inference" == "false" ]]; then

@@ -26,7 +26,6 @@
     },
     "diffEditor.ignoreTrimWhitespace": false,
     "editor.insertSpaces": true,
-
     "markdownlint.configFile": ".markdownlint-cli2.jsonc",
     "markdownlint.lintWorkspaceGlobs": [
         "**/*.{md,mkd,mdwn,mdown,markdown,markdn,mdtxt,mdtext,workbook}",
@@ -49,7 +48,6 @@
         "editor.suggest.insertMode": "replace",
         "editor.formatOnSave": true,
     },
-
     "[terraform-vars]": {
         "editor.defaultFormatter": "hashicorp.terraform",
         "editor.formatOnSave": true,
@@ -123,14 +121,12 @@
             "file": "./.github/instructions/commit-message.instructions.md"
         }
     ],
-
     "chat.modeFilesLocations": {
         ".github/chatmodes": true,
         "/Users/vscode/repos/chatmodes": true,
         "../hve-core/.github/chatmodes": true,
         "../hve-core/copilot/beads/chatmodes": true,
     },
-
     "chat.instructionsFilesLocations": {
         ".github/instructions": true,
         "/Users/vscode/repos/instructions": true,
@@ -139,7 +135,6 @@
         "../hve-core/.github/instructions": true,
         "../hve-core/copilot/beads/instructions": true,
     },
-
     "chat.promptFilesLocations": {
         ".github/prompts": true,
         "/Users/vscode/repos/prompts": true,

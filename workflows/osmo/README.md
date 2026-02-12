@@ -103,7 +103,7 @@ Submits LeRobot behavioral cloning training for ACT and Diffusion policy archite
 
 * ACT and Diffusion policy architectures
 * HuggingFace Hub dataset integration
-* WANDB or Azure MLflow logging backends
+* Azure MLflow logging backend
 * Automatic checkpoint registration to Azure ML
 * No source payload packaging required
 
