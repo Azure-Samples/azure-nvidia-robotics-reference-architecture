@@ -4,7 +4,7 @@ Terraform configuration for the robotics reference architecture. Deploys Azure r
 
 ## 📋 Prerequisites
 
-| Tool         | Version         | Installation                    |
+| Tool         | Version         | Setup or Check                  |
 |--------------|-----------------|---------------------------------|
 | Azure CLI    | Latest          | `az login`                      |
 | Terraform    | 1.5+            | `terraform version`             |
@@ -322,7 +322,7 @@ az group delete --name <resource-group-name> --yes --no-wait
 
 ## 🔍 Troubleshooting
 
-Issues and resolutions encountered during infrastructure deployment and teardown.
+Issues and resolutions encountered during infrastructure deployment and destroy.
 
 ### Destroy Takes a Long Time
 
