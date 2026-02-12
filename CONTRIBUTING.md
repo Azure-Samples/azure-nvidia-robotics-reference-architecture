@@ -2,7 +2,7 @@
 title: Contributing
 description: How to contribute to the Azure NVIDIA Robotics Reference Architecture
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-08
+ms.date: 2026-02-11
 ms.topic: how-to
 keywords:
   - contributing
@@ -28,16 +28,17 @@ If you are new to the project, start with issues labeled `good first issue` or d
 
 Detailed documentation lives in [`docs/contributing/`](docs/contributing/):
 
-| Guide                                                               | Description                                                   |
-|---------------------------------------------------------------------|---------------------------------------------------------------|
-| [Contributing Guide](docs/contributing/README.md)                   | Main hub — prerequisites, workflow, commit messages, style    |
-| [Prerequisites](docs/contributing/prerequisites.md)                 | Required tools, Azure access, NGC credentials, build commands |
-| [Contribution Workflow](docs/contributing/contribution-workflow.md) | Bug reports, feature requests, first contributions            |
-| [Pull Request Process](docs/contributing/pull-request-process.md)   | PR workflow, reviewers, approval criteria                     |
-| [Infrastructure Style](docs/contributing/infrastructure-style.md)   | Terraform conventions, shell scripts, copyright headers       |
-| [Deployment Validation](docs/contributing/deployment-validation.md) | Validation levels, testing templates, cost optimization       |
-| [Cost Considerations](docs/contributing/cost-considerations.md)     | Component costs, budgeting, regional pricing                  |
-| [Security Review](docs/contributing/security-review.md)             | Security checklist, credential handling, dependency updates   |
+| Guide                                                                       | Description                                                    |
+|-----------------------------------------------------------------------------|----------------------------------------------------------------|
+| [Contributing Guide](docs/contributing/README.md)                           | Main hub — prerequisites, workflow, commit messages, style     |
+| [Prerequisites](docs/contributing/prerequisites.md)                         | Required tools, Azure access, NGC credentials, build commands  |
+| [Contribution Workflow](docs/contributing/contribution-workflow.md)         | Bug reports, feature requests, first contributions             |
+| [Pull Request Process](docs/contributing/pull-request-process.md)           | PR workflow, reviewers, approval criteria                      |
+| [Infrastructure Style](docs/contributing/infrastructure-style.md)           | Terraform conventions, shell scripts, copyright headers        |
+| [Deployment Validation](docs/contributing/deployment-validation.md)         | Validation levels, testing templates, cost optimization        |
+| [Cost Considerations](docs/contributing/cost-considerations.md)             | Component costs, budgeting, regional pricing                   |
+| [Security Review](docs/contributing/security-review.md)                     | Security checklist, credential handling, dependency updates    |
+| [Documentation Maintenance](docs/contributing/documentation-maintenance.md) | Documentation update triggers, ownership, freshness policy     |
 
 ## I Have a Question
 
@@ -210,6 +211,10 @@ Pytest and coverage are not yet centrally configured in `pyproject.toml`. When a
 ### Shell and Infrastructure Tests
 
 Use [BATS-core](https://github.com/bats-core/bats-core) for shell script tests, [Pester v5](https://pester.dev/) for PowerShell tests, and the native `terraform test` framework for Terraform modules. When adding tests, include framework-specific details in the README for each area.
+
+## Documentation Maintenance
+
+Documentation stays current through update triggers, ownership rules, and freshness reviews. See the [Documentation Maintenance](docs/contributing/documentation-maintenance.md) guide for the complete policy including review criteria, PR requirements, and release lifecycle.
 
 ## Code of Conduct
 

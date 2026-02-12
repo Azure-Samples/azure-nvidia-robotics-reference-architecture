@@ -1,0 +1,17 @@
+# Documentation ownership for OpenSSF documentation_current compliance
+# Last matching pattern takes precedence - order general to specific
+
+# Default: all markdown files require team review
+*.md                        @Azure-Samples/edge-ai-core-dev
+
+# Documentation directory
+/docs/                      @Azure-Samples/edge-ai-core-dev
+
+# Contributing guides
+/docs/contributing/         @Azure-Samples/edge-ai-core-dev
+
+# Component-level READMEs
+/deploy/**/README.md        @Azure-Samples/edge-ai-core-dev
+
+# Protect ownership file itself
+/.github/CODEOWNERS         @Azure-Samples/edge-ai-core-dev
