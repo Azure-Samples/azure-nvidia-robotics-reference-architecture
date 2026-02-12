@@ -131,6 +131,10 @@ For issues and questions:
 
 - Review [microsoft/edge-ai](https://github.com/microsoft/edge-ai) documentation
 
+## 🗺️ Roadmap
+
+See the [project roadmap](docs/contributing/ROADMAP.md) for priorities, timelines, and success metrics covering Q1 2026 through Q1 2027.
+
 ## 🙏 Acknowledgments
 
 This reference architecture builds upon:
