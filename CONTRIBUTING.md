@@ -38,6 +38,7 @@ Detailed documentation lives in [`docs/contributing/`](docs/contributing/):
 | [Deployment Validation](docs/contributing/deployment-validation.md)         | Validation levels, testing templates, cost optimization        |
 | [Cost Considerations](docs/contributing/cost-considerations.md)             | Component costs, budgeting, regional pricing                   |
 | [Security Review](docs/contributing/security-review.md)                     | Security checklist, credential handling, dependency updates    |
+| [Accessibility](docs/contributing/accessibility.md)                         | Accessibility scope, documentation and CLI output guidelines   |
 | [Documentation Maintenance](docs/contributing/documentation-maintenance.md) | Documentation update triggers, ownership, freshness policy     |
 
 ## I Have a Question
