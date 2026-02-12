@@ -59,6 +59,73 @@ Run the setup script to configure your local development environment:
 
 This installs npm dependencies for linting, spell checking, and link validation. See the [Prerequisites](docs/contributing/prerequisites.md) guide for required tools and version requirements.
 
+## Cleanup and Uninstall
+
+Reverse the changes made by `setup-dev.sh` and remove deployed Azure resources.
+
+### Remove Python Environment
+
+The setup script creates a virtual environment at `.venv/` and syncs dependencies from `pyproject.toml`.
+
+```bash
+# Deactivate if currently active
+command -v deactivate &>/dev/null && deactivate
+
+# Remove the virtual environment
+rm -rf .venv
+```
+
+### Remove External Dependencies
+
+The setup script clones IsaacLab for IntelliSense support.
+
+```bash
+# Remove IsaacLab clone
+rm -rf external/IsaacLab
+
+# Remove Node.js linting dependencies (if installed separately via npm install)
+rm -rf node_modules
+```
+
+### Clear Package Caches (Optional)
+
+Free disk space by clearing uv and npm caches. This affects all projects using these tools, not just this repository.
+
+```bash
+# Clear uv download and build cache
+uv cache clean
+
+# Clear npm cache
+npm cache clean --force
+```
+
+### Destroy Azure Infrastructure
+
+Remove all deployed Azure resources:
+
+```bash
+cd deploy/001-iac
+terraform destroy -var-file=terraform.tfvars
+```
+
+> [!WARNING]
+> `terraform destroy` permanently deletes all deployed Azure resources including AKS clusters, storage accounts, Key Vault, and networking. Back up training data and model checkpoints before running this command.
+
+For automation deployments:
+
+```bash
+cd deploy/001-iac/automation
+terraform destroy -var-file=terraform.tfvars
+```
+
+Verify no orphaned resources remain:
+
+```bash
+az group list --query "[?starts_with(name, 'your-prefix')].name" -o tsv
+```
+
+See [Cost Considerations](docs/contributing/cost-considerations.md) for component costs and cleanup timing.
+
 ## Build and Validation
 
 Run these commands to validate changes before submitting a PR:
