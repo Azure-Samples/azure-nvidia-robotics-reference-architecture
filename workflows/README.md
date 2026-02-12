@@ -146,7 +146,7 @@ The `lerobot-train.yaml` workflow trains behavioral cloning policies using the L
   -r my-diffusion-model
 ```
 
-##  LeRobot Inference Workflow
+## LeRobot Inference Workflow
 
 The `lerobot-infer.yaml` workflow evaluates trained LeRobot policies from HuggingFace Hub. Downloads policy checkpoints, runs evaluation, and optionally registers models to Azure ML.
 
@@ -213,7 +213,7 @@ The workflow accepts checkpoints from multiple sources:
     --task Isaac-Ant-v0
 ```
 
-### Inference Parameters
+### OSMO Inference Parameters
 
 | Parameter          | Default        | Description                |
 |--------------------|----------------|----------------------------|
