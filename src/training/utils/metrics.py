@@ -1,6 +1,8 @@
 """System and training metrics collection utilities.
 
 Provides reusable metrics collectors for training integrations.
+CPU and memory metrics require ``psutil``. GPU metrics require
+``pynvml``; collection degrades gracefully when pynvml is unavailable.
 """
 
 from __future__ import annotations
@@ -12,32 +14,80 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _is_tensor_scalar(value: Any) -> bool:
-    """Check if value is a single-element tensor."""
+    """Check whether *value* is a single-element tensor.
+
+    Args:
+        value: Object to inspect.
+
+    Returns:
+        ``True`` when *value* has ``item`` and ``numel`` attributes
+        and contains exactly one element.
+    """
     return hasattr(value, "item") and hasattr(value, "numel") and value.numel() == 1
 
 
 def _is_tensor_array(value: Any) -> bool:
-    """Check if value is a multi-element tensor."""
+    """Check whether *value* is a multi-element tensor.
+
+    Args:
+        value: Object to inspect.
+
+    Returns:
+        ``True`` when *value* has ``item`` and ``numel`` attributes
+        and contains more than one element.
+    """
     return hasattr(value, "item") and hasattr(value, "numel") and value.numel() > 1
 
 
 def _is_numpy_array(value: Any) -> bool:
-    """Check if value is a multi-element numpy array."""
+    """Check whether *value* is a multi-element numpy array.
+
+    Args:
+        value: Object to inspect.
+
+    Returns:
+        ``True`` when *value* has a ``mean`` attribute, supports
+        ``len()``, and contains more than one element.
+    """
     return hasattr(value, "mean") and hasattr(value, "__len__") and len(value) > 1
 
 
 def _is_single_element_sequence(value: Any) -> bool:
-    """Check if value is a sequence with exactly one element."""
+    """Check whether *value* is a sequence with exactly one element.
+
+    Args:
+        value: Object to inspect.
+
+    Returns:
+        ``True`` when *value* supports ``len()`` and contains
+        exactly one element.
+    """
     return hasattr(value, "__len__") and len(value) == 1
 
 
 def _extract_tensor_scalar(name: str, value: Any, metrics: dict[str, float]) -> None:
-    """Extract scalar value from single-element tensor."""
+    """Extract scalar value from a single-element tensor into *metrics*.
+
+    Args:
+        name: Metric key name.
+        value: Single-element tensor with an ``item`` method.
+        metrics: Output dictionary to populate.
+    """
     metrics[name] = float(value.item())
 
 
 def _extract_tensor_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
-    """Extract mean, std, min, max statistics from tensor array."""
+    """Extract mean, std, min, and max statistics from a tensor array.
+
+    Stores four keys: ``{name}/mean``, ``{name}/std``, ``{name}/min``,
+    ``{name}/max``.
+
+    Args:
+        name: Base metric key name.
+        value: Multi-element tensor with ``mean``, ``std``, ``min``,
+            and ``max`` methods.
+        metrics: Output dictionary to populate.
+    """
     if hasattr(value, "mean"):
         metrics[f"{name}/mean"] = float(value.mean().item())
     if hasattr(value, "std"):
@@ -49,7 +99,16 @@ def _extract_tensor_statistics(name: str, value: Any, metrics: dict[str, float])
 
 
 def _extract_numpy_statistics(name: str, value: Any, metrics: dict[str, float]) -> None:
-    """Extract mean, std, min, max statistics from numpy array."""
+    """Extract mean, std, min, and max statistics from a numpy array.
+
+    Imports ``numpy`` at call time. Stores four keys:
+    ``{name}/mean``, ``{name}/std``, ``{name}/min``, ``{name}/max``.
+
+    Args:
+        name: Base metric key name.
+        value: Array-like object convertible via ``numpy.asarray``.
+        metrics: Output dictionary to populate.
+    """
     import numpy as np
 
     arr = np.asarray(value)
@@ -149,13 +208,28 @@ _STANDARD_METRIC_ATTRS = [
 
 
 class SystemMetricsCollector:
-    """Collects system metrics using psutil and pynvml."""
+    """Collect system-level CPU, memory, GPU, and disk metrics.
+
+    All returned metric keys use the ``system/`` prefix. GPU metrics
+    are optional and omitted when ``pynvml`` is unavailable or
+    initialization fails; a warning is logged in that case.
+
+    Attributes:
+        _collect_disk: Whether disk metrics are included in collection.
+        _gpu_available: Whether GPU monitoring initialized successfully.
+        _gpu_handles: List of pynvml device handles, empty when GPU
+            is unavailable.
+    """
 
     def __init__(self, collect_gpu: bool = True, collect_disk: bool = True) -> None:
         """Initialize system metrics collector.
 
+        When *collect_gpu* is enabled, GPU monitoring is initialized via
+        ``pynvml``. If ``pynvml`` is unavailable or initialization raises
+        an exception, GPU metrics are disabled and a warning is logged.
+
         Args:
-            collect_gpu: Enable GPU metrics collection (requires pynvml).
+            collect_gpu: Enable GPU metrics collection. Requires ``pynvml``.
             collect_disk: Enable disk metrics collection.
         """
         self._collect_disk = collect_disk
@@ -166,7 +240,13 @@ class SystemMetricsCollector:
             self._initialize_gpu()
 
     def _initialize_gpu(self) -> None:
-        """Initialize GPU monitoring (NVIDIA via pynvml)."""
+        """Initialize GPU monitoring via pynvml.
+
+        Discovers NVIDIA devices and stores their handles for subsequent
+        metric collection. Logs device count on success. On failure
+        (missing ``pynvml`` or driver issues), sets
+        ``_gpu_available`` to ``False`` and logs a warning.
+        """
         try:
             import pynvml
 
@@ -180,10 +260,16 @@ class SystemMetricsCollector:
             self._gpu_available = False
 
     def collect_metrics(self) -> dict[str, float]:
-        """Collect all system metrics.
+        """Collect all enabled system metrics.
+
+        Aggregates CPU, memory, GPU, and disk metrics into a single
+        dictionary. GPU entries are omitted when GPU monitoring is
+        unavailable. Disk entries are omitted when disk collection is
+        disabled via the ``collect_disk`` initialization flag.
 
         Returns:
-            Dictionary of system metrics with system/ prefix.
+            Dictionary of metric names to float values. All keys use
+            the ``system/`` prefix.
         """
         metrics: dict[str, float] = {}
 
@@ -196,10 +282,18 @@ class SystemMetricsCollector:
         return metrics
 
     def _collect_cpu_metrics(self) -> dict[str, float]:
-        """Collect CPU and memory metrics using psutil.
+        """Collect CPU and memory metrics via ``psutil``.
+
+        Imports ``psutil`` at call time. Collects CPU utilization
+        percentage and virtual memory used, available, and percent
+        metrics.
 
         Returns:
-            Dictionary with cpu_utilization_percentage and memory metrics.
+            Dictionary with ``system/cpu_utilization_percentage``,
+            ``system/memory_used_megabytes``,
+            ``system/memory_available_megabytes``, and
+            ``system/memory_percent`` keys. Empty when runtime
+            collection encounters an error.
         """
         import psutil
 
@@ -218,10 +312,18 @@ class SystemMetricsCollector:
         return metrics
 
     def _collect_gpu_metrics(self) -> dict[str, float]:
-        """Collect GPU metrics using pynvml (NVIDIA only).
+        """Collect GPU metrics via ``pynvml`` for each NVIDIA device.
+
+        Imports ``pynvml`` at call time. Collects utilization, memory
+        usage, and power draw per device. Individual device failures
+        are logged at debug level and skipped.
 
         Returns:
-            Dictionary with gpu_{i}_* metrics, or empty dict if unavailable.
+            Dictionary with ``system/gpu_{i}_utilization_percentage``,
+            ``system/gpu_{i}_memory_used_megabytes``,
+            ``system/gpu_{i}_memory_percent``, and
+            ``system/gpu_{i}_power_watts`` keys per device. Empty when
+            GPU monitoring is unavailable.
         """
         if not self._gpu_available:
             return {}
@@ -247,10 +349,16 @@ class SystemMetricsCollector:
         return metrics
 
     def _collect_disk_metrics(self) -> dict[str, float]:
-        """Collect disk usage metrics using psutil.
+        """Collect disk usage metrics via ``psutil`` for the root filesystem.
+
+        Imports ``psutil`` at call time. Reports used and available
+        space in gigabytes and overall utilization percentage.
 
         Returns:
-            Dictionary with disk usage metrics for root filesystem.
+            Dictionary with ``system/disk_used_gigabytes``,
+            ``system/disk_available_gigabytes``, and
+            ``system/disk_percent`` keys. Empty when runtime
+            collection encounters an error.
         """
         import psutil
 

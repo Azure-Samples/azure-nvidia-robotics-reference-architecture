@@ -22,7 +22,7 @@ if (-not (Test-Path $logsDir)) {
     New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
 }
 
-Write-Host "🔍 Checking for URLs with language paths..." -ForegroundColor Cyan
+Write-Host "Checking for URLs with language paths..." -ForegroundColor Cyan
 
 if ($Files -and $Files.Count -gt 0) {
     $jsonOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") -Files $Files 2>&1
@@ -64,7 +64,7 @@ try {
         Write-GitHubStepSummary -Content @"
 ## Link Language Path Check Results
 
-⚠️ **Status**: Issues Found
+**Status**: Issues Found
 
 Found $($results.Count) URL(s) containing language path 'en-us'.
 
@@ -83,7 +83,7 @@ $(($uniqueFiles | ForEach-Object { $count = ($results | Where-Object file -eq $_
         exit 1
     }
     else {
-        Write-Host "✅ No URLs with language paths found" -ForegroundColor Green
+        Write-Host "No URLs with language paths found" -ForegroundColor Green
 
         $emptyResults = @{
             timestamp = (Get-Date).ToUniversalTime().ToString("o")
@@ -101,7 +101,7 @@ $(($uniqueFiles | ForEach-Object { $count = ($results | Where-Object file -eq $_
         Write-GitHubStepSummary -Content @"
 ## Link Language Path Check Results
 
-✅ **Status**: Passed
+**Status**: Passed
 
 No URLs with language-specific paths detected.
 "@

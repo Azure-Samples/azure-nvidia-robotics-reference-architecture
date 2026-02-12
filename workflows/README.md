@@ -30,13 +30,13 @@ workflows/
 
 ## ⚖️ Platform Comparison
 
-| Feature       | AzureML                   | OSMO                     |
-| ------------- | ------------------------- | ------------------------ |
-| Orchestration | Azure ML Job Service      | OSMO Workflow Engine     |
-| Scheduling    | Azure ML Compute          | KAI Scheduler / Volcano  |
-| Multi-node    | Azure ML distributed jobs | OSMO workflow DAGs       |
-| Checkpointing | MLflow integration        | MLflow + custom handlers |
-| Monitoring    | Azure ML Studio           | OSMO UI Dashboard        |
+| Feature        | AzureML                   | OSMO                     |
+|----------------|---------------------------|--------------------------|
+| Orchestration  | Azure ML Job Service      | OSMO Workflow Engine     |
+| Scheduling     | Azure ML Compute          | KAI Scheduler / Volcano  |
+| Multi-node     | Azure ML distributed jobs | OSMO workflow DAGs       |
+| Checkpointing  | MLflow integration        | MLflow + custom handlers |
+| Monitoring     | Azure ML Studio           | OSMO UI Dashboard        |
 
 ## 🚀 Quick Start
 
@@ -79,12 +79,12 @@ workflows/
 
 The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO dataset instead of base64-encoding it inline.
 
-| Aspect         | train.yaml             | train-dataset.yaml    |
-| -------------- | ---------------------- | --------------------- |
-| Payload method | Base64-encoded archive | Dataset folder upload |
-| Size limit     | ~1MB                   | Unlimited             |
-| Versioning     | None                   | Automatic             |
-| Reusability    | Per-run                | Across runs           |
+| Aspect         | train.yaml             | train-dataset.yaml        |
+|----------------|------------------------|----------------------------|
+| Payload method | Base64-encoded archive | Dataset folder upload     |
+| Size limit     | ~1MB                   | Unlimited                 |
+| Versioning     | None                   | Automatic                 |
+| Reusability    | Per-run                | Across runs               |
 
 ### Dataset Submission
 
@@ -101,11 +101,11 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
 
 ### Dataset Parameters
 
-| Parameter          | Default         | Description                   |
-| ------------------ | --------------- | ----------------------------- |
-| `--dataset-bucket` | `training`      | OSMO bucket for training code |
-| `--dataset-name`   | `training-code` | Dataset name (auto-versioned) |
-| `--training-path`  | `src/training`  | Local folder to upload        |
+| Parameter          | Default         | Description                    |
+|--------------------|-----------------|--------------------------------|
+| `--dataset-bucket` | `training`      | OSMO bucket for training code  |
+| `--dataset-name`   | `training-code` | Dataset name (auto-versioned)  |
+| `--training-path`  | `src/training`  | Local folder to upload         |
 
 The training folder mounts at `/data/<dataset_name>/training` inside the container.
 
@@ -211,7 +211,7 @@ The inference workflow exports trained checkpoints to deployment-ready formats (
 ### Supported Model Formats
 
 | Format      | Extension | Use Case                                   |
-| ----------- | --------- | ------------------------------------------ |
+|-------------|-----------|--------------------------------------------|
 | ONNX        | `.onnx`   | Cross-platform deployment, ONNX Runtime    |
 | TorchScript | `.pt`     | PyTorch-native deployment, JIT compilation |
 | Both        | —         | Export and validate both formats (default) |
@@ -237,14 +237,8 @@ The workflow accepts checkpoints from multiple sources:
 
 ### Inference Parameters
 
-| Parameter          | Default        | Description                |
-| ------------------ | -------------- | -------------------------- |
-| `--checkpoint-uri` | (required)     | URI to training checkpoint |
-| `--task`           | `Isaac-Ant-v0` | Isaac Lab task name        |
-| `--format`         | `both`         | `onnx`, `jit`, or `both`   |
-| `--num-envs`       | `4`            | Number of  environments    |
-| `--max-steps`      | `500`          | Maximum inference steps    |
-| `--video-length`   | `200`          | Video recording length     |
+| Parameter          | Default        | Description                  |
+|--------------------|----------------|------------------------------|
 
 ### Examples
 
@@ -304,7 +298,7 @@ runs:/b906b426-078e-4539-b907-aecb3121a76d/checkpoints/final/model_99.pt
 The inference workflow produces:
 
 | Artifact                    | Description                               |
-| --------------------------- | ----------------------------------------- |
+|-----------------------------|-------------------------------------------|
 | `exported/policy.onnx`      | ONNX-exported policy model                |
 | `exported/policy.pt`        | TorchScript-exported policy model         |
 | `metrics/onnx_metrics.json` | ONNX inference performance metrics        |
@@ -314,12 +308,12 @@ The inference workflow produces:
 
 ## 📋 Prerequisites
 
-| Requirement                   | Setup                    |
-| ----------------------------- | ------------------------ |
-| Infrastructure deployed       | `deploy/001-iac/`        |
-| Setup scripts completed       | `deploy/002-setup/`      |
-| Azure CLI authenticated       | `az login`               |
-| OSMO CLI (for OSMO workflows) | Installed and configured |
+| Requirement                         | Setup                    |
+|-------------------------------------|---------------------------|
+| Infrastructure deployed             | `deploy/001-iac/`        |
+| Setup scripts completed             | `deploy/002-setup/`      |
+| Azure CLI authenticated             | `az login`               |
+| OSMO CLI (for OSMO workflows)       | Installed and configured |
 
 ## ⚙️ Configuration
 

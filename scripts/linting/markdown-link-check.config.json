@@ -2,12 +2,16 @@
   "projectBaseUrl": ".",
   "timeout": "20s",
   "retryOn429": true,
+  "retryCount": 3,
   "ignorePatterns": [
     { "pattern": "\\{\\{[A-Z0-9_]+\\}\\}" },
     { "pattern": "^mailto:" },
     { "pattern": "^tel:" },
     {
       "pattern": "^https://github\\.com/Azure-Samples/azure-nvidia-robotics-reference-architecture"
+    },
+    {
+      "pattern": "^https://developer\\.hashicorp\\.com/"
     }
   ],
   "replacementPatterns": []
