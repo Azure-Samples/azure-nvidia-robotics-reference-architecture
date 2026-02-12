@@ -131,12 +131,13 @@ cd 002-setup/cleanup
 ./uninstall-azureml-extension.sh
 ./uninstall-robotics-charts.sh --delete-namespaces --delete-crds
 
-# Destroy infrastructure
-cd ../../001-iac
+# Destroy VPN first (if deployed)
+cd ../../001-iac/vpn
 terraform destroy -var-file=terraform.tfvars
 
-# Optional: destroy VPN if deployed
-cd vpn && terraform destroy -var-file=terraform.tfvars
+# Destroy remaining infrastructure
+cd ..
+terraform destroy -var-file=terraform.tfvars
 ```
 
 **Option B: Delete Resource Group** (fastest, deletes everything)
