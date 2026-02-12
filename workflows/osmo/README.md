@@ -10,13 +10,12 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 
 ## 📜 Available Templates
 
-| Template                                                 | Purpose                               | Submission Script                                |
-| -------------------------------------------------------- | ------------------------------------- | ------------------------------------------------ |
-| [train.yaml](train.yaml)                                 | Distributed training (base64 inline)  | `scripts/submit-osmo-training.sh`                |
-| [train-dataset.yaml](train-dataset.yaml)                 | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh`        |
-| [lerobot-train.yaml](lerobot-train.yaml)                 | LeRobot behavioral cloning            | `scripts/submit-osmo-lerobot-training.sh`        |
-| [lerobot-train-dataset.yaml](lerobot-train-dataset.yaml) | LeRobot training (OSMO dataset mount) | `scripts/submit-osmo-lerobot-training.sh -w ...` |
-| [lerobot-infer.yaml](lerobot-infer.yaml)                 | LeRobot inference/evaluation          | `scripts/submit-osmo-lerobot-inference.sh`       |
+| Template                                 | Purpose                               | Submission Script                          |
+| ---------------------------------------- | ------------------------------------- | ------------------------------------------ |
+| [train.yaml](train.yaml)                 | Distributed training (base64 inline)  | `scripts/submit-osmo-training.sh`          |
+| [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh`  |
+| [lerobot-train.yaml](lerobot-train.yaml) | LeRobot behavioral cloning            | `scripts/submit-osmo-lerobot-training.sh`  |
+| [lerobot-infer.yaml](lerobot-infer.yaml) | LeRobot inference/evaluation          | `scripts/submit-osmo-lerobot-inference.sh` |
 
 ## ⚖️ Workflow Comparison
 
