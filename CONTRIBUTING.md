@@ -28,16 +28,16 @@ If you are new to the project, start with issues labeled `good first issue` or d
 
 Detailed documentation lives in [`docs/contributing/`](docs/contributing/):
 
-| Guide                                                                   | Description                                                    |
-|-------------------------------------------------------------------------|----------------------------------------------------------------|
-| [Contributing Guide](docs/contributing/README.md)                       | Main hub — prerequisites, workflow, commit messages, style     |
-| [Prerequisites](docs/contributing/prerequisites.md)                     | Required tools, Azure access, NGC credentials, build commands  |
-| [Contribution Workflow](docs/contributing/contribution-workflow.md)     | Bug reports, feature requests, first contributions             |
-| [Pull Request Process](docs/contributing/pull-request-process.md)       | PR workflow, reviewers, approval criteria                      |
-| [Infrastructure Style](docs/contributing/infrastructure-style.md)       | Terraform conventions, shell scripts, copyright headers        |
-| [Deployment Validation](docs/contributing/deployment-validation.md)     | Validation levels, testing templates, cost optimization        |
-| [Cost Considerations](docs/contributing/cost-considerations.md)         | Component costs, budgeting, regional pricing                   |
-| [Security Review](docs/contributing/security-review.md)                 | Security checklist, credential handling, dependency updates    |
+| Guide                                                               | Description                                                   |
+|---------------------------------------------------------------------|---------------------------------------------------------------|
+| [Contributing Guide](docs/contributing/README.md)                   | Main hub — prerequisites, workflow, commit messages, style    |
+| [Prerequisites](docs/contributing/prerequisites.md)                 | Required tools, Azure access, NGC credentials, build commands |
+| [Contribution Workflow](docs/contributing/contribution-workflow.md) | Bug reports, feature requests, first contributions            |
+| [Pull Request Process](docs/contributing/pull-request-process.md)   | PR workflow, reviewers, approval criteria                     |
+| [Infrastructure Style](docs/contributing/infrastructure-style.md)   | Terraform conventions, shell scripts, copyright headers       |
+| [Deployment Validation](docs/contributing/deployment-validation.md) | Validation levels, testing templates, cost optimization       |
+| [Cost Considerations](docs/contributing/cost-considerations.md)     | Component costs, budgeting, regional pricing                  |
+| [Security Review](docs/contributing/security-review.md)             | Security checklist, credential handling, dependency updates   |
 
 ## I Have a Question
 
