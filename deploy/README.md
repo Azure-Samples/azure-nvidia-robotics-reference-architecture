@@ -1,6 +1,6 @@
 # Deploy
 
-Infrastructure deployment and cluster configuration for the robotics reference architecture. See [Terminology Glossary](#-terminology-glossary) for standard deployment terms.
+Infrastructure deployment and cluster configuration for the robotics reference architecture.
 
 ## 📖 Terminology Glossary
 
