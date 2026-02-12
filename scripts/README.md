@@ -10,12 +10,16 @@ Submission scripts for training and validation workflows on Azure ML and OSMO pl
 
 ## 📜 Submission Scripts
 
-| Script                            | Purpose                                             | Platform |
-|-----------------------------------|-----------------------------------------------------|----------|
-| `submit-azureml-training.sh`      | Package code and submit Azure ML training job       | Azure ML |
-| `submit-azureml-validation.sh`    | Submit model validation job                         | Azure ML |
-| `submit-osmo-training.sh`         | Package code and submit OSMO workflow (base64)      | OSMO     |
-| `submit-osmo-dataset-training.sh` | Submit OSMO workflow using dataset folder injection | OSMO     |
+| Script                               | Purpose                                             | Platform |
+| ------------------------------------ | --------------------------------------------------- | -------- |
+| `submit-azureml-training.sh`         | Package code and submit Azure ML training job       | Azure ML |
+| `submit-azureml-validation.sh`       | Submit model validation job                         | Azure ML |
+| `submit-azureml-lerobot-training.sh` | Submit LeRobot training to Azure ML                 | Azure ML |
+| `submit-osmo-training.sh`            | Package code and submit OSMO workflow (base64)      | OSMO     |
+| `submit-osmo-dataset-training.sh`    | Submit OSMO workflow using dataset folder injection | OSMO     |
+| `submit-osmo-lerobot-training.sh`    | Submit LeRobot behavioral cloning training          | OSMO     |
+| `submit-osmo-lerobot-inference.sh`   | Submit LeRobot inference/evaluation                 | OSMO     |
+| `run-lerobot-pipeline.sh`            | End-to-end train → evaluate → register pipeline     | OSMO     |
 
 ## 🚀 Quick Start
 
@@ -30,6 +34,21 @@ Scripts auto-detect Azure context from Terraform outputs in `deploy/001-iac/`:
 
 # OSMO training (dataset folder upload)
 ./submit-osmo-dataset-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
+
+# LeRobot behavioral cloning (OSMO)
+./submit-osmo-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
+
+# LeRobot behavioral cloning (Azure ML)
+./submit-azureml-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
+
+# LeRobot inference/evaluation
+./submit-osmo-lerobot-inference.sh --policy-repo-id user/trained-policy
+
+# End-to-end pipeline: train → evaluate → register
+./run-lerobot-pipeline.sh \
+  -d lerobot/aloha_sim_insertion_human \
+  --policy-repo-id user/my-policy \
+  -r my-model
 
 # Validation (requires registered model)
 ./submit-azureml-validation.sh --model-name anymal-c-velocity --model-version 1
@@ -219,19 +238,166 @@ The `submit-osmo-dataset-training.sh` script uploads `src/training/` as a versio
 ### Dataset Parameters
 
 | Parameter          | Default         | Description                   |
-|--------------------|-----------------|-------------------------------|
+| ------------------ | --------------- | ----------------------------- |
 | `--dataset-bucket` | `training`      | OSMO bucket for training code |
 | `--dataset-name`   | `training-code` | Dataset name (auto-versioned) |
 | `--training-path`  | `src/training`  | Local folder to upload        |
 
 The script stages files to exclude `__pycache__` and build artifacts via `.amlignore` patterns before upload.
 
+## 🤖 LeRobot Behavioral Cloning
+
+The `submit-osmo-lerobot-training.sh` script submits LeRobot training workflows supporting ACT and Diffusion policy architectures. Uses HuggingFace Hub datasets and installs LeRobot dynamically at runtime.
+
+### LeRobot Submission Examples
+
+```bash
+# ACT policy with WANDB logging
+./submit-osmo-lerobot-training.sh -d user/my-dataset
+
+# Diffusion policy with Azure MLflow
+./submit-osmo-lerobot-training.sh \
+  -d user/my-dataset \
+  -p diffusion \
+  --mlflow-enable \
+  -r my-model-name
+
+# Fine-tune from pre-trained policy
+./submit-osmo-lerobot-training.sh \
+  -d user/my-dataset \
+  --policy-repo-id user/pretrained-act \
+  --training-steps 50000 \
+  --batch-size 16
+```
+
+### LeRobot Parameters
+
+| Parameter           | Default                | Description                        |
+| ------------------- | ---------------------- | ---------------------------------- |
+| `--dataset-repo-id` | (required)             | HuggingFace dataset repository ID  |
+| `--policy-type`     | `act`                  | Policy: `act`, `diffusion`         |
+| `--job-name`        | `lerobot-act-training` | Job identifier                     |
+| `--wandb-enable`    | enabled                | WANDB logging (default)            |
+| `--mlflow-enable`   | disabled               | Azure ML MLflow logging            |
+| `--policy-repo-id`  | (none)                 | Pre-trained policy for fine-tuning |
+| `--training-steps`  | (LeRobot default)      | Total training iterations          |
+| `--save-freq`       | `5000`                 | Checkpoint save frequency          |
+
+## 🧪 LeRobot Inference
+
+The `submit-osmo-lerobot-inference.sh` script evaluates trained LeRobot policies from HuggingFace Hub. Downloads the policy, runs evaluation, and optionally registers the model to Azure ML.
+
+### LeRobot Inference Examples
+
+```bash
+# Evaluate a trained policy
+./submit-osmo-lerobot-inference.sh --policy-repo-id user/trained-act-policy
+
+# Evaluate with model registration
+./submit-osmo-lerobot-inference.sh \
+  --policy-repo-id user/trained-act-policy \
+  -r my-evaluated-model
+
+# Diffusion policy evaluation
+./submit-osmo-lerobot-inference.sh \
+  --policy-repo-id user/trained-diffusion \
+  -p diffusion \
+  --eval-episodes 50
+```
+
+### Inference Parameters
+
+| Parameter           | Default    | Description                          |
+| ------------------- | ---------- | ------------------------------------ |
+| `--policy-repo-id`  | (required) | HuggingFace policy repository        |
+| `--policy-type`     | `act`      | Policy: `act`, `diffusion`           |
+| `--eval-episodes`   | `10`       | Number of evaluation episodes        |
+| `--register-model`  | (none)     | Model name for Azure ML registration |
+| `--dataset-repo-id` | (none)     | Dataset for environment replay       |
+
+## 🏢 AzureML LeRobot Training
+
+The `submit-azureml-lerobot-training.sh` script submits LeRobot training directly to Azure ML instead of OSMO. Registers an environment, builds an inline training command, and submits via `az ml job create`.
+
+### AzureML LeRobot Examples
+
+```bash
+# ACT policy training
+./submit-azureml-lerobot-training.sh -d user/my-dataset
+
+# With model registration and log streaming
+./submit-azureml-lerobot-training.sh \
+  -d user/my-dataset \
+  -r my-act-model \
+  --stream
+
+# Custom environment and compute
+./submit-azureml-lerobot-training.sh \
+  -d user/my-dataset \
+  --image custom-registry.io/lerobot:latest \
+  --compute my-gpu-cluster
+```
+
+## 🔄 End-to-End Pipeline
+
+The `run-lerobot-pipeline.sh` script orchestrates the full LeRobot lifecycle: training → polling → inference → model registration. It delegates to the individual submission scripts and polls OSMO workflow status between stages.
+
+### Pipeline Stages
+
+| Stage | Action                                | Script Used                        |
+| ----- | ------------------------------------- | ---------------------------------- |
+| 1     | Submit training workflow              | `submit-osmo-lerobot-training.sh`  |
+| 2     | Poll workflow status until completion | `osmo workflow status`             |
+| 3     | Submit inference/evaluation workflow  | `submit-osmo-lerobot-inference.sh` |
+
+### Pipeline Examples
+
+```bash
+# Full pipeline: train → evaluate → register
+./run-lerobot-pipeline.sh \
+  -d lerobot/aloha_sim_insertion_human \
+  --policy-repo-id user/my-act-policy \
+  -r my-act-model
+
+# Async mode (submit training and exit)
+./run-lerobot-pipeline.sh \
+  -d user/my-dataset \
+  --skip-wait
+
+# Diffusion pipeline with MLflow
+./run-lerobot-pipeline.sh \
+  -d user/my-dataset \
+  --policy-repo-id user/my-diffusion \
+  -p diffusion \
+  --mlflow-enable \
+  --training-steps 100000 \
+  -r my-diffusion-model
+
+# Skip inference (training only with polling)
+./run-lerobot-pipeline.sh \
+  -d user/my-dataset \
+  --skip-inference
+```
+
+### Pipeline Parameters
+
+| Parameter           | Default     | Description                      |
+| ------------------- | ----------- | -------------------------------- |
+| `--dataset-repo-id` | (required)  | HuggingFace dataset repository   |
+| `--policy-repo-id`  | (required*) | HuggingFace policy target repo   |
+| `--policy-type`     | `act`       | Policy: `act`, `diffusion`       |
+| `--register-model`  | (none)      | Azure ML model registration name |
+| `--poll-interval`   | `60`        | Status check interval (seconds)  |
+| `--timeout`         | `720`       | Training timeout (minutes)       |
+| `--skip-wait`       | disabled    | Async mode: submit and exit      |
+| `--skip-inference`  | disabled    | Skip inference stage             |
+
 ## ⚙️ Configuration
 
 Scripts resolve values in order: CLI arguments → environment variables → Terraform outputs.
 
 | Variable                 | Description                      |
-|--------------------------|----------------------------------|
+| ------------------------ | -------------------------------- |
 | `AZURE_SUBSCRIPTION_ID`  | Azure subscription               |
 | `AZURE_RESOURCE_GROUP`   | Resource group name              |
 | `AZUREML_WORKSPACE_NAME` | ML workspace name                |
@@ -239,11 +405,13 @@ Scripts resolve values in order: CLI arguments → environment variables → Ter
 | `NUM_ENVS`               | Number of parallel environments  |
 | `OSMO_DATASET_BUCKET`    | Dataset bucket for OSMO training |
 | `OSMO_DATASET_NAME`      | Dataset name for OSMO training   |
+| `DATASET_REPO_ID`        | HuggingFace dataset repo ID      |
+| `POLICY_TYPE`            | LeRobot policy architecture      |
 
 ## 📚 Library
 
 | File                       | Purpose                                        |
-|----------------------------|------------------------------------------------|
+| -------------------------- | ---------------------------------------------- |
 | `lib/terraform-outputs.sh` | Shared functions for reading Terraform outputs |
 
 Source the library to use helper functions:
@@ -258,7 +426,7 @@ get_azureml_workspace  # Returns ML workspace name
 ## 🔗 Related Documentation
 
 | Resource                                  | Description                                        |
-|-------------------------------------------|----------------------------------------------------|
+| ----------------------------------------- | -------------------------------------------------- |
 | [workflows/](../workflows/)               | YAML templates for training and validation jobs    |
 | [workflows/osmo/](../workflows/osmo/)     | OSMO workflow templates including dataset training |
 | [deploy/002-setup/](../deploy/002-setup/) | Cluster configuration and OSMO deployment          |

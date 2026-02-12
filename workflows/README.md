@@ -15,13 +15,16 @@ workflows/
 ├── README.md
 ├── azureml/
 │   ├── README.md
-│   ├── train.yaml           # Training job specification
-│   └── validate.yaml        # Validation job specification
+│   ├── train.yaml              # Training job specification
+│   ├── lerobot-train.yaml      # LeRobot behavioral cloning (AzureML)
+│   └── validate.yaml           # Validation job specification
 └── osmo/
     ├── README.md
-    ├── train.yaml           # OSMO training (base64 payload)
-    ├── train-dataset.yaml   # OSMO training (dataset folder upload)
-    └── infer.yaml           # OSMO inference workflow
+    ├── train.yaml              # OSMO training (base64 payload)
+    ├── train-dataset.yaml      # OSMO training (dataset folder upload)
+    ├── lerobot-train.yaml      # LeRobot behavioral cloning training
+    ├── lerobot-infer.yaml      # LeRobot inference/evaluation
+    └── infer.yaml              # OSMO inference workflow
 ```
 
 ## ⚖️ Platform Comparison
@@ -42,6 +45,9 @@ workflows/
 # Training job
 ./scripts/submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 
+# LeRobot behavioral cloning (AzureML)
+./scripts/submit-azureml-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
+
 # Validation job (model name derived from task by default)
 ./scripts/submit-azureml-validation.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 ```
@@ -54,6 +60,18 @@ workflows/
 
 # Dataset folder upload (unlimited size, versioned)
 ./scripts/submit-osmo-dataset-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
+
+# LeRobot behavioral cloning (HuggingFace datasets)
+./scripts/submit-osmo-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
+
+# LeRobot inference/evaluation
+./scripts/submit-osmo-lerobot-inference.sh --policy-repo-id user/trained-policy
+
+# End-to-end pipeline: train → evaluate → register
+./scripts/run-lerobot-pipeline.sh \
+  -d lerobot/aloha_sim_insertion_human \
+  --policy-repo-id user/my-policy \
+  -r my-model
 ```
 
 ## 💾 OSMO Dataset Workflow
@@ -90,6 +108,80 @@ The `train-dataset.yaml` template uploads `src/training/` as a versioned OSMO da
 
 The training folder mounts at `/data/<dataset_name>/training` inside the container.
 
+## 🤖 LeRobot Behavioral Cloning Workflow
+
+The `lerobot-train.yaml` workflow trains behavioral cloning policies using the LeRobot framework. It supports ACT and Diffusion policy architectures with HuggingFace Hub datasets.
+
+### LeRobot Features
+
+| Feature         | Description                                           |
+|-----------------|-------------------------------------------------------|
+| Policy types    | ACT, Diffusion                                        |
+| Dataset source  | HuggingFace Hub (e.g., `lerobot/aloha_sim_insertion`) |
+| Logging         | Azure MLflow                                          |
+| Checkpoints     | Automatic save + Azure ML registration                |
+| Runtime install | LeRobot installed via `uv pip` (no source packaging)  |
+
+### LeRobot Parameters
+
+| Parameter               | Default    | Description                          |
+|-------------------------|------------|--------------------------------------|
+| `--dataset-repo-id`     | (required) | HuggingFace dataset repository ID    |
+| `--policy-type`         | `act`      | Policy: `act`, `diffusion`           |
+| `--mlflow-enable`       | disabled   | Azure ML MLflow logging              |
+| `--register-checkpoint` | (none)     | Model name for Azure ML registration |
+
+### LeRobot Examples
+
+```bash
+# ACT training with WANDB
+./scripts/submit-osmo-lerobot-training.sh \
+  -d lerobot/aloha_sim_insertion_human
+
+# Diffusion policy with MLflow and model registration
+./scripts/submit-osmo-lerobot-training.sh \
+  -d user/custom-dataset \
+  -p diffusion \
+  --mlflow-enable \
+  -r my-diffusion-model
+```
+
+## LeRobot Inference Workflow
+
+The `lerobot-infer.yaml` workflow evaluates trained LeRobot policies from HuggingFace Hub. Downloads policy checkpoints, runs evaluation, and optionally registers models to Azure ML.
+
+### Inference Features
+
+| Feature            | Description                               |
+|--------------------|-------------------------------------------|
+| Policy source      | HuggingFace Hub repositories              |
+| Policy types       | ACT, Diffusion                            |
+| Model registration | Optional Azure ML model registration      |
+| Evaluation         | Configurable episode count and batch size |
+
+### Inference Parameters
+
+| Parameter          | Default    | Description                          |
+|--------------------|------------|--------------------------------------|
+| `--policy-repo-id` | (required) | HuggingFace policy repository        |
+| `--policy-type`    | `act`      | Policy: `act`, `diffusion`           |
+| `--eval-episodes`  | `10`       | Number of evaluation episodes        |
+| `--register-model` | (none)     | Model name for Azure ML registration |
+
+### Inference Examples
+
+```bash
+# Evaluate trained policy
+./scripts/submit-osmo-lerobot-inference.sh \
+  --policy-repo-id user/trained-act-policy
+
+# Evaluate with model registration
+./scripts/submit-osmo-lerobot-inference.sh \
+  --policy-repo-id user/trained-act-policy \
+  -r my-evaluated-model \
+  --eval-episodes 50
+```
+
 ## 🔮 OSMO Inference Workflow
 
 The inference workflow exports trained checkpoints to deployment-ready formats (ONNX, TorchScript) and validates them in simulation.
@@ -121,7 +213,7 @@ The workflow accepts checkpoints from multiple sources:
     --task Isaac-Ant-v0
 ```
 
-### Inference Parameters
+### OSMO Inference Parameters
 
 | Parameter          | Default        | Description                |
 |--------------------|----------------|----------------------------|
