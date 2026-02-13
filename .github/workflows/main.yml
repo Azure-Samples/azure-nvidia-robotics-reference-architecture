@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   # Spell checking using cspell
@@ -53,6 +54,24 @@ jobs:
     permissions:
       contents: read
 
+  # SHA pinning compliance for GitHub Actions and dependencies
+  dependency-pinning:
+    name: Dependency Pinning
+    uses: ./.github/workflows/dependency-pinning-scan.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  # PowerShell Pester test execution
+  pester-tests:
+    name: Pester Tests
+    uses: ./.github/workflows/pester-tests.yml
+    with:
+      changed-files-only: false
+      code-coverage: true
+    permissions:
+      contents: read
+
   # Automated release PR management via release-please
   release-please:
     if: "${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
@@ -63,6 +82,8 @@ jobs:
       - psscriptanalyzer
       - link-lang-check
       - markdown-link-check
+      - dependency-pinning
+      - pester-tests
     name: Release Please
     runs-on: ubuntu-latest
     concurrency:
