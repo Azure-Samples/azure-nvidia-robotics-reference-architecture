@@ -4,8 +4,8 @@
 #
 # pester.config.ps1
 #
-# Purpose: Pester 5.x configuration for HVE-Core PowerShell testing
-# Author: HVE Core Team
+# Purpose: Pester 5.x configuration for PowerShell testing
+# Author: Robotics-AI Team
 #
 
 [CmdletBinding()]
@@ -40,7 +40,7 @@ $configuration.Output.CILogLevel = 'Error'
 $configuration.TestResult.Enabled = $CI.IsPresent
 $configuration.TestResult.OutputFormat = 'NUnitXml'
 $configuration.TestResult.OutputPath = Join-Path $PSScriptRoot '../../logs/pester-results.xml'
-$configuration.TestResult.TestSuiteName = 'HVE-Core-PowerShell-Tests'
+$configuration.TestResult.TestSuiteName = 'Robotics-RefArch-PowerShell-Tests'
 
 # Code coverage configuration
 if ($CodeCoverage.IsPresent) {
@@ -50,7 +50,7 @@ if ($CodeCoverage.IsPresent) {
 
     # Resolve coverage paths explicitly - Join-Path with wildcards returns literal paths without file system expansion in Pester configuration
     $scriptRoot = Split-Path $PSScriptRoot -Parent
-    $coverageDirs = @('linting', 'security', 'dev-tools', 'lib', 'extension')
+    $coverageDirs = @('linting', 'security', 'lib')
 
     $coveragePaths = $coverageDirs | ForEach-Object {
         Get-ChildItem -Path (Join-Path $scriptRoot $_) -Include '*.ps1', '*.psm1' -Recurse -File -ErrorAction SilentlyContinue
