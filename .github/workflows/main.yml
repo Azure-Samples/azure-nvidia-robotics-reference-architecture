@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   # Spell checking using cspell
@@ -71,6 +70,7 @@ jobs:
       code-coverage: true
     permissions:
       contents: read
+      id-token: write
 
   # Automated release PR management via release-please
   release-please:
