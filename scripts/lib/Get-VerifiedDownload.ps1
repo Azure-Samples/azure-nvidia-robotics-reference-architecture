@@ -1,14 +1,16 @@
+#!/usr/bin/env pwsh
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
 #Requires -Version 7.0
 
 <#
 .SYNOPSIS
-    Downloads and verifies artifacts using SHA256 checksums.
+    Downloads and verifies artifacts using SHA-256, SHA-384, or SHA-512 checksums.
 
 .DESCRIPTION
     Securely downloads files from URLs and verifies their integrity using
-    SHA256 checksums before saving or extracting. Contains pure functions
+    SHA-256, SHA-384, or SHA-512 checksums before saving or extracting.
+    Contains pure functions
     for testability and an I/O wrapper for orchestration.
 
 .PARAMETER Url
@@ -17,7 +19,7 @@
 .PARAMETER ExpectedSHA256
     Expected SHA256 checksum of the file.
 
-.PARAMETER OutputPath   
+.PARAMETER OutputPath
     Path where the downloaded file will be saved.
 
 .PARAMETER Extract
@@ -274,6 +276,42 @@ function Invoke-VerifiedDownload {
     if (Test-Path $targetPath) {
         if (Test-ExistingFileValid -Path $targetPath -ExpectedHash $ExpectedHash -Algorithm $Algorithm) {
             Write-Verbose "File already exists and hash matches: $targetPath"
+            if ($Extract) {
+                $extractDir = if ($ExtractPath) { $ExtractPath } else { $DestinationDirectory }
+                if (-not (Test-Path $extractDir)) {
+                    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+                }
+                $archiveType = Get-ArchiveType -Path $targetPath
+                switch ($archiveType) {
+                    'zip' {
+                        Write-Verbose "Extracting ZIP archive to $extractDir"
+                        Expand-Archive -Path $targetPath -DestinationPath $extractDir -Force
+                    }
+                    'tar.gz' {
+                        if (-not (Test-TarAvailable)) {
+                            throw "tar command not available for .tar.gz extraction"
+                        }
+                        Write-Verbose "Extracting tar.gz archive to $extractDir"
+                        tar -xzf $targetPath -C $extractDir
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "tar extraction failed with exit code $LASTEXITCODE"
+                        }
+                    }
+                    'tar' {
+                        if (-not (Test-TarAvailable)) {
+                            throw "tar command not available for .tar extraction"
+                        }
+                        Write-Verbose "Extracting tar archive to $extractDir"
+                        tar -xf $targetPath -C $extractDir
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "tar extraction failed with exit code $LASTEXITCODE"
+                        }
+                    }
+                    default {
+                        throw "Unsupported archive format for '$targetPath'. Supported: .zip, .tar.gz, .tgz, .tar"
+                    }
+                }
+            }
             return New-DownloadResult -Path $targetPath -WasDownloaded $false -HashVerified $true
         }
     }
@@ -298,6 +336,8 @@ function Invoke-VerifiedDownload {
 
         # Handle extraction or move
         if ($Extract) {
+            Move-Item -Path $tempFile -Destination $targetPath -Force
+
             $extractDir = if ($ExtractPath) { $ExtractPath } else { $DestinationDirectory }
             if (-not (Test-Path $extractDir)) {
                 New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
@@ -307,14 +347,14 @@ function Invoke-VerifiedDownload {
             switch ($archiveType) {
                 'zip' {
                     Write-Verbose "Extracting ZIP archive to $extractDir"
-                    Expand-Archive -Path $tempFile -DestinationPath $extractDir -Force
+                    Expand-Archive -Path $targetPath -DestinationPath $extractDir -Force
                 }
                 'tar.gz' {
                     if (-not (Test-TarAvailable)) {
                         throw "tar command not available for .tar.gz extraction"
                     }
                     Write-Verbose "Extracting tar.gz archive to $extractDir"
-                    tar -xzf $tempFile -C $extractDir
+                    tar -xzf $targetPath -C $extractDir
                     if ($LASTEXITCODE -ne 0) {
                         throw "tar extraction failed with exit code $LASTEXITCODE"
                     }
@@ -324,7 +364,7 @@ function Invoke-VerifiedDownload {
                         throw "tar command not available for .tar extraction"
                     }
                     Write-Verbose "Extracting tar archive to $extractDir"
-                    tar -xf $tempFile -C $extractDir
+                    tar -xf $targetPath -C $extractDir
                     if ($LASTEXITCODE -ne 0) {
                         throw "tar extraction failed with exit code $LASTEXITCODE"
                     }

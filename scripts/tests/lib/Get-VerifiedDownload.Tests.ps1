@@ -218,6 +218,28 @@ Describe 'Invoke-VerifiedDownload' {
             $result.Path | Should -Not -BeNullOrEmpty
             $result.Path | Should -Exist
         }
+
+        It 'Extracts archive on cache hit when Extract flag is set' {
+            New-Item -ItemType Directory -Path $script:testDestDir -Force | Out-Null
+            $prePath = Join-Path $script:testDestDir 'archive.zip'
+            'cached archive' | Set-Content -Path $prePath -NoNewline
+            $actualHash = (Get-FileHash -Path $prePath -Algorithm SHA256).Hash
+
+            Mock Expand-Archive { }
+            Mock Get-ArchiveType { return 'zip' }
+
+            $extractDir = Join-Path $TestDrive 'cache-extracted'
+            $result = Invoke-VerifiedDownload `
+                -Url 'https://example.com/archive.zip' `
+                -DestinationDirectory $script:testDestDir `
+                -ExpectedHash $actualHash `
+                -Extract `
+                -ExtractPath $extractDir
+
+            $result.WasDownloaded | Should -BeFalse
+            $result.HashVerified | Should -BeTrue
+            Should -Invoke -CommandName Expand-Archive -Times 1 -Exactly
+        }
     }
 
     Context 'Successful download with valid hash' {
@@ -294,6 +316,29 @@ Describe 'Invoke-VerifiedDownload' {
 
             $result.HashVerified | Should -BeTrue
             Should -Invoke -CommandName Expand-Archive -Times 1 -Exactly
+        }
+
+        It 'Persists archive at target path after extraction' {
+            $downloadedContent = 'mock zip content'
+            $expectedHash = 'PERSISTHASH12345678901234567890123456789012345678901234567890'
+
+            Mock Invoke-WebRequest {
+                param($OutFile)
+                Set-Content -Path $OutFile -Value $downloadedContent -NoNewline
+            }
+            Mock Get-FileHashValue { return $expectedHash }
+            Mock Expand-Archive { }
+            Mock Get-ArchiveType { return 'zip' }
+
+            $extractDir = Join-Path $TestDrive 'persist-extracted'
+            $result = Invoke-VerifiedDownload `
+                -Url 'https://example.com/archive.zip' `
+                -DestinationDirectory $script:testDestDir `
+                -ExpectedHash $expectedHash `
+                -Extract `
+                -ExtractPath $extractDir
+
+            $result.Path | Should -Exist
         }
     }
 
