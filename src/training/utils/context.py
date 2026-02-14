@@ -2,10 +2,10 @@
 
 Provides ``bootstrap_azure_ml`` to initialize an Azure ML workspace
 connection, configure MLflow tracking, and optionally set up Azure
-Blob Storage for checkpoint uploads.
+Blob Storage for blob uploads.
 
 Required dependencies: ``azure-ai-ml``, ``azure-identity``, ``mlflow``.
-Optional: ``azure-storage-blob`` (for checkpoint uploads via
+Optional: ``azure-storage-blob`` (for blob uploads via
 ``AzureStorageContext``).
 """
 
@@ -67,7 +67,10 @@ class AzureStorageContext:
         """
         file_path = Path(local_path)
         if not file_path.is_file():
-            raise FileNotFoundError(f"File not found: {local_path}")
+            raise FileNotFoundError(
+                f"File not found: {local_path} "
+                f"(destination: {self.container_name}/{blob_name})"
+            )
 
         blob = self.blob_client.get_blob_client(
             container=self.container_name,
@@ -230,7 +233,8 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
         from azure.storage.blob import BlobServiceClient
     except ImportError as exc:  # pragma: no cover - optional dependency guard
         raise AzureConfigError(
-            "azure-storage-blob is required to upload checkpoints. Install the package or unset AZURE_STORAGE_ACCOUNT_NAME."
+            "azure-storage-blob is required for Azure Blob Storage uploads. "
+            "Install the package or unset AZURE_STORAGE_ACCOUNT_NAME."
         ) from exc
 
     container_name = (
@@ -365,7 +369,6 @@ def bootstrap_azure_ml(
             f"Failed to access workspace {workspace_name}: {exc}"
         ) from exc
 
-    workspace = client.workspaces.get(workspace_name)
     tracking_uri = getattr(workspace, "mlflow_tracking_uri", None)
     if not tracking_uri:
         raise AzureConfigError(
