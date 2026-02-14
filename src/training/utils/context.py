@@ -21,7 +21,6 @@ from azure.ai.ml import MLClient
 from azure.identity import DefaultAzureCredential
 import mlflow  # type: ignore[import-not-found]
 
-
 if TYPE_CHECKING:  # pragma: no cover - optional dependency import guard
     from azure.storage.blob import BlobServiceClient
 
@@ -68,7 +67,7 @@ class AzureStorageContext:
         """
         file_path = Path(local_path)
         if not file_path.is_file():
-            raise FileNotFoundError(f"Checkpoint file not found: {local_path}")
+            raise FileNotFoundError(f"File not found: {local_path}")
 
         blob = self.blob_client.get_blob_client(
             container=self.container_name,
@@ -102,7 +101,9 @@ class AzureStorageContext:
 
         with ThreadPoolExecutor(max_workers=min(10, len(files))) as executor:
             future_to_file = {
-                executor.submit(self.upload_file, local_path=local_path, blob_name=blob_name): (
+                executor.submit(
+                    self.upload_file, local_path=local_path, blob_name=blob_name
+                ): (
                     local_path,
                     blob_name,
                 )
@@ -232,7 +233,9 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
             "azure-storage-blob is required to upload checkpoints. Install the package or unset AZURE_STORAGE_ACCOUNT_NAME."
         ) from exc
 
-    container_name = _optional_env("AZURE_STORAGE_CONTAINER_NAME") or "isaaclab-training-logs"
+    container_name = (
+        _optional_env("AZURE_STORAGE_CONTAINER_NAME") or "isaaclab-training-logs"
+    )
     account_url = f"https://{account_name}.blob.core.windows.net/"
 
     try:
@@ -243,7 +246,9 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
         except ResourceExistsError:
             # Container already exists; safe to ignore.
             pass
-        return AzureStorageContext(blob_client=blob_client, container_name=container_name)
+        return AzureStorageContext(
+            blob_client=blob_client, container_name=container_name
+        )
     except AzureError as exc:
         raise AzureConfigError(
             f"Failed to initialize Azure Storage container '{container_name}' in account '{account_name}': {exc}"
@@ -270,7 +275,9 @@ def _build_credential() -> DefaultAzureCredential:
         os.environ.setdefault("AZURE_CLIENT_ID", default_identity_client_id)
 
     # Check if we should exclude managed identity (for local dev on Azure VMs)
-    exclude_managed_identity = os.environ.get("AZURE_EXCLUDE_MANAGED_IDENTITY", "false").lower() == "true"
+    exclude_managed_identity = (
+        os.environ.get("AZURE_EXCLUDE_MANAGED_IDENTITY", "false").lower() == "true"
+    )
 
     return DefaultAzureCredential(
         managed_identity_client_id=managed_identity_client_id,
@@ -354,12 +361,16 @@ def bootstrap_azure_ml(
     try:
         workspace = client.workspaces.get(workspace_name)
     except Exception as exc:
-        raise AzureConfigError(f"Failed to access workspace {workspace_name}: {exc}") from exc
+        raise AzureConfigError(
+            f"Failed to access workspace {workspace_name}: {exc}"
+        ) from exc
 
     workspace = client.workspaces.get(workspace_name)
     tracking_uri = getattr(workspace, "mlflow_tracking_uri", None)
     if not tracking_uri:
-        raise AzureConfigError("Azure ML workspace does not expose an MLflow tracking URI")
+        raise AzureConfigError(
+            "Azure ML workspace does not expose an MLflow tracking URI"
+        )
 
     try:
         mlflow.set_tracking_uri(tracking_uri)
