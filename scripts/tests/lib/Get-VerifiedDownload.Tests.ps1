@@ -338,7 +338,9 @@ Describe 'Invoke-VerifiedDownload' {
                 -Extract `
                 -ExtractPath $extractDir
 
-            $result.Path | Should -Exist
+            $archivePath = Join-Path $script:testDestDir 'archive.zip'
+            $archivePath | Should -Exist
+            $result.Path | Should -Be $extractDir
         }
     }
 

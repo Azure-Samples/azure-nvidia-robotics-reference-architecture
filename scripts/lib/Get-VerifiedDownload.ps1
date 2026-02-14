@@ -312,7 +312,8 @@ function Invoke-VerifiedDownload {
                     }
                 }
             }
-            return New-DownloadResult -Path $targetPath -WasDownloaded $false -HashVerified $true
+            $resultPath = if ($Extract) { $extractDir } else { $targetPath }
+            return New-DownloadResult -Path $resultPath -WasDownloaded $false -HashVerified $true
         }
     }
 
@@ -378,8 +379,9 @@ function Invoke-VerifiedDownload {
             Move-Item -Path $tempFile -Destination $targetPath -Force
         }
 
+        $resultPath = if ($Extract) { $extractDir } else { $targetPath }
         Write-Host "Download verified and complete" -ForegroundColor Green
-        return New-DownloadResult -Path $targetPath -WasDownloaded $true -HashVerified $true
+        return New-DownloadResult -Path $resultPath -WasDownloaded $true -HashVerified $true
     }
     finally {
         if (Test-Path $tempFile) {
