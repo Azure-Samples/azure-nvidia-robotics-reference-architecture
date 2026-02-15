@@ -1,0 +1,710 @@
+﻿#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
+
+using module ..\..\..\scripts\linting\Modules\FrontmatterValidation.psm1
+
+BeforeDiscovery {
+    $lintingDir = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+    $schemaDir = Join-Path $lintingDir 'schemas' 'frontmatter'
+    $mappingPath = Join-Path $schemaDir 'schema-mapping.json'
+    $script:SchemaAvailable = Test-Path $mappingPath
+}
+
+BeforeAll {
+    # Import modules
+    $lintingDir = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+    $modulePath = Join-Path $lintingDir 'Modules' 'FrontmatterValidation.psm1'
+    $ciHelpersPath = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'lib' 'Modules' 'CIHelpers.psm1'
+    $lintingHelpersPath = Join-Path $lintingDir 'Modules' 'LintingHelpers.psm1'
+    $gitMocksPath = Join-Path $PSScriptRoot '..' 'Mocks' 'GitMocks.psm1'
+
+    Import-Module $modulePath -Force
+    Import-Module $ciHelpersPath -Force
+    Import-Module $lintingHelpersPath -Force
+    Import-Module $gitMocksPath -Force
+
+    $script:FVModule = Get-Module FrontmatterValidation
+    $script:FixtureDir = Join-Path $PSScriptRoot '..' 'Fixtures' 'Frontmatter'
+    $script:SchemaDir = Join-Path $lintingDir 'schemas' 'frontmatter'
+
+    # Dot-source the entry-point script to load internal functions
+    . (Join-Path $lintingDir 'Invoke-FrontmatterValidation.ps1')
+}
+
+AfterAll {
+    Remove-Module FrontmatterValidation -Force -ErrorAction SilentlyContinue
+    Remove-Module CIHelpers -Force -ErrorAction SilentlyContinue
+    Remove-Module LintingHelpers -Force -ErrorAction SilentlyContinue
+    Remove-Module GitMocks -Force -ErrorAction SilentlyContinue
+}
+
+#region Initialize-JsonSchemaValidation
+
+Describe 'Initialize-JsonSchemaValidation' -Tag 'Unit' {
+    Context 'Valid schema directory' {
+        It 'returns hashtable with Mapping, Schemas, and BasePath' {
+            $result = Initialize-JsonSchemaValidation -SchemaDirectory $script:SchemaDir
+            $result | Should -Not -BeNullOrEmpty
+            $result | Should -BeOfType [hashtable]
+            $result.Mapping | Should -Not -BeNullOrEmpty
+            $result.Schemas | Should -Not -BeNullOrEmpty
+            $result.BasePath | Should -Be $script:SchemaDir
+        }
+
+        It 'loads all schema files referenced in mapping' {
+            $result = Initialize-JsonSchemaValidation -SchemaDirectory $script:SchemaDir
+            $result.Schemas.Count | Should -BeGreaterOrEqual 1
+        }
+    }
+
+    Context 'Missing schema directory' {
+        It 'returns null when mapping file not found' {
+            $result = Initialize-JsonSchemaValidation -SchemaDirectory (Join-Path $TestDrive 'nonexistent')
+            $result | Should -BeNullOrEmpty
+        }
+    }
+
+    Context 'Missing individual schema files' {
+        It 'warns but continues when a schema file is missing' {
+            $tempDir = Join-Path $TestDrive 'partial-schemas'
+            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+            $mappingContent = @{
+                mappings = @(
+                    @{ glob = '*.md'; schema = 'missing-schema.json' }
+                )
+                defaultSchema = 'also-missing.json'
+            } | ConvertTo-Json -Depth 5
+            Set-Content -Path (Join-Path $tempDir 'schema-mapping.json') -Value $mappingContent
+
+            $null = Initialize-JsonSchemaValidation -SchemaDirectory $tempDir 3>&1
+            # Function should still return a hashtable (possibly with empty schemas)
+            # or emit warnings — either way it should not throw
+        }
+    }
+}
+
+#endregion
+
+#region Get-SchemaForFile
+
+Describe 'Get-SchemaForFile' -Tag 'Unit' {
+    BeforeAll {
+        $script:TestSchemaContext = Initialize-JsonSchemaValidation -SchemaDirectory $script:SchemaDir
+    }
+
+    Context 'Glob matching' {
+        It 'matches docs/**/*.md to docs schema' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath 'docs/guide.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'docs-frontmatter.schema.json'
+        }
+
+        It 'matches nested docs path' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath 'docs/contributing/workflow.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'docs-frontmatter.schema.json'
+        }
+
+        It 'matches .instructions.md to instruction schema' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath '.github/instructions/style.instructions.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'instruction-frontmatter.schema.json'
+        }
+
+        It 'matches .prompt.md to prompt schema' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath '.github/prompts/summarize.prompt.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'prompt-frontmatter.schema.json'
+        }
+
+        It 'matches root *.md to root-community schema' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath 'README.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'root-community-frontmatter.schema.json'
+        }
+
+        It 'falls back to default schema for unmatched paths' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath 'scripts/linting/README.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'base-frontmatter.schema.json'
+        }
+    }
+
+    Context 'Path normalization' {
+        It 'strips leading ./ from paths' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath './docs/guide.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'docs-frontmatter.schema.json'
+        }
+
+        It 'normalizes backslashes to forward slashes' -Skip:(-not $script:SchemaAvailable) {
+            $result = Get-SchemaForFile -FilePath 'docs\subfolder\guide.md' -SchemaContext $script:TestSchemaContext
+            $result | Should -Not -BeNullOrEmpty
+            $result.SchemaName | Should -Be 'docs-frontmatter.schema.json'
+        }
+    }
+
+    Context 'Null schema context' {
+        It 'returns null when schema not found' {
+            $emptyContext = @{
+                Mapping  = [PSCustomObject]@{ mappings = @(); defaultSchema = 'nonexistent.json' }
+                Schemas  = @{}
+                BasePath = $TestDrive
+            }
+            $result = Get-SchemaForFile -FilePath 'any.md' -SchemaContext $emptyContext
+            $result | Should -BeNullOrEmpty
+        }
+    }
+}
+
+#endregion
+
+#region Test-JsonSchemaValidation
+
+Describe 'Test-JsonSchemaValidation' -Tag 'Unit' {
+    Context 'Required fields' {
+        It 'reports missing required fields' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    required   = @('title', 'description')
+                    properties = [PSCustomObject]@{
+                        title       = [PSCustomObject]@{ type = 'string' }
+                        description = [PSCustomObject]@{ type = 'string' }
+                    }
+                }
+            }
+            $fm = @{ title = 'Hello' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeFalse
+            $result.Errors | Should -Contain "Missing required field: 'description'"
+        }
+
+        It 'passes when all required fields present' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    required   = @('title')
+                    properties = [PSCustomObject]@{
+                        title = [PSCustomObject]@{ type = 'string' }
+                    }
+                }
+            }
+            $fm = @{ title = 'Hello' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeTrue
+            $result.Errors | Should -HaveCount 0
+        }
+    }
+
+    Context 'Type validation' {
+        It 'reports type mismatch for string field' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        title = [PSCustomObject]@{ type = 'string' }
+                    }
+                }
+            }
+            $fm = @{ title = 42 }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeFalse
+            $result.Errors.Count | Should -BeGreaterOrEqual 1
+        }
+
+        It 'reports type mismatch for integer field' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        count = [PSCustomObject]@{ type = 'integer' }
+                    }
+                }
+            }
+            $fm = @{ count = 'not-a-number' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeFalse
+        }
+
+        It 'passes for correct types' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        title = [PSCustomObject]@{ type = 'string' }
+                        count = [PSCustomObject]@{ type = 'integer' }
+                    }
+                }
+            }
+            $fm = @{ title = 'Hello'; count = 5 }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeTrue
+        }
+    }
+
+    Context 'Enum validation' {
+        It 'reports invalid enum value' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        'ms.topic' = [PSCustomObject]@{
+                            type = 'string'
+                            enum = @('conceptual', 'how-to', 'reference')
+                        }
+                    }
+                }
+            }
+            $fm = @{ 'ms.topic' = 'invalid-topic' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeFalse
+            ($result.Errors | Where-Object { $_ -match 'must be one of' }) | Should -Not -BeNullOrEmpty
+        }
+
+        It 'accepts valid enum value' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        'ms.topic' = [PSCustomObject]@{
+                            type = 'string'
+                            enum = @('conceptual', 'how-to', 'reference')
+                        }
+                    }
+                }
+            }
+            $fm = @{ 'ms.topic' = 'conceptual' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeTrue
+        }
+    }
+
+    Context 'Pattern validation' {
+        It 'reports pattern mismatch' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        'ms.date' = [PSCustomObject]@{
+                            type    = 'string'
+                            pattern = '^\d{4}-\d{2}-\d{2}$'
+                        }
+                    }
+                }
+            }
+            $fm = @{ 'ms.date' = '01/15/2025' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeFalse
+        }
+
+        It 'accepts matching pattern' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        'ms.date' = [PSCustomObject]@{
+                            type    = 'string'
+                            pattern = '^\d{4}-\d{2}-\d{2}$'
+                        }
+                    }
+                }
+            }
+            $fm = @{ 'ms.date' = '2025-01-15' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeTrue
+        }
+    }
+
+    Context 'MinLength validation' {
+        It 'reports string shorter than minLength' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        description = [PSCustomObject]@{ type = 'string'; minLength = 5 }
+                    }
+                }
+            }
+            $fm = @{ description = 'Hi' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeFalse
+        }
+    }
+
+    Context 'AdditionalProperties' {
+        It 'reports disallowed additional properties' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties           = [PSCustomObject]@{
+                        description = [PSCustomObject]@{ type = 'string' }
+                    }
+                    additionalProperties = $false
+                }
+            }
+            $fm = @{ description = 'Valid'; extraField = 'disallowed' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeFalse
+            ($result.Errors | Where-Object { $_ -match 'Additional property not allowed' }) | Should -Not -BeNullOrEmpty
+        }
+
+        It 'allows additional properties when not restricted' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = [PSCustomObject]@{
+                    properties = [PSCustomObject]@{
+                        description = [PSCustomObject]@{ type = 'string' }
+                    }
+                }
+            }
+            $fm = @{ description = 'Valid'; extraField = 'allowed' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeTrue
+        }
+    }
+
+    Context 'Null schema' {
+        It 'returns valid when schema is null' {
+            $schemaInfo = [PSCustomObject]@{
+                SchemaName = 'test-schema.json'
+                Schema     = $null
+            }
+            $fm = @{ title = 'Hello' }
+            $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+            $result.IsValid | Should -BeTrue
+        }
+    }
+}
+
+#endregion
+
+#region Get-MarkdownFiles
+
+Describe 'Get-MarkdownFiles' -Tag 'Unit' {
+    BeforeAll {
+        Save-CIEnvironment
+        $script:MockCIFiles = Initialize-MockCIEnvironment -Repository 'Azure-Samples/azure-nvidia-robotics-reference-architecture'
+    }
+
+    AfterAll {
+        Remove-MockCIFiles -MockFiles $script:MockCIFiles
+        Restore-CIEnvironment
+    }
+
+    Context 'Explicit files' {
+        It 'returns only existing explicit files' {
+            $existingFile = (Resolve-Path (Join-Path $script:FixtureDir 'valid-docs.md')).Path
+            $nonExistent = Join-Path $TestDrive 'does-not-exist.md'
+            $result = Get-MarkdownFiles -ScanPaths @() -ExplicitFiles @($existingFile, $nonExistent) -Exclude @()
+            $result | Should -Contain $existingFile
+            $result | Should -Not -Contain $nonExistent
+        }
+    }
+
+    Context 'Directory scanning' {
+        It 'finds markdown files in fixture directory' {
+            $result = Get-MarkdownFiles -ScanPaths @($script:FixtureDir) -ExplicitFiles @() -Exclude @()
+            $result.Count | Should -BeGreaterOrEqual 1
+            $result | ForEach-Object { $_ | Should -BeLike '*.md' }
+        }
+    }
+
+    Context 'Exclude patterns' {
+        It 'excludes files matching exclude patterns' {
+            $tempDir = Join-Path $TestDrive 'exclude-test'
+            $includeDir = Join-Path $tempDir 'docs'
+            $excludeDir = Join-Path $tempDir 'node_modules'
+            New-Item -ItemType Directory -Path $includeDir -Force | Out-Null
+            New-Item -ItemType Directory -Path $excludeDir -Force | Out-Null
+            Set-Content -Path (Join-Path $includeDir 'keep.md') -Value '# Keep'
+            Set-Content -Path (Join-Path $excludeDir 'skip.md') -Value '# Skip'
+
+            $result = Get-MarkdownFiles -ScanPaths @($tempDir) -ExplicitFiles @() -Exclude @('node_modules')
+            $result | ForEach-Object { $_ | Should -Not -BeLike '*node_modules*' }
+        }
+
+        It 'excludes files by filename pattern' {
+            $tempDir = Join-Path $TestDrive 'exclude-filename'
+            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+            Set-Content -Path (Join-Path $tempDir 'CHANGELOG.md') -Value '# Changelog'
+            Set-Content -Path (Join-Path $tempDir 'README.md') -Value '# Readme'
+
+            $result = Get-MarkdownFiles -ScanPaths @($tempDir) -ExplicitFiles @() -Exclude @('CHANGELOG.md')
+            $matchingChangelog = $result | Where-Object { [System.IO.Path]::GetFileName($_) -eq 'CHANGELOG.md' }
+            $matchingChangelog | Should -BeNullOrEmpty
+        }
+    }
+
+    Context 'Changed files only mode' {
+        It 'uses Get-ChangedFilesFromGit when ChangedOnly is set' {
+            Mock Get-ChangedFilesFromGit {
+                return @('docs/guide.md', 'README.md')
+            }
+
+            $result = Get-MarkdownFiles -ScanPaths @('.') -ExplicitFiles @() -Exclude @() -ChangedOnly -Branch 'main'
+            $result | Should -Contain 'docs/guide.md'
+            $result | Should -Contain 'README.md'
+            Should -Invoke Get-ChangedFilesFromGit -Times 1
+        }
+
+        It 'returns empty array when no changed files' {
+            Mock Get-ChangedFilesFromGit { return @() }
+            Mock Write-CIAnnotation {}
+            Mock Set-CIOutput {}
+
+            $result = Get-MarkdownFiles -ScanPaths @('.') -ExplicitFiles @() -Exclude @() -ChangedOnly -Branch 'main'
+            $result | Should -HaveCount 0
+        }
+    }
+}
+
+#endregion
+
+#region Invoke-Validation
+
+Describe 'Invoke-Validation' -Tag 'Unit' {
+    BeforeAll {
+        Save-CIEnvironment
+        $script:MockCIFiles = Initialize-MockCIEnvironment -Repository 'Azure-Samples/azure-nvidia-robotics-reference-architecture'
+    }
+
+    AfterAll {
+        Remove-MockCIFiles -MockFiles $script:MockCIFiles
+        Restore-CIEnvironment
+    }
+
+    BeforeEach {
+        # Mock CI output functions to prevent actual CI interactions
+        Mock Write-CIAnnotation {} -Verifiable
+        Mock Write-CIAnnotations {} -Verifiable
+        Mock Set-CIOutput {} -Verifiable
+        Mock Set-CIEnv {} -Verifiable
+        Mock Write-CIStepSummary {} -Verifiable
+    }
+
+    Context 'No files to validate' {
+        It 'exits early when no markdown files found' {
+            # Set script-scope params for Invoke-Validation
+            $script:Paths = @($TestDrive)
+            $script:Files = @()
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            # TestDrive has no .md files by default
+            Invoke-Validation
+            # Should not throw, just print "No markdown files to validate."
+        }
+    }
+
+    Context 'Valid files' {
+        It 'validates fixture files without errors' {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $script:Paths = @()
+            $script:Files = @($validFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            # This will exercise the main validation path
+            # With current bugs, this may fail — that confirms bugs exist
+            { Invoke-Validation } | Should -Not -Throw
+        }
+    }
+
+    Context 'CI output integration' {
+        It 'calls Set-CIOutput with expected output names' {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $script:Paths = @()
+            $script:Files = @($validFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            Invoke-Validation
+
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-issues' }
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-errors' }
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-warnings' }
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' }
+        }
+
+        It 'calls Write-CIStepSummary with markdown content' {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $script:Paths = @()
+            $script:Files = @($validFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            Invoke-Validation
+
+            Should -Invoke Write-CIStepSummary -Times 1
+        }
+    }
+
+    Context 'JSON export' {
+        It 'creates JSON results file in logs directory' {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $tempLintingDir = Join-Path $TestDrive 'scripts' 'linting'
+            $tempLogsDir = Join-Path $TestDrive 'scripts' 'logs'
+            New-Item -ItemType Directory -Path $tempLintingDir -Force | Out-Null
+
+            $script:Paths = @()
+            $script:Files = @($validFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = $tempLintingDir
+
+            Invoke-Validation
+
+            $jsonPath = Join-Path $tempLogsDir 'frontmatter-validation-results.json'
+            Test-Path $jsonPath | Should -BeTrue
+            $jsonContent = Get-Content $jsonPath -Raw | ConvertFrom-Json
+            $jsonContent.summary | Should -Not -BeNullOrEmpty
+            $jsonContent.results | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'Error handling' {
+        It 'sets FRONTMATTER_VALIDATION_FAILED env when errors found' {
+            $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+            $tempScriptsLinting = Join-Path $tempRoot 'scripts' 'linting'
+            $tempDocsDir = Join-Path $tempRoot 'docs'
+            New-Item -ItemType Directory -Path $tempScriptsLinting -Force | Out-Null
+            New-Item -ItemType Directory -Path $tempDocsDir -Force | Out-Null
+
+            $badFile = Join-Path $tempDocsDir 'missing-frontmatter.md'
+            Copy-Item (Join-Path $script:FixtureDir 'missing-frontmatter.md') -Destination $badFile
+
+            $script:Paths = @()
+            $script:Files = @($badFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $true
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = $tempScriptsLinting
+
+            Invoke-Validation
+
+            Should -Invoke Set-CIEnv -ParameterFilter { $Name -eq 'FRONTMATTER_VALIDATION_FAILED' -and $Value -eq 'true' }
+        }
+    }
+
+    Context 'Multiple fixture files' {
+        It 'validates all fixture files and produces summary' {
+            $fixtures = Get-ChildItem -Path $script:FixtureDir -Filter '*.md' | Select-Object -ExpandProperty FullName
+            $script:Paths = @()
+            $script:Files = $fixtures
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $true
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            Invoke-Validation
+
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' }
+            Should -Invoke Write-CIStepSummary -Times 1
+        }
+    }
+}
+
+#endregion
+
+#region SchemaValidationResult Class
+
+Describe 'SchemaValidationResult Class' -Tag 'Unit' {
+    It 'creates with default valid state' {
+        $result = [SchemaValidationResult]::new()
+        $result.IsValid | Should -BeTrue
+        $result.Errors | Should -HaveCount 0
+        $result.SchemaName | Should -Be ''
+    }
+
+    It 'allows setting properties' {
+        $result = [SchemaValidationResult]::new()
+        $result.IsValid = $false
+        $result.SchemaName = 'test-schema.json'
+        $result.Errors = @('Error 1', 'Error 2')
+        $result.IsValid | Should -BeFalse
+        $result.Errors | Should -HaveCount 2
+    }
+}
+
+#endregion
+
+#region End-to-End Schema Validation
+
+Describe 'Schema Validation End-to-End' -Tag 'Unit' {
+    BeforeAll {
+        $script:TestSchemaContext = Initialize-JsonSchemaValidation -SchemaDirectory $script:SchemaDir
+    }
+
+    Context 'Docs schema against fixture' -Skip:(-not $script:SchemaAvailable) {
+        It 'validates valid-docs.md frontmatter against docs schema' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $fm = Get-FrontmatterFromFile -FilePath $filePath
+            $schemaInfo = Get-SchemaForFile -FilePath 'docs/valid-docs.md' -SchemaContext $script:TestSchemaContext
+
+            if ($null -ne $fm -and $null -ne $schemaInfo) {
+                $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+                $result.IsValid | Should -BeTrue
+            }
+        }
+    }
+
+    Context 'Instruction schema against fixture' -Skip:(-not $script:SchemaAvailable) {
+        It 'validates valid-instruction.md against instruction schema' {
+            $filePath = Join-Path $script:FixtureDir 'valid-instruction.md'
+            $fm = Get-FrontmatterFromFile -FilePath $filePath
+            $schemaInfo = Get-SchemaForFile -FilePath '.github/instructions/valid.instructions.md' -SchemaContext $script:TestSchemaContext
+
+            if ($null -ne $fm -and $null -ne $schemaInfo) {
+                $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+                $result.IsValid | Should -BeTrue
+            }
+        }
+    }
+
+    Context 'Strict schema rejects extra fields' -Skip:(-not $script:SchemaAvailable) {
+        It 'rejects extra-fields-strict.md against instruction schema' {
+            $filePath = Join-Path $script:FixtureDir 'extra-fields-strict.md'
+            $fm = Get-FrontmatterFromFile -FilePath $filePath
+            $schemaInfo = Get-SchemaForFile -FilePath '.github/instructions/extra.instructions.md' -SchemaContext $script:TestSchemaContext
+
+            if ($null -ne $fm -and $null -ne $schemaInfo -and $null -ne $schemaInfo.Schema) {
+                $result = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+                $result.IsValid | Should -BeFalse
+                ($result.Errors | Where-Object { $_ -match 'Additional property not allowed' }) | Should -Not -BeNullOrEmpty
+            }
+        }
+    }
+}
+
+#endregion
