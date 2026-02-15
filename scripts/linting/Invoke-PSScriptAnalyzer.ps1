@@ -1,4 +1,9 @@
 #!/usr/bin/env pwsh
+# Copyright (c) Microsoft Corporation.
+# SPDX-License-Identifier: MIT
+
+#Requires -Version 7.0
+
 <#
 .SYNOPSIS
     Runs PSScriptAnalyzer on PowerShell files in the repository.
@@ -19,9 +24,6 @@
 .PARAMETER OutputPath
     Path for JSON results output. When specified, results are exported to this file.
 
-.PARAMETER SoftFail
-    When specified, the script exits with code 0 even if violations are found.
-
 .EXAMPLE
     ./Invoke-PSScriptAnalyzer.ps1
     Analyzes all PowerShell files in the repository.
@@ -35,173 +37,145 @@ param(
     [switch]$ChangedFilesOnly,
     [string]$BaseBranch = 'origin/main',
     [string]$ConfigPath = '',
-    [string]$OutputPath = '',
-    [switch]$SoftFail
+    [string]$OutputPath = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Import shared helper functions
-$modulePath = Join-Path $PSScriptRoot 'Modules/LintingHelpers.psm1'
-if (Test-Path $modulePath) {
-    Import-Module $modulePath -Force
-}
+Import-Module (Join-Path $PSScriptRoot "Modules/LintingHelpers.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "../lib/Modules/CIHelpers.psm1") -Force
 
-# Determine repository root
-$repoRoot = git rev-parse --show-toplevel 2>$null
-if (-not $repoRoot) {
-    $repoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
-}
+function Invoke-PSScriptAnalyzerCore {
+    [CmdletBinding()]
+    param(
+        [switch]$ChangedFilesOnly,
+        [string]$BaseBranch = 'origin/main',
+        [string]$ConfigPath = '',
+        [string]$OutputPath = ''
+    )
 
-# Set default config path if not specified
-if (-not $ConfigPath) {
-    $ConfigPath = Join-Path $PSScriptRoot 'PSScriptAnalyzer.psd1'
-}
+    # Determine repository root
+    $repoRoot = git rev-parse --show-toplevel 2>$null
+    if (-not $repoRoot) {
+        $repoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
+    }
 
-# Ensure PSScriptAnalyzer module is installed
-Write-Host '::group::PSScriptAnalyzer Setup'
-if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-    Write-Host 'Installing PSScriptAnalyzer module...'
-    Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
-}
-Import-Module PSScriptAnalyzer -Force
-Write-Host "PSScriptAnalyzer version: $((Get-Module PSScriptAnalyzer).Version)"
-Write-Host '::endgroup::'
+    # Set default config path if not specified
+    if (-not $ConfigPath) {
+        $ConfigPath = Join-Path $PSScriptRoot 'PSScriptAnalyzer.psd1'
+    }
 
-# Collect files to analyze
-Write-Host '::group::Collecting Files'
-$filesToAnalyze = @()
+    # Ensure PSScriptAnalyzer module is installed
+    if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+        Write-Host 'Installing PSScriptAnalyzer module...'
+        Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+    }
+    Import-Module PSScriptAnalyzer -Force
+    Write-Host "PSScriptAnalyzer version: $((Get-Module PSScriptAnalyzer).Version)"
 
-if ($ChangedFilesOnly) {
-    Write-Host "Analyzing changed files only (base: $BaseBranch)"
-    if (Get-Command -Name 'Get-ChangedFilesFromGit' -ErrorAction SilentlyContinue) {
+    # Collect files to analyze
+    $filesToAnalyze = @()
+
+    if ($ChangedFilesOnly) {
+        Write-Host "Analyzing changed files only (base: $BaseBranch)"
         $filesToAnalyze = @(Get-ChangedFilesFromGit -BaseBranch $BaseBranch -FileExtensions @('*.ps1', '*.psm1', '*.psd1'))
     } else {
-        # Fallback if module not available
-        $mergeBase = git merge-base HEAD $BaseBranch 2>$null
-        if (-not $mergeBase) {
-            $mergeBase = $BaseBranch
-        }
-        $changedFiles = git diff --name-only --diff-filter=d $mergeBase HEAD 2>$null
-        if ($changedFiles) {
-            $filesToAnalyze = @($changedFiles | Where-Object { $_ -match '\.(ps1|psm1|psd1)$' } | ForEach-Object {
-                Join-Path $repoRoot $_
-            } | Where-Object { Test-Path $_ })
-        }
+        Write-Host 'Analyzing all PowerShell files in repository'
+        $filesToAnalyze = @(Get-ChildItem -Path $repoRoot -Include '*.ps1', '*.psm1', '*.psd1' -Recurse -File |
+            Where-Object { $_.FullName -notmatch '[\\/](\.git|node_modules|vendor)[\\/]' } |
+            Select-Object -ExpandProperty FullName)
     }
-} else {
-    Write-Host 'Analyzing all PowerShell files in repository'
-    $filesToAnalyze = @(Get-ChildItem -Path $repoRoot -Include '*.ps1', '*.psm1', '*.psd1' -Recurse -File |
-        Where-Object { $_.FullName -notmatch '[\\/](\.git|node_modules|vendor)[\\/]' } |
-        Select-Object -ExpandProperty FullName)
-}
 
-Write-Host "Found $(@($filesToAnalyze).Count) file(s) to analyze"
-if (@($filesToAnalyze).Count -gt 0) {
-    $filesToAnalyze | ForEach-Object { Write-Host "  - $_" }
-}
-Write-Host '::endgroup::'
+    Write-Host "Found $(@($filesToAnalyze).Count) file(s) to analyze"
+    if (@($filesToAnalyze).Count -gt 0) {
+        $filesToAnalyze | ForEach-Object { Write-Host "  - $_" }
+    }
 
-# Run analysis
-$allResults = @()
-$errorCount = 0
-$warningCount = 0
+    # Run analysis
+    $allResults = @()
+    $errorCount = 0
+    $warningCount = 0
 
-if (@($filesToAnalyze).Count -gt 0) {
-    Write-Host '::group::PSScriptAnalyzer Results'
+    if (@($filesToAnalyze).Count -gt 0) {
+        foreach ($file in $filesToAnalyze) {
+            $relativePath = $file
+            if ($file.StartsWith($repoRoot)) {
+                $relativePath = $file.Substring($repoRoot.Length).TrimStart('\', '/')
+            }
 
-    foreach ($file in $filesToAnalyze) {
-        $relativePath = $file
-        if ($file.StartsWith($repoRoot)) {
-            $relativePath = $file.Substring($repoRoot.Length).TrimStart('\', '/')
-        }
+            $analyzerParams = @{
+                Path = $file
+                Recurse = $false
+            }
 
-        $analyzerParams = @{
-            Path = $file
-            Recurse = $false
-        }
+            if ((Test-Path $ConfigPath)) {
+                $analyzerParams['Settings'] = $ConfigPath
+            }
 
-        if ((Test-Path $ConfigPath)) {
-            $analyzerParams['Settings'] = $ConfigPath
-        }
+            $results = Invoke-ScriptAnalyzer @analyzerParams
 
-        $results = Invoke-ScriptAnalyzer @analyzerParams
+            if ($results) {
+                $allResults += $results
 
-        if ($results) {
-            $allResults += $results
+                foreach ($result in $results) {
+                    $message = "$($result.RuleName): $($result.Message)"
 
-            foreach ($result in $results) {
-                $severity = $result.Severity.ToString().ToLower()
-                $message = "$($result.RuleName): $($result.Message)"
+                    $annotationLevel = switch ($result.Severity) {
+                        'Error' { 'Error' }
+                        'Warning' { 'Warning' }
+                        'Information' { 'Notice' }
+                        default { 'Notice' }
+                    }
 
-                # Map PSScriptAnalyzer severity to GitHub annotation type
-                $annotationType = switch ($severity) {
-                    'error' { 'error' }
-                    'warning' { 'warning' }
-                    default { 'notice' }
-                }
+                    if ($result.Severity -eq 'Error') { $errorCount++ }
+                    if ($result.Severity -eq 'Warning') { $warningCount++ }
 
-                if ($severity -eq 'error') { $errorCount++ }
-                if ($severity -eq 'warning') { $warningCount++ }
-
-                # Write GitHub Actions annotation
-                if (Get-Command -Name 'Write-GitHubAnnotation' -ErrorAction SilentlyContinue) {
-                    Write-GitHubAnnotation -Type $annotationType -Message $message -File $relativePath -Line $result.Line -Column $result.Column
-                } else {
-                    Write-Host "::$annotationType file=$relativePath,line=$($result.Line),col=$($result.Column)::$message"
+                    Write-CIAnnotation -Message $message -Level $annotationLevel -File $relativePath -Line $result.Line -Column $result.Column
                 }
             }
         }
     }
 
-    Write-Host '::endgroup::'
-}
+    # Export results if OutputPath specified
+    if ($OutputPath) {
+        $outputDir = Split-Path $OutputPath -Parent
+        if ($outputDir -and -not (Test-Path $outputDir)) {
+            New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+        }
 
-# Export results if OutputPath specified
-if ($OutputPath) {
-    $outputDir = Split-Path $OutputPath -Parent
-    if ($outputDir -and -not (Test-Path $outputDir)) {
-        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-    }
-
-    $exportData = @{
-        timestamp = (Get-Date).ToString('o')
-        totalFiles = @($filesToAnalyze).Count
-        errorCount = $errorCount
-        warningCount = $warningCount
-        results = $allResults | ForEach-Object {
-            @{
-                file = $_.ScriptPath
-                line = $_.Line
-                column = $_.Column
-                severity = $_.Severity.ToString()
-                rule = $_.RuleName
-                message = $_.Message
+        $exportData = @{
+            timestamp = (Get-Date).ToString('o')
+            totalFiles = @($filesToAnalyze).Count
+            errorCount = $errorCount
+            warningCount = $warningCount
+            results = $allResults | ForEach-Object {
+                @{
+                    file = $_.ScriptPath
+                    line = $_.Line
+                    column = $_.Column
+                    severity = $_.Severity.ToString()
+                    rule = $_.RuleName
+                    message = $_.Message
+                }
             }
         }
+
+        $exportData | ConvertTo-Json -Depth 10 | Set-Content -Path $OutputPath -Encoding UTF8
+        Write-Host "Results exported to: $OutputPath"
     }
 
-    $exportData | ConvertTo-Json -Depth 10 | Set-Content -Path $OutputPath -Encoding UTF8
-    Write-Host "Results exported to: $OutputPath"
-}
+    # Summary
+    Write-Host ''
+    Write-Host "PSScriptAnalyzer Summary:"
+    Write-Host "  Files analyzed: $(@($filesToAnalyze).Count)"
+    Write-Host "  Errors: $errorCount"
+    Write-Host "  Warnings: $warningCount"
 
-# Summary
-Write-Host ''
-Write-Host "PSScriptAnalyzer Summary:"
-Write-Host "  Files analyzed: $(@($filesToAnalyze).Count)"
-Write-Host "  Errors: $errorCount"
-Write-Host "  Warnings: $warningCount"
+    Set-CIOutput -Name "issues" -Value ($errorCount + $warningCount)
+    Set-CIOutput -Name "errors" -Value $errorCount
+    Set-CIOutput -Name "warnings" -Value $warningCount
 
-# Set GitHub outputs if available
-if (Get-Command -Name 'Set-GitHubOutput' -ErrorAction SilentlyContinue) {
-    Set-GitHubOutput -Name 'error-count' -Value $errorCount
-    Set-GitHubOutput -Name 'warning-count' -Value $warningCount
-    Set-GitHubOutput -Name 'files-analyzed' -Value @($filesToAnalyze).Count
-}
-
-# Write step summary if in GitHub Actions
-if ($env:GITHUB_STEP_SUMMARY) {
     $summary = @"
 ## PSScriptAnalyzer Results
 
@@ -212,18 +186,27 @@ if ($env:GITHUB_STEP_SUMMARY) {
 | Warnings | $warningCount |
 
 "@
-    if (Get-Command -Name 'Write-GitHubStepSummary' -ErrorAction SilentlyContinue) {
-        Write-GitHubStepSummary -Content $summary
-    } else {
-        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
+    Write-CIStepSummary -Content $summary
+
+    if ($errorCount -gt 0) {
+        Set-CIEnv -Name "PSSCRIPTANALYZER_FAILED" -Value "true"
+        Write-CIAnnotation -Message "PSScriptAnalyzer found $errorCount error(s). Fix the issues above." -Level Error
+        return 1
+    }
+
+    return 0
+}
+
+#region Main Execution
+if ($MyInvocation.InvocationName -ne '.') {
+    try {
+        $exitCode = Invoke-PSScriptAnalyzerCore -ChangedFilesOnly:$ChangedFilesOnly -BaseBranch $BaseBranch -ConfigPath $ConfigPath -OutputPath $OutputPath
+        exit $exitCode
+    }
+    catch {
+        Write-Error -ErrorAction Continue "Invoke-PSScriptAnalyzer failed: $($_.Exception.Message)"
+        Write-CIAnnotation -Message $_.Exception.Message -Level Error
+        exit 1
     }
 }
-
-# Exit with appropriate code
-if ($errorCount -gt 0 -and -not $SoftFail) {
-    Write-Host ''
-    Write-Host "::error::PSScriptAnalyzer found $errorCount error(s). Fix the issues above."
-    exit 1
-}
-
-exit 0
+#endregion Main Execution
