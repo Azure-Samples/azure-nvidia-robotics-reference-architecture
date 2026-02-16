@@ -5,19 +5,22 @@
 
 <#
 .SYNOPSIS
-    Downloads and verifies artifacts using SHA-256, SHA-384, or SHA-512 checksums.
+    Downloads and verifies artifacts using SHA-256 checksums.
 
 .DESCRIPTION
     Securely downloads files from URLs and verifies their integrity using
-    SHA-256, SHA-384, or SHA-512 checksums before saving or extracting.
-    Contains pure functions
+    SHA-256 checksums before saving or extracting. Contains pure functions
     for testability and an I/O wrapper for orchestration.
+
+    Direct invocation supports SHA-256 via -ExpectedSHA256. For SHA-384
+    and SHA-512 support, dot-source and use Invoke-VerifiedDownload with
+    -Algorithm and -ExpectedHash parameters.
 
 .PARAMETER Url
     URL to download from.
 
 .PARAMETER ExpectedSHA256
-    Expected SHA256 checksum of the file.
+    Expected SHA-256 checksum of the file.
 
 .PARAMETER OutputPath
     Path where the downloaded file will be saved.
@@ -36,7 +39,7 @@
 
 .EXAMPLE
     . .\Get-VerifiedDownload.ps1
-    Invoke-VerifiedDownload -Url "https://example.com/file.zip" -DestinationDirectory "C:\downloads" -ExpectedHash "abc123..."
+    Invoke-VerifiedDownload -Url "https://example.com/file.zip" -DestinationDirectory "C:\downloads" -ExpectedHash "abc123..." -Algorithm SHA512
 #>
 
 #region Script Parameters
@@ -60,8 +63,6 @@ param(
 )
 
 #endregion
-
-$ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot "Modules/CIHelpers.psm1") -Force
 
@@ -270,6 +271,8 @@ function Invoke-VerifiedDownload {
         [string]$ExtractPath
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $targetPath = Get-DownloadTargetPath -Url $Url -DestinationDirectory $DestinationDirectory -FileName $FileName
 
     # Check if valid file already exists
@@ -344,7 +347,7 @@ function Invoke-VerifiedDownload {
                 New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
             }
 
-            $archiveType = Get-ArchiveType -Path $Url
+            $archiveType = Get-ArchiveType -Path $targetPath
             switch ($archiveType) {
                 'zip' {
                     Write-Verbose "Extracting ZIP archive to $extractDir"
@@ -394,6 +397,7 @@ function Invoke-VerifiedDownload {
 
 #region Main Execution
 if ($MyInvocation.InvocationName -ne '.') {
+    $ErrorActionPreference = 'Stop'
     try {
         # Require parameters for direct invocation
         if (-not $Url -or -not $ExpectedSHA256 -or -not $OutputPath) {

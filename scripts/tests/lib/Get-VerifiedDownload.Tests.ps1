@@ -369,7 +369,7 @@ Describe 'Invoke-VerifiedDownload' {
                 Set-Content -Path $OutFile -Value 'bad content' -NoNewline
             }
             Mock Get-FileHashValue { return 'MISMATCHHASH23456789012345678901234567890123456789012345678901' }
-            Mock Remove-Item { } -Verifiable
+            Mock Remove-Item { Microsoft.PowerShell.Management\Remove-Item -Path $Path -ErrorAction SilentlyContinue } -Verifiable
 
             { Invoke-VerifiedDownload `
                     -Url $script:testUrl `
