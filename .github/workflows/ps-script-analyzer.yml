@@ -42,13 +42,11 @@ jobs:
 
       - name: Run PSScriptAnalyzer
         shell: pwsh
+        continue-on-error: ${{ inputs.soft-fail }}
         run: |
           $args = @()
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
             $args += '-ChangedFilesOnly'
-          }
-          if ('${{ inputs.soft-fail }}' -eq 'true') {
-            $args += '-SoftFail'
           }
           & scripts/linting/Invoke-PSScriptAnalyzer.ps1 @args
 

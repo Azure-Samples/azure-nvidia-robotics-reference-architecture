@@ -1,6 +1,7 @@
 #!/usr/bin/env pwsh
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
+
 #Requires -Version 7.0
 <#
 .SYNOPSIS
@@ -254,15 +255,12 @@ function Invoke-LinkLanguageCheck {
             Write-Output "No URLs containing 'en-us' were found."
         }
     }
-
-    return 0
 }
 
 #region Main Execution
 if ($MyInvocation.InvocationName -ne '.') {
     try {
-        $exitCode = Invoke-LinkLanguageCheck -Fix:$Fix -Files $Files
-        exit $exitCode
+        Invoke-LinkLanguageCheck -Fix:$Fix -Files $Files
     }
     catch {
         Write-Error -ErrorAction Continue "Link-Lang-Check failed: $($_.Exception.Message)"

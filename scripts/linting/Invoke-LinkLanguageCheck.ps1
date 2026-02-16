@@ -54,17 +54,19 @@ function Invoke-LinkLanguageCheckCore {
     Write-Host "Checking for URLs with language paths..." -ForegroundColor Cyan
 
     if ($Files -and $Files.Count -gt 0) {
-        $jsonOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") -Files $Files 2>&1
+        $rawOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") -Files $Files 2>&1
     }
     else {
-        $jsonOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") 2>&1
+        $rawOutput = & (Join-Path $PSScriptRoot "Link-Lang-Check.ps1") 2>&1
     }
+
+    $jsonOutput = @($rawOutput | Where-Object { $_ -is [string] }) -join "`n"
 
     try {
         $results = $jsonOutput | ConvertFrom-Json
 
-        if ($results -and $results.Count -gt 0) {
-            Write-Host "Found $($results.Count) URLs with 'en-us' language paths`n" -ForegroundColor Yellow
+        if ($results -and @($results).Count -gt 0) {
+            Write-Host "Found $(@($results).Count) URLs with 'en-us' language paths`n" -ForegroundColor Yellow
 
             foreach ($item in $results) {
                 Write-CIAnnotation `
@@ -78,14 +80,14 @@ function Invoke-LinkLanguageCheckCore {
                 timestamp = (Get-Date).ToUniversalTime().ToString("o")
                 script    = "link-lang-check"
                 summary   = @{
-                    total_issues   = $results.Count
-                    files_affected = ($results | Select-Object -ExpandProperty file -Unique).Count
+                    total_issues   = @($results).Count
+                    files_affected = @($results | Select-Object -ExpandProperty file -Unique).Count
                 }
                 issues    = $results
             }
             $outputData | ConvertTo-Json -Depth 3 | Out-File (Join-Path $logsDir "link-lang-check-results.json") -Encoding utf8
 
-            Set-CIOutput -Name "issues" -Value $results.Count
+            Set-CIOutput -Name "issues" -Value @($results).Count.ToString()
             Set-CIEnv -Name "LINK_LANG_FAILED" -Value "true"
 
             $uniqueFiles = $results | Select-Object -ExpandProperty file -Unique
@@ -95,7 +97,7 @@ function Invoke-LinkLanguageCheckCore {
 
 **Status**: Issues Found
 
-Found $($results.Count) URL(s) containing language path 'en-us'.
+Found $(@($results).Count) URL(s) containing language path 'en-us'.
 
 **Why this matters:**
 Language-specific URLs don't adapt to user preferences and may break for non-English users.

@@ -172,9 +172,9 @@ function Invoke-PSScriptAnalyzerCore {
     Write-Host "  Errors: $errorCount"
     Write-Host "  Warnings: $warningCount"
 
-    Set-CIOutput -Name "issues" -Value ($errorCount + $warningCount)
-    Set-CIOutput -Name "errors" -Value $errorCount
-    Set-CIOutput -Name "warnings" -Value $warningCount
+    Set-CIOutput -Name "issues" -Value ($errorCount + $warningCount).ToString()
+    Set-CIOutput -Name "errors" -Value $errorCount.ToString()
+    Set-CIOutput -Name "warnings" -Value $warningCount.ToString()
 
     $summary = @"
 ## PSScriptAnalyzer Results
