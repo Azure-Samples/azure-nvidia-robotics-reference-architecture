@@ -435,6 +435,10 @@ function Get-MarkdownFiles {
 
     if ($ChangedOnly) {
         $files = @(Get-ChangedFilesFromGit -FileExtensions @('*.md') -BaseBranch $Branch)
+
+        # Normalize to an array of strings and remove empties
+        $files = @($files | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
         if ($files.Count -eq 0) {
             Write-CIAnnotation -Message 'No changed markdown files detected' -Level 'Notice'
             Set-CIOutput -Name 'total-issues' -Value '0' -IsOutput
@@ -453,19 +457,22 @@ function Get-MarkdownFiles {
     }
 
     # Apply exclude patterns
-    if (@($Exclude).Count -gt 0 -and $files.Count -gt 0) {
-        $files = $files | Where-Object {
-            $filePath = $_
-            $excluded = $false
-            foreach ($pattern in $Exclude) {
-                if ($filePath -like "*/$pattern/*" -or $filePath -like "*\$pattern\*" -or
-                    $filePath -like "*/$pattern" -or $filePath -like "*\$pattern" -or
-                    [System.IO.Path]::GetFileName($filePath) -eq $pattern) {
-                    $excluded = $true
-                    break
+    if (@($Exclude).Count -gt 0) {
+        $files = @($files)
+        if ($files.Count -gt 0) {
+            $files = $files | Where-Object {
+                $filePath = $_
+                $excluded = $false
+                foreach ($pattern in $Exclude) {
+                    if ($filePath -like "*/$pattern/*" -or $filePath -like "*\$pattern\*" -or
+                        $filePath -like "*/$pattern" -or $filePath -like "*\$pattern" -or
+                        [System.IO.Path]::GetFileName($filePath) -eq $pattern) {
+                        $excluded = $true
+                        break
+                    }
                 }
+                -not $excluded
             }
-            -not $excluded
         }
     }
 
