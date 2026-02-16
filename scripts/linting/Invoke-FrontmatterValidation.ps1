@@ -1,4 +1,6 @@
 #!/usr/bin/env pwsh
+# Copyright (c) Microsoft Corporation.
+# SPDX-License-Identifier: MIT
 <#
 .SYNOPSIS
     Validates YAML frontmatter in markdown files against schema and structural rules.
@@ -433,14 +435,13 @@ function Get-MarkdownFiles {
 
     if ($ChangedOnly) {
         $files = @(Get-ChangedFilesFromGit -FileExtensions @('*.md') -BaseBranch $Branch)
-        $files = @($files)
-        if ($files.Length -eq 0) {
+        if ($files.Count -eq 0) {
             Write-CIAnnotation -Message 'No changed markdown files detected' -Level 'Notice'
             Set-CIOutput -Name 'total-issues' -Value '0' -IsOutput
             return @()
         }
     } elseif (@($ExplicitFiles).Count -gt 0) {
-        $files = @($ExplicitFiles | Where-Object { Test-Path $_ } | ForEach-Object { (Resolve-Path $_).Path })
+        $files = $ExplicitFiles | Where-Object { Test-Path $_ } | ForEach-Object { (Resolve-Path $_).Path }
     } else {
         foreach ($scanPath in $ScanPaths) {
             $resolved = Resolve-Path $scanPath -ErrorAction SilentlyContinue
@@ -452,8 +453,8 @@ function Get-MarkdownFiles {
     }
 
     # Apply exclude patterns
-    if (@($Exclude).Length -gt 0 -and @($files).Length -gt 0) {
-        $files = @($files | Where-Object {
+    if (@($Exclude).Count -gt 0 -and $files.Count -gt 0) {
+        $files = $files | Where-Object {
             $filePath = $_
             $excluded = $false
             foreach ($pattern in $Exclude) {
@@ -465,7 +466,7 @@ function Get-MarkdownFiles {
                 }
             }
             -not $excluded
-        })
+        }
     }
 
     return @($files)
