@@ -57,7 +57,7 @@ param(
     [switch]$ChangedFilesOnly,
 
     [Parameter()]
-    [string]$BaseBranch = 'main',
+    [string]$BaseBranch = 'origin/main',
 
     [Parameter()]
     [switch]$EnableSchemaValidation,
@@ -358,7 +358,7 @@ function Get-MarkdownFiles {
             Set-CIOutput -Name 'total-issues' -Value '0' -IsOutput
             return @()
         }
-    } elseif ($ExplicitFiles.Count -gt 0) {
+    } elseif (@($ExplicitFiles).Count -gt 0) {
         $files = $ExplicitFiles | Where-Object { Test-Path $_ } | ForEach-Object { (Resolve-Path $_).Path }
     } else {
         foreach ($scanPath in $ScanPaths) {
@@ -371,7 +371,7 @@ function Get-MarkdownFiles {
     }
 
     # Apply exclude patterns
-    if ($Exclude.Count -gt 0 -and $files.Count -gt 0) {
+    if (@($Exclude).Count -gt 0 -and $files.Count -gt 0) {
         $files = $files | Where-Object {
             $filePath = $_
             $excluded = $false
@@ -587,6 +587,7 @@ if ($MyInvocation.InvocationName -ne '.' -and $MyInvocation.InvocationName -ne '
         Invoke-Validation
     } catch {
         Write-CIAnnotation -Message "Frontmatter validation failed: $_" -Level 'Error'
+        Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
         if (-not $SoftFail) {
             exit 1
         }
