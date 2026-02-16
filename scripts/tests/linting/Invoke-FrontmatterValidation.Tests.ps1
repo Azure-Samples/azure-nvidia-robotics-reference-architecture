@@ -516,7 +516,7 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
             $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
 
             # This will exercise the main validation path
-            # With current bugs, this may fail — that confirms bugs exist
+            # Asserts that validation completes without throwing for a valid fixture file
             { Invoke-Validation } | Should -Not -Throw
         }
     }
@@ -564,7 +564,7 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
         It 'creates JSON results file in logs directory' {
             $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
             $tempLintingDir = Join-Path $TestDrive 'scripts' 'linting'
-            $tempLogsDir = Join-Path $TestDrive 'scripts' 'logs'
+            $tempLogsDir = Join-Path $TestDrive 'logs'
             New-Item -ItemType Directory -Path $tempLintingDir -Force | Out-Null
 
             $script:Paths = @()

@@ -676,9 +676,8 @@ Describe 'Test-InstructionFileFields' -Tag 'Unit' {
         $fm = @{ name = 'test' }
         $issues = Test-InstructionFileFields -Frontmatter $fm
         $errors = $issues | Where-Object { $_.Type -eq 'Error' }
-        $errors.Count | Should -BeGreaterOrEqual 2
+        $errors.Count | Should -BeGreaterOrEqual 1
         $errors.Field | Should -Contain 'description'
-        $errors.Field | Should -Contain 'applyTo'
     }
 
     It 'returns error when description is empty' {

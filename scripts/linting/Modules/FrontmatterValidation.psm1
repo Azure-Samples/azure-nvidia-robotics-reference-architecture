@@ -490,7 +490,7 @@ function Test-InstructionFileFields {
     $issues = [System.Collections.Generic.List[ValidationIssue]]::new()
 
     $issues.AddRange([ValidationIssue[]] (Test-DescriptionField -Frontmatter $Frontmatter -Required $true))
-    $issues.AddRange([ValidationIssue[]] (Test-ApplyToField -Frontmatter $Frontmatter -Required $true))
+    $issues.AddRange([ValidationIssue[]] (Test-ApplyToField -Frontmatter $Frontmatter -Required $false))
 
     return , $issues.ToArray()
 }

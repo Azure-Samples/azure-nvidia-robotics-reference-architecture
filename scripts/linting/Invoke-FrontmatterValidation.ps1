@@ -201,6 +201,79 @@ function Get-SchemaForFile {
     return $null
 }
 
+function Get-JsonSchemaPointerValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Schema,
+
+        [Parameter(Mandatory)]
+        [string]$Pointer
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Pointer) -or $Pointer -eq '/') {
+        return $Schema
+    }
+
+    $segments = $Pointer.TrimStart('/') -split '/'
+    $current = $Schema
+
+    foreach ($segment in $segments) {
+        $key = $segment -replace '~1', '/' -replace '~0', '~'
+        if ($current -is [System.Collections.IDictionary]) {
+            if (-not $current.Contains($key)) { return $null }
+            $current = $current[$key]
+            continue
+        }
+        $prop = $current.PSObject.Properties[$key]
+        if ($null -eq $prop) { return $null }
+        $current = $prop.Value
+    }
+
+    return $current
+}
+
+function Resolve-JsonSchemaRef {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Ref,
+
+        [Parameter(Mandatory)]
+        [object]$RootSchema,
+
+        [Parameter()]
+        [hashtable]$SchemaContext = $null
+    )
+
+    if ($Ref.StartsWith('#')) {
+        $pointer = $Ref.Substring(1)
+        return Get-JsonSchemaPointerValue -Schema $RootSchema -Pointer $pointer
+    }
+
+    $filePart = $Ref
+    $pointerPart = $null
+    if ($Ref -like '*#*') {
+        $split = $Ref.Split('#', 2)
+        $filePart = $split[0]
+        $pointerPart = $split[1]
+    }
+
+    $externalSchema = $null
+    if ($null -ne $SchemaContext -and $SchemaContext.Schemas.ContainsKey($filePart)) {
+        $externalSchema = $SchemaContext.Schemas[$filePart]
+    } elseif ($null -ne $SchemaContext) {
+        $resolvedPath = Join-Path $SchemaContext.BasePath $filePart
+        if (Test-Path $resolvedPath) {
+            $externalSchema = Get-Content $resolvedPath -Raw | ConvertFrom-Json -Depth 64
+        }
+    }
+
+    if ($null -eq $externalSchema) { return $null }
+    if ([string]::IsNullOrWhiteSpace($pointerPart)) { return $externalSchema }
+    return Get-JsonSchemaPointerValue -Schema $externalSchema -Pointer $pointerPart
+}
+
 function Test-JsonSchemaValidation {
     [CmdletBinding()]
     [OutputType([SchemaValidationResult])]
@@ -209,7 +282,10 @@ function Test-JsonSchemaValidation {
         [hashtable]$Frontmatter,
 
         [Parameter(Mandatory)]
-        [PSCustomObject]$SchemaInfo
+        [PSCustomObject]$SchemaInfo,
+
+        [Parameter()]
+        [hashtable]$SchemaContext = $null
     )
 
     $result = [SchemaValidationResult]::new()
@@ -222,21 +298,17 @@ function Test-JsonSchemaValidation {
 
     $errors = [List[string]]::new()
 
-    # Resolve allOf references
+    # Resolve allOf references (including external $ref targets)
     $allSchemas = @($schema)
     if ($schema.PSObject.Properties['allOf']) {
-        foreach ($ref in $schema.allOf) {
-            if ($ref.'$ref') {
-                $refName = ($ref.'$ref' -split '/')[-1]
-                $baseDefs = $null
-                if ($schema.PSObject.Properties['definitions']) {
-                    $baseDefs = $schema.definitions
-                }
-                if ($null -ne $baseDefs -and $baseDefs.PSObject.Properties[$refName]) {
-                    $allSchemas += $baseDefs.$refName
+        foreach ($subSchema in $schema.allOf) {
+            if ($subSchema.PSObject.Properties['$ref']) {
+                $resolved = Resolve-JsonSchemaRef -Ref $subSchema.'$ref' -RootSchema $schema -SchemaContext $SchemaContext
+                if ($null -ne $resolved) {
+                    $allSchemas += $resolved
                 }
             } else {
-                $allSchemas += $ref
+                $allSchemas += $subSchema
             }
         }
     }
@@ -262,6 +334,14 @@ function Test-JsonSchemaValidation {
                 }
 
                 $value = $Frontmatter[$propName]
+
+                # Resolve property-level $ref
+                if ($propSchema.PSObject.Properties['$ref']) {
+                    $resolvedProp = Resolve-JsonSchemaRef -Ref $propSchema.'$ref' -RootSchema $schema -SchemaContext $SchemaContext
+                    if ($null -ne $resolvedProp) {
+                        $propSchema = $resolvedProp
+                    }
+                }
 
                 # Type validation
                 if ($propSchema.PSObject.Properties['type']) {
@@ -409,6 +489,35 @@ function Invoke-Validation {
 
     if ($mdFiles.Count -eq 0) {
         Write-Host 'No markdown files to validate.'
+        Set-CIOutput -Name 'total-issues' -Value '0' -IsOutput
+        Set-CIOutput -Name 'total-errors' -Value '0' -IsOutput
+        Set-CIOutput -Name 'total-warnings' -Value '0' -IsOutput
+        Set-CIOutput -Name 'files-checked' -Value '0' -IsOutput
+        $summaryMd = @"
+## Frontmatter Validation Results
+
+| Metric | Count |
+|--------|-------|
+| Files checked | 0 |
+| Files passed | 0 |
+| Files failed | 0 |
+| Errors | 0 |
+| Warnings | 0 |
+"@
+        Write-CIStepSummary -Content $summaryMd
+        $repoRoot = Split-Path (Split-Path $script:scriptRoot -Parent) -Parent
+        $earlyLogsDir = Join-Path $repoRoot 'logs'
+        if (-not (Test-Path $earlyLogsDir)) {
+            New-Item -ItemType Directory -Path $earlyLogsDir -Force | Out-Null
+        }
+        $emptyResults = [PSCustomObject]@{
+            timestamp = (Get-Date -Format 'o')
+            summary   = @{ totalFiles = 0; passedFiles = 0; failedFiles = 0; errorCount = 0; warningCount = 0 }
+            results   = @()
+        }
+        $jsonPath = Join-Path $earlyLogsDir 'frontmatter-validation-results.json'
+        $emptyResults | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath -Encoding utf8
+        Write-Host "Results exported to $jsonPath"
         return
     }
 
@@ -455,7 +564,7 @@ function Invoke-Validation {
                     continue
                 }
 
-                $schemaResult = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo
+                $schemaResult = Test-JsonSchemaValidation -Frontmatter $fm -SchemaInfo $schemaInfo -SchemaContext $schemaContext
                 if (-not $schemaResult.IsValid) {
                     foreach ($err in $schemaResult.Errors) {
                         $fileResult.AddError("schema/$($schemaResult.SchemaName)", $err)
@@ -535,13 +644,20 @@ function Invoke-Validation {
 
     Write-CIStepSummary -Content $summaryMd
 
+    # Promote warnings to errors when WarningsAsErrors is set
+    $effectiveErrors = $totalErrors
+    if ($script:WarningsAsErrors) {
+        $effectiveErrors += $totalWarnings
+    }
+
     # Environment variable for downstream jobs
-    if ($totalErrors -gt 0) {
+    if ($effectiveErrors -gt 0) {
         Set-CIEnv -Name 'FRONTMATTER_VALIDATION_FAILED' -Value 'true'
     }
 
     # JSON export
-    $logsDir = Join-Path (Split-Path $script:scriptRoot -Parent) 'logs'
+    $repoRoot = Split-Path (Split-Path $script:scriptRoot -Parent) -Parent
+    $logsDir = Join-Path $repoRoot 'logs'
     if (-not (Test-Path $logsDir)) {
         New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
     }
@@ -576,7 +692,7 @@ function Invoke-Validation {
     Write-Host "Results exported to $jsonPath"
 
     # Exit logic
-    if ($totalErrors -gt 0 -and -not $script:SoftFail) {
+    if ($effectiveErrors -gt 0 -and -not $script:SoftFail) {
         exit 1
     }
 }
