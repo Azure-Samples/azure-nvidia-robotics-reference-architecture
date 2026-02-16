@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# SPDX-License-Identifier: MIT
+
 #Requires -Version 7.0
 
 Set-StrictMode -Version Latest
