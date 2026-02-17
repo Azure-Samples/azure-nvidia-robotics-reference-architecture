@@ -50,10 +50,10 @@ function Get-ChangedFilesFromGit {
         }
         else {
             Write-Verbose "HEAD~1 failed, using staged/unstaged files"
-            $changedFiles = git diff --name-only HEAD 2>$null
+            $changedFiles = git diff --name-only --diff-filter=ACMR HEAD 2>$null
         }
 
-        if ($LASTEXITCODE -ne 0) {
+        if ($LASTEXITCODE -ne 0 -or -not $changedFiles) {
             Write-Warning "Unable to determine changed files from git"
             return @()
         }
@@ -116,7 +116,7 @@ function Get-FilesRecursive {
         [string]$GitIgnorePath
     )
 
-    $files = Get-ChildItem -Path $Path -Recurse -Include $Include -File -ErrorAction SilentlyContinue
+    $files = @(Get-ChildItem -Path $Path -Recurse -Include $Include -File -ErrorAction SilentlyContinue)
 
     # Apply gitignore filtering if provided
     if ($GitIgnorePath -and (Test-Path $GitIgnorePath)) {
@@ -163,7 +163,15 @@ function Get-GitIgnorePatterns {
 
     $sep = [System.IO.Path]::DirectorySeparatorChar
 
-    $patterns = Get-Content $GitIgnorePath | Where-Object {
+    try {
+        $lines = Get-Content $GitIgnorePath -ErrorAction Stop
+    }
+    catch {
+        Write-Warning "Unable to read gitignore file '$GitIgnorePath': $($_.Exception.Message)"
+        return @()
+    }
+
+    $patterns = $lines | Where-Object {
         $_ -and -not $_.StartsWith('#') -and $_.Trim() -ne ''
     } | ForEach-Object {
         $pattern = $_.Trim()
@@ -176,6 +184,9 @@ function Get-GitIgnorePatterns {
         }
         elseif ($pattern.Contains('/') -or $pattern.Contains('\')) {
             "*$sep$normalizedPattern*"
+        }
+        elseif ($pattern -match '[\*\?\.]') {
+            "*$sep$normalizedPattern"
         }
         else {
             "*$sep$normalizedPattern$sep*"
