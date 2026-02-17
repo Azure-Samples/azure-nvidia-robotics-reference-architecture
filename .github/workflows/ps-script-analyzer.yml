@@ -63,7 +63,7 @@ jobs:
         shell: pwsh
         run: |
           if ($env:PSSCRIPTANALYZER_FAILED -eq 'true') {
-            Import-Module scripts/lib/Modules/CIHelpers.psm1
+            Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
             Write-CIAnnotation -Level Error -Message 'PSScriptAnalyzer found violations — see annotations above for details'
             exit 1
           }

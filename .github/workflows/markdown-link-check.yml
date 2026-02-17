@@ -92,6 +92,6 @@ jobs:
         if: steps.changed-files.outputs.has_changes == 'true' && !inputs.soft-fail && steps.link-check.outcome == 'failure'
         shell: pwsh
         run: |
-          Import-Module scripts/lib/Modules/CIHelpers.psm1
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           Write-CIAnnotation -Level Error -Message 'Markdown link check found broken links — see annotations and step summary above for details'
           exit 1

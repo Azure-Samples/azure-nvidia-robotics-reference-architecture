@@ -48,7 +48,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          Import-Module scripts/lib/Modules/CIHelpers.psm1
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           $md = @(
             '## CodeQL Security Analysis Complete'
             '**Language:** ${{ matrix.language }}'
