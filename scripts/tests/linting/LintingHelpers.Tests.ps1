@@ -148,6 +148,27 @@ Describe 'Get-ChangedFilesFromGit' {
         }
     }
 
+    Context 'Returns safely when all files filtered by extension' {
+        BeforeEach {
+            Mock git {
+                $global:LASTEXITCODE = 0
+                return 'abc123def456789'
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'merge-base' }
+
+            Mock git {
+                $global:LASTEXITCODE = 0
+                return @('readme.md', 'config.json')
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'diff' }
+
+            Mock Test-Path { return $true } -ModuleName 'LintingHelpers' -ParameterFilter { $PathType -eq 'Leaf' }
+        }
+
+        It 'Returns zero results when no files match extension' {
+            $result = @(Get-ChangedFilesFromGit -FileExtensions @('*.ps1'))
+            $result.Count | Should -Be 0
+        }
+    }
+
     Context 'Empty and whitespace file entries' {
         BeforeEach {
             Mock git {
@@ -331,6 +352,12 @@ Describe 'Get-GitIgnorePatterns' {
             @('# Comment', '', 'node_modules/', '  ', '*.log') | Set-Content 'TestDrive:/.gitignore'
             $result = Get-GitIgnorePatterns -GitIgnorePath 'TestDrive:/.gitignore'
             $result.Count | Should -Be 2
+        }
+
+        It 'Returns zero patterns for file with only comments' {
+            @('# Comment', '', '  ') | Set-Content 'TestDrive:/.gitignore-comments'
+            $result = @(Get-GitIgnorePatterns -GitIgnorePath 'TestDrive:/.gitignore-comments')
+            $result.Count | Should -Be 0
         }
 
         It 'Converts directory patterns correctly' {

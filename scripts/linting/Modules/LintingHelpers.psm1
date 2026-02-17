@@ -44,7 +44,7 @@ function Get-ChangedFilesFromGit {
             Write-Verbose "Using merge-base: $mergeBase"
             $changedFiles = git diff --name-only --diff-filter=ACMR $mergeBase HEAD 2>$null
         }
-        elseif ((git rev-parse HEAD~1 2>$null)) {
+        elseif ((git rev-parse HEAD~1 2>$null) -and $LASTEXITCODE -eq 0) {
             Write-Verbose "Merge base failed, using HEAD~1"
             $changedFiles = git diff --name-only --diff-filter=ACMR HEAD~1 HEAD 2>$null
         }
@@ -76,7 +76,7 @@ function Get-ChangedFilesFromGit {
         }
 
         Write-Verbose "Found $($filteredFiles.Count) changed files matching extensions: $($FileExtensions -join ', ')"
-        return $filteredFiles
+        return @($filteredFiles)
     }
     catch {
         Write-Warning "Error getting changed files: $($_.Exception.Message)"
@@ -122,7 +122,7 @@ function Get-FilesRecursive {
     if ($GitIgnorePath -and (Test-Path $GitIgnorePath)) {
         $gitignorePatterns = Get-GitIgnorePatterns -GitIgnorePath $GitIgnorePath
 
-        $files = $files | Where-Object {
+        $files = @($files | Where-Object {
             $file = $_
             $excluded = $false
 
@@ -134,7 +134,7 @@ function Get-FilesRecursive {
             }
 
             -not $excluded
-        }
+        })
     }
 
     return $files
@@ -193,7 +193,7 @@ function Get-GitIgnorePatterns {
         }
     }
 
-    return $patterns
+    return @($patterns)
 }
 
 # Export local functions only - CIHelpers functions are used via direct import
