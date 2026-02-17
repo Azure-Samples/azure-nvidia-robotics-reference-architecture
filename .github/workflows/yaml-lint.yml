@@ -49,9 +49,9 @@ jobs:
         shell: pwsh
         continue-on-error: ${{ inputs.soft-fail }}
         run: |
-          $lintArgs = @()
+          $lintArgs = @{}
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $lintArgs += '-ChangedFilesOnly'
+            $lintArgs['ChangedFilesOnly'] = $true
           }
           & scripts/linting/Invoke-YamlLint.ps1 @lintArgs
 
@@ -68,6 +68,7 @@ jobs:
         shell: pwsh
         run: |
           if ($env:YAML_LINT_FAILED -eq 'true') {
-            Write-Error "YAML linting failed — see annotations above"
+            Import-Module scripts/lib/Modules/CIHelpers.psm1
+            Write-CIAnnotation -Level Error -Message 'YAML linting failed — see annotations above'
             exit 1
           }

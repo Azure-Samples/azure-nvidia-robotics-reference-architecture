@@ -44,11 +44,11 @@ jobs:
         shell: pwsh
         continue-on-error: ${{ inputs.soft-fail }}
         run: |
-          $args = @()
+          $scriptArgs = @{}
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $args += '-ChangedFilesOnly'
+            $scriptArgs['ChangedFilesOnly'] = $true
           }
-          & scripts/linting/Invoke-PSScriptAnalyzer.ps1 @args
+          & scripts/linting/Invoke-PSScriptAnalyzer.ps1 @scriptArgs
 
       - name: Upload PSScriptAnalyzer results
         if: always()
@@ -57,3 +57,13 @@ jobs:
           name: psscriptanalyzer-results
           path: logs/
           retention-days: 30
+
+      - name: Check results
+        if: ${{ !inputs.soft-fail }}
+        shell: pwsh
+        run: |
+          if ($env:PSSCRIPTANALYZER_FAILED -eq 'true') {
+            Import-Module scripts/lib/Modules/CIHelpers.psm1
+            Write-CIAnnotation -Level Error -Message 'PSScriptAnalyzer found violations — see annotations above for details'
+            exit 1
+          }
