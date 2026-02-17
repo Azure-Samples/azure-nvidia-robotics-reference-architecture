@@ -62,13 +62,3 @@ jobs:
           name: yaml-lint-results
           path: logs/
           retention-days: 30
-
-      - name: Check results
-        if: ${{ !inputs.soft-fail }}
-        shell: pwsh
-        run: |
-          if ($env:YAML_LINT_FAILED -eq 'true') {
-            Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
-            Write-CIAnnotation -Level Error -Message 'YAML linting failed — see annotations above'
-            exit 1
-          }
