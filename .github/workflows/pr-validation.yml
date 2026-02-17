@@ -43,6 +43,15 @@ jobs:
     permissions:
       contents: read
 
+  # YAML/actionlint workflow linting
+  yaml-lint:
+    name: YAML Lint
+    uses: ./.github/workflows/yaml-lint.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
   # Link language locale check
   link-lang-check:
     name: Link Language Check
