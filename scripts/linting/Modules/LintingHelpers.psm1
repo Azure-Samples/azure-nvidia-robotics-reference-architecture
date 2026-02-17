@@ -39,7 +39,7 @@ function Get-ChangedFilesFromGit {
     try {
         # Try merge-base first (best for PRs)
         $mergeBase = git merge-base HEAD $BaseBranch 2>$null
-        
+
         if ($LASTEXITCODE -eq 0 -and $mergeBase) {
             Write-Verbose "Using merge-base: $mergeBase"
             $changedFiles = git diff --name-only --diff-filter=ACMR $mergeBase HEAD 2>$null
@@ -61,7 +61,7 @@ function Get-ChangedFilesFromGit {
         # Filter by extensions and verify files exist
         $filteredFiles = $changedFiles | Where-Object {
             if ([string]::IsNullOrEmpty($_)) { return $false }
-            
+
             # Check if file matches any of the allowed extensions
             $currentFile = $_
             $matchesExtension = $false
@@ -71,7 +71,7 @@ function Get-ChangedFilesFromGit {
                     break
                 }
             }
-            
+
             $matchesExtension -and (Test-Path $currentFile -PathType Leaf)
         }
 
@@ -121,18 +121,18 @@ function Get-FilesRecursive {
     # Apply gitignore filtering if provided
     if ($GitIgnorePath -and (Test-Path $GitIgnorePath)) {
         $gitignorePatterns = Get-GitIgnorePatterns -GitIgnorePath $GitIgnorePath
-        
+
         $files = $files | Where-Object {
             $file = $_
             $excluded = $false
-            
+
             foreach ($pattern in $gitignorePatterns) {
                 if ($file.FullName -like $pattern) {
                     $excluded = $true
                     break
                 }
             }
-            
+
             -not $excluded
         }
     }
@@ -167,10 +167,10 @@ function Get-GitIgnorePatterns {
         $_ -and -not $_.StartsWith('#') -and $_.Trim() -ne ''
     } | ForEach-Object {
         $pattern = $_.Trim()
-        
+
         # Normalize to platform separator
         $normalizedPattern = $pattern.Replace('/', $sep).Replace('\', $sep)
-        
+
         if ($pattern.EndsWith('/')) {
             "*$sep$($normalizedPattern.TrimEnd($sep))$sep*"
         }
