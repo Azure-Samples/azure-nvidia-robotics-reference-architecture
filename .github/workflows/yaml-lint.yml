@@ -49,11 +49,11 @@ jobs:
         shell: pwsh
         continue-on-error: ${{ inputs.soft-fail }}
         run: |
-          $args = @()
+          $lintArgs = @()
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $args += '-ChangedFilesOnly'
+            $lintArgs += '-ChangedFilesOnly'
           }
-          & scripts/linting/Invoke-YamlLint.ps1 @args
+          & scripts/linting/Invoke-YamlLint.ps1 @lintArgs
 
       - name: Upload YAML lint results
         if: always()
