@@ -30,6 +30,15 @@ jobs:
     permissions:
       contents: read
 
+  # Frontmatter validation for markdown files
+  frontmatter-validation:
+    name: Frontmatter Validation
+    uses: ./.github/workflows/frontmatter-validation.yml
+    with:
+      changed-files-only: false
+    permissions:
+      contents: read
+
   # PowerShell script analysis
   psscriptanalyzer:
     name: PSScriptAnalyzer
@@ -88,6 +97,7 @@ jobs:
       - spell-check
       - markdown-lint
       - table-format
+      - frontmatter-validation
       - psscriptanalyzer
       - yaml-lint
       - link-lang-check
