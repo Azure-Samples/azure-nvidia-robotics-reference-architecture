@@ -323,6 +323,11 @@ function Get-FilesToScan {
     <#
     .SYNOPSIS
     Discovers files to scan based on dependency type patterns.
+    .DESCRIPTION
+    Converts glob patterns (e.g., **/.github/workflows/*.yml) into
+    PowerShell Get-ChildItem calls. The leading **/ prefix is stripped
+    because Get-ChildItem does not support ** as a path segment; recursion
+    is handled via the -Recurse parameter instead.
     #>
     param(
         [string]$ScanPath,
@@ -338,16 +343,30 @@ function Get-FilesToScan {
             $patterns = $DependencyPatterns[$type].FilePatterns
 
             foreach ($pattern in $patterns) {
-                # Convert glob pattern to PowerShell-compatible path
-                $searchPath = Join-Path $ScanPath $pattern
+                # Strip leading **/ — Get-ChildItem cannot resolve ** as a directory segment
+                $hasRecursiveGlob = $pattern.StartsWith('**/')
+                $effectivePattern = if ($hasRecursiveGlob) { $pattern.Substring(3) } else { $pattern }
+
+                $dirPart = Split-Path $effectivePattern -Parent
+                $filePart = Split-Path $effectivePattern -Leaf
 
                 try {
-                    if ($Recursive) {
-                        $files = Get-ChildItem -Path $searchPath -Recurse -File -ErrorAction SilentlyContinue
+                    $gciParams = @{ File = $true; ErrorAction = 'SilentlyContinue' }
+
+                    if ($dirPart) {
+                        $gciParams['Path'] = Join-Path $ScanPath $dirPart
+                        $gciParams['Filter'] = $filePart
                     }
                     else {
-                        $files = Get-ChildItem -Path $searchPath -File -ErrorAction SilentlyContinue
+                        $gciParams['Path'] = $ScanPath
+                        $gciParams['Filter'] = $filePart
                     }
+
+                    if ($hasRecursiveGlob -or $Recursive) {
+                        $gciParams['Recurse'] = $true
+                    }
+
+                    $files = Get-ChildItem @gciParams
 
                     # Apply exclusion filters
                     if ($ExcludePatterns) {
