@@ -1,8 +1,12 @@
+# Copyright (c) Microsoft Corporation.
+# SPDX-License-Identifier: MIT
+
 # LintingHelpers.psm1
 #
 # Purpose: Shared helper functions for linting scripts and workflows
 # Author: HVE Core Team
-# Created: 2025-11-05
+
+Import-Module (Join-Path $PSScriptRoot "../../lib/Modules/CIHelpers.psm1") -Force
 
 function Get-ChangedFilesFromGit {
     <#
@@ -35,124 +39,117 @@ function Get-ChangedFilesFromGit {
     try {
         # Try merge-base first (best for PRs)
         $mergeBase = git merge-base HEAD $BaseBranch 2>$null
+
         if ($LASTEXITCODE -eq 0 -and $mergeBase) {
-            $changedFiles = git diff --name-only $mergeBase HEAD 2>$null
+            Write-Verbose "Using merge-base: $mergeBase"
+            $changedFiles = git diff --name-only --diff-filter=ACMR $mergeBase HEAD 2>$null
+        }
+        elseif ((git rev-parse HEAD~1 2>$null) -and $LASTEXITCODE -eq 0) {
+            Write-Verbose "Merge base failed, using HEAD~1"
+            $changedFiles = git diff --name-only --diff-filter=ACMR HEAD~1 HEAD 2>$null
         }
         else {
-            # Fallback: compare directly with base branch
-            $changedFiles = git diff --name-only $BaseBranch HEAD 2>$null
-            if ($LASTEXITCODE -ne 0) {
-                # Final fallback: get all tracked files
-                Write-Warning "Could not determine changed files, analyzing all files"
-                $changedFiles = git ls-files 2>$null
-            }
+            Write-Verbose "HEAD~1 failed, using staged/unstaged files"
+            $changedFiles = git diff --name-only --diff-filter=ACMR HEAD 2>$null
         }
-    }
-    catch {
-        Write-Warning "Git operation failed: $_"
-        $changedFiles = git ls-files 2>$null
-    }
 
-    # Filter by extensions
-    if ($FileExtensions -and $FileExtensions[0] -ne '*') {
-        $filteredFiles = @()
-        foreach ($file in $changedFiles) {
-            foreach ($ext in $FileExtensions) {
-                $pattern = $ext.TrimStart('*')
-                if ($file -like "*$pattern") {
-                    $filteredFiles += $file
+        if ($LASTEXITCODE -ne 0 -or -not $changedFiles) {
+            Write-Warning "Unable to determine changed files from git"
+            return @()
+        }
+
+        # Filter by extensions and verify files exist
+        $filteredFiles = $changedFiles | Where-Object {
+            if ([string]::IsNullOrEmpty($_)) { return $false }
+
+            # Check if file matches any of the allowed extensions
+            $currentFile = $_
+            $matchesExtension = $false
+            foreach ($pattern in $FileExtensions) {
+                if ($currentFile -like $pattern) {
+                    $matchesExtension = $true
                     break
                 }
             }
-        }
-        $changedFiles = $filteredFiles
-    }
 
-    # Return only existing files
-    $existingFiles = @()
-    foreach ($file in $changedFiles) {
-        if (Test-Path $file) {
-            $existingFiles += $file
+            $matchesExtension -and (Test-Path $currentFile -PathType Leaf)
         }
-    }
 
-    return $existingFiles
+        Write-Verbose "Found $($filteredFiles.Count) changed files matching extensions: $($FileExtensions -join ', ')"
+        return @($filteredFiles)
+    }
+    catch {
+        Write-Warning "Error getting changed files: $($_.Exception.Message)"
+        return @()
+    }
 }
 
 function Get-FilesRecursive {
     <#
     .SYNOPSIS
-    Gets files recursively with gitignore pattern support.
+    Gets files recursively with gitignore filtering.
 
     .DESCRIPTION
-    Retrieves files matching specified patterns while respecting gitignore rules.
+    Recursively finds files by extension, respecting .gitignore patterns.
 
     .PARAMETER Path
     Root path to search from.
 
     .PARAMETER Include
-    Array of file patterns to include (e.g., @('*.ps1', '*.psm1')).
+    File patterns to include (e.g., @('*.ps1', '*.psm1')).
 
     .PARAMETER GitIgnorePath
     Path to .gitignore file for exclusion patterns.
 
     .OUTPUTS
-    Array of file paths.
+    Array of FileInfo objects.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path,
 
-        [Parameter(Mandatory = $false)]
-        [string[]]$Include = @('*'),
+        [Parameter(Mandatory = $true)]
+        [string[]]$Include,
 
         [Parameter(Mandatory = $false)]
         [string]$GitIgnorePath
     )
 
-    $files = @()
-    $excludePatterns = @()
+    $files = @(Get-ChildItem -Path $Path -Recurse -Include $Include -File -ErrorAction SilentlyContinue)
 
-    # Load gitignore patterns if provided
+    # Apply gitignore filtering if provided
     if ($GitIgnorePath -and (Test-Path $GitIgnorePath)) {
-        $excludePatterns = Get-GitIgnorePatterns -GitIgnorePath $GitIgnorePath
-    }
+        $gitignorePatterns = Get-GitIgnorePatterns -GitIgnorePath $GitIgnorePath
 
-    # Get all files matching include patterns
-    foreach ($pattern in $Include) {
-        $matchingFiles = Get-ChildItem -Path $Path -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue
-        foreach ($file in $matchingFiles) {
-            $relativePath = $file.FullName.Substring((Get-Location).Path.Length + 1)
-
-            # Check against exclude patterns
+        $files = @($files | Where-Object {
+            $file = $_
             $excluded = $false
-            foreach ($excludePattern in $excludePatterns) {
-                if ($relativePath -like $excludePattern) {
+
+            foreach ($pattern in $gitignorePatterns) {
+                if ($file.FullName -like $pattern) {
                     $excluded = $true
                     break
                 }
             }
 
-            if (-not $excluded) {
-                $files += $file
-            }
-        }
+            -not $excluded
+        })
     }
 
-    return $files | Select-Object -Unique
+    return $files
 }
 
 function Get-GitIgnorePatterns {
     <#
     .SYNOPSIS
-    Converts gitignore patterns to PowerShell wildcard patterns.
+    Parses .gitignore into PowerShell wildcard patterns.
 
     .PARAMETER GitIgnorePath
-    Path to the .gitignore file.
+    Path to .gitignore file.
 
     .OUTPUTS
-    Array of PowerShell wildcard patterns.
+    Array of wildcard patterns using platform-appropriate separators.
     #>
     [CmdletBinding()]
     param(
@@ -160,187 +157,48 @@ function Get-GitIgnorePatterns {
         [string]$GitIgnorePath
     )
 
-    $patterns = @()
-
     if (-not (Test-Path $GitIgnorePath)) {
-        return $patterns
+        return @()
     }
 
-    $lines = Get-Content $GitIgnorePath -ErrorAction SilentlyContinue
-    foreach ($line in $lines) {
-        $line = $line.Trim()
+    $sep = [System.IO.Path]::DirectorySeparatorChar
 
-        # Skip comments and empty lines
-        if ([string]::IsNullOrWhiteSpace($line) -or $line.StartsWith('#')) {
-            continue
-        }
+    try {
+        $lines = Get-Content $GitIgnorePath -ErrorAction Stop
+    }
+    catch {
+        Write-Warning "Unable to read gitignore file '$GitIgnorePath': $($_.Exception.Message)"
+        return @()
+    }
 
-        # Convert to PowerShell pattern
-        $pattern = if ($line.StartsWith('/')) {
-            $line.Substring(1).Replace('/', '\')
+    $patterns = $lines | Where-Object {
+        $_ -and -not $_.StartsWith('#') -and $_.Trim() -ne ''
+    } | ForEach-Object {
+        $pattern = $_.Trim()
+
+        # Normalize to platform separator
+        $normalizedPattern = $pattern.Replace('/', $sep).Replace('\', $sep)
+
+        if ($pattern.EndsWith('/')) {
+            "*$sep$($normalizedPattern.TrimEnd($sep))$sep*"
         }
-        elseif ($line.Contains('/')) {
-            "*\$($line.Replace('/', '\'))*"
+        elseif ($pattern.Contains('/') -or $pattern.Contains('\')) {
+            "*$sep$normalizedPattern*"
+        }
+        elseif ($pattern -match '[\*\?\.]') {
+            "*$sep$normalizedPattern"
         }
         else {
-            "*\$line\*"
+            "*$sep$normalizedPattern$sep*"
         }
-
-        $patterns += $pattern
     }
 
-    return $patterns
+    return @($patterns)
 }
 
-function Write-GitHubAnnotation {
-    <#
-    .SYNOPSIS
-    Writes GitHub Actions annotations for errors, warnings, or notices.
-
-    .PARAMETER Type
-    Annotation type: 'error', 'warning', or 'notice'.
-
-    .PARAMETER Message
-    The annotation message.
-
-    .PARAMETER File
-    Optional file path.
-
-    .PARAMETER Line
-    Optional line number.
-
-    .PARAMETER Column
-    Optional column number.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateSet('error', 'warning', 'notice')]
-        [string]$Type,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Message,
-
-        [Parameter(Mandatory = $false)]
-        [string]$File,
-
-        [Parameter(Mandatory = $false)]
-        [int]$Line,
-
-        [Parameter(Mandatory = $false)]
-        [int]$Column
-    )
-
-    if ($env:GITHUB_ACTIONS) {
-        $annotation = "::$Type"
-        $params = @()
-
-        if ($File) { $params += "file=$File" }
-        if ($Line) { $params += "line=$Line" }
-        if ($Column) { $params += "col=$Column" }
-
-        if ($params.Count -gt 0) {
-            $annotation += " $($params -join ',')"
-        }
-
-        $annotation += "::$Message"
-        Write-Host $annotation
-    }
-    else {
-        $prefix = switch ($Type) {
-            'error' { 'ERROR' }
-            'warning' { 'WARN' }
-            'notice' { 'INFO' }
-        }
-        Write-Host "$prefix $Message"
-    }
-}
-
-function Set-GitHubOutput {
-    <#
-    .SYNOPSIS
-    Sets a GitHub Actions output variable.
-
-    .PARAMETER Name
-    Output variable name.
-
-    .PARAMETER Value
-    Output variable value.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Value
-    )
-
-    if ($env:GITHUB_OUTPUT) {
-        "$Name=$Value" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-    }
-    else {
-        Write-Verbose "GitHub output: $Name=$Value"
-    }
-}
-
-function Set-GitHubEnv {
-    <#
-    .SYNOPSIS
-    Sets a GitHub Actions environment variable.
-
-    .PARAMETER Name
-    Environment variable name.
-
-    .PARAMETER Value
-    Environment variable value.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Value
-    )
-
-    if ($env:GITHUB_ENV) {
-        "$Name=$Value" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-    }
-    else {
-        Write-Verbose "GitHub env: $Name=$Value"
-    }
-}
-
-function Write-GitHubStepSummary {
-    <#
-    .SYNOPSIS
-    Appends content to GitHub Actions step summary.
-
-    .PARAMETER Content
-    Markdown content to append.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Content
-    )
-
-    if ($env:GITHUB_STEP_SUMMARY) {
-        $Content | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-    }
-    else {
-        Write-Verbose "Not in GitHub Actions environment - summary content: $Content"
-    }
-}
-
-# Export functions
+# Export local functions only - CIHelpers functions are used via direct import
 Export-ModuleMember -Function @(
     'Get-ChangedFilesFromGit',
     'Get-FilesRecursive',
-    'Get-GitIgnorePatterns',
-    'Write-GitHubAnnotation',
-    'Set-GitHubOutput',
-    'Set-GitHubEnv',
-    'Write-GitHubStepSummary'
+    'Get-GitIgnorePatterns'
 )

@@ -1,4 +1,8 @@
 #!/usr/bin/env pwsh
+# Copyright (c) Microsoft Corporation.
+# SPDX-License-Identifier: MIT
+
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Language Path Link Checker and Fixer
@@ -23,6 +27,11 @@ param(
     [switch]$Fix,
     [string[]]$Files
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+Import-Module (Join-Path $PSScriptRoot "../lib/Modules/CIHelpers.psm1") -Force
 
 function Get-GitTextFile {
     <#
@@ -178,11 +187,19 @@ function ConvertTo-JsonOutput {
     return $jsonData
 }
 
-# Main script execution
-try {
-    if ($Verbose) {
-        Write-Information "Getting list of git-tracked text files..." -InformationAction Continue
-    }
+function Invoke-LinkLanguageCheck {
+    <#
+    .SYNOPSIS
+        Main entry point for the link language checker.
+    #>
+
+    [CmdletBinding()]
+    param(
+        [switch]$Fix,
+        [string[]]$Files
+    )
+
+    Write-Verbose "Getting list of git-tracked text files..."
 
     if ($Files -and $Files.Count -gt 0) {
         $files = $Files
@@ -191,23 +208,17 @@ try {
         $files = Get-GitTextFile
     }
 
-    if ($Verbose) {
-        Write-Information "Found $($files.Count) git-tracked text files" -InformationAction Continue
-    }
+    Write-Verbose "Found $($files.Count) git-tracked text files"
 
     $allLinks = @()
 
     foreach ($filePath in $files) {
         if (-not (Test-Path -Path $filePath -PathType Leaf)) {
-            if ($Verbose) {
-                Write-Warning "Skipping $filePath`: not a regular file"
-            }
+            Write-Warning "Skipping $filePath`: not a regular file"
             continue
         }
 
-        if ($Verbose) {
-            Write-Verbose "Processing $filePath..."
-        }
+        Write-Verbose "Processing $filePath..."
 
         $links = Find-LinksInFile -FilePath $filePath
         $allLinks += $links
@@ -215,26 +226,20 @@ try {
 
     if ($allLinks.Count -gt 0) {
         if ($Fix) {
-            if ($Verbose) {
-                Write-Information "`nFound $($allLinks.Count) URLs containing 'en-us':`n" -InformationAction Continue
-                foreach ($linkInfo in $allLinks) {
-                    Write-Information "File: $($linkInfo.File), Line: $($linkInfo.LineNumber)" -InformationAction Continue
-                    Write-Information "  URL: $($linkInfo.OriginalUrl)" -InformationAction Continue
-                    Write-Information "" -InformationAction Continue
-                }
+            Write-Verbose "`nFound $($allLinks.Count) URLs containing 'en-us':`n"
+            foreach ($linkInfo in $allLinks) {
+                Write-Verbose "File: $($linkInfo.File), Line: $($linkInfo.LineNumber)"
+                Write-Verbose "  URL: $($linkInfo.OriginalUrl)"
             }
 
             $filesModified = Repair-AllLink -AllLinks $allLinks
             Write-Output "Fixed $($allLinks.Count) URLs in $filesModified files."
 
-            if ($Verbose) {
-                Write-Information "`nDetails of fixes:" -InformationAction Continue
-                foreach ($linkInfo in $allLinks) {
-                    Write-Information "File: $($linkInfo.File), Line: $($linkInfo.LineNumber)" -InformationAction Continue
-                    Write-Information "  Original: $($linkInfo.OriginalUrl)" -InformationAction Continue
-                    Write-Information "  Fixed: $($linkInfo.FixedUrl)" -InformationAction Continue
-                    Write-Information "" -InformationAction Continue
-                }
+            Write-Verbose "`nDetails of fixes:"
+            foreach ($linkInfo in $allLinks) {
+                Write-Verbose "File: $($linkInfo.File), Line: $($linkInfo.LineNumber)"
+                Write-Verbose "  Original: $($linkInfo.OriginalUrl)"
+                Write-Verbose "  Fixed: $($linkInfo.FixedUrl)"
             }
         }
         else {
@@ -251,7 +256,16 @@ try {
         }
     }
 }
-catch {
-    Write-Error "An error occurred: $_"
-    exit 1
+
+#region Main Execution
+if ($MyInvocation.InvocationName -ne '.') {
+    try {
+        Invoke-LinkLanguageCheck -Fix:$Fix -Files $Files
+    }
+    catch {
+        Write-Error -ErrorAction Continue "Link-Lang-Check failed: $($_.Exception.Message)"
+        Write-CIAnnotation -Message $_.Exception.Message -Level Error
+        exit 1
+    }
 }
+#endregion Main Execution

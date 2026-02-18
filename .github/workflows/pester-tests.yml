@@ -1,0 +1,216 @@
+name: Pester Tests
+
+on:
+  workflow_call:
+    inputs:
+      soft-fail:
+        description: 'Whether to continue on test failures'
+        required: false
+        type: boolean
+        default: false
+      changed-files-only:
+        description: 'Whether to run only tests for changed files'
+        required: false
+        type: boolean
+        default: true
+      code-coverage:
+        description: 'Whether to collect code coverage'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  pester:
+    name: PowerShell Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create logs directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path logs | Out-Null
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -RequiredVersion 5.7.1 -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester -RequiredVersion 5.7.1
+
+      - name: Install PowerShell-Yaml
+        shell: pwsh
+        run: |
+          Install-Module -Name powershell-yaml -Force -SkipPublisherCheck -Scope CurrentUser
+
+      - name: Get changed files
+        id: changed-files
+        if: inputs.changed-files-only
+        shell: pwsh
+        run: |
+          # Determine base ref for comparison
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
+            $baseRef = "origin/${{ github.base_ref }}"
+          } else {
+            $baseRef = 'HEAD~1'
+          }
+
+          # Get changed PowerShell files
+          $changedFiles = git diff --name-only $baseRef -- '*.ps1' '*.psm1' '*.psd1' 2>$null
+          if (-not $changedFiles) {
+            Write-Host "No PowerShell files changed"
+            "has-changes=false" >> $env:GITHUB_OUTPUT
+            return
+          }
+
+          "has-changes=true" >> $env:GITHUB_OUTPUT
+
+          # Map source files to test files
+          $testPaths = @()
+          foreach ($file in $changedFiles) {
+            Write-Host "Changed: $file"
+
+            # Direct test file change
+            if ($file -match '\.Tests\.ps1$') {
+              $testPaths += $file
+              continue
+            }
+
+            # Map source to test: scripts/security/Foo.ps1 -> scripts/tests/security/Foo.Tests.ps1
+            if ($file -match '^scripts/(.+)\.psm?1$') {
+              $relativePath = $Matches[1]
+              $testFile = "scripts/tests/$relativePath.Tests.ps1"
+              if (Test-Path $testFile) {
+                $testPaths += $testFile
+              }
+            }
+          }
+
+          $uniquePaths = $testPaths | Sort-Object -Unique
+          if ($uniquePaths) {
+            Write-Host "Test files to run:"
+            $uniquePaths | ForEach-Object { Write-Host "  $_" }
+            "test-paths=$($uniquePaths -join ',')" >> $env:GITHUB_OUTPUT
+          }
+          else {
+            Write-Host "No matching test files found for changed source files"
+            "has-changes=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Run Pester Tests
+        id: pester
+        if: "!inputs.changed-files-only || steps.changed-files.outputs.has-changes == 'true'"
+        shell: pwsh
+        continue-on-error: ${{ inputs.soft-fail }}
+        run: |
+          $env:PESTER_FAILED = 'false'
+
+          $configParams = @{}
+          if ('${{ inputs.code-coverage }}' -eq 'true') {
+            $configParams['CodeCoverage'] = $true
+          }
+
+          # Filter to specific test files if running changed-files-only
+          $testPaths = '${{ steps.changed-files.outputs.test-paths }}'
+          if ($testPaths -and '${{ inputs.changed-files-only }}' -eq 'true') {
+            $configParams['TestPath'] = $testPaths -split ','
+          }
+
+          try {
+            $config = & scripts/tests/pester.config.ps1 @configParams
+            $result = Invoke-Pester -Configuration $config
+
+            if ($result.FailedCount -gt 0) {
+              $env:PESTER_FAILED = 'true'
+              "pester-failed=true" >> $env:GITHUB_OUTPUT
+              Write-Warning "$($result.FailedCount) test(s) failed"
+            }
+            else {
+              "pester-failed=false" >> $env:GITHUB_OUTPUT
+              Write-Host "All $($result.PassedCount) tests passed"
+            }
+          }
+          catch {
+            $env:PESTER_FAILED = 'true'
+            "pester-failed=true" >> $env:GITHUB_OUTPUT
+            Write-Error "Pester execution failed: $_"
+          }
+
+      - name: Upload test results
+        if: always() && steps.pester.outcome != 'skipped'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        with:
+          name: pester-results
+          path: logs/pester-results.xml
+          retention-days: 30
+
+      - name: Upload Coverage Report
+        if: inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        with:
+          name: coverage-report
+          path: logs/coverage.xml
+          retention-days: 30
+
+      - name: Upload to Codecov
+        if: inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        with:
+          use_oidc: true
+          files: logs/coverage.xml
+          flags: pester
+          fail_ci_if_error: false
+
+      - name: Coverage Threshold Check
+        if: inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
+        shell: pwsh
+        run: |
+          if (Test-Path logs/coverage.xml) {
+            [xml]$coverage = Get-Content logs/coverage.xml
+            $lineRate = [double]$coverage.report.counter |
+              Where-Object { $_.type -eq 'LINE' } |
+              ForEach-Object {
+                $missed = [int]$_.missed
+                $covered = [int]$_.covered
+                if (($missed + $covered) -gt 0) { [math]::Round(($covered / ($missed + $covered)) * 100, 2) } else { 0 }
+              }
+            
+            # Baseline threshold (18%) — increase as coverage grows
+            $threshold = 18
+            
+            Write-Host "Line coverage: $lineRate%"
+            Write-Host "Threshold: $threshold%"
+            
+            if ($lineRate -lt $threshold) {
+              Write-Warning "Coverage $lineRate% is below threshold $threshold%"
+            }
+            else {
+              Write-Host "Coverage $lineRate% meets threshold $threshold%"
+            }
+          }
+          else {
+            Write-Warning "Coverage report not found at logs/coverage.xml"
+          }
+
+      - name: Check results
+        if: always() && steps.pester.outcome != 'skipped'
+        shell: pwsh
+        run: |
+          $failed = '${{ steps.pester.outputs.pester-failed }}'
+          $softFail = '${{ inputs.soft-fail }}'
+          
+          if ($failed -eq 'true' -and $softFail -ne 'true') {
+            Write-Error "Pester tests failed. Review test results artifact for details."
+            exit 1
+          }
+          elseif ($failed -eq 'true') {
+            Write-Warning "Pester tests failed but soft-fail is enabled"
+          }

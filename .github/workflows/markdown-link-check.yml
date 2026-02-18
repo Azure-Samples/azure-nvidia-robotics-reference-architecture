@@ -19,11 +19,6 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.10.2
-        with:
-          egress-policy: audit
-
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
         with:
@@ -35,15 +30,19 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- '*.md' | tr '\n' ' ')
+            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- '*.md' | tr '\n' ' ')
           else
             CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT HEAD~1 HEAD -- '*.md' | tr '\n' ' ')
           fi
-          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          {
+            echo "files=$CHANGED_FILES"
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "has_changes=false"
+            else
+              echo "has_changes=true"
+            fi
+          } >> "$GITHUB_OUTPUT"
+          if [ -n "$CHANGED_FILES" ]; then
             echo "Changed markdown files: $CHANGED_FILES"
           fi
 
@@ -88,5 +87,6 @@ jobs:
         if: steps.changed-files.outputs.has_changes == 'true' && !inputs.soft-fail && steps.link-check.outcome == 'failure'
         shell: pwsh
         run: |
-          Write-Host "Markdown link check failed and soft-fail is false. Failing the job."
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+          Write-CIAnnotation -Level Error -Message 'Markdown link check found broken links — see annotations and step summary above for details'
           exit 1

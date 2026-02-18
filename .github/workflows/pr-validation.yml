@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   # Spell checking using cspell
@@ -35,10 +34,28 @@ jobs:
     permissions:
       contents: read
 
+  # Frontmatter validation for markdown files
+  frontmatter-validation:
+    name: Frontmatter Validation
+    uses: ./.github/workflows/frontmatter-validation.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
   # PowerShell script analysis
   psscriptanalyzer:
     name: PSScriptAnalyzer
     uses: ./.github/workflows/ps-script-analyzer.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
+  # YAML/actionlint workflow linting
+  yaml-lint:
+    name: YAML Lint
+    uses: ./.github/workflows/yaml-lint.yml
     with:
       changed-files-only: true
     permissions:
@@ -65,3 +82,21 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+
+  # SHA pinning compliance for GitHub Actions and dependencies
+  dependency-pinning:
+    name: Dependency Pinning
+    uses: ./.github/workflows/dependency-pinning-scan.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  # PowerShell Pester test execution
+  pester-tests:
+    name: Pester Tests
+    uses: ./.github/workflows/pester-tests.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+      id-token: write
