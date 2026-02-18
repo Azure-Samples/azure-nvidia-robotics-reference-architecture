@@ -191,7 +191,7 @@ def fix_video_timestamps(dataset_dir: Path, info: dict) -> None:
             continue
 
         aligned_ts = [i / fps for i in range(len(ts))]
-        max_drift = max(abs(a - b) for a, b in zip(ts, aligned_ts, strict=False))
+        max_drift = max(abs(a - b) for a, b in zip(ts, aligned_ts, strict=True))
 
         if max_drift > 0.02:
             col_idx = table.column_names.index("timestamp")
