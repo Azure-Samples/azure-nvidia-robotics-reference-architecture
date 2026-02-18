@@ -19,11 +19,6 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.10.2
-        with:
-          egress-policy: audit
-
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
         with:
@@ -41,14 +36,24 @@ jobs:
       - name: Check table formatting
         id: table-format
         run: |
-          npm run format:tables > table-format-output.txt 2>&1 || echo "TABLE_FORMAT_FAILED=true" >> $GITHUB_ENV
+          npm run format:tables > table-format-output.txt 2>&1 || echo "TABLE_FORMAT_FAILED=true" >> "$GITHUB_ENV"
           cat table-format-output.txt
         continue-on-error: true
 
       - name: Create annotations
         if: env.TABLE_FORMAT_FAILED == 'true'
+        shell: pwsh
         run: |
-          echo "::warning::Table formatting issues found. This check does NOT auto-fix. Please manually format tables or run 'npm run format:tables' locally."
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+          $changed = (git diff --name-only -- '*.md' 2>$null) | Where-Object { $_ }
+          if ($changed) {
+            foreach ($file in $changed) {
+              Write-CIAnnotation -Level Error -Message "Table formatting issues — run 'npm run format:tables' locally to fix" -File $file
+            }
+          }
+          else {
+            Write-CIAnnotation -Level Error -Message 'Table format check failed — see step log for details'
+          }
 
       - name: Upload table format results
         if: always()
@@ -60,25 +65,48 @@ jobs:
 
       - name: Add job summary
         if: always()
+        shell: pwsh
         run: |
-          echo "## Table Format Check Results" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ env.TABLE_FORMAT_FAILED }}" == "true" ]; then
-            echo "❌ **Status**: Failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **Note**: This check does NOT auto-fix tables." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**To fix manually:**" >> $GITHUB_STEP_SUMMARY
-            echo "1. Run \`npm run format:tables\` locally" >> $GITHUB_STEP_SUMMARY
-            echo "2. Review and commit the changes" >> $GITHUB_STEP_SUMMARY
-            echo "3. Push to update this PR" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ **Status**: Passed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "All tables are properly formatted." >> $GITHUB_STEP_SUMMARY
-          fi
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+          if ($env:TABLE_FORMAT_FAILED -eq 'true') {
+            $changed = (git diff --name-only -- '*.md' 2>$null) | Where-Object { $_ }
+            $md = @(
+              '## Table Format Check Results'
+              '❌ **Status**: Failed'
+              ''
+            )
+            if ($changed) {
+              $md += '### Files with table formatting issues'
+              $md += ''
+              foreach ($file in $changed) {
+                $md += "- ``$file``"
+              }
+              $md += ''
+            }
+            $md += @(
+              '⚠️ **Note**: This check does NOT auto-fix tables.'
+              ''
+              '**To fix manually:**'
+              '1. Run `npm run format:tables` locally'
+              '2. Review and commit the changes'
+              '3. Push to update this PR'
+            )
+            Write-CIStepSummary -Content ($md -join "`n")
+          }
+          else {
+            $md = @(
+              '## Table Format Check Results'
+              '✅ **Status**: Passed'
+              ''
+              'All tables are properly formatted.'
+            )
+            Write-CIStepSummary -Content ($md -join "`n")
+          }
 
       - name: Fail job if issues found
         if: env.TABLE_FORMAT_FAILED == 'true' && !inputs.soft-fail
+        shell: pwsh
         run: |
-          echo "Table format check failed"
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+          Write-CIAnnotation -Level Error -Message "Table format check failed — run 'npm run format:tables' locally to fix. See step summary for details"
           exit 1

@@ -1,0 +1,92 @@
+name: Frontmatter Validation
+
+on:
+  workflow_call:
+    inputs:
+      soft-fail:
+        description: 'Whether to continue on frontmatter validation errors'
+        required: false
+        type: boolean
+        default: false
+      changed-files-only:
+        description: 'Only validate changed markdown files'
+        required: false
+        type: boolean
+        default: true
+      warnings-as-errors:
+        description: 'Treat warnings as errors'
+        required: false
+        type: boolean
+        default: true
+      enable-schema-validation:
+        description: 'Enable JSON schema validation against schema definitions'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  frontmatter-validation:
+    name: Validate Markdown Frontmatter
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.10.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Create logs directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path logs | Out-Null
+
+      - name: Install PowerShell-Yaml
+        shell: pwsh
+        run: |
+          Install-Module -Name PowerShell-Yaml -Force -Scope CurrentUser
+
+      - name: Run Frontmatter Validation
+        shell: pwsh
+        run: |
+          $args = @()
+          if ('${{ inputs.changed-files-only }}' -eq 'true') {
+            $args += '-ChangedFilesOnly'
+          }
+          if ('${{ inputs.warnings-as-errors }}' -eq 'true') {
+            $args += '-WarningsAsErrors'
+          }
+          if ('${{ inputs.enable-schema-validation }}' -eq 'true') {
+            $args += '-EnableSchemaValidation'
+          }
+          if ('${{ inputs.soft-fail }}' -eq 'true') {
+            $args += '-SoftFail'
+          }
+          & scripts/linting/Invoke-FrontmatterValidation.ps1 @args
+        continue-on-error: ${{ inputs.soft-fail }}
+
+      - name: Upload frontmatter validation results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        with:
+          name: frontmatter-validation-results
+          path: logs/frontmatter-validation-results.json
+          retention-days: 30
+
+      - name: Check results and fail if needed
+        if: ${{ !inputs.soft-fail }}
+        shell: pwsh
+        run: |
+          if ($env:FRONTMATTER_VALIDATION_FAILED -eq 'true') {
+            Write-Host "Frontmatter validation failed. Failing the job."
+            exit 1
+          }

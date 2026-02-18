@@ -34,10 +34,28 @@ jobs:
     permissions:
       contents: read
 
+  # Frontmatter validation for markdown files
+  frontmatter-validation:
+    name: Frontmatter Validation
+    uses: ./.github/workflows/frontmatter-validation.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
   # PowerShell script analysis
   psscriptanalyzer:
     name: PSScriptAnalyzer
     uses: ./.github/workflows/ps-script-analyzer.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
+  # YAML/actionlint workflow linting
+  yaml-lint:
+    name: YAML Lint
+    uses: ./.github/workflows/yaml-lint.yml
     with:
       changed-files-only: true
     permissions:
