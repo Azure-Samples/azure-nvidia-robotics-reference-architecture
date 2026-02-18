@@ -11,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  security-events: write
 
 jobs:
   # Spell checking using cspell
@@ -83,3 +81,4 @@ jobs:
       changed-files-only: true
     permissions:
       contents: read
+      id-token: write

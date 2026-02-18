@@ -121,7 +121,7 @@ jobs:
           # Filter to specific test files if running changed-files-only
           $testPaths = '${{ steps.changed-files.outputs.test-paths }}'
           if ($testPaths -and '${{ inputs.changed-files-only }}' -eq 'true') {
-            $configParams['TestPaths'] = $testPaths -split ','
+            $configParams['TestPath'] = $testPaths -split ','
           }
 
           try {
