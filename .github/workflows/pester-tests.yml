@@ -175,7 +175,7 @@ jobs:
         run: |
           if (Test-Path logs/coverage.xml) {
             [xml]$coverage = Get-Content logs/coverage.xml
-            $lineRate = [double]$coverage.report.counter |
+            $lineRate = $coverage.report.counter |
               Where-Object { $_.type -eq 'LINE' } |
               ForEach-Object {
                 $missed = [int]$_.missed
