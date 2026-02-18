@@ -72,6 +72,13 @@ jobs:
       contents: read
       id-token: write
 
+  # Python linting using ruff
+  python-lint:
+    name: Python Lint
+    uses: ./.github/workflows/python-lint.yml
+    permissions:
+      contents: read
+
   # Automated release PR management via release-please
   release-please:
     if: "${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
@@ -84,6 +91,7 @@ jobs:
       - markdown-link-check
       - dependency-pinning
       - pester-tests
+      - python-lint
     name: Release Please
     runs-on: ubuntu-latest
     concurrency:

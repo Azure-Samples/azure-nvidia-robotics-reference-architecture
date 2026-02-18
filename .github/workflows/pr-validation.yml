@@ -82,3 +82,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
+  # Python linting using ruff
+  python-lint:
+    name: Python Lint
+    uses: ./.github/workflows/python-lint.yml
+    permissions:
+      contents: read

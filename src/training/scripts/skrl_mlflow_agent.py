@@ -36,7 +36,8 @@ from different SKRL algorithms (PPO, SAC, TD3, DDPG, A2C, etc.).
 Collected via psutil and pynvml with system/ prefix:
 - CPU: system/cpu_utilization_percentage
 - Memory: system/memory_used_megabytes, system/memory_percent, system/memory_available_megabytes
-- GPU: system/gpu_{i}_utilization_percentage, system/gpu_{i}_memory_percent, system/gpu_{i}_memory_used_megabytes, system/gpu_{i}_power_watts
+- GPU: system/gpu_{i}_utilization_percentage, system/gpu_{i}_memory_percent,
+  system/gpu_{i}_memory_used_megabytes, system/gpu_{i}_power_watts
 - Disk: system/disk_used_gigabytes, system/disk_percent, system/disk_available_gigabytes
 
 Metric Logging
@@ -78,11 +79,12 @@ runner.run()
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Any, Protocol, runtime_checkable
 
 from training.utils.metrics import (
-    SystemMetricsCollector,
     _STANDARD_METRIC_ATTRS,
+    SystemMetricsCollector,
     _extract_from_tracking_data,
     _extract_from_value,
 )

@@ -191,7 +191,7 @@ def fix_video_timestamps(dataset_dir: Path, info: dict) -> None:
             continue
 
         aligned_ts = [i / fps for i in range(len(ts))]
-        max_drift = max(abs(a - b) for a, b in zip(ts, aligned_ts))
+        max_drift = max(abs(a - b) for a, b in zip(ts, aligned_ts, strict=False))
 
         if max_drift > 0.02:
             col_idx = table.column_names.index("timestamp")
@@ -200,7 +200,7 @@ def fix_video_timestamps(dataset_dir: Path, info: dict) -> None:
             pq.write_table(table, fpath)
             fixed_data += 1
             rel = fpath.relative_to(dataset_dir)
-            print(f"Realigned timestamps in {rel} (drift was {max_drift*1000:.0f}ms)")
+            print(f"Realigned timestamps in {rel} (drift was {max_drift * 1000:.0f}ms)")
 
     if fixed_data:
         print(f"Realigned timestamps in {fixed_data} data files")
