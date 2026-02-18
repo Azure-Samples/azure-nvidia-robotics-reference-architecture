@@ -269,16 +269,18 @@ def main() -> None:
 
     from training.utils import set_env_defaults
 
-    set_env_defaults({
-        "TASK": "unknown",
-        "EXPORT_DIR": "/tmp/exported",
-        "ONNX_SUCCESS": "0",
-        "JIT_SUCCESS": "0",
-        "NUM_ENVS": "4",
-        "MAX_STEPS": "500",
-        "VIDEO_LENGTH": "200",
-        "INFERENCE_FORMAT": "both",
-    })
+    set_env_defaults(
+        {
+            "TASK": "unknown",
+            "EXPORT_DIR": "/tmp/exported",
+            "ONNX_SUCCESS": "0",
+            "JIT_SUCCESS": "0",
+            "NUM_ENVS": "4",
+            "MAX_STEPS": "500",
+            "VIDEO_LENGTH": "200",
+            "INFERENCE_FORMAT": "both",
+        }
+    )
 
     task = os.environ["TASK"]
     export_dir = Path(os.environ["EXPORT_DIR"])
