@@ -48,6 +48,15 @@ jobs:
     permissions:
       contents: read
 
+  # YAML/actionlint workflow linting
+  yaml-lint:
+    name: YAML Lint
+    uses: ./.github/workflows/yaml-lint.yml
+    with:
+      changed-files-only: false
+    permissions:
+      contents: read
+
   # Link language locale check
   link-lang-check:
     name: Link Language Check
@@ -90,6 +99,7 @@ jobs:
       - table-format
       - frontmatter-validation
       - psscriptanalyzer
+      - yaml-lint
       - link-lang-check
       - markdown-link-check
       - dependency-pinning
