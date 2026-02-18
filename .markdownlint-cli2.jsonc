@@ -4,7 +4,8 @@
     ".copilot-tracking/**",
     "venv/**",
     ".venv/**",
-    "external/**"
+    "external/**",
+    "scripts/tests/Fixtures/**"
   ],
   "config": {
     "default": true,

@@ -122,8 +122,9 @@ function Get-FilesRecursive {
     # Get all files matching include patterns
     foreach ($pattern in $Include) {
         $matchingFiles = Get-ChildItem -Path $Path -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue
+        $basePath = (Resolve-Path -LiteralPath $Path).Path
         foreach ($file in $matchingFiles) {
-            $relativePath = $file.FullName.Substring((Get-Location).Path.Length + 1)
+            $relativePath = [System.IO.Path]::GetRelativePath($basePath, $file.FullName)
 
             # Check against exclude patterns
             $excluded = $false
