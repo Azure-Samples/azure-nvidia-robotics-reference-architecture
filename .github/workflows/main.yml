@@ -127,11 +127,6 @@ jobs:
       minor: ${{ steps.release.outputs.minor }}
       patch: ${{ steps.release.outputs.patch }}
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e  # v2.10.2
-        with:
-          egress-policy: audit
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.0.0
@@ -160,11 +155,6 @@ jobs:
       contents: read
       issues: write
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e  # v2.10.2
-        with:
-          egress-policy: audit
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.0.0
