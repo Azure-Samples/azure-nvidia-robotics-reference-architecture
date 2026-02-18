@@ -6,11 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     # Dev tools
-    "black>=25.9.0",
     "ipykernel>=7.1.0",
     "ipython>=9.7.0",
     "ipywidgets>=8.1.8",
-    "pytest>=8.4.2",
     "tqdm>=4.67.1",
     # Core Isaac Lab dependencies
     "numpy<3",
@@ -26,11 +24,6 @@ dependencies = [
     "warp-lang",
     "pillow==12.1.0",
     "starlette==0.52.1",
-    # Testing
-    "pytest-mock",
-    "junitparser",
-    "flatdict==4.0.1",
-    "flaky",
     # RL Framework dependencies
     "protobuf>=4.25.8,!=5.26.0",
     "hydra-core",
@@ -74,10 +67,44 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/training"]
 
-[dependency-groups]
-dev = [
+[tool.uv]
+dev-dependencies = [
     "ipykernel>=7.1.0",
     "ipywidgets>=8.1.8",
-    "black>=25.9.0",
     "pytest>=8.4.2",
+    "pytest-mock",
+    "pytest-cov",
+    "ruff",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = []
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/training/scripts/rsl_rl/*.py" = ["E402"]
+"src/inference/scripts/play_policy.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["training", "common", "inference"]
+
+[tool.ruff.format]
+quote-style = "double"
