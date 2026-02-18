@@ -24,11 +24,6 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.10.2
-        with:
-          egress-policy: audit
-
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
         with:
@@ -44,11 +39,11 @@ jobs:
         shell: pwsh
         continue-on-error: ${{ inputs.soft-fail }}
         run: |
-          $args = @()
+          $scriptArgs = @{}
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $args += '-ChangedFilesOnly'
+            $scriptArgs['ChangedFilesOnly'] = $true
           }
-          & scripts/linting/Invoke-PSScriptAnalyzer.ps1 @args
+          & scripts/linting/Invoke-PSScriptAnalyzer.ps1 @scriptArgs
 
       - name: Upload PSScriptAnalyzer results
         if: always()
@@ -57,3 +52,13 @@ jobs:
           name: psscriptanalyzer-results
           path: logs/
           retention-days: 30
+
+      - name: Check results
+        if: ${{ !inputs.soft-fail }}
+        shell: pwsh
+        run: |
+          if ($env:PSSCRIPTANALYZER_FAILED -eq 'true') {
+            Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+            Write-CIAnnotation -Level Error -Message 'PSScriptAnalyzer found violations — see annotations above for details'
+            exit 1
+          }
