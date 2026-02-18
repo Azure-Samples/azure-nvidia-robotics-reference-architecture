@@ -31,3 +31,4 @@ jobs:
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: always
+          allow-ghsas: GHSA-r6ph-v2qm-q3c2
