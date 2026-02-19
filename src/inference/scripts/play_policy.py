@@ -89,20 +89,19 @@ args_cli, hydra_args = parser.parse_known_args()
 if args_cli.video:
     args_cli.enable_cameras = True
 
-sys.argv = [sys.argv[0]] + hydra_args
+sys.argv = [sys.argv[0], *hydra_args]
 
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
-import gymnasium as gym
-import numpy as np
 import os
 import time
 
+import gymnasium as gym
+import numpy as np
 import torch
-
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
@@ -121,11 +120,12 @@ except ImportError:
     except ImportError:
         from isaaclab_rl.rsl_rl import RslRlPpoRunnerCfg as RslRlRunnerCfg
 
-from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
-from tensordict import TensorDict
+import contextlib
 
 import isaaclab_tasks  # noqa: F401
+from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
 from isaaclab_tasks.utils.hydra import hydra_task_config
+from tensordict import TensorDict
 
 
 def detect_model_format(model_path: str) -> str:
@@ -160,10 +160,8 @@ class RslRl3xCompatWrapper:
         self._env = env
         for attr in dir(env):
             if not attr.startswith("_") and attr not in ("get_observations", "step", "reset"):
-                try:
+                with contextlib.suppress(AttributeError):
                     setattr(self, attr, getattr(env, attr))
-                except AttributeError:
-                    pass
 
     def __getattr__(self, name: str):
         return getattr(self._env, name)

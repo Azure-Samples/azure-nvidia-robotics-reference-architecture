@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib
 import logging
 import os
 import sys
 import tempfile
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any
 
+from training.scripts import launch as launch_entrypoint
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
 from training.utils.context import AzureStorageContext
-from training.scripts import launch as launch_entrypoint
 
 _LOGGER = logging.getLogger("isaaclab.azure-smoke")
 _DEFAULT_EXPERIMENT = "isaaclab-smoke-test"
@@ -81,7 +83,7 @@ def _test_credential_acquisition() -> bool:
     """Test credential acquisition and log which method succeeded."""
     try:
         identity = importlib.import_module("azure.identity")
-        credential_cls = getattr(identity, "DefaultAzureCredential")
+        credential_cls = identity.DefaultAzureCredential
         credential = credential_cls()
         credential.get_token("https://management.azure.com/.default")
         _LOGGER.info("Successfully acquired Azure credential")
@@ -130,11 +132,8 @@ def _test_storage_upload(storage: AzureStorageContext) -> None:
         )
         raise
     finally:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.remove(checkpoint_path)
-        except FileNotFoundError:
-            # File may have already been deleted or not created; safe to ignore
-            pass
 
 
 def _parse_single_tag(raw: str) -> tuple[str, str]:
@@ -194,8 +193,8 @@ def _load_mlflow() -> Any:
 def _start_run(
     context: AzureMLContext,
     args: argparse.Namespace,
-    user_tags: Dict[str, str],
-    identity_info: Dict[str, str],
+    user_tags: dict[str, str],
+    identity_info: dict[str, str],
 ) -> str:
     mlflow_module = _load_mlflow()
 
@@ -207,7 +206,7 @@ def _start_run(
     tags.update(user_tags)
 
     summary = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "message": args.summary_message,
         "workspace": context.workspace_name,
         "tracking_uri": context.tracking_uri,

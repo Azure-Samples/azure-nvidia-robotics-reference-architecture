@@ -58,8 +58,9 @@ def upload_to_mlflow(
 ) -> bool:
     """Upload artifacts to MLflow via Azure ML integration."""
     try:
-        from training.utils import AzureConfigError, bootstrap_azure_ml
         import mlflow
+
+        from training.utils import AzureConfigError, bootstrap_azure_ml
     except ImportError as e:
         print(f"[WARNING] training.utils not available: {e}")
         return False
@@ -155,7 +156,7 @@ def upload_to_mlflow(
                         videos_logged += 1
 
             print(f"\n{'=' * 60}")
-            print(f"[MLflow] Artifacts logged to Azure ML Studio!")
+            print("[MLflow] Artifacts logged to Azure ML Studio!")
             print(f"[MLflow] Run ID: {run.info.run_id}")
             print(f"[MLflow] Experiment: {experiment_name}")
             print(f"[MLflow] Run name: {run_name}")
@@ -194,12 +195,11 @@ def upload_to_blob_fallback(
     timestamp: str,
 ) -> bool:
     """Upload artifacts directly to Azure Blob Storage as fallback."""
-    if not blob_account and checkpoint_uri.startswith("https://"):
-        if ".blob.core.windows.net" in checkpoint_uri:
-            parsed = urlparse(checkpoint_uri)
-            blob_account = parsed.netloc.split(".")[0]
-            path_parts = parsed.path.lstrip("/").split("/", 1)
-            blob_container = path_parts[0] if path_parts else "inference-outputs"
+    if not blob_account and checkpoint_uri.startswith("https://") and ".blob.core.windows.net" in checkpoint_uri:
+        parsed = urlparse(checkpoint_uri)
+        blob_account = parsed.netloc.split(".")[0]
+        path_parts = parsed.path.lstrip("/").split("/", 1)
+        blob_container = path_parts[0] if path_parts else "inference-outputs"
 
     if not blob_account:
         blob_account = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME", "")
@@ -269,16 +269,18 @@ def main() -> None:
 
     from training.utils import set_env_defaults
 
-    set_env_defaults({
-        "TASK": "unknown",
-        "EXPORT_DIR": "/tmp/exported",
-        "ONNX_SUCCESS": "0",
-        "JIT_SUCCESS": "0",
-        "NUM_ENVS": "4",
-        "MAX_STEPS": "500",
-        "VIDEO_LENGTH": "200",
-        "INFERENCE_FORMAT": "both",
-    })
+    set_env_defaults(
+        {
+            "TASK": "unknown",
+            "EXPORT_DIR": "/tmp/exported",
+            "ONNX_SUCCESS": "0",
+            "JIT_SUCCESS": "0",
+            "NUM_ENVS": "4",
+            "MAX_STEPS": "500",
+            "VIDEO_LENGTH": "200",
+            "INFERENCE_FORMAT": "both",
+        }
+    )
 
     task = os.environ["TASK"]
     export_dir = Path(os.environ["EXPORT_DIR"])

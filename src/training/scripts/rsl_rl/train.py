@@ -16,7 +16,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # Add the src directory to the path for common module import
 _SRC_DIR = Path(__file__).resolve().parents[3]  # src/ directory
@@ -88,7 +88,7 @@ if args_cli.video:
     args_cli.enable_cameras = True
 
 # clear out sys.argv for Hydra
-sys.argv = [sys.argv[0]] + hydra_args
+sys.argv = [sys.argv[0], *hydra_args]
 
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
@@ -130,20 +130,22 @@ if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
     )
     exit(1)
 
-import gymnasium as gym
 import statistics
-import torch
-from tensordict import TensorDict
-from typing import Any, Optional
 
+import gymnasium as gym
 import omni
+import torch
 from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from tensordict import TensorDict
 
 _CURRENT_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _CURRENT_DIR.parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+import contextlib
+
+import isaaclab_tasks  # noqa: F401
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
@@ -153,10 +155,7 @@ from isaaclab.envs import (
 )
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.io import dump_yaml
-
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
-
-import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
@@ -196,10 +195,8 @@ class RslRl3xCompatWrapper:
         # Proxy all attributes to the underlying env
         for attr in dir(env):
             if not attr.startswith("_") and attr not in ("get_observations", "step", "reset"):
-                try:
+                with contextlib.suppress(AttributeError):
                     setattr(self, attr, getattr(env, attr))
-                except AttributeError:
-                    pass
 
     def __getattr__(self, name: str):
         return getattr(self._env, name)
@@ -251,7 +248,7 @@ def _is_primary_rank(args_cli: argparse.Namespace, app_launcher: AppLauncher) ->
     return getattr(app_launcher, "local_rank", 0) == 0
 
 
-def _resolve_env_count(env_cfg: object) -> Optional[int]:
+def _resolve_env_count(env_cfg: object) -> int | None:
     """Best-effort extraction of the configured number of environments."""
 
     scene = getattr(env_cfg, "scene", None)
@@ -267,7 +264,7 @@ def _start_mlflow_run(
     run_name: str,
     tags: dict[str, str],
     params: dict[str, Any],
-) -> tuple[Optional[Any], bool]:
+) -> tuple[Any | None, bool]:
     """Start an MLflow run and return the module with activation state."""
     try:
         import mlflow
@@ -293,7 +290,7 @@ def _start_mlflow_run(
         return None, False
 
 
-def _log_config_artifacts(mlflow_module: Optional[Any], log_dir: str) -> None:
+def _log_config_artifacts(mlflow_module: Any | None, log_dir: str) -> None:
     """Upload environment and agent configuration artifacts to MLflow."""
 
     if mlflow_module is None:
@@ -318,7 +315,7 @@ def _log_config_artifacts(mlflow_module: Optional[Any], log_dir: str) -> None:
 
 
 def _sync_logs_to_storage(
-    storage_context: Optional[Any],
+    storage_context: Any | None,
     *,
     log_dir: str,
     experiment_name: str,
@@ -358,11 +355,11 @@ def _sync_logs_to_storage(
 
 def _register_final_model(
     *,
-    context: Optional[Any],
+    context: Any | None,
     model_path: str,
     model_name: str,
     tags: dict[str, str],
-    properties: Optional[dict[str, str]] = None,
+    properties: dict[str, str] | None = None,
 ) -> bool:
     """Register a trained model in Azure ML if dependencies are available.
 
@@ -404,7 +401,7 @@ def _register_final_model(
 
 def _create_enhanced_log(
     original_log,
-    mlflow_module: Optional[Any],
+    mlflow_module: Any | None,
     mlflow_run_active: bool,
     runner: Any,
     collect_system_metrics: bool = True,
@@ -461,7 +458,7 @@ def _create_enhanced_log(
                     mean_std = runner.alg.policy.action_std.mean()
                     metrics_batch["mean_noise_std"] = mean_std.item()
 
-                if "ep_infos" in locs and locs["ep_infos"]:
+                if locs.get("ep_infos"):
                     import torch
 
                     for key in locs["ep_infos"][0]:
@@ -507,9 +504,9 @@ def _create_enhanced_log(
 
 def _create_enhanced_save(
     original_save,
-    mlflow_module: Optional[Any],
+    mlflow_module: Any | None,
     mlflow_run_active: bool,
-    storage_context: Optional[Any],
+    storage_context: Any | None,
     log_dir: str,
     model_name: str,
     runner: Any,
@@ -524,10 +521,9 @@ def _create_enhanced_save(
             full_path = path if os.path.isabs(path) else os.path.join(log_dir, path)
             tags_to_set = {}
 
-            if mlflow_module and mlflow_run_active:
-                if os.path.isfile(full_path):
-                    mlflow_module.log_artifact(full_path, artifact_path="checkpoints")
-                    tags_to_set["last_checkpoint_path"] = full_path
+            if mlflow_module and mlflow_run_active and os.path.isfile(full_path):
+                mlflow_module.log_artifact(full_path, artifact_path="checkpoints")
+                tags_to_set["last_checkpoint_path"] = full_path
 
             blob_name = None
             if storage_context and os.path.isfile(full_path):
@@ -559,8 +555,8 @@ def main(
     is_primary_process = _is_primary_rank(args_cli, app_launcher)
     azure_enabled = not args_cli.disable_azure and (not args_cli.azure_primary_rank_only or is_primary_process)
 
-    azure_context: Optional[Any] = None
-    mlflow_module: Optional[Any] = None
+    azure_context: Any | None = None
+    mlflow_module: Any | None = None
     mlflow_run_active = False
 
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
@@ -589,7 +585,7 @@ def main(
             else:
                 print(f"[INFO] Azure ML workspace connected: {azure_context.workspace_name}")
                 if azure_context.storage:
-                    print(f"[INFO] Azure Storage enabled for checkpoint uploads")
+                    print("[INFO] Azure Storage enabled for checkpoint uploads")
         except Exception as exc:
             if AzureConfigError and isinstance(exc, AzureConfigError):
                 print(f"[WARNING] Azure ML bootstrap failed: {exc}")
@@ -606,7 +602,7 @@ def main(
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
-    resume_path: Optional[str] = None
+    resume_path: str | None = None
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
 
@@ -772,7 +768,7 @@ def main(
                             model_name=f"{args_cli.task}_{agent_cfg.experiment_name}_final",
                             step=None,
                         )
-                        print("[INFO] Uploaded final model to Azure Storage: " f"{final_blob}")
+                        print(f"[INFO] Uploaded final model to Azure Storage: {final_blob}")
                     except Exception as exc:
                         print(f"[WARNING] Failed to upload final model to Azure Storage: {exc}")
 
