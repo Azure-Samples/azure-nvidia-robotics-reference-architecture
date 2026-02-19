@@ -36,14 +36,14 @@ pyglet<3
 transformers
 einops
 warp-lang
-pillow==12.1.0
+pillow==12.1.1
 starlette==0.52.1
 
 # Testing
 pytest
 pytest-mock
 junitparser
-flatdict==4.0.1
+flatdict==4.1.0
 flaky
 
 # Reinforcement Learning Framework Dependencies (from isaaclab_rl/setup.py)
