@@ -130,6 +130,7 @@ jobs:
 
           try {
             $config = & scripts/tests/pester.config.ps1 -CI @configParams
+            $config.Run.Exit = $false
             $result = Invoke-Pester -Configuration $config
 
             if ($result.FailedCount -gt 0) {
