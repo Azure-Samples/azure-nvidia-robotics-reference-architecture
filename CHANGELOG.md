@@ -15,6 +15,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **Note:** This file is automatically maintained by [release-please](https://github.com/googleapis/release-please). Do not edit manually.
 
+## [0.3.0](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.2.0...v0.3.0) (2026-02-19)
+
+
+### ✨ Features
+
+* add LeRobot imitation learning pipelines for OSMO and Azure ML ([#165](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/165)) ([baef32d](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/baef32de241def42a2d688a47d1628f182d6f272))
+* **linting:** add YAML and GitHub Actions workflow linting via actionlint ([#192](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/192)) ([e6c1730](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/e6c1730b73c65172a9a6858bcae6536de84f9323))
+* **scripts:** add dependency pinning compliance scanning ([#169](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/169)) ([5d90d4c](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/5d90d4c2608f325dabd8a78b1b67b1917e4024ea))
+* **scripts:** add frontmatter validation linting pipeline ([#185](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/185)) ([6ff58e3](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/6ff58e3a001fc86189fbb79cd5a1f434fbb0114a))
+* **scripts:** add verified download utility with hash checking ([#180](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/180)) ([063dd69](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/063dd692a8ec02c62934040d7a6d983617d38f07))
+
+
+### 🐛 Bug Fixes
+
+* **build:** remove [double] cast on JaCoCo counter array in coverage threshold check ([#312](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/312)) ([6b196de](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/6b196de1280a0683f4a14bb19a10662527a237a2))
+* **build:** resolve release-please draft race condition ([#311](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/311)) ([6af1d8b](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/6af1d8b2dc633d62ade95d2722bf469aabe3c60c))
+* **scripts:** wrap Get-MarkdownTarget returns in array subexpression ([#314](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/314)) ([1c5e757](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/1c5e757fbaa78441d95c94dde0aa5459666e8a22))
+* **src:** replace checkpoint-specific error message in upload_file ([#178](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/178)) ([bc0bc7f](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/bc0bc7f396d9386d026de62d49250c3ff3bccb5f))
+* **workflows:** add id-token write permission for pester-tests ([#183](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/183)) ([5c87ca8](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/5c87ca8c9ec8965298d7c21b7ad9951544af2e8d))
+
+
+### ♻️ Code Refactoring
+
+* **scripts:** align LintingHelpers.psm1 with hve-core upstream ([#193](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/193)) ([f24bc04](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/f24bc0465aab0ffb255ad122175fc7a1b894742e))
+* **scripts:** replace GitHub-only CI wrappers with CIHelpers in linting scripts ([#184](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/184)) ([033cc9c](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/033cc9cf75c82b2ba9169c3c7f5abea1a098c491))
+* **src:** standardize os.environ usage in inference upload script ([#194](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/194)) ([5a82581](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/5a82581f89fb7e2c0b88f168a7735707788f087c))
+
+
+### 🔧 Miscellaneous
+
+* **scripts:** add Pester test runner and fix test configuration ([#176](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/176)) ([4e54ae2](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/4e54ae2330b09a437f5bbfb0a9832f971852058f))
+
 ## [0.2.0](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.1.0...v0.2.0) (2026-02-12)
 
 
