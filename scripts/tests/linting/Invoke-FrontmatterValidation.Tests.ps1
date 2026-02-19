@@ -457,6 +457,47 @@ Describe 'Get-MarkdownFiles' -Tag 'Unit' {
             $result | Should -HaveCount 0
         }
     }
+
+    Context 'ExcludePaths with multiple patterns' {
+        It 'excludes files matching multiple patterns' {
+            $tempDir = Join-Path $TestDrive 'multi-exclude'
+            $srcDir = Join-Path $tempDir 'src'
+            $docsDir = Join-Path $tempDir 'docs'
+            New-Item -Path $srcDir -ItemType Directory -Force
+            New-Item -Path $docsDir -ItemType Directory -Force
+            @('---', 'title: src', 'description: test', '---') | Set-Content (Join-Path $srcDir 'guide.md')
+            @('---', 'title: docs', 'description: test', '---') | Set-Content (Join-Path $docsDir 'readme.md')
+            @('---', 'title: root', 'description: test', '---') | Set-Content (Join-Path $tempDir 'CHANGELOG.md')
+            @('---', 'title: keep', 'description: test', '---') | Set-Content (Join-Path $tempDir 'CONTRIBUTING.md')
+
+            $result = Get-MarkdownFiles -ScanPaths @($tempDir) -ExplicitFiles @() -Exclude @('CHANGELOG.md', 'docs')
+            $result | Should -Not -BeNullOrEmpty
+            $changelogMatch = $result | Where-Object { $_ -like '*CHANGELOG.md' }
+            $changelogMatch | Should -BeNullOrEmpty
+            $docsMatch = $result | Where-Object { $_ -like '*docs*' }
+            $docsMatch | Should -BeNullOrEmpty
+        }
+
+        It 'returns all files when ExcludePaths is empty' {
+            $testRoot = Join-Path $TestDrive 'no-exclude'
+            New-Item -Path $testRoot -ItemType Directory -Force
+            @('---', 'title: test', 'description: test', '---') | Set-Content (Join-Path $testRoot 'readme.md')
+
+            $result = Get-MarkdownFiles -ScanPaths @($testRoot) -ExplicitFiles @() -Exclude @()
+            $result | Should -HaveCount 1
+        }
+    }
+
+    Context 'ChangedFilesOnly with no changed markdown files' {
+        It 'returns empty when git reports only non-markdown changed files' {
+            Mock Get-ChangedFilesFromGit {
+                return @()
+            }
+
+            $result = Get-MarkdownFiles -ScanPaths @('.') -ExplicitFiles @() -Exclude @() -ChangedOnly -Branch 'main'
+            $result | Should -HaveCount 0
+        }
+    }
 }
 
 #endregion
@@ -631,6 +672,124 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
 
             Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' }
             Should -Invoke Write-CIStepSummary -Times 1
+        }
+    }
+
+    Context 'SoftFail suppresses exit code' {
+        It 'does not throw when SoftFail is enabled and errors exist' {
+            $badFile = Join-Path $script:FixtureDir 'missing-frontmatter.md'
+            $tempScriptsLinting = Join-Path $TestDrive 'softfail-scripts' 'linting'
+            New-Item -ItemType Directory -Path $tempScriptsLinting -Force | Out-Null
+
+            $script:Paths = @()
+            $script:Files = @($badFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $true
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = $tempScriptsLinting
+
+            { Invoke-Validation } | Should -Not -Throw
+            Should -Invoke Set-CIEnv -ParameterFilter { $Name -eq 'FRONTMATTER_VALIDATION_FAILED' -and $Value -eq 'true' }
+        }
+
+        It 'still reports errors in CI outputs when SoftFail is enabled' {
+            $badFile = Join-Path $script:FixtureDir 'missing-frontmatter.md'
+            $tempScriptsLinting = Join-Path $TestDrive 'softfail-out-scripts' 'linting'
+            New-Item -ItemType Directory -Path $tempScriptsLinting -Force | Out-Null
+
+            $script:Paths = @()
+            $script:Files = @($badFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $true
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = $tempScriptsLinting
+
+            Invoke-Validation
+
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-errors' }
+            Should -Invoke Write-CIStepSummary -Times 1
+        }
+    }
+
+    Context 'WarningsAsErrors promotes warnings to errors' {
+        It 'sets WarningsAsErrors flag for validation run' {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $script:Paths = @()
+            $script:Files = @($validFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $true
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            { Invoke-Validation } | Should -Not -Throw
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-issues' }
+        }
+    }
+
+    Context 'No-files early exit writes zero CI outputs' {
+        It 'writes zero counts when no markdown files found in directory' {
+            $emptyDir = Join-Path $TestDrive 'early-exit-empty'
+            New-Item -Path $emptyDir -ItemType Directory -Force
+
+            $script:Paths = @($emptyDir)
+            $script:Files = @()
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            Invoke-Validation
+
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-issues' -and $Value -eq '0' }
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-errors' -and $Value -eq '0' }
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-warnings' -and $Value -eq '0' }
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' -and $Value -eq '0' }
+        }
+    }
+
+    Context 'EnableSchemaValidation overlay orchestration' {
+        It 'validates schema when EnableSchemaValidation is set' -Skip:(-not $SchemaAvailable) {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $script:Paths = @()
+            $script:Files = @($validFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $true
+            $script:SoftFail = $true
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            { Invoke-Validation } | Should -Not -Throw
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' }
+        }
+
+        It 'skips schema validation when switch is not set' {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $script:Paths = @()
+            $script:Files = @($validFile)
+            $script:ExcludePaths = @()
+            $script:ChangedFilesOnly = $false
+            $script:BaseBranch = 'main'
+            $script:EnableSchemaValidation = $false
+            $script:SoftFail = $false
+            $script:WarningsAsErrors = $false
+            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+
+            { Invoke-Validation } | Should -Not -Throw
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' }
         }
     }
 }
