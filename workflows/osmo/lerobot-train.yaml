@@ -90,7 +90,7 @@ workflow:
 
             PIP_PACKAGES=(
               "${LEROBOT_PKG}" huggingface-hub
-              azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0"
+              azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0,<3.0.0"
               psutil pynvml
             )
 

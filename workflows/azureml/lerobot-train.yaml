@@ -7,74 +7,32 @@
 # - Setting the environment (LeRobot PyTorch image)
 # - Setting compute target
 # - Building the command with all training parameters
-# - Setting all input values (dataset, policy type, Azure context, etc.)
+# - Setting all environment variables via --set flags
 #
 # This file defines:
 # - The job structure and schema
-# - Input/output specifications
-# - Environment variable mappings for HuggingFace and logging
 # - Identity configuration for Azure ML model registration
+# - Output specifications
 #
 # To submit a job, use submit-azureml-lerobot-training.sh with appropriate flags.
 
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 type: command
 display_name: LeRobot Behavioral Cloning Training
-description: LeRobot imitation learning training (ACT/Diffusion) with MLflow integration and checkpoint registration.
+description: LeRobot imitation learning training (ACT/Diffusion) with Azure ML MLflow integration and checkpoint registration.
 experiment_name: lerobot-training
 identity:
   type: managed_identity
 
-# All values below are placeholders and will be overridden by submit-azureml-lerobot-training.sh
 code: .
 environment: azureml:lerobot-training-env:latest
 compute: azureml:cpu-cluster
 
-inputs:
-  dataset_repo_id: none
-  policy_type: act
-  job_name: lerobot-act-training
-  output_dir: /workspace/outputs/train
-  policy_repo_id: none
-  lerobot_version: none
-  training_steps: none
-  batch_size: none
-  eval_freq: none
-  save_freq: "5000"
-  wandb_enable: "true"
-  wandb_project: lerobot-training
-  register_checkpoint: none
-  subscription_id: placeholder
-  resource_group: placeholder
-  workspace_name: placeholder
-  mlflow_token_refresh_retries: "3"
-  mlflow_http_request_timeout: "60"
-
 command: echo "Command will be set by submission script"
 
+# All environment variables are set by submit-azureml-lerobot-training.sh via --set flags.
 environment_variables:
-  DATASET_REPO_ID: ${{inputs.dataset_repo_id}}
-  POLICY_TYPE: ${{inputs.policy_type}}
-  JOB_NAME: ${{inputs.job_name}}
-  OUTPUT_DIR: ${{inputs.output_dir}}
-  POLICY_REPO_ID: ${{inputs.policy_repo_id}}
-  LEROBOT_VERSION: ${{inputs.lerobot_version}}
-  TRAINING_STEPS: ${{inputs.training_steps}}
-  BATCH_SIZE: ${{inputs.batch_size}}
-  EVAL_FREQ: ${{inputs.eval_freq}}
-  SAVE_FREQ: ${{inputs.save_freq}}
-  WANDB_ENABLE: ${{inputs.wandb_enable}}
-  WANDB_PROJECT: ${{inputs.wandb_project}}
-  REGISTER_CHECKPOINT: ${{inputs.register_checkpoint}}
   TRAINING_CHECKPOINT_OUTPUT: ${{outputs.checkpoints}}
-  # The following are set by submit-azureml-lerobot-training.sh via --set flags
-  # AZURE_SUBSCRIPTION_ID: <set by script>
-  # AZURE_RESOURCE_GROUP: <set by script>
-  # AZUREML_WORKSPACE_NAME: <set by script>
-  # HF_TOKEN: <set by script via env secret>
-  # WANDB_API_KEY: <set by script via env secret>
-  # MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES: <set by script>
-  # MLFLOW_HTTP_REQUEST_TIMEOUT: <set by script>
 
 outputs:
   checkpoints:

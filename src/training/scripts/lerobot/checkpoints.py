@@ -95,6 +95,54 @@ def _register_model_via_aml(
         return False
 
 
+def _upload_artifacts_via_aml(
+    checkpoint_path: Path,
+    checkpoint_name: str,
+    run_id: str,
+) -> bool:
+    """Upload checkpoint artifacts to AML datastore directly.
+
+    Bypasses mlflow.log_artifacts() to avoid azureml-mlflow SDK incompatibility
+    with mlflow 3.x (azureml_artifacts_builder() rejects tracking_uri kwarg).
+
+    Args:
+        checkpoint_path: Local path to the pretrained_model directory.
+        checkpoint_name: Identifier for the checkpoint (e.g., "005000").
+        run_id: Active MLflow run ID for tagging.
+
+    Returns:
+        True if upload succeeded.
+    """
+    client = _get_aml_client()
+    if client is None:
+        return False
+
+    try:
+        from azure.ai.ml.constants import AssetTypes
+        from azure.ai.ml.entities import Data
+
+        job_name = os.environ.get("JOB_NAME", "lerobot-training")
+        data_name = f"{job_name}-checkpoint-{checkpoint_name}"
+
+        data_asset = Data(
+            path=str(checkpoint_path),
+            name=data_name,
+            description=f"Checkpoint {checkpoint_name} artifacts from run {run_id}",
+            type=AssetTypes.URI_FOLDER,
+            tags={
+                "checkpoint": checkpoint_name,
+                "run_id": run_id,
+                "job_name": job_name,
+            },
+        )
+        registered = client.data.create_or_update(data_asset)
+        print(f"[AzureML] Uploaded artifacts: {registered.name} v{registered.version} ({checkpoint_name})")
+        return True
+    except Exception as exc:
+        print(f"[AzureML] Failed to upload artifacts for {checkpoint_name}: {exc}")
+        return False
+
+
 def upload_new_checkpoints(
     run: Any,
     output_dir: Path,
@@ -102,7 +150,7 @@ def upload_new_checkpoints(
     *,
     source: str = "osmo-lerobot-training",
 ) -> None:
-    """Scan for new checkpoint directories, log artifacts to MLflow, and register via AML SDK.
+    """Scan for new checkpoint directories, upload artifacts, and register via AML SDK.
 
     Args:
         run: Active MLflow run object.
@@ -121,12 +169,17 @@ def upload_new_checkpoints(
             pretrained_dir = ckpt_dir / "pretrained_model"
             if pretrained_dir.exists() and (pretrained_dir / "model.safetensors").exists():
                 print(f"[MLflow] Uploading checkpoint: {ckpt_dir.name}")
-                artifact_path = f"checkpoints/{ckpt_dir.name}"
+
+                _upload_artifacts_via_aml(
+                    pretrained_dir,
+                    ckpt_dir.name,
+                    run.info.run_id,
+                )
+
                 try:
-                    mlflow.log_artifacts(str(pretrained_dir), artifact_path)
-                    mlflow.set_tag(f"checkpoint_{ckpt_dir.name}_artifact", artifact_path)
-                except Exception as exc:
-                    print(f"[MLflow] Failed to log artifacts for {ckpt_dir.name}: {exc}")
+                    mlflow.set_tag(f"checkpoint_{ckpt_dir.name}_uploaded", "true")
+                except Exception:
+                    pass
 
                 uploaded.add(ckpt_dir.name)
                 _register_model_via_aml(pretrained_dir, ckpt_dir.name, source=source)

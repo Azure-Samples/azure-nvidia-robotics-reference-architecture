@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Submit LeRobot behavioral cloning training to Azure ML
-# Installs LeRobot dynamically and trains ACT/Diffusion policies from HuggingFace datasets
+# Reuses src/training Python orchestrator for Azure ML MLflow logging (no wandb)
 set -o errexit -o nounset
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,6 +30,7 @@ show_help() {
 Usage: submit-azureml-lerobot-training.sh [OPTIONS] [-- az-ml-job-flags]
 
 Submit LeRobot behavioral cloning training to Azure ML.
+Uses Azure ML MLflow for logging (same orchestrator as OSMO workflow).
 
 REQUIRED:
     -d, --dataset-repo-id ID     HuggingFace dataset repository (e.g., user/dataset)
@@ -49,15 +50,20 @@ TRAINING OPTIONS:
         --lerobot-version VER     Specific LeRobot version or "latest" (default: latest)
 
 TRAINING HYPERPARAMETERS:
-        --training-steps N        Total training iterations
-        --batch-size N            Training batch size
+        --training-steps N        Total training iterations (default: 100000)
+        --batch-size N            Training batch size (default: 32)
+        --learning-rate LR        Optimizer learning rate (default: 1e-4)
+        --lr-warmup-steps N       Learning rate warmup steps (default: 1000)
         --eval-freq N             Evaluation frequency
         --save-freq N             Checkpoint save frequency (default: 5000)
 
-LOGGING OPTIONS:
-        --wandb-enable            Enable WANDB logging (default)
-        --no-wandb                Disable WANDB logging
-        --wandb-project NAME      WANDB project name (default: lerobot-training)
+VALIDATION:
+        --val-split RATIO         Validation split ratio (default: 0.1 = 10%%)
+        --no-val-split            Disable train/val splitting
+
+LOGGING:
+        --experiment-name NAME    MLflow experiment name
+        --no-system-metrics       Disable GPU/CPU/memory metrics logging
 
 CHECKPOINT REGISTRATION:
     -r, --register-checkpoint NAME  Model name for Azure ML registration
@@ -68,7 +74,6 @@ AZURE CONTEXT:
         --workspace-name NAME     Azure ML workspace
         --compute TARGET          Compute target override
         --instance-type NAME      Instance type (default: gpuspot)
-        --experiment-name NAME    Experiment name override
         --display-name NAME       Display name override
         --stream                  Stream logs after submission
 
@@ -157,13 +162,18 @@ output_dir="${OUTPUT_DIR:-/workspace/outputs/train}"
 policy_repo_id="${POLICY_REPO_ID:-}"
 lerobot_version="${LEROBOT_VERSION:-}"
 
-training_steps="${TRAINING_STEPS:-}"
-batch_size="${BATCH_SIZE:-}"
+training_steps="${TRAINING_STEPS:-100000}"
+batch_size="${BATCH_SIZE:-32}"
+learning_rate="${LEARNING_RATE:-1e-4}"
+lr_warmup_steps="${LR_WARMUP_STEPS:-1000}"
 eval_freq="${EVAL_FREQ:-}"
 save_freq="${SAVE_FREQ:-5000}"
 
-wandb_enable="${WANDB_ENABLE:-true}"
-wandb_project="${WANDB_PROJECT:-lerobot-training}"
+val_split="${VAL_SPLIT:-0.1}"
+val_split_enabled=true
+system_metrics="${SYSTEM_METRICS:-true}"
+
+experiment_name="${EXPERIMENT_NAME:-}"
 register_checkpoint="${REGISTER_CHECKPOINT:-}"
 
 subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
@@ -174,9 +184,9 @@ mlflow_timeout="${MLFLOW_HTTP_REQUEST_TIMEOUT:-60}"
 
 compute="${AZUREML_COMPUTE:-$(get_compute_target)}"
 instance_type="gpuspot"
-experiment_name=""
 display_name=""
 stream_logs=false
+
 forward_args=()
 
 #------------------------------------------------------------------------------
@@ -199,11 +209,14 @@ while [[ $# -gt 0 ]]; do
     --lerobot-version)            lerobot_version="$2"; shift 2 ;;
     --training-steps)             training_steps="$2"; shift 2 ;;
     --batch-size)                 batch_size="$2"; shift 2 ;;
+    --learning-rate)              learning_rate="$2"; shift 2 ;;
+    --lr-warmup-steps)            lr_warmup_steps="$2"; shift 2 ;;
     --eval-freq)                  eval_freq="$2"; shift 2 ;;
     --save-freq)                  save_freq="$2"; shift 2 ;;
-    --wandb-enable)               wandb_enable="true"; shift ;;
-    --no-wandb)                   wandb_enable="false"; shift ;;
-    --wandb-project)              wandb_project="$2"; shift 2 ;;
+    --val-split)                  val_split="$2"; shift 2 ;;
+    --no-val-split)               val_split_enabled=false; shift ;;
+    --no-system-metrics)          system_metrics="false"; shift ;;
+    --experiment-name)            experiment_name="$2"; shift 2 ;;
     -r|--register-checkpoint)     register_checkpoint="$2"; shift 2 ;;
     --subscription-id)            subscription_id="$2"; shift 2 ;;
     --resource-group)             resource_group="$2"; shift 2 ;;
@@ -212,7 +225,6 @@ while [[ $# -gt 0 ]]; do
     --mlflow-http-timeout)        mlflow_timeout="$2"; shift 2 ;;
     --compute)                    compute="$2"; shift 2 ;;
     --instance-type)              instance_type="$2"; shift 2 ;;
-    --experiment-name)            experiment_name="$2"; shift 2 ;;
     --display-name)               display_name="$2"; shift 2 ;;
     --stream)                     stream_logs=true; shift ;;
     --)                           shift; forward_args=("$@"); break ;;
@@ -231,11 +243,15 @@ ensure_ml_extension
 [[ -n "$subscription_id" ]] || fatal "AZURE_SUBSCRIPTION_ID required"
 [[ -n "$resource_group" ]] || fatal "AZURE_RESOURCE_GROUP required"
 [[ -n "$workspace_name" ]] || fatal "AZUREML_WORKSPACE_NAME required"
+[[ -n "$compute" ]] || fatal "Compute target required (set AZUREML_COMPUTE or ensure Terraform outputs are available)"
+[[ -d "$REPO_ROOT/src/training" ]] || fatal "Directory src/training not found"
 
 case "$policy_type" in
   act|diffusion) ;;
   *) fatal "Unsupported policy type: $policy_type (use: act, diffusion)" ;;
 esac
+
+[[ "$val_split_enabled" == "false" ]] && val_split="0"
 
 #------------------------------------------------------------------------------
 # Register Environment
@@ -260,99 +276,76 @@ fi
 #------------------------------------------------------------------------------
 # Build Training Command
 #
-# The AzureML job runs a training entry script that:
-# 1. Installs LeRobot via uv pip
-# 2. Authenticates with HuggingFace Hub
-# 3. Configures MLflow tracking
-# 4. Runs lerobot-train with appropriate arguments
-# 5. Registers the final checkpoint to Azure ML
+# Mirrors the OSMO workflow entry script:
+# 1. Installs system dependencies and LeRobot via uv
+# 2. Sets PYTHONPATH to include code snapshot (src/training, src/common)
+# 3. Runs training via Python orchestrator with Azure ML MLflow logging
+# 4. Registers checkpoints to Azure ML model registry
 #------------------------------------------------------------------------------
 
-# Build the inline training command
 train_cmd='bash -c '"'"'
 set -euo pipefail
 
 echo "=== LeRobot AzureML Training ==="
+echo "Dataset: ${DATASET_REPO_ID}"
+echo "Policy Type: ${POLICY_TYPE}"
+echo "Job Name: ${JOB_NAME}"
+echo "Output Dir: ${OUTPUT_DIR}"
+echo "Logging: Azure ML MLflow"
+echo "Val Split: ${VAL_SPLIT:-0.1}"
+echo "System Metrics: ${SYSTEM_METRICS:-true}"
 
-# Install uv and LeRobot
-apt-get update -qq && apt-get install -y -qq ffmpeg git build-essential > /dev/null 2>&1
+# Install system dependencies
+echo "Installing system dependencies..."
+apt-get update -qq && apt-get install -y -qq \
+  ffmpeg \
+  libgl1-mesa-glx \
+  libglib2.0-0 \
+  build-essential \
+  gcc \
+  unzip \
+  python3-dev \
+  > /dev/null 2>&1
+
+# Install UV package manager
+echo "Installing UV package manager..."
 pip install --quiet uv
 
-LEROBOT_VER="${LEROBOT_VERSION:-}"
-if [[ -n "$LEROBOT_VER" && "$LEROBOT_VER" != "latest" ]]; then
-  uv pip install "lerobot==${LEROBOT_VER}" wandb huggingface-hub azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0" --system
-else
-  uv pip install lerobot wandb huggingface-hub azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0" --system
+# Install LeRobot and Azure ML dependencies
+LEROBOT_PKG="lerobot"
+if [[ -n "${LEROBOT_VERSION:-}" && "${LEROBOT_VERSION}" != "latest" ]]; then
+  LEROBOT_PKG="lerobot==${LEROBOT_VERSION}"
 fi
 
-# HuggingFace auth
-if [[ -n "${HF_TOKEN:-}" ]]; then
-  python3 -c "from huggingface_hub import login; login(token=\"${HF_TOKEN}\", add_to_git_credential=False)"
-fi
-
-# Build lerobot-train args
-train_args=(
-  --dataset.repo_id="${DATASET_REPO_ID}"
-  --policy.type="${POLICY_TYPE}"
-  --output_dir="${OUTPUT_DIR}"
-  --job_name="${JOB_NAME}"
-  --policy.device=cuda
+PIP_PACKAGES=(
+  "${LEROBOT_PKG}" huggingface-hub
+  azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0,<3.0.0"
+  psutil pynvml
 )
 
-if [[ "${WANDB_ENABLE:-true}" == "true" ]]; then
-  train_args+=(--wandb.enable=true)
-  [[ -n "${WANDB_PROJECT:-}" ]] && train_args+=(--wandb.project="${WANDB_PROJECT}")
+echo "Installing LeRobot ${LEROBOT_VERSION:-latest} and dependencies..."
+if command -v uv &>/dev/null; then
+  uv pip install "${PIP_PACKAGES[@]}" --system
 else
-  train_args+=(--wandb.enable=false)
+  pip install --quiet --no-cache-dir "${PIP_PACKAGES[@]}"
 fi
 
-[[ -n "${POLICY_REPO_ID:-}" ]] && train_args+=(--policy.repo_id="${POLICY_REPO_ID}")
-[[ -n "${TRAINING_STEPS:-}" ]] && train_args+=(--steps="${TRAINING_STEPS}")
-[[ -n "${BATCH_SIZE:-}" ]] && train_args+=(--batch_size="${BATCH_SIZE}")
-[[ -n "${EVAL_FREQ:-}" ]] && train_args+=(--eval_freq="${EVAL_FREQ}")
-[[ -n "${SAVE_FREQ:-}" ]] && train_args+=(--save_freq="${SAVE_FREQ}")
+# The code snapshot (src/) is mounted at the working directory by Azure ML
+export PYTHONPATH=".:${PYTHONPATH:-}"
+echo "Training modules available via code snapshot"
 
-echo "Running: lerobot-train ${train_args[*]}"
-lerobot-train "${train_args[@]}"
+# Run training via Python orchestrator
+echo "Starting LeRobot training..."
+python3 -m training.scripts.lerobot.train
 
 echo "=== Training Complete ==="
+ls -la "${OUTPUT_DIR}/" 2>/dev/null || true
 
-# Register checkpoint
-if [[ -n "${REGISTER_CHECKPOINT:-}" ]]; then
-  echo "Registering checkpoint to Azure ML..."
-  python3 -c "
-import os, sys
-from pathlib import Path
-from azure.ai.ml import MLClient
-from azure.ai.ml.entities import Model
-from azure.ai.ml.constants import AssetTypes
-from azure.identity import DefaultAzureCredential
-
-output_dir = Path(os.environ[\"OUTPUT_DIR\"])
-checkpoint_dirs = sorted(output_dir.glob(\"checkpoints/*\"), key=lambda p: p.stat().st_mtime, reverse=True)
-if not checkpoint_dirs:
-    pretrained = output_dir / \"pretrained_model\"
-    checkpoint_path = pretrained if pretrained.exists() else None
-else:
-    pretrained = checkpoint_dirs[0] / \"pretrained_model\"
-    checkpoint_path = pretrained if pretrained.exists() else checkpoint_dirs[0]
-
-if not checkpoint_path:
-    print(\"No checkpoints found\"); sys.exit(0)
-
-policy_type = os.environ.get(\"POLICY_TYPE\", \"act\")
-credential = DefaultAzureCredential()
-client = MLClient(credential, os.environ[\"AZURE_SUBSCRIPTION_ID\"], os.environ[\"AZURE_RESOURCE_GROUP\"], os.environ[\"AZUREML_WORKSPACE_NAME\"])
-model = Model(
-    path=str(checkpoint_path),
-    name=os.environ[\"REGISTER_CHECKPOINT\"],
-    description=\"LeRobot %s policy\" % policy_type,
-    type=AssetTypes.CUSTOM_MODEL,
-    tags={\"framework\": \"lerobot\", \"policy_type\": policy_type, \"source\": \"azureml-job\"},
-)
-registered = client.models.create_or_update(model)
-print(f\"Model registered: {registered.name} v{registered.version}\")
-"
+# Upload checkpoints to Azure ML model registry
+if [[ -n "${REGISTER_CHECKPOINT:-}" && -n "${AZURE_SUBSCRIPTION_ID:-}" && -n "${AZURE_RESOURCE_GROUP:-}" && -n "${AZUREML_WORKSPACE_NAME:-}" ]]; then
+  echo "=== Uploading Checkpoints to Azure ML ==="
+  python3 -c "from training.scripts.lerobot.checkpoints import upload_checkpoints_to_azure_ml; upload_checkpoints_to_azure_ml()"
+  echo "=== Checkpoint Upload Complete ==="
 fi
 '"'"''
 
@@ -366,46 +359,41 @@ az_args=(
   --workspace-name "$workspace_name"
   --file "$job_file"
   --set "environment=azureml:${environment_name}:${environment_version}"
+  --set "code=$REPO_ROOT/src"
 )
 
 [[ -n "$compute" ]] && az_args+=(--set "compute=$compute")
 [[ -n "$instance_type" ]] && az_args+=(--set "resources.instance_type=$instance_type")
-[[ -n "$experiment_name" ]] && az_args+=(--set "experiment_name=$experiment_name")
 [[ -n "$display_name" ]] && az_args+=(--set "display_name=$display_name")
 
 az_args+=(--set "command=$train_cmd")
 
-# Input values
+# Environment variables — all set directly via --set flags
 az_args+=(
-  --set "inputs.dataset_repo_id=$dataset_repo_id"
-  --set "inputs.policy_type=$policy_type"
-  --set "inputs.job_name=$job_name"
-  --set "inputs.output_dir=$output_dir"
-  --set "inputs.save_freq=$save_freq"
-  --set "inputs.wandb_enable=$wandb_enable"
-  --set "inputs.wandb_project=$wandb_project"
-  --set "inputs.subscription_id=$subscription_id"
-  --set "inputs.resource_group=$resource_group"
-  --set "inputs.workspace_name=$workspace_name"
-  --set "inputs.mlflow_token_refresh_retries=$mlflow_retries"
-  --set "inputs.mlflow_http_request_timeout=$mlflow_timeout"
-)
-
-[[ -n "$policy_repo_id" ]]      && az_args+=(--set "inputs.policy_repo_id=$policy_repo_id")
-[[ -n "$lerobot_version" ]]     && az_args+=(--set "inputs.lerobot_version=$lerobot_version")
-[[ -n "$training_steps" ]]      && az_args+=(--set "inputs.training_steps=$training_steps")
-[[ -n "$batch_size" ]]          && az_args+=(--set "inputs.batch_size=$batch_size")
-[[ -n "$eval_freq" ]]           && az_args+=(--set "inputs.eval_freq=$eval_freq")
-[[ -n "$register_checkpoint" ]] && az_args+=(--set "inputs.register_checkpoint=$register_checkpoint")
-
-# Environment variables
-az_args+=(
+  --set "environment_variables.DATASET_REPO_ID=$dataset_repo_id"
+  --set "environment_variables.POLICY_TYPE=$policy_type"
+  --set "environment_variables.JOB_NAME=$job_name"
+  --set "environment_variables.OUTPUT_DIR=$output_dir"
+  --set "environment_variables.TRAINING_STEPS=$training_steps"
+  --set "environment_variables.BATCH_SIZE=$batch_size"
+  --set "environment_variables.LEARNING_RATE=$learning_rate"
+  --set "environment_variables.LR_WARMUP_STEPS=$lr_warmup_steps"
+  --set "environment_variables.SAVE_FREQ=$save_freq"
+  --set "environment_variables.VAL_SPLIT=$val_split"
+  --set "environment_variables.SYSTEM_METRICS=$system_metrics"
   --set "environment_variables.AZURE_SUBSCRIPTION_ID=$subscription_id"
   --set "environment_variables.AZURE_RESOURCE_GROUP=$resource_group"
   --set "environment_variables.AZUREML_WORKSPACE_NAME=$workspace_name"
   --set "environment_variables.MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES=$mlflow_retries"
   --set "environment_variables.MLFLOW_HTTP_REQUEST_TIMEOUT=$mlflow_timeout"
 )
+
+# Optional environment variables — only set when non-empty
+[[ -n "$policy_repo_id" ]]      && az_args+=(--set "environment_variables.POLICY_REPO_ID=$policy_repo_id")
+[[ -n "$lerobot_version" ]]     && az_args+=(--set "environment_variables.LEROBOT_VERSION=$lerobot_version")
+[[ -n "$eval_freq" ]]           && az_args+=(--set "environment_variables.EVAL_FREQ=$eval_freq")
+[[ -n "$experiment_name" ]]     && az_args+=(--set "environment_variables.EXPERIMENT_NAME=$experiment_name")
+[[ -n "$register_checkpoint" ]] && az_args+=(--set "environment_variables.REGISTER_CHECKPOINT=$register_checkpoint")
 
 [[ ${#forward_args[@]} -gt 0 ]] && az_args+=("${forward_args[@]}")
 az_args+=(--query "name" -o "tsv")
@@ -419,6 +407,14 @@ info "  Dataset: $dataset_repo_id"
 info "  Policy: $policy_type"
 info "  Job Name: $job_name"
 info "  Image: $image"
+info "  Logging: Azure MLflow"
+info "  Training Steps: $training_steps"
+info "  Batch Size: $batch_size"
+info "  Learning Rate: $learning_rate"
+info "  Val Split: $val_split"
+info "  System Metrics: $system_metrics"
+[[ -n "$policy_repo_id" ]] && info "  Fine-tune from: $policy_repo_id"
+[[ -n "$register_checkpoint" ]] && info "  Register model: $register_checkpoint"
 
 job_result=$("${az_args[@]}") || fatal "Job submission failed"
 
