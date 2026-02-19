@@ -7,9 +7,13 @@ BeforeAll {
     Import-Module $modulePath -Force
 }
 
+AfterAll {
+    Remove-Module 'LintingHelpers' -Force -ErrorAction SilentlyContinue
+}
+
 #region Get-ChangedFilesFromGit Tests
 
-Describe 'Get-ChangedFilesFromGit' {
+Describe 'Get-ChangedFilesFromGit' -Tag 'Unit' {
     Context 'Merge-base succeeds' {
         BeforeEach {
             $changedFiles = @('scripts/test.ps1', 'docs/readme.md', 'config/settings.json')
@@ -311,7 +315,7 @@ Describe 'Get-ChangedFilesFromGit' {
 
 #region Get-FilesRecursive Tests
 
-Describe 'Get-FilesRecursive' {
+Describe 'Get-FilesRecursive' -Tag 'Unit' {
     Context 'Basic file enumeration' {
         BeforeEach {
             New-Item -Path 'TestDrive:/scripts' -ItemType Directory -Force | Out-Null
@@ -421,7 +425,7 @@ Describe 'Get-FilesRecursive' {
 
 #region Get-GitIgnorePatterns Tests
 
-Describe 'Get-GitIgnorePatterns' {
+Describe 'Get-GitIgnorePatterns' -Tag 'Unit' {
     Context 'Non-existent file' {
         It 'Returns empty for non-existent file' {
             $result = Get-GitIgnorePatterns -GitIgnorePath 'TestDrive:/nonexistent/.gitignore'

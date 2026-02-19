@@ -522,20 +522,22 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
         Mock Set-CIOutput {} -Verifiable
         Mock Set-CIEnv {} -Verifiable
         Mock Write-CIStepSummary {} -Verifiable
+
+        # Default script-scope parameters for Invoke-Validation
+        $script:Paths = @()
+        $script:Files = @()
+        $script:ExcludePaths = @()
+        $script:ChangedFilesOnly = $false
+        $script:BaseBranch = 'main'
+        $script:EnableSchemaValidation = $false
+        $script:SoftFail = $false
+        $script:WarningsAsErrors = $false
+        $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
     }
 
     Context 'No files to validate' {
         It 'exits early when no markdown files found' {
-            # Set script-scope params for Invoke-Validation
             $script:Paths = @($TestDrive)
-            $script:Files = @()
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
 
             # TestDrive has no .md files by default
             Invoke-Validation
@@ -546,18 +548,8 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
     Context 'Valid files' {
         It 'validates fixture files without errors' {
             $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
-            $script:Paths = @()
             $script:Files = @($validFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
 
-            # This will exercise the main validation path
-            # Asserts that validation completes without throwing for a valid fixture file
             { Invoke-Validation } | Should -Not -Throw
         }
     }
@@ -565,15 +557,7 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
     Context 'CI output integration' {
         It 'calls Set-CIOutput with expected output names' {
             $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
-            $script:Paths = @()
             $script:Files = @($validFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
 
             Invoke-Validation
 
@@ -585,15 +569,7 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
 
         It 'calls Write-CIStepSummary with markdown content' {
             $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
-            $script:Paths = @()
             $script:Files = @($validFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
 
             Invoke-Validation
 
@@ -608,14 +584,7 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
             $tempLogsDir = Join-Path $TestDrive 'logs'
             New-Item -ItemType Directory -Path $tempLintingDir -Force | Out-Null
 
-            $script:Paths = @()
             $script:Files = @($validFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $false
             $script:scriptRoot = $tempLintingDir
 
             Invoke-Validation
@@ -639,14 +608,8 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
             $badFile = Join-Path $tempDocsDir 'missing-frontmatter.md'
             Copy-Item (Join-Path $script:FixtureDir 'missing-frontmatter.md') -Destination $badFile
 
-            $script:Paths = @()
             $script:Files = @($badFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
             $script:SoftFail = $true
-            $script:WarningsAsErrors = $false
             $script:scriptRoot = $tempScriptsLinting
 
             Invoke-Validation
@@ -658,15 +621,8 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
     Context 'Multiple fixture files' {
         It 'validates all fixture files and produces summary' {
             $fixtures = Get-ChildItem -Path $script:FixtureDir -Filter '*.md' | Select-Object -ExpandProperty FullName
-            $script:Paths = @()
             $script:Files = $fixtures
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
             $script:SoftFail = $true
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
 
             Invoke-Validation
 
@@ -681,14 +637,8 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
             $tempScriptsLinting = Join-Path $TestDrive 'softfail-scripts' 'linting'
             New-Item -ItemType Directory -Path $tempScriptsLinting -Force | Out-Null
 
-            $script:Paths = @()
             $script:Files = @($badFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
             $script:SoftFail = $true
-            $script:WarningsAsErrors = $false
             $script:scriptRoot = $tempScriptsLinting
 
             { Invoke-Validation } | Should -Not -Throw
@@ -700,14 +650,8 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
             $tempScriptsLinting = Join-Path $TestDrive 'softfail-out-scripts' 'linting'
             New-Item -ItemType Directory -Path $tempScriptsLinting -Force | Out-Null
 
-            $script:Paths = @()
             $script:Files = @($badFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
             $script:SoftFail = $true
-            $script:WarningsAsErrors = $false
             $script:scriptRoot = $tempScriptsLinting
 
             Invoke-Validation
@@ -718,20 +662,44 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
     }
 
     Context 'WarningsAsErrors promotes warnings to errors' {
-        It 'sets WarningsAsErrors flag for validation run' {
-            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
-            $script:Paths = @()
-            $script:Files = @($validFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $true
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+        It 'promotes warnings to effective errors and sets failure env' {
+            $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+            $tempScriptsLinting = Join-Path $tempRoot 'scripts' 'linting'
+            $tempDocsDir = Join-Path $tempRoot 'docs'
+            New-Item -ItemType Directory -Path $tempScriptsLinting -Force | Out-Null
+            New-Item -ItemType Directory -Path $tempDocsDir -Force | Out-Null
 
-            { Invoke-Validation } | Should -Not -Throw
-            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-issues' }
+            $warningFile = Join-Path $tempDocsDir 'warning-author-empty.md'
+            Copy-Item (Join-Path $script:FixtureDir 'warning-author-empty.md') -Destination $warningFile
+
+            $script:Files = @($warningFile)
+            $script:WarningsAsErrors = $true
+            $script:SoftFail = $true
+            $script:scriptRoot = $tempScriptsLinting
+
+            Invoke-Validation
+
+            Should -Invoke Set-CIEnv -ParameterFilter { $Name -eq 'FRONTMATTER_VALIDATION_FAILED' -and $Value -eq 'true' }
+        }
+
+        It 'does not set failure env for warnings when WarningsAsErrors is false' {
+            $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+            $tempScriptsLinting = Join-Path $tempRoot 'scripts' 'linting'
+            $tempDocsDir = Join-Path $tempRoot 'docs'
+            New-Item -ItemType Directory -Path $tempScriptsLinting -Force | Out-Null
+            New-Item -ItemType Directory -Path $tempDocsDir -Force | Out-Null
+
+            $warningFile = Join-Path $tempDocsDir 'warning-author-empty.md'
+            Copy-Item (Join-Path $script:FixtureDir 'warning-author-empty.md') -Destination $warningFile
+
+            $script:Files = @($warningFile)
+            $script:SoftFail = $true
+            $script:scriptRoot = $tempScriptsLinting
+
+            Invoke-Validation
+
+            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'total-warnings' }
+            Should -Not -Invoke Set-CIEnv -ParameterFilter { $Name -eq 'FRONTMATTER_VALIDATION_FAILED' }
         }
     }
 
@@ -741,14 +709,6 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
             New-Item -Path $emptyDir -ItemType Directory -Force
 
             $script:Paths = @($emptyDir)
-            $script:Files = @()
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
 
             Invoke-Validation
 
@@ -760,36 +720,34 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
     }
 
     Context 'EnableSchemaValidation overlay orchestration' {
-        It 'validates schema when EnableSchemaValidation is set' -Skip:(-not $SchemaAvailable) {
-            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
-            $script:Paths = @()
-            $script:Files = @($validFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $true
-            $script:SoftFail = $true
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
-
-            { Invoke-Validation } | Should -Not -Throw
-            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' }
+        BeforeEach {
+            Mock Initialize-JsonSchemaValidation {
+                return @{
+                    Mapping  = [PSCustomObject]@{ mappings = @() }
+                    Schemas  = @{}
+                    BasePath = $TestDrive
+                }
+            }
         }
 
-        It 'skips schema validation when switch is not set' {
+        It 'invokes Initialize-JsonSchemaValidation when enabled' {
             $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
-            $script:Paths = @()
             $script:Files = @($validFile)
-            $script:ExcludePaths = @()
-            $script:ChangedFilesOnly = $false
-            $script:BaseBranch = 'main'
-            $script:EnableSchemaValidation = $false
-            $script:SoftFail = $false
-            $script:WarningsAsErrors = $false
-            $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
+            $script:EnableSchemaValidation = $true
+            $script:SoftFail = $true
 
-            { Invoke-Validation } | Should -Not -Throw
-            Should -Invoke Set-CIOutput -ParameterFilter { $Name -eq 'files-checked' }
+            Invoke-Validation
+
+            Should -Invoke Initialize-JsonSchemaValidation -Times 1
+        }
+
+        It 'does not invoke Initialize-JsonSchemaValidation when disabled' {
+            $validFile = Join-Path $script:FixtureDir 'valid-docs.md'
+            $script:Files = @($validFile)
+
+            Invoke-Validation
+
+            Should -Invoke Initialize-JsonSchemaValidation -Times 0
         }
     }
 }
