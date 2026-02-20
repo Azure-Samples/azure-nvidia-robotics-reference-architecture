@@ -214,6 +214,41 @@ All contributions require appropriate tests. This policy supports code quality a
 - Bug fixes require regression tests that reproduce the fixed behavior.
 - Refactoring changes must not reduce test coverage.
 
+### Regression Testing
+
+At least half of all bug fix PRs must include a regression test.
+
+A regression test is required when:
+
+- The bug affected user-facing functionality
+- The fix changes control flow
+- The bug could reasonably recur
+
+A regression test may be omitted when:
+
+- The bug was in documentation only
+- The fix is purely cosmetic (whitespace, formatting)
+- A test is technically impractical (requires external services that cannot be mocked)
+
+#### What Counts as a Regression Test
+
+| Test Type                              | Counts as Regression Test                |
+|----------------------------------------|------------------------------------------|
+| Unit test verifying the fix            | Yes                                      |
+| Integration test covering the scenario | Yes                                      |
+| Manual test documented in PR           | Only if automated test is impractical    |
+| Informal local verification            | No                                       |
+
+#### Bug Fix PR Requirements
+
+When submitting a bug fix:
+
+1. Link to the issue being fixed
+2. Include a regression test, or document why one is omitted
+3. Describe what the test verifies
+
+Reviewers verify regression tests are included. Compliance is tracked over time via PR labels (`has-regression-test`, `regression-test-omitted`).
+
 ### Running Tests
 
 Once a `tests/` directory exists, run the full test suite:
