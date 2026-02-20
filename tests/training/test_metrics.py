@@ -167,8 +167,7 @@ def test_extract_from_value_covers_scalar_array_and_failure_branches(
             return 2
 
     class BadFloat:
-        def __float__(self) -> float:
-            raise TypeError("cannot convert")
+        pass
 
     def _fake_numpy_extract(name: str, value: object, output: dict[str, float]) -> None:
         output[f"{name}/mean"] = 5.0

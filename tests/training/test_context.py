@@ -4,7 +4,6 @@ import importlib
 import sys
 import types
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -43,16 +42,13 @@ sys.modules.setdefault("azure.identity", azure_identity_module)
 sys.modules.setdefault("mlflow", mlflow_module)
 
 context_module = importlib.import_module("training.utils.context")
-AzureConfigError = context_module.AzureConfigError
-AzureStorageContext = context_module.AzureStorageContext
-bootstrap_azure_ml = context_module.bootstrap_azure_ml
 
 
 def test_bootstrap_azure_ml_success_returns_context(monkeypatch: pytest.MonkeyPatch) -> None:
     credential = object()
     storage = object()
     mlflow_tracking_uri = "https://mlflow.example"
-    workspace = SimpleNamespace(mlflow_tracking_uri=mlflow_tracking_uri)
+    workspace = types.SimpleNamespace(mlflow_tracking_uri=mlflow_tracking_uri)
 
     require_env_values = {
         "AZURE_SUBSCRIPTION_ID": "sub-id",
@@ -61,7 +57,7 @@ def test_bootstrap_azure_ml_success_returns_context(monkeypatch: pytest.MonkeyPa
     }
 
     def mock_require_env(name: str, *, error_type: type[Exception] = RuntimeError) -> str:
-        assert error_type is AzureConfigError
+        assert error_type is context_module.AzureConfigError
         return require_env_values[name]
 
     set_defaults_mock = Mock()
@@ -86,7 +82,7 @@ def test_bootstrap_azure_ml_success_returns_context(monkeypatch: pytest.MonkeyPa
         build_storage_context_mock,
     )
 
-    result = bootstrap_azure_ml(experiment_name="exp-name")
+    result = context_module.bootstrap_azure_ml(experiment_name="exp-name")
 
     ml_client_constructor.assert_called_once_with(
         credential=credential,
@@ -140,7 +136,7 @@ def test_bootstrap_azure_ml_setup_failures_raise_azure_config_error(
     monkeypatch.setattr(context_module, "set_env_defaults", Mock())
     monkeypatch.setattr(context_module, "_build_credential", Mock(return_value=object()))
 
-    workspace = SimpleNamespace(mlflow_tracking_uri="https://mlflow.example")
+    workspace = types.SimpleNamespace(mlflow_tracking_uri="https://mlflow.example")
     ml_client_mock = Mock()
     ml_client_mock.workspaces.get.return_value = workspace
     monkeypatch.setattr(context_module, "MLClient", Mock(return_value=ml_client_mock))
@@ -150,8 +146,8 @@ def test_bootstrap_azure_ml_setup_failures_raise_azure_config_error(
 
     setup_patch(monkeypatch)
 
-    with pytest.raises(AzureConfigError, match=message_fragment):
-        bootstrap_azure_ml(experiment_name="exp-name")
+    with pytest.raises(context_module.AzureConfigError, match=message_fragment):
+        context_module.bootstrap_azure_ml(experiment_name="exp-name")
 
 
 def test_azure_storage_context_upload_file_happy_path(tmp_path: Path) -> None:
@@ -168,7 +164,7 @@ def test_azure_storage_context_upload_file_happy_path(tmp_path: Path) -> None:
     blob_mock.upload_blob.side_effect = capture_upload
     blob_client_mock = Mock()
     blob_client_mock.get_blob_client.return_value = blob_mock
-    storage_context = AzureStorageContext(
+    storage_context = context_module.AzureStorageContext(
         blob_client=blob_client_mock,
         container_name="container-a",
     )
@@ -188,7 +184,7 @@ def test_azure_storage_context_upload_file_happy_path(tmp_path: Path) -> None:
 
 
 def test_azure_storage_context_upload_file_missing_file_raises(tmp_path: Path) -> None:
-    storage_context = AzureStorageContext(
+    storage_context = context_module.AzureStorageContext(
         blob_client=Mock(),
         container_name="container-a",
     )
@@ -205,14 +201,14 @@ def test_upload_files_batch_continues_on_error_and_aggregates(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    storage_context = AzureStorageContext(blob_client=Mock(), container_name="container-a")
+    storage_context = context_module.AzureStorageContext(blob_client=Mock(), container_name="container-a")
 
     def mock_upload_file(self, *, local_path: str, blob_name: str) -> str:
         if local_path.endswith("bad.ckpt"):
             raise RuntimeError("upload failed")
         return blob_name
 
-    monkeypatch.setattr(AzureStorageContext, "upload_file", mock_upload_file)
+    monkeypatch.setattr(context_module.AzureStorageContext, "upload_file", mock_upload_file)
 
     files = [
         ("/tmp/good-a.ckpt", "checkpoints/good-a.ckpt"),
@@ -231,13 +227,13 @@ def test_upload_files_batch_continues_on_error_and_aggregates(
 def test_upload_checkpoint_wires_blob_name_and_propagates_upload_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    storage_context = AzureStorageContext(blob_client=Mock(), container_name="container-a")
+    storage_context = context_module.AzureStorageContext(blob_client=Mock(), container_name="container-a")
     upload_file_mock = Mock(return_value="checkpoints/model-a/20260219_101112_step_42.pt")
 
     def patched_upload_file(self, *, local_path: str, blob_name: str) -> str:
         return upload_file_mock(local_path=local_path, blob_name=blob_name)
 
-    monkeypatch.setattr(AzureStorageContext, "upload_file", patched_upload_file)
+    monkeypatch.setattr(context_module.AzureStorageContext, "upload_file", patched_upload_file)
 
     fake_now = Mock()
     fake_now.strftime.return_value = "20260219_101112"
