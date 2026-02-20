@@ -28,6 +28,7 @@ dev = ["pytest", "ruff", "mypy"]
 ur10e-deploy = "ur10e_deploy.main:main"
 ur10e-replay = "ur10e_deploy.replay:main"
 ur10e-rosbag-replay = "ur10e_deploy.rosbag_replay:main"
+ur10e-offline-eval = "ur10e_deploy.offline_eval:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

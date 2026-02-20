@@ -69,17 +69,23 @@ class PolicyRunner:
     # ------------------------------------------------------------------
 
     def load(self) -> None:
-        """Load the ACT policy and pre/post processors from checkpoint.
+        """Load the ACT policy from a pretrained checkpoint.
 
-        Uses a Windows-compatible workaround for draccus temp-file
-        locking issues in ``PreTrainedConfig.from_pretrained``.
+        Supports two checkpoint formats:
+
+        1. **Training checkpoint** (e.g. ``050000/pretrained_model``):
+           Contains ``config.json``, ``model.safetensors``, and
+           ``train_config.json``.  Normalization statistics (mean/std)
+           are embedded in the model weights inside the
+           ``normalize_inputs``, ``normalize_targets``, and
+           ``unnormalize_outputs`` ParameterDict buffers.  No separate
+           preprocessor/postprocessor files are needed.
+
+        2. **Converted checkpoint** (e.g. ``pretrained_model/`` with
+           ``policy_preprocessor_*.safetensors``):
+           Normalization stats live in separate safetensors files and
+           are injected into the loaded model after ``from_pretrained``.
         """
-        import json
-        import os
-        import tempfile
-
-        import draccus
-        from lerobot.configs.policies import PreTrainedConfig
         from lerobot.policies.act.modeling_act import ACTPolicy
 
         checkpoint_dir = Path(self.cfg.checkpoint_dir).resolve()
@@ -89,65 +95,21 @@ class PolicyRunner:
             )
         logger.info("Loading ACT policy from %s ...", checkpoint_dir)
 
-        # --- Load config (Windows-safe) ---
-        # PreTrainedConfig.from_pretrained uses NamedTemporaryFile which
-        # causes PermissionError on Windows.  Parse the config manually.
-        config_file = str(checkpoint_dir / "config.json")
+        self._policy = ACTPolicy.from_pretrained(str(checkpoint_dir))
 
-        with open(config_file) as f:
-            raw_config = json.load(f)
-
-        # Resolve the concrete config subclass from the "type" discriminator
-        # without going through draccus (which rejects unknown fields).
-        import dataclasses
-
-        config_type_name = raw_config.get("type")
-        if config_type_name is None:
-            raise ValueError("config.json missing 'type' field")
-
-        # Map policy type name → concrete config class
-        _CONFIG_CLASSES = {
-            "act": "lerobot.policies.act.configuration_act.ACTConfig",
-            "diffusion": "lerobot.policies.diffusion.configuration_diffusion.DiffusionConfig",
-            "tdmpc": "lerobot.policies.tdmpc.configuration_tdmpc.TDMPCConfig",
-            "vqbet": "lerobot.policies.vqbet.configuration_vqbet.VQBeTConfig",
-        }
-
-        import importlib
-        module_path = _CONFIG_CLASSES.get(config_type_name)
-        if module_path is None:
-            raise ValueError(f"Unknown policy type: {config_type_name}")
-        mod_name, cls_name = module_path.rsplit(".", 1)
-        concrete_cls = getattr(importlib.import_module(mod_name), cls_name)
-
-        # Strip "type" discriminator and any fields not in the concrete class
-        raw_config.pop("type", None)
-        valid_fields = {fld.name for fld in dataclasses.fields(concrete_cls)}
-        unknown = set(raw_config.keys()) - valid_fields
-        for key in unknown:
-            logger.warning("Stripping unknown config field: %s", key)
-            raw_config.pop(key)
-
-        tmp_path = os.path.join(tempfile.gettempdir(), "_lerobot_cfg.json")
-        with open(tmp_path, "w") as f:
-            json.dump(raw_config, f)
-        try:
-            with draccus.config_type("json"):
-                policy_cfg = draccus.parse(concrete_cls, tmp_path, args=[])
-        finally:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
-        # Load policy with pre-parsed config (bypasses the buggy path)
-        self._policy = ACTPolicy.from_pretrained(
-            str(checkpoint_dir), config=policy_cfg
-        )
-
-        # --- Load normalization stats from preprocessor/postprocessor ---
-        # model.safetensors doesn't include these; they're in separate files.
-        self._load_norm_stats(checkpoint_dir)
+        # If the checkpoint has separate preprocessor/postprocessor
+        # safetensors files (converted-checkpoint format), load those
+        # stats and inject them into the model.  Training checkpoints
+        # already embed normalization in model.safetensors so this
+        # step is a no-op for them.
+        pre_file = checkpoint_dir / "policy_preprocessor_step_3_normalizer_processor.safetensors"
+        if pre_file.exists():
+            self._load_norm_stats(checkpoint_dir)
+        else:
+            logger.info(
+                "No separate preprocessor files found — "
+                "using normalization stats embedded in model weights"
+            )
 
         self._policy.to(self._device)
         self._policy.eval()
