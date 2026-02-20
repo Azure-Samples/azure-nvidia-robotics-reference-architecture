@@ -163,6 +163,7 @@ Describe 'ConvertTo-AzureDevOpsEscaped' {
 Describe 'Get-CIPlatform' {
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
     }
 
     AfterEach {
@@ -232,6 +233,7 @@ Describe 'Get-CIPlatform' {
 Describe 'Test-CIEnvironment' {
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
     }
 
     AfterEach {
@@ -269,6 +271,7 @@ Describe 'Set-CIOutput' {
 
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
         if (Test-Path $script:testOutputFile) {
             Remove-Item $script:testOutputFile -Force
         }
@@ -386,6 +389,7 @@ Describe 'Set-CIEnv' {
 
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
         if (Test-Path $script:testEnvFile) {
             Remove-Item $script:testEnvFile -Force
         }
@@ -529,6 +533,7 @@ Describe 'Write-CIStepSummary' {
 
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
         if (Test-Path $script:testSummaryFile) {
             Remove-Item $script:testSummaryFile -Force
         }
@@ -641,6 +646,7 @@ Describe 'Write-CIStepSummary' {
 Describe 'Write-CIAnnotation' {
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
     }
 
     AfterEach {
@@ -1061,6 +1067,7 @@ Describe 'Write-CIAnnotations' {
 Describe 'Set-CITaskResult' {
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
     }
 
     AfterEach {
@@ -1154,6 +1161,7 @@ Describe 'Publish-CIArtifact' {
 
     BeforeEach {
         Save-CIEnvironment
+        Clear-MockCIEnvironment
         New-Item -Path $script:testArtifactFile -ItemType File -Force | Out-Null
         if (Test-Path $script:testOutputFile) {
             Remove-Item $script:testOutputFile -Force
