@@ -53,9 +53,7 @@ FPS = 30
 # ------------------------------------------------------------------
 
 
-def load_episode_data(
-    dataset_dir: Path, episode_index: int
-) -> dict[str, np.ndarray]:
+def load_episode_data(dataset_dir: Path, episode_index: int) -> dict[str, np.ndarray]:
     """Load observation states and ground-truth actions for one episode.
 
     Reads parquet files directly via pyarrow (no pandas dependency).
@@ -80,26 +78,16 @@ def load_episode_data(
     action_col = table.column("action")
     ts_col = table.column("timestamp")
 
-    indices = [
-        i for i in range(len(ep_col)) if ep_col[i].as_py() == episode_index
-    ]
+    indices = [i for i in range(len(ep_col)) if ep_col[i].as_py() == episode_index]
     if not indices:
-        raise ValueError(
-            f"Episode {episode_index} not found in {parquet_path}"
-        )
+        raise ValueError(f"Episode {episode_index} not found in {parquet_path}")
 
     # Sort by frame_index
     frame_order = sorted(indices, key=lambda i: frame_col[i].as_py())
 
-    states = np.array(
-        [state_col[i].as_py() for i in frame_order], dtype=np.float32
-    )
-    actions = np.array(
-        [action_col[i].as_py() for i in frame_order], dtype=np.float32
-    )
-    timestamps = np.array(
-        [ts_col[i].as_py() for i in frame_order], dtype=np.float64
-    )
+    states = np.array([state_col[i].as_py() for i in frame_order], dtype=np.float32)
+    actions = np.array([action_col[i].as_py() for i in frame_order], dtype=np.float32)
+    timestamps = np.array([ts_col[i].as_py() for i in frame_order], dtype=np.float64)
 
     logger.info(
         "Episode %d: %d frames, state shape %s",
@@ -110,9 +98,7 @@ def load_episode_data(
     return {"states": states, "actions": actions, "timestamps": timestamps}
 
 
-def _find_episode_parquet(
-    data_dir: Path, episode_index: int
-) -> Path:
+def _find_episode_parquet(data_dir: Path, episode_index: int) -> Path:
     """Scan data directory for a parquet containing the target episode."""
     import pyarrow.parquet as pq
 
@@ -121,14 +107,10 @@ def _find_episode_parquet(
         eps = {row.as_py() for row in table.column("episode_index")}
         if episode_index in eps:
             return pf
-    raise FileNotFoundError(
-        f"No parquet file found for episode {episode_index} in {data_dir}"
-    )
+    raise FileNotFoundError(f"No parquet file found for episode {episode_index} in {data_dir}")
 
 
-def load_video_frames(
-    dataset_dir: Path, episode_index: int, n_frames: int
-) -> list[np.ndarray]:
+def load_video_frames(dataset_dir: Path, episode_index: int, n_frames: int) -> list[np.ndarray]:
     """Decode video frames for an episode from the dataset MP4 file.
 
     Returns list of (H, W, 3) uint8 numpy arrays.
@@ -182,23 +164,17 @@ def load_policy(
 
     logger.info("Loading ACT policy from %s", checkpoint_dir)
 
-    has_preprocessor = (
-        checkpoint_dir / "policy_preprocessor_step_3_normalizer_processor.safetensors"
-    ).exists()
+    has_preprocessor = (checkpoint_dir / "policy_preprocessor_step_3_normalizer_processor.safetensors").exists()
 
     policy = ACTPolicy.from_pretrained(str(checkpoint_dir))
 
     if not has_preprocessor and dataset_dir is not None:
         logger.info(
-            "Preprocessor files not found in checkpoint — "
-            "injecting normalization stats from dataset stats.json"
+            "Preprocessor files not found in checkpoint — " "injecting normalization stats from dataset stats.json"
         )
         _inject_norm_stats(policy, dataset_dir)
     elif not has_preprocessor:
-        logger.warning(
-            "No preprocessor files and no dataset dir — "
-            "normalization may be incorrect"
-        )
+        logger.warning("No preprocessor files and no dataset dir — " "normalization may be incorrect")
 
     policy.to(device)
     policy.eval()
@@ -208,9 +184,7 @@ def load_policy(
     return policy
 
 
-def _inject_norm_stats(
-    policy: torch.nn.Module, dataset_dir: Path
-) -> None:
+def _inject_norm_stats(policy: torch.nn.Module, dataset_dir: Path) -> None:
     """Inject normalization mean/std from dataset stats.json into the policy."""
     stats_path = dataset_dir / "meta" / "stats.json"
     if not stats_path.exists():
@@ -351,12 +325,8 @@ def run_inference(
         image = frames[frame_idx]
 
         # Build observation batch
-        state_tensor = (
-            torch.from_numpy(state).float().unsqueeze(0).to(device)
-        )
-        img_tensor = (
-            torch.from_numpy(image).float().permute(2, 0, 1) / 255.0
-        ).unsqueeze(0).to(device)
+        state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        img_tensor = (torch.from_numpy(image).float().permute(2, 0, 1) / 255.0).unsqueeze(0).to(device)
 
         obs = {
             "observation.state": state_tensor,
@@ -400,10 +370,7 @@ def run_inference(
     logger.info("Overall MAE: %.6f rad", mae)
     logger.info(
         "Per-joint MAE: %s",
-        ", ".join(
-            f"{name}={v:.6f}"
-            for name, v in zip(JOINT_NAMES, per_joint_mae)
-        ),
+        ", ".join(f"{name}={v:.6f}" for name, v in zip(JOINT_NAMES, per_joint_mae)),
     )
     logger.info("Mean inference latency: %.1f ms", mean_latency_ms)
     logger.info(
@@ -430,9 +397,7 @@ def plot_action_deltas(
     n_steps, n_joints = predicted.shape
     t = np.arange(n_steps) / FPS
 
-    fig, axes = plt.subplots(
-        n_joints, 1, figsize=(14, 2.5 * n_joints), sharex=True
-    )
+    fig, axes = plt.subplots(n_joints, 1, figsize=(14, 2.5 * n_joints), sharex=True)
     fig.suptitle(
         f"Episode {episode} — Action Deltas: Predicted vs Ground Truth",
         fontsize=14,
@@ -440,16 +405,27 @@ def plot_action_deltas(
     )
     for j, ax in enumerate(axes):
         ax.plot(
-            t, ground_truth[:, j],
-            color="#2196F3", alpha=0.8, linewidth=1.2, label="Ground Truth",
+            t,
+            ground_truth[:, j],
+            color="#2196F3",
+            alpha=0.8,
+            linewidth=1.2,
+            label="Ground Truth",
         )
         ax.plot(
-            t, predicted[:, j],
-            color="#FF5722", alpha=0.8, linewidth=1.2, label="Predicted",
+            t,
+            predicted[:, j],
+            color="#FF5722",
+            alpha=0.8,
+            linewidth=1.2,
+            label="Predicted",
         )
         ax.fill_between(
-            t, ground_truth[:, j], predicted[:, j],
-            alpha=0.15, color="#9C27B0",
+            t,
+            ground_truth[:, j],
+            predicted[:, j],
+            alpha=0.15,
+            color="#9C27B0",
         )
         ax.set_ylabel(f"{JOINT_NAMES[j]}\n(rad)", fontsize=9)
         ax.grid(True, alpha=0.3)
@@ -479,9 +455,7 @@ def plot_cumulative_positions(
     n_steps, n_joints = predicted.shape
     t = np.arange(n_steps) / FPS
 
-    fig, axes = plt.subplots(
-        n_joints, 1, figsize=(14, 2.5 * n_joints), sharex=True
-    )
+    fig, axes = plt.subplots(n_joints, 1, figsize=(14, 2.5 * n_joints), sharex=True)
     fig.suptitle(
         f"Episode {episode} — Reconstructed Joint Positions",
         fontsize=14,
@@ -489,15 +463,27 @@ def plot_cumulative_positions(
     )
     for j, ax in enumerate(axes):
         ax.plot(
-            t, gt_pos[:, j],
-            color="#2196F3", alpha=0.8, linewidth=1.2, label="Ground Truth",
+            t,
+            gt_pos[:, j],
+            color="#2196F3",
+            alpha=0.8,
+            linewidth=1.2,
+            label="Ground Truth",
         )
         ax.plot(
-            t, pred_pos[:, j],
-            color="#FF5722", alpha=0.8, linewidth=1.2, label="Predicted",
+            t,
+            pred_pos[:, j],
+            color="#FF5722",
+            alpha=0.8,
+            linewidth=1.2,
+            label="Predicted",
         )
         ax.fill_between(
-            t, gt_pos[:, j], pred_pos[:, j], alpha=0.15, color="#9C27B0",
+            t,
+            gt_pos[:, j],
+            pred_pos[:, j],
+            alpha=0.15,
+            color="#9C27B0",
         )
         ax.set_ylabel(f"{JOINT_NAMES[j]}\n(rad)", fontsize=9)
         ax.grid(True, alpha=0.3)
@@ -506,9 +492,7 @@ def plot_cumulative_positions(
             ax.legend(loc="upper right", fontsize=8)
     axes[-1].set_xlabel("Time (s)", fontsize=10)
     fig.tight_layout()
-    fig.savefig(
-        out_dir / "cumulative_positions.png", dpi=150, bbox_inches="tight"
-    )
+    fig.savefig(out_dir / "cumulative_positions.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -570,8 +554,12 @@ def plot_summary_panel(
     for j in range(n_joints):
         ax.plot(t, ground_truth[:, j], color=colors[j], alpha=0.6, linewidth=1.0)
         ax.plot(
-            t, predicted[:, j],
-            color=colors[j], alpha=0.6, linewidth=1.0, linestyle="--",
+            t,
+            predicted[:, j],
+            color=colors[j],
+            alpha=0.6,
+            linewidth=1.0,
+            linestyle="--",
         )
     ax.set_xlabel("Time (s)", fontsize=9)
     ax.set_ylabel("Action delta (rad)", fontsize=9)
@@ -614,9 +602,7 @@ def plot_summary_panel(
     # Bottom-right: per-joint MAE bar chart
     ax = axes[1, 1]
     per_joint_mae = np.mean(error, axis=0)
-    bars = ax.bar(
-        JOINT_NAMES, per_joint_mae, color=colors[:n_joints], alpha=0.7
-    )
+    bars = ax.bar(JOINT_NAMES, per_joint_mae, color=colors[:n_joints], alpha=0.7)
     ax.set_ylabel("MAE (rad)", fontsize=9)
     ax.set_title("Per-Joint Mean Absolute Error", fontsize=10)
     ax.tick_params(axis="x", rotation=30, labelsize=8)
@@ -663,9 +649,7 @@ def generate_plots(
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Offline ACT policy inference evaluation"
-    )
+    p = argparse.ArgumentParser(description="Offline ACT policy inference evaluation")
     p.add_argument(
         "--checkpoint-dir",
         type=str,
@@ -748,9 +732,7 @@ def main() -> None:
     # Load video frames
     n_frames_needed = len(ep_data["states"])
     if args.num_steps is not None:
-        n_frames_needed = min(
-            n_frames_needed, args.start_frame + args.num_steps + 1
-        )
+        n_frames_needed = min(n_frames_needed, args.start_frame + args.num_steps + 1)
     frames = load_video_frames(dataset_dir, args.episode, n_frames_needed)
 
     # Load policy

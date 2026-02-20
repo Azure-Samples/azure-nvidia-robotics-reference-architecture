@@ -24,6 +24,7 @@ def _wrap_to_pi(angles: np.ndarray) -> np.ndarray:
     """
     return (angles + np.pi) % (2 * np.pi) - np.pi
 
+
 from .config import PolicyConfig
 
 logger = logging.getLogger(__name__)
@@ -90,9 +91,7 @@ class PolicyRunner:
 
         checkpoint_dir = Path(self.cfg.checkpoint_dir).resolve()
         if not checkpoint_dir.exists():
-            raise FileNotFoundError(
-                f"Checkpoint directory not found: {checkpoint_dir}"
-            )
+            raise FileNotFoundError(f"Checkpoint directory not found: {checkpoint_dir}")
         logger.info("Loading ACT policy from %s ...", checkpoint_dir)
 
         self._policy = ACTPolicy.from_pretrained(str(checkpoint_dir))
@@ -106,10 +105,7 @@ class PolicyRunner:
         if pre_file.exists():
             self._load_norm_stats(checkpoint_dir)
         else:
-            logger.info(
-                "No separate preprocessor files found — "
-                "using normalization stats embedded in model weights"
-            )
+            logger.info("No separate preprocessor files found — " "using normalization stats embedded in model weights")
 
         self._policy.to(self._device)
         self._policy.eval()
@@ -302,10 +298,7 @@ class PolicyRunner:
 
         # Prune old chunks that no longer contribute
         max_keep = action_np.shape[0]
-        while (
-            len(self._all_actions) > 1
-            and self._ensemble_step - 0 >= len(self._all_actions[0])
-        ):
+        while len(self._all_actions) > 1 and self._ensemble_step - 0 >= len(self._all_actions[0]):
             # The oldest chunk's last timestep has passed
             oldest_last_step = 0 + len(self._all_actions[0]) - 1
             if self._ensemble_step > oldest_last_step:

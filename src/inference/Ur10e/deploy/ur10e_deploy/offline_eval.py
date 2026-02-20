@@ -59,9 +59,7 @@ FPS = 30
 # ------------------------------------------------------------------
 
 
-def load_episode_data(
-    dataset_dir: Path, episode_index: int
-) -> dict[str, np.ndarray]:
+def load_episode_data(dataset_dir: Path, episode_index: int) -> dict[str, np.ndarray]:
     """Load observation states and ground-truth actions for one episode.
 
     Returns dict with keys: states (N, 6), actions (N, 6), timestamps (N,).
@@ -70,9 +68,7 @@ def load_episode_data(
     parquet_path = chunk_dir / f"file-{episode_index:03d}.parquet"
 
     if not parquet_path.exists():
-        parquet_path = _find_episode_parquet(
-            dataset_dir / "data", episode_index
-        )
+        parquet_path = _find_episode_parquet(dataset_dir / "data", episode_index)
 
     table = pq.read_table(parquet_path)
 
@@ -82,25 +78,15 @@ def load_episode_data(
     action_col = table.column("action")
     ts_col = table.column("timestamp")
 
-    indices = [
-        i for i in range(len(ep_col)) if ep_col[i].as_py() == episode_index
-    ]
+    indices = [i for i in range(len(ep_col)) if ep_col[i].as_py() == episode_index]
     if not indices:
-        raise ValueError(
-            f"Episode {episode_index} not found in {parquet_path}"
-        )
+        raise ValueError(f"Episode {episode_index} not found in {parquet_path}")
 
     frame_order = sorted(indices, key=lambda i: frame_col[i].as_py())
 
-    states = np.array(
-        [state_col[i].as_py() for i in frame_order], dtype=np.float32
-    )
-    actions = np.array(
-        [action_col[i].as_py() for i in frame_order], dtype=np.float32
-    )
-    timestamps = np.array(
-        [ts_col[i].as_py() for i in frame_order], dtype=np.float64
-    )
+    states = np.array([state_col[i].as_py() for i in frame_order], dtype=np.float32)
+    actions = np.array([action_col[i].as_py() for i in frame_order], dtype=np.float32)
+    timestamps = np.array([ts_col[i].as_py() for i in frame_order], dtype=np.float64)
 
     logger.info(
         "Episode %d: %d frames, state shape %s",
@@ -118,14 +104,10 @@ def _find_episode_parquet(data_dir: Path, episode_index: int) -> Path:
         eps = {row.as_py() for row in table.column("episode_index")}
         if episode_index in eps:
             return pf
-    raise FileNotFoundError(
-        f"No parquet file found for episode {episode_index} in {data_dir}"
-    )
+    raise FileNotFoundError(f"No parquet file found for episode {episode_index} in {data_dir}")
 
 
-def load_video_frames(
-    dataset_dir: Path, episode_index: int, n_frames: int
-) -> list[np.ndarray]:
+def load_video_frames(dataset_dir: Path, episode_index: int, n_frames: int) -> list[np.ndarray]:
     """Decode video frames for an episode from the dataset MP4 file.
 
     Returns list of (H, W, 3) uint8 numpy arrays.
@@ -207,30 +189,18 @@ def run_episode_inference(
 
         gt_action = actions[frame_idx]
 
-        records.append({
-            "step": step,
-            "frame_index": frame_idx,
-            "timestamp": frame_idx / FPS,
-            "inference_time_s": dt,
-            **{
-                f"joint_position_{JOINT_NAMES[j]}": float(state[j])
-                for j in range(6)
-            },
-            **{
-                f"predicted_action_{JOINT_NAMES[j]}": float(predicted_action[j])
-                for j in range(6)
-            },
-            **{
-                f"gt_action_{JOINT_NAMES[j]}": float(gt_action[j])
-                for j in range(6)
-            },
-            **{
-                f"abs_error_{JOINT_NAMES[j]}": float(
-                    abs(predicted_action[j] - gt_action[j])
-                )
-                for j in range(6)
-            },
-        })
+        records.append(
+            {
+                "step": step,
+                "frame_index": frame_idx,
+                "timestamp": frame_idx / FPS,
+                "inference_time_s": dt,
+                **{f"joint_position_{JOINT_NAMES[j]}": float(state[j]) for j in range(6)},
+                **{f"predicted_action_{JOINT_NAMES[j]}": float(predicted_action[j]) for j in range(6)},
+                **{f"gt_action_{JOINT_NAMES[j]}": float(gt_action[j]) for j in range(6)},
+                **{f"abs_error_{JOINT_NAMES[j]}": float(abs(predicted_action[j] - gt_action[j])) for j in range(6)},
+            }
+        )
 
         if (step + 1) % 100 == 0 or step == 0:
             logger.info(
@@ -299,9 +269,7 @@ def print_summary(records: list[dict], episode_index: int) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Offline UR10e ACT policy evaluation with parquet logging"
-    )
+    p = argparse.ArgumentParser(description="Offline UR10e ACT policy evaluation with parquet logging")
     p.add_argument(
         "--checkpoint",
         type=str,
