@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
+import importlib
 import sys
 import types
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -41,8 +42,10 @@ sys.modules.setdefault("azure.ai.ml", azure_ai_ml_module)
 sys.modules.setdefault("azure.identity", azure_identity_module)
 sys.modules.setdefault("mlflow", mlflow_module)
 
-from training.utils.context import AzureConfigError, AzureStorageContext, bootstrap_azure_ml
-import training.utils.context as context_module
+context_module = importlib.import_module("training.utils.context")
+AzureConfigError = context_module.AzureConfigError
+AzureStorageContext = context_module.AzureStorageContext
+bootstrap_azure_ml = context_module.bootstrap_azure_ml
 
 
 def test_bootstrap_azure_ml_success_returns_context(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -191,7 +194,7 @@ def test_azure_storage_context_upload_file_missing_file_raises(tmp_path: Path) -
     )
     missing_file = tmp_path / "missing.pt"
 
-    with pytest.raises(FileNotFoundError, match="destination: container-a/checkpoints/missing.pt"):
+    with pytest.raises(FileNotFoundError, match=r"destination: container-a/checkpoints/missing\.pt"):
         storage_context.upload_file(
             local_path=str(missing_file),
             blob_name="checkpoints/missing.pt",
