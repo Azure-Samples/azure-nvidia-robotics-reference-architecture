@@ -39,12 +39,11 @@ warp-lang
 pillow==12.1.0
 starlette==0.52.1
 
-# Testing
+# Testing and Development
 pytest
 pytest-mock
-junitparser
-flatdict==4.0.1
-flaky
+pytest-cov
+ruff
 
 # Reinforcement Learning Framework Dependencies (from isaaclab_rl/setup.py)
 protobuf>=4.25.8,!=5.26.0

@@ -26,7 +26,7 @@ class PolicyArchitecture:
     activation: str = "elu"
 
     def __str__(self) -> str:
-        layers = [self.obs_dim] + self.hidden_dims + [self.action_dim]
+        layers = [self.obs_dim, *self.hidden_dims, self.action_dim]
         return f"MLP({' -> '.join(map(str, layers))})"
 
 
@@ -88,7 +88,7 @@ def build_mlp(
     activation_fn = {"elu": nn.ELU, "relu": nn.ReLU, "tanh": nn.Tanh}.get(activation.lower(), nn.ELU)
 
     layers = []
-    dims = [input_dim] + hidden_dims + [output_dim]
+    dims = [input_dim, *hidden_dims, output_dim]
 
     for i in range(len(dims) - 1):
         layers.append(nn.Linear(dims[i], dims[i + 1]))
@@ -130,11 +130,11 @@ def infer_architecture_from_checkpoint(checkpoint_path: str) -> PolicyArchitectu
         raise ValueError("No actor weights found in checkpoint")
 
     # First layer input dim = obs_dim
-    first_layer_key, first_layer_weight = actor_weights[0]
+    _first_layer_key, first_layer_weight = actor_weights[0]
     obs_dim = first_layer_weight.shape[1]
 
     # Last layer output dim = action_dim
-    last_layer_key, last_layer_weight = actor_weights[-1]
+    _last_layer_key, last_layer_weight = actor_weights[-1]
     action_dim = last_layer_weight.shape[0]
 
     # Hidden dims = output dims of all layers except the last
@@ -192,7 +192,7 @@ def load_actor_from_checkpoint(
 
     # Load actor weights
     actor_state = {}
-    for key in state_dict.keys():
+    for key in state_dict:
         if key.startswith("actor."):
             new_key = key.replace("actor.", "")
             actor_state[new_key] = state_dict[key]
@@ -202,7 +202,7 @@ def load_actor_from_checkpoint(
 
     # Check for normalizer
     normalizer = None
-    normalizer_keys = [k for k in state_dict.keys() if "normalizer" in k.lower()]
+    normalizer_keys = [k for k in state_dict if "normalizer" in k.lower()]
     if normalizer_keys:
         print(f"Found normalizer keys: {normalizer_keys}")
 

@@ -12,12 +12,12 @@ dataset features used during training:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 
 
-class JointName(str, Enum):
+class JointName(StrEnum):
     """UR10E joint names in kinematic order."""
 
     SHOULDER_PAN = "shoulder_pan_joint"
@@ -62,11 +62,11 @@ class RobotObservation:
 
     def __post_init__(self) -> None:
         if self.joint_positions.shape != (NUM_JOINTS,):
-            raise ValueError(f"joint_positions shape must be ({NUM_JOINTS},), " f"got {self.joint_positions.shape}")
+            raise ValueError(f"joint_positions shape must be ({NUM_JOINTS},), got {self.joint_positions.shape}")
         if self.color_image is not None:
             expected = (IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_CHANNELS)
             if self.color_image.shape != expected:
-                raise ValueError(f"color_image shape must be {expected}, " f"got {self.color_image.shape}")
+                raise ValueError(f"color_image shape must be {expected}, got {self.color_image.shape}")
 
 
 @dataclass(slots=True)
@@ -84,7 +84,7 @@ class JointPositionCommand:
 
     def __post_init__(self) -> None:
         if self.positions.shape != (NUM_JOINTS,):
-            raise ValueError(f"positions shape must be ({NUM_JOINTS},), " f"got {self.positions.shape}")
+            raise ValueError(f"positions shape must be ({NUM_JOINTS},), got {self.positions.shape}")
 
     def as_absolute(self, current: np.ndarray) -> JointPositionCommand:
         """Interpret ``positions`` as deltas and return absolute targets.

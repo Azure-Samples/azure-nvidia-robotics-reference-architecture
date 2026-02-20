@@ -15,9 +15,7 @@ def add_rsl_rl_args(parser: argparse.ArgumentParser):
         parser: The parser to add the arguments to.
     """
     # create a new argument group
-    arg_group = parser.add_argument_group(
-        "rsl_rl", description="Arguments for RSL-RL agent."
-    )
+    arg_group = parser.add_argument_group("rsl_rl", description="Arguments for RSL-RL agent.")
     # -- experiment arguments
     arg_group.add_argument(
         "--experiment_name",
@@ -44,9 +42,7 @@ def add_rsl_rl_args(parser: argparse.ArgumentParser):
         default=None,
         help="Name of the run folder to resume from.",
     )
-    arg_group.add_argument(
-        "--checkpoint", type=str, default=None, help="Checkpoint file to resume from."
-    )
+    arg_group.add_argument("--checkpoint", type=str, default=None, help="Checkpoint file to resume from.")
     # -- logger arguments
     arg_group.add_argument(
         "--logger",
@@ -63,9 +59,7 @@ def add_rsl_rl_args(parser: argparse.ArgumentParser):
     )
 
 
-def parse_rsl_rl_cfg(
-    task_name: str, args_cli: argparse.Namespace
-) -> RslRlBaseRunnerCfg:
+def parse_rsl_rl_cfg(task_name: str, args_cli: argparse.Namespace) -> RslRlBaseRunnerCfg:
     """Parse configuration for RSL-RL agent based on inputs.
 
     Args:
@@ -78,9 +72,7 @@ def parse_rsl_rl_cfg(
     from isaaclab_tasks.utils.parse_cfg import load_cfg_from_registry
 
     # load the default configuration
-    rslrl_cfg: RslRlBaseRunnerCfg = load_cfg_from_registry(
-        task_name, "rsl_rl_cfg_entry_point"
-    )
+    rslrl_cfg: RslRlBaseRunnerCfg = load_cfg_from_registry(task_name, "rsl_rl_cfg_entry_point")
     rslrl_cfg = update_rsl_rl_cfg(rslrl_cfg, args_cli)
     return rslrl_cfg
 
