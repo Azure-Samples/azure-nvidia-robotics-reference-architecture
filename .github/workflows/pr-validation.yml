@@ -107,3 +107,12 @@ jobs:
     uses: ./.github/workflows/python-lint.yml
     permissions:
       contents: read
+
+  # CodeQL security analysis
+  codeql-analysis:
+    name: CodeQL Analysis
+    uses: ./.github/workflows/codeql-analysis.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
