@@ -301,6 +301,131 @@ Describe 'Invoke-YamlLintCore' -Tag 'Unit' {
             }
         }
     }
+
+    #region Parameter validation
+    Context 'BaseBranch parameter passthrough' {
+        It 'passes BaseBranch value to Get-ChangedFilesFromGit' {
+            $customBranch = 'origin/develop'
+            Mock -ModuleName LintingHelpers -CommandName git -MockWith { '' }
+
+            Invoke-YamlLintCore -ChangedFilesOnly -BaseBranch $customBranch
+
+            Should -Invoke -CommandName git -ModuleName LintingHelpers `
+                -ParameterFilter { $args -contains $customBranch } -Times 1
+        }
+
+        It 'uses default BaseBranch when not specified' {
+            Mock -ModuleName LintingHelpers -CommandName git -MockWith { '' }
+
+            Invoke-YamlLintCore -ChangedFilesOnly
+
+            Should -Invoke -CommandName git -ModuleName LintingHelpers `
+                -ParameterFilter { $args -contains 'origin/main' } -Times 1
+        }
+    }
+
+    Context 'repoRoot fallback when git rev-parse fails' {
+        It 'falls back to script directory when git rev-parse fails' {
+            Mock git -ParameterFilter { $args[0] -eq 'rev-parse' -and $args[1] -eq '--show-toplevel' } `
+                -MockWith { $null }
+
+            { Invoke-YamlLintCore -OutputPath $script:TestOutputPath } | Should -Not -Throw
+        }
+    }
+    #endregion
+
+    #region OutputPath behavior
+    Context 'Default OutputPath from repoRoot' {
+        It 'derives OutputPath from repository root when not specified' {
+            Invoke-YamlLintCore
+
+            $outputContent = Get-Content $env:GITHUB_OUTPUT -Raw
+            $outputContent | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'Parent directory creation for OutputPath' {
+        It 'creates parent directories when they do not exist' {
+            'name: Test' | Set-Content (Join-Path $script:WorkflowDir 'test.yml')
+            $nestedPath = Join-Path $TestDrive 'nested/deep/output.json'
+
+            Invoke-YamlLintCore -OutputPath $nestedPath
+
+            Test-Path (Split-Path $nestedPath -Parent) | Should -BeTrue
+        }
+    }
+    #endregion
+
+    #region Exit code propagation
+    Context 'YAML_LINT_FAILED environment variable on errors' {
+        It 'sets YAML_LINT_FAILED=true when actionlint returns errors' {
+            Mock actionlint -MockWith {
+                '[{"filepath":"test.yml","line":1,"column":1,"message":"error","kind":"syntax"}]'
+            }
+
+            'name: CI' | Set-Content (Join-Path $script:WorkflowDir 'ci.yml')
+
+            Invoke-YamlLintCore -OutputPath $script:TestOutputPath
+
+            $envContent = Get-Content $env:GITHUB_ENV -Raw
+            $envContent | Should -Match 'YAML_LINT_FAILED'
+            $envContent | Should -Match 'true'
+        }
+    }
+
+    Context 'Exit code verification' {
+        It 'returns zero exit code on clean run' {
+            Mock actionlint -MockWith { '[]' }
+
+            'name: CI' | Set-Content (Join-Path $script:WorkflowDir 'ci.yml')
+
+            $result = Invoke-YamlLintCore -OutputPath $script:TestOutputPath
+            $result | Should -Not -BeNullOrEmpty
+            $outputContent = Get-Content $env:GITHUB_OUTPUT -Raw
+            $outputContent | Should -Match 'errors=0'
+        }
+
+        It 'reports non-zero errors when issues found' {
+            Mock actionlint -MockWith {
+                '[{"filepath":"test.yml","line":1,"column":1,"message":"bad","kind":"syntax"}]'
+            }
+
+            'name: CI' | Set-Content (Join-Path $script:WorkflowDir 'ci.yml')
+
+            Invoke-YamlLintCore -OutputPath $script:TestOutputPath
+
+            $outputContent = Get-Content $env:GITHUB_OUTPUT -Raw
+            $outputContent | Should -Not -Match 'errors=0'
+        }
+    }
+    #endregion
+
+    #region Step summary and CI output
+    Context 'Step summary markdown table content' {
+        It 'writes step summary with issue counts' {
+            Mock actionlint -MockWith {
+                '[{"filepath":"ci.yml","line":1,"column":1,"message":"warn","kind":"expression"}]'
+            }
+
+            'name: CI' | Set-Content (Join-Path $script:WorkflowDir 'ci.yml')
+
+            Invoke-YamlLintCore -OutputPath $script:TestOutputPath
+
+            $summaryContent = Get-Content $env:GITHUB_STEP_SUMMARY -Raw
+            $summaryContent | Should -Match '\|'
+            $summaryContent | Should -Match 'Errors'
+        }
+    }
+
+    Context 'CI outputs on zero-issue no-files path' {
+        It 'writes zero-count outputs when no workflow files exist' {
+            Invoke-YamlLintCore -OutputPath $script:TestOutputPath
+
+            $outputContent = Get-Content $env:GITHUB_OUTPUT -Raw
+            $outputContent | Should -Match 'issues=0'
+        }
+    }
+    #endregion
 }
 
 Describe 'Dot-sourced execution protection' -Tag 'Unit' {

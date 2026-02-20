@@ -26,6 +26,7 @@ Usage:
                    -p device:=cuda \\
                    -p enable_control:=false
 """
+
 from __future__ import annotations
 
 import sys
@@ -131,7 +132,7 @@ class ACTInferenceNode(Node):
 
         safety = "ENABLED" if self._enable_control else "DISABLED (dry run)"
         self.get_logger().info(
-            f"Inference node ready at {self._control_hz} Hz, " f"action_mode={self._action_mode}, control={safety}"
+            f"Inference node ready at {self._control_hz} Hz, action_mode={self._action_mode}, control={safety}"
         )
 
     # -- Subscriber callbacks ------------------------------------------------
@@ -227,7 +228,7 @@ def main(args: list[str] | None = None) -> None:
         rclpy.spin(node)
     except KeyboardInterrupt:
         m = node._runner.metrics
-        node.get_logger().info(f"Shutting down. Steps={m.steps}, " f"avg_inference={m.avg_inference_ms:.1f}ms")
+        node.get_logger().info(f"Shutting down. Steps={m.steps}, avg_inference={m.avg_inference_ms:.1f}ms")
     finally:
         node.destroy_node()
         rclpy.shutdown()

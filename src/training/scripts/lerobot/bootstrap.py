@@ -6,7 +6,6 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -50,7 +49,7 @@ def bootstrap_mlflow(
 
     if not all([subscription_id, resource_group, workspace_name]):
         print(
-            "[ERROR] Azure ML requires AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, " "and AZUREML_WORKSPACE_NAME",
+            "[ERROR] Azure ML requires AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, and AZUREML_WORKSPACE_NAME",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -88,7 +87,7 @@ def bootstrap_mlflow(
 
         # Write config for downstream scripts
         config_path = Path("/tmp/mlflow_config.env")
-        config_path.write_text(f"MLFLOW_TRACKING_URI={tracking_uri}\n" f"MLFLOW_EXPERIMENT_NAME={resolved_name}\n")
+        config_path.write_text(f"MLFLOW_TRACKING_URI={tracking_uri}\nMLFLOW_EXPERIMENT_NAME={resolved_name}\n")
 
         return MLflowConfig(tracking_uri=tracking_uri, experiment_name=resolved_name)
 
@@ -97,7 +96,7 @@ def bootstrap_mlflow(
         sys.exit(1)
 
 
-def authenticate_huggingface() -> Optional[str]:
+def authenticate_huggingface() -> str | None:
     """Authenticate with HuggingFace Hub using HF_TOKEN environment variable.
 
     Returns:

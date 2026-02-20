@@ -107,3 +107,18 @@ jobs:
     uses: ./.github/workflows/pytest-tests.yml
     permissions:
       contents: read
+  # Python linting using ruff
+  python-lint:
+    name: Python Lint
+    uses: ./.github/workflows/python-lint.yml
+    permissions:
+      contents: read
+
+  # CodeQL security analysis
+  codeql-analysis:
+    name: CodeQL Analysis
+    uses: ./.github/workflows/codeql-analysis.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read

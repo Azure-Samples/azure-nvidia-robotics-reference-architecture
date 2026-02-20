@@ -70,7 +70,7 @@ AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
 
 # clear out sys.argv for Hydra
-sys.argv = [sys.argv[0]] + hydra_args
+sys.argv = [sys.argv[0], *hydra_args]
 
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
@@ -78,19 +78,17 @@ simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
-import torch
-import numpy as np
-import gymnasium as gym
 import glob
 import json
 import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner
-
+import gymnasium as gym
+import isaaclab_tasks  # noqa: F401
+import numpy as np
+import torch
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
@@ -98,14 +96,12 @@ from isaaclab.envs import (
     ManagerBasedRLEnvCfg,
     multi_agent_to_single_agent,
 )
-
 from isaaclab_rl.rsl_rl import (
     RslRlBaseRunnerCfg,
     RslRlVecEnvWrapper,
 )
-
-import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner
 
 
 class CheckpointMonitor:
@@ -158,11 +154,11 @@ class CheckpointMonitor:
         # wrap around environment for rsl-rl
         self.env = RslRlVecEnvWrapper(self.env, clip_actions=self.agent_cfg.clip_actions)
 
-    def _load_metrics_history(self) -> Dict:
+    def _load_metrics_history(self) -> dict:
         """Load existing metrics history from file."""
         if os.path.exists(self.metrics_file):
             try:
-                with open(self.metrics_file, "r") as f:
+                with open(self.metrics_file) as f:
                     return json.load(f)
             except (json.JSONDecodeError, FileNotFoundError):
                 pass
@@ -173,7 +169,7 @@ class CheckpointMonitor:
         with open(self.metrics_file, "w") as f:
             json.dump(self.metrics_history, f, indent=2)
 
-    def _get_checkpoint_files(self) -> List[str]:
+    def _get_checkpoint_files(self) -> list[str]:
         """Get all checkpoint files in the monitored directory."""
         pattern = os.path.join(self.checkpoint_dir, "model_*.pt")
         return sorted(glob.glob(pattern))
@@ -215,7 +211,7 @@ class CheckpointMonitor:
 
         return policy
 
-    def _evaluate_policy(self, policy, checkpoint_number: int) -> Dict:
+    def _evaluate_policy(self, policy, checkpoint_number: int) -> dict:
         """Evaluate a policy and return metrics."""
         print(f"[INFO] Evaluating checkpoint {checkpoint_number} for {self.eval_episodes} episodes...")
 
@@ -255,9 +251,8 @@ class CheckpointMonitor:
                         done = done or bool(truncated)
 
                     # Check for success in info
-                    if infos and isinstance(infos, dict) and "success" in infos:
-                        if infos["success"]:
-                            success_count += 1
+                    if infos and isinstance(infos, dict) and "success" in infos and infos["success"]:
+                        success_count += 1
 
             episode_rewards.append(episode_reward)
             episode_lengths.append(episode_length)
@@ -283,7 +278,7 @@ class CheckpointMonitor:
 
         return metrics
 
-    def _print_metrics(self, metrics: Dict):
+    def _print_metrics(self, metrics: dict):
         """Print metrics in a readable format."""
         print("\n" + "=" * 60)
         print(f"CHECKPOINT {metrics['checkpoint_number']} EVALUATION RESULTS")
@@ -296,7 +291,7 @@ class CheckpointMonitor:
         print(f"Success Rate: {metrics['success_rate']:.1%}")
         print("=" * 60 + "\n")
 
-    def _compare_with_previous(self, current_metrics: Dict):
+    def _compare_with_previous(self, current_metrics: dict):
         """Compare current metrics with previous checkpoint."""
         if not self.metrics_history:
             print("[INFO] No previous metrics to compare with.")
@@ -327,7 +322,7 @@ class CheckpointMonitor:
         success_diff = curr_success - prev_success
 
         print(f"Reward Change: {reward_diff:+.3f} ({reward_percent_change:+.1f}%)")
-        print(f"Success Rate Change: {success_diff:+.3f} ({success_diff*100:+.1f} percentage points)")
+        print(f"Success Rate Change: {success_diff:+.3f} ({success_diff * 100:+.1f} percentage points)")
 
         # Determine if improvement
         if reward_diff > 0 and success_diff >= 0:
@@ -342,7 +337,7 @@ class CheckpointMonitor:
 
     def monitor(self):
         """Main monitoring loop."""
-        print(f"[INFO] Starting checkpoint monitoring...")
+        print("[INFO] Starting checkpoint monitoring...")
         print(f"[INFO] Monitoring directory: {self.checkpoint_dir}")
         print(f"[INFO] Check interval: {args_cli.monitor_interval} seconds")
         print(f"[INFO] Evaluation episodes: {self.eval_episodes}")

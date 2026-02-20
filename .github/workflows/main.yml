@@ -97,9 +97,24 @@ jobs:
     permissions:
       contents: read
 
+  # Python linting using ruff
+  python-lint:
+    name: Python Lint
+    uses: ./.github/workflows/python-lint.yml
+    permissions:
+      contents: read
+
+  # CodeQL security analysis
+  codeql-analysis:
+    name: CodeQL Analysis
+    uses: ./.github/workflows/codeql-analysis.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
   # Automated release PR management via release-please
   release-please:
-    if: "${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
     needs:
       - spell-check
       - markdown-lint
@@ -112,6 +127,8 @@ jobs:
       - dependency-pinning
       - pester-tests
       - pytest-tests
+      - python-lint
+      - codeql-analysis
     name: Release Please
     runs-on: ubuntu-latest
     concurrency:
@@ -127,11 +144,6 @@ jobs:
       minor: ${{ steps.release.outputs.minor }}
       patch: ${{ steps.release.outputs.patch }}
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e  # v2.10.2
-        with:
-          egress-policy: audit
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.0.0
@@ -146,6 +158,37 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: release-please-manifest.json
+          # On release commits, skip PR creation to prevent bogus PRs
+          # from draft release lazy tag timing. Release commits have zero
+          # unreleased changes so skipping loses nothing. The tag is
+          # created in the next step, ensuring subsequent runs find it.
+          skip-github-pull-request: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main)') }}
+
+      # Workaround: release-please with "draft": true uses lazy tag
+      # creation. The git tag is not materialized until the release is
+      # published. Without the tag, release-please cannot find the draft
+      # on subsequent runs, breaking version anchoring and causing bogus
+      # changelog entries. The skip-github-pull-request conditional above
+      # prevents PR creation on release commits (zero unreleased changes),
+      # and this step creates the tag so subsequent runs find the release.
+      # Replace both workarounds with "force-tag-creation": true in
+      # release-please-config.json once release-please-action ships a
+      # version that includes googleapis/release-please#2627.
+      - name: Create git tag for draft release
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          TAG="${{ steps.release.outputs.tag_name }}"
+          REPO="${{ github.repository }}"
+          if ! gh api "/repos/$REPO/git/refs/tags/$TAG" --silent 2>/dev/null; then
+            gh api "/repos/$REPO/git/refs" \
+              -f "ref=refs/tags/$TAG" \
+              -f "sha=${{ github.sha }}"
+            echo "Created git tag $TAG -> ${{ github.sha }}"
+          else
+            echo "Git tag $TAG already exists"
+          fi
 
   # Promote draft release to published
   publish-release:
@@ -160,11 +203,6 @@ jobs:
       contents: read
       issues: write
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e  # v2.10.2
-        with:
-          egress-policy: audit
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2.0.0
