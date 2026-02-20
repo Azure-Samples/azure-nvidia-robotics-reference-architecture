@@ -12,10 +12,34 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 
 | Template                                 | Purpose                               | Submission Script                          |
 | ---------------------------------------- | ------------------------------------- | ------------------------------------------ |
+| [hello-world.yaml](hello-world.yaml)     | **Minimal smoke test** (no payload)   | `osmo workflow submit` (see below)         |
 | [train.yaml](train.yaml)                 | Distributed training (base64 inline)  | `scripts/submit-osmo-training.sh`          |
 | [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh`  |
 | [lerobot-train.yaml](lerobot-train.yaml) | LeRobot behavioral cloning            | `scripts/submit-osmo-lerobot-training.sh`  |
 | [lerobot-infer.yaml](lerobot-infer.yaml) | LeRobot inference/evaluation          | `scripts/submit-osmo-lerobot-inference.sh` |
+
+## 👋 Hello World (smoke test)
+
+Use this to confirm OSMO control plane and backend are working without any training code or datasets.
+
+**Prerequisites:** Control plane and backend deployed; OSMO CLI installed and logged in (see [Accessing OSMO](#-accessing-osmo)). If using port-forward, run `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` and `osmo login http://localhost:9000 --method=dev --username=testuser`.
+
+```bash
+# From repo root
+osmo workflow submit workflows/osmo/hello-world.yaml
+# Note the Workflow ID from the output (e.g. hello-world-1).
+
+# List workflows and check status (use the workflow ID, not the name)
+osmo workflow list
+osmo workflow query hello-world-1
+
+# View logs (use the same workflow ID)
+osmo workflow logs hello-world-1
+```
+
+Use the **workflow ID** returned by submit (e.g. `hello-world-1`); the API does not accept the workflow name alone for `logs` or `query`. The workflow runs a single task using a `busybox` image that prints "Hello from OSMO" and exits. No parameters are required.
+
+If the workflow shows **FAILED_SERVER_ERROR**, see [Deployment issues and fixes](../../docs/deployment-issues-and-fixes.md#34-workflow-failed_server_error-eg-hello-world) for how to inspect `osmo-workflows` pods, events, and backend operator logs.
 
 ## ⚖️ Workflow Comparison
 

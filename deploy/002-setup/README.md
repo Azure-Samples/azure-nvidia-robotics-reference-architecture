@@ -78,7 +78,9 @@ osmo_config = {
 
 ### Scenario 2: Workload Identity
 
-Secure, key-less authentication via Azure Workload Identity.
+Secure, key-less authentication via Azure Workload Identity. Terraform creates one OSMO managed identity, assigns it roles (Storage, Key Vault, ACR, Azure ML), and federates it to the Kubernetes ServiceAccounts used by the OSMO Helm charts. Pods then obtain short-lived Azure AD tokens—no keys are stored in the cluster.
+
+For a detailed explanation (what Terraform creates, role assignments, federated credentials, and the token flow), see [OSMO Authentication](../../docs/osmo-authentication.md).
 
 ```bash
 # terraform.tfvars

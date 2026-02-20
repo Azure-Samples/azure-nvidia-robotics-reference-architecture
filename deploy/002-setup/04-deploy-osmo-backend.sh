@@ -30,6 +30,7 @@ OPTIONS:
     --use-access-keys       Use storage access keys instead of workload identity
     --regenerate-token      Force creation of a fresh service token
     --expires-at DATE       Token expiry date YYYY-MM-DD (default: +1 year)
+    --timeout DURATION      Helm upgrade wait timeout (default: 600s; use 1200s if rollout is slow)
     --config-preview        Print configuration and exit
     --skip-configure-datasets  Skip dataset bucket configuration
     --dataset-container NAME   Container name for datasets (default: datasets)
@@ -55,6 +56,7 @@ use_access_keys=false
 osmo_identity_client_id=""
 regenerate_token=false
 custom_expiry=""
+helm_timeout=""
 config_preview=false
 skip_configure_datasets=false
 dataset_container="${DATASET_CONTAINER_NAME}"
@@ -76,6 +78,7 @@ while [[ $# -gt 0 ]]; do
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
     --regenerate-token)    regenerate_token=true; shift ;;
     --expires-at)          custom_expiry="$2"; shift 2 ;;
+    --timeout)             helm_timeout="$2"; shift 2 ;;
     --config-preview)      config_preview=true; shift ;;
     --skip-configure-datasets) skip_configure_datasets=true; shift ;;
     --dataset-container)   dataset_container="$2"; shift 2 ;;
@@ -249,10 +252,11 @@ if [[ "$use_access_keys" == "false" ]]; then
   helm_args+=(-f "$identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
 fi
 
+helm_timeout_val="${helm_timeout:-$TIMEOUT_DEPLOY}"
 if [[ "$use_acr" == "true" ]]; then
-  helm upgrade -i osmo-operator "oci://${acr_login_server}/helm/backend-operator" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i osmo-operator "oci://${acr_login_server}/helm/backend-operator" "${helm_args[@]}" --wait --timeout "$helm_timeout_val"
 else
-  helm upgrade -i osmo-operator osmo/backend-operator "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i osmo-operator osmo/backend-operator "${helm_args[@]}" --wait --timeout "$helm_timeout_val"
 fi
 
 #------------------------------------------------------------------------------
@@ -315,6 +319,25 @@ if [[ "$skip_configure_datasets" == "false" ]]; then
   export DATASET_BUCKET_NAME="$dataset_bucket"
   export DATASET_CONTAINER_NAME="$dataset_container"
   export STORAGE_ACCOUNT_NAME="$storage_name"
+
+  # Use access-keys dataset template (with default_credential) when a storage key is
+  # available so workflow uploads succeed. With workload identity we still prefer
+  # key for the dataset bucket if the account has keys enabled (fresh deploy).
+  dataset_credential_key="${account_key}"
+  if [[ -z "$dataset_credential_key" && "$use_access_keys" == "false" ]]; then
+    dataset_credential_key=$(az storage account keys list -g "$rg" -n "$storage_name" --query '[0].value' -o tsv 2>/dev/null || true)
+  fi
+  if [[ -n "$dataset_credential_key" ]]; then
+    # OSMO CLI expects access_key = full Azure connection string (not raw key)
+    export STORAGE_ACCESS_KEY_ID="$storage_name"
+    export STORAGE_ACCESS_KEY="DefaultEndpointsProtocol=https;AccountName=${storage_name};AccountKey=${dataset_credential_key};EndpointSuffix=core.windows.net"
+    dataset_template="$CONFIG_DIR/dataset-config-access-keys.template.json"
+    info "Using dataset config with default_credential (storage key available)"
+  else
+    dataset_template="$CONFIG_DIR/dataset-config-${auth_mode}.template.json"
+    [[ -f "$dataset_template" ]] || fatal "Dataset template not found: $dataset_template"
+    warn "Storage account has no key available; dataset config has no default_credential. Workflow uploads to datasets may fail with 'Credential not set'. Enable shared access keys or run configure-dataset-credential.sh after enabling."
+  fi
 
   # Render and apply dataset configuration
   envsubst < "$dataset_template" > "$CONFIG_DIR/out/dataset-config.json"

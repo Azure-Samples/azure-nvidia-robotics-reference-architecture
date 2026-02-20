@@ -1,0 +1,21 @@
+# Minimal OSMO workflow to verify the control plane and backend.
+# Run: osmo workflow submit workflows/osmo/hello-world.yaml
+# Then use the workflow ID (e.g. hello-world-1): osmo workflow query <id>  &&  osmo workflow logs <id>
+workflow:
+  name: hello-world
+  timeout:
+    exec_timeout: 5m
+  resources:
+    default:
+      cpu: 1
+      memory: 2Gi
+      storage: 8Gi
+  tasks:
+    - name: say-hello
+      image: "{{ image }}"
+      command:
+        - /bin/sh
+        - -c
+        - "echo Hello from OSMO && echo Image: $(cat /etc/os-release 2>/dev/null | head -1 || echo unknown) && exit 0"
+default-values:
+  image: busybox:latest

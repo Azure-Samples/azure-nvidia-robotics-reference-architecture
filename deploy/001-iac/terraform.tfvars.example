@@ -38,13 +38,22 @@ node_pools = {
 should_deploy_postgresql = true
 should_deploy_redis      = true
 
-// Network Security
-// Three modes available (see README.md for details):
-//   Full Private (default): Both true - VPN required for all access
-//   Hybrid:                 private_endpoint=true, private_aks_cluster=false - No VPN for kubectl
-//   Full Public:            Both false - Not recommended without additional security
+// Network Security - First-deployment combo: Hybrid (private Azure services, public AKS)
+// No VPN required for kubectl or 002-setup. See README.md for Full Private / Full Public.
 should_enable_private_endpoint    = true
-should_enable_private_aks_cluster = true
+should_enable_private_aks_cluster = false
 
 should_enable_public_network_access     = true
 should_add_current_user_key_vault_admin = true
+
+// OSMO: Scenario 2 - Workload Identity (key-less auth, recommended)
+// Terraform creates an OSMO managed identity and federated credentials so pods
+// can authenticate to Azure (Storage, Key Vault, ACR) without secrets.
+// See docs/osmo-authentication.md for details.
+osmo_config = {
+  should_enable_identity   = true
+  should_federate_identity = true
+  control_plane_namespace  = "osmo-control-plane"
+  operator_namespace       = "osmo-operator"
+  workflows_namespace      = "osmo-workflows"
+}

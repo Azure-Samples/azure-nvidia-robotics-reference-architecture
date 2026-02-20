@@ -29,6 +29,7 @@ OPTIONS:
     --force-mek             Replace existing MEK (data loss warning)
     --mek-config-file PATH  Use existing MEK config file
     --skip-service-config   Skip service_base_url configuration
+    --service-url URL      Set service_base_url explicitly (default: auto-detect)
     --config-preview        Print configuration and exit
 
 EXAMPLES:
@@ -49,6 +50,7 @@ skip_mek=false
 force_mek=false
 mek_config_file=""
 skip_service_config=false
+service_url=""
 config_preview=false
 
 while [[ $# -gt 0 ]]; do
@@ -65,6 +67,7 @@ while [[ $# -gt 0 ]]; do
     --force-mek)           force_mek=true; shift ;;
     --mek-config-file)     mek_config_file="$2"; shift 2 ;;
     --skip-service-config) skip_service_config=true; shift ;;
+    --service-url)         service_url="$2"; shift 2 ;;
     --config-preview)      config_preview=true; shift ;;
     *)                     fatal "Unknown option: $1" ;;
   esac
@@ -277,7 +280,11 @@ if [[ "$skip_service_config" == "false" ]]; then
   section "Configure OSMO Service"
   kubectl wait --for=condition=available deployment/osmo-service -n "$NS_OSMO_CONTROL_PLANE" --timeout=120s
 
-  service_url=$(detect_service_url)
+  if [[ -z "$service_url" ]]; then
+    service_url=$(detect_service_url)
+  else
+    info "Using provided service URL: $service_url"
+  fi
   if [[ -n "$service_url" ]]; then
     [[ -f "$service_config_template" ]] || fatal "Service config template not found: $service_config_template"
     export SERVICE_BASE_URL="$service_url"

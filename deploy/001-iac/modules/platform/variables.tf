@@ -153,6 +153,6 @@ variable "should_enable_osmo_identity" {
 
 variable "should_enable_storage_shared_access_key" {
   type        = bool
-  description = "Whether to enable Shared Key (SAS token) authorization for the storage account. When false, all requests must use Azure AD authentication"
-  default     = false
+  description = "Whether to enable Shared Key (SAS token) authorization for the storage account. When true, 04-deploy-osmo-backend.sh can use the account key for DATASET default_credential so workflow dataset uploads work out of the box. When false, all requests must use Azure AD authentication (workload identity); dataset uploads require OSMO to support Azure AD credential for the bucket or a separate credential step"
+  default     = true
 }

@@ -48,7 +48,7 @@
                             "ephemeral-storage": "{{USER_STORAGE}}"
                         },
                         "requests": {
-                            "cpu": "{% if USER_CPU > 2 %}2{% else %}{{USER_CPU}}{% endif %}",
+                            "cpu": "2",
                             "memory": "1Gi",
                             "ephemeral-storage": "4Gi"
                         }

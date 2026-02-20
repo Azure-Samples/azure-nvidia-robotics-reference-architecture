@@ -141,22 +141,24 @@ detect_osmo_identity() {
   echo "$client_id"
 }
 
-# Detect OSMO service URL from cluster
+# Detect OSMO service URL from cluster (used by backend and workflow pods to reach the API/logger).
+# Prefer LoadBalancer so backend and control plane renegotiate auth correctly; fallback to in-cluster.
 detect_service_url() {
   local url=""
-  # Try internal load balancer first
+  # Prefer internal LoadBalancer (recommended: backend/auth works via LB)
   local lb_ip
   lb_ip=$(kubectl get svc azureml-ingress-nginx-internal-lb -n azureml \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   if [[ -n "$lb_ip" ]]; then
     url="http://${lb_ip}"
   else
-    # Fallback to ClusterIP
     local cluster_ip
     cluster_ip=$(kubectl get svc azureml-ingress-nginx-controller -n azureml \
       -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
     if [[ -n "$cluster_ip" && "$cluster_ip" != "None" ]]; then
       url="http://${cluster_ip}"
+    elif kubectl get svc osmo-service -n osmo-control-plane &>/dev/null; then
+      url="http://osmo-service.osmo-control-plane.svc.cluster.local"
     fi
   fi
   echo "$url"

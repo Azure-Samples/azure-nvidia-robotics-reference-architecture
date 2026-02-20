@@ -14,6 +14,10 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 | Destroy | Delete Azure infrastructure (Terraform destroy or resource group deletion). |
 | Teardown | Avoid in docs; use Destroy for infrastructure removal. |
 
+## 🚀 New to this repo?
+
+For a step-by-step first deployment (Hybrid network, no VPN, Workload Identity), see **[GETTING-STARTED.md](GETTING-STARTED.md)**.
+
 ## 📋 Deployment Order
 
 | Step | Folder                                  | Description                                              | Time      |
