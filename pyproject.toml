@@ -70,8 +70,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/training"]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "ipykernel>=7.1.0",
     "ipywidgets>=8.1.8",
     "pytest>=8.4.2",
