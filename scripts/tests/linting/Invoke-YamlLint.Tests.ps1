@@ -380,6 +380,7 @@ Describe 'Invoke-YamlLintCore' -Tag 'Unit' {
             'name: CI' | Set-Content (Join-Path $script:WorkflowDir 'ci.yml')
 
             $result = Invoke-YamlLintCore -OutputPath $script:TestOutputPath
+            $result | Should -Not -BeNullOrEmpty
             $outputContent = Get-Content $env:GITHUB_OUTPUT -Raw
             $outputContent | Should -Match 'errors=0'
         }
