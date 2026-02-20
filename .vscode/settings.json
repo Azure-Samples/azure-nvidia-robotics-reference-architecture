@@ -121,25 +121,21 @@
             "file": "./.github/instructions/commit-message.instructions.md"
         }
     ],
-    "chat.modeFilesLocations": {
-        ".github/chatmodes": true,
-        "/Users/vscode/repos/chatmodes": true,
-        "../hve-core/.github/chatmodes": true,
-        "../hve-core/copilot/beads/chatmodes": true,
-    },
-    "chat.instructionsFilesLocations": {
-        ".github/instructions": true,
-        "/Users/vscode/repos/instructions": true,
-        ".copilot-tracking/instructions": true,
-        ".copilot-tracking/plans": true,
-        "../hve-core/.github/instructions": true,
-        "../hve-core/copilot/beads/instructions": true,
-    },
-    "chat.promptFilesLocations": {
-        ".github/prompts": true,
-        "/Users/vscode/repos/prompts": true,
-        ".copilot-tracking/prompts": true,
-        "../hve-core/.github/prompts": true,
-        "../hve-core/copilot/beads/prompts": true,
-    },
+  "chat.instructionsFilesLocations": {
+    "../../../microsoft/hve-core/.github/instructions/coding-standards": true,
+    "../../../microsoft/hve-core/.github/instructions/github": true,
+    "../../../microsoft/hve-core/.github/instructions/hve-core": true,
+    "../../../microsoft/hve-core/.github/instructions/shared": true,
+  },
+  "chat.agentFilesLocations": {
+    "../../../microsoft/hve-core/.github/agents/github": true,
+    "../../../microsoft/hve-core/.github/agents/installer": true,
+    "../../../microsoft/hve-core/.github/agents/project-planning": true,
+    "../../../microsoft/hve-core/.github/agents/hve-core": true,
+    "../../../microsoft/hve-core/.github/agents/hve-core/subagents": true,
+  },
+  "chat.promptFilesLocations": {
+    "../../../microsoft/hve-core/.github/prompts/github": true,
+    "../../../microsoft/hve-core/.github/prompts/hve-core": true,
+  },
 }

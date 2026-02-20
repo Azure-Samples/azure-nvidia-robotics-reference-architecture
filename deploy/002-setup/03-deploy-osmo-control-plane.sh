@@ -3,8 +3,10 @@
 set -o errexit -o nounset
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck disable=SC1091
 # shellcheck source=defaults.conf
 source "$SCRIPT_DIR/defaults.conf"
 
@@ -41,6 +43,8 @@ EOF
 tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
 chart_version="$OSMO_CHART_VERSION"
 image_version="$OSMO_IMAGE_VERSION"
+[[ "$OSMO_USE_PRERELEASE" == "true" ]] && chart_version="$OSMO_PRERELEASE_CHART_VERSION"
+[[ "$OSMO_USE_PRERELEASE" == "true" ]] && image_version="$OSMO_PRERELEASE_IMAGE_VERSION"
 use_acr=false
 acr_name=""
 osmo_identity_client_id=""
@@ -50,13 +54,15 @@ force_mek=false
 mek_config_file=""
 skip_service_config=false
 config_preview=false
+chart_version_set=false
+image_version_set=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)             show_help; exit 0 ;;
     -t|--tf-dir)           tf_dir="$2"; shift 2 ;;
-    --chart-version)       chart_version="$2"; shift 2 ;;
-    --image-version)       image_version="$2"; shift 2 ;;
+    --chart-version)       chart_version="$2"; chart_version_set=true; shift 2 ;;
+    --image-version)       image_version="$2"; image_version_set=true; shift 2 ;;
     --use-acr)             use_acr=true; shift ;;
     --acr-name)            acr_name="$2"; use_acr=true; shift 2 ;;
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
@@ -71,6 +77,83 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_tools az terraform kubectl helm jq openssl envsubst
+
+is_prerelease_tag() {
+  local tag="${1:?image tag required}"
+  [[ "$tag" =~ (rc|beta|alpha) ]]
+}
+
+validate_version_pair() {
+  [[ -n "$chart_version" ]] || fatal "Chart version cannot be empty"
+  [[ -n "$image_version" ]] || fatal "Image version cannot be empty"
+
+  if [[ "$chart_version_set" != "$image_version_set" ]]; then
+    fatal "Use --chart-version and --image-version together to keep a tested chart/image pair"
+  fi
+
+  if is_prerelease_tag "$image_version"; then
+    if [[ "$chart_version" != "$OSMO_PRERELEASE_CHART_VERSION" || "$image_version" != "$OSMO_PRERELEASE_IMAGE_VERSION" ]]; then
+      fatal "Unsupported prerelease pair: chart=${chart_version}, image=${image_version}. Set OSMO_PRERELEASE_CHART_VERSION/OSMO_PRERELEASE_IMAGE_VERSION to a tested pair, then retry."
+    fi
+
+    if [[ "$OSMO_USE_PRERELEASE" != "true" && "$chart_version_set" != "true" ]]; then
+      fatal "Prerelease image requires explicit opt-in. Set OSMO_USE_PRERELEASE=true or provide both --chart-version and --image-version."
+    fi
+  fi
+}
+
+verify_chart_exists() {
+  local chart_ref="${1:?chart reference required}"
+  helm show chart "$chart_ref" --version "$chart_version" >/dev/null 2>&1 || \
+    fatal "Chart ${chart_ref}:${chart_version} not found. For prerelease fallback, set OSMO_PRERELEASE_* to the previous tested pair and retry."
+}
+
+verify_image_exists() {
+  local image_name="${1:?image name required}"
+  if [[ "$use_acr" == "true" ]]; then
+    az acr repository show-tags --name "$acr_name" --repository "osmo/${image_name}" --query "contains(@, '${image_version}')" -o tsv | grep -qi '^true$' || \
+      fatal "Image osmo/${image_name}:${image_version} not found in ACR ${acr_name}. Import the image or use a tested prerelease fallback pair."
+    return
+  fi
+
+  if command -v docker >/dev/null 2>&1; then
+    docker manifest inspect "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1 || \
+      fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
+    return
+  fi
+
+  if command -v crane >/dev/null 2>&1; then
+    crane manifest "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1 || \
+      fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
+    return
+  fi
+
+  if is_prerelease_tag "$image_version"; then
+    fatal "Cannot validate nvcr.io image tag without docker or crane. Install one of them or deploy prerelease images through --use-acr."
+  fi
+
+  warn "Skipping nvcr.io image preflight for ${image_name}:${image_version} because docker/crane is unavailable"
+}
+
+run_preflight_checks() {
+  section "Preflight Version Checks"
+  validate_version_pair
+
+  if [[ "$use_acr" == "true" ]]; then
+    verify_chart_exists "oci://${acr_login_server}/helm/osmo"
+    verify_chart_exists "oci://${acr_login_server}/helm/router"
+    verify_chart_exists "oci://${acr_login_server}/helm/ui"
+  else
+    verify_chart_exists "osmo/service"
+    verify_chart_exists "osmo/router"
+    verify_chart_exists "osmo/web-ui"
+  fi
+
+  control_plane_images=(service router web-ui worker logger agent client init-container)
+  for image_name in "${control_plane_images[@]}"; do
+    verify_image_exists "$image_name"
+  done
+}
 
 #------------------------------------------------------------------------------
 # Gather Configuration
@@ -222,6 +305,8 @@ if [[ "$use_acr" == "false" ]]; then
   helm repo add osmo "$HELM_REPO_OSMO" 2>/dev/null || true
   helm repo update osmo
 fi
+
+run_preflight_checks
 
 #------------------------------------------------------------------------------
 # Deploy OSMO Charts
