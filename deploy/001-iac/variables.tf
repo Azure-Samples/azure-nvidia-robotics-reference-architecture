@@ -92,10 +92,10 @@ variable "postgresql_databases" {
   }
 }
 
-variable "postgresql_subnet_address_prefixes" {
-  type        = list(string)
-  description = "Address prefixes for the PostgreSQL delegated subnet"
-  default     = ["10.0.12.0/24"]
+variable "postgresql_location" {
+  type        = string
+  description = "Location for PostgreSQL Flexible Server. Defaults to the main location. Set to a different region when PostgreSQL provisioning is restricted in the primary location"
+  default     = null
 }
 
 variable "postgresql_sku_name" {

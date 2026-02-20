@@ -91,21 +91,21 @@ variable "should_deploy_postgresql" {
 
 variable "postgresql_config" {
   type = object({
+    location                  = string
     sku_name                  = string
     storage_mb                = number
     version                   = string
-    subnet_prefixes           = list(string)
     databases                 = map(object({ collation = string, charset = string }))
     zone                      = optional(string)
     high_availability_enabled = optional(bool, false)
     standby_availability_zone = optional(string)
   })
-  description = "PostgreSQL configuration for OSMO including SKU, storage, zone, HA settings, and database definitions"
+  description = "PostgreSQL configuration for OSMO including location, SKU, storage, zone, HA settings, and database definitions"
   default = {
+    location                  = "westus3"
     sku_name                  = "GP_Standard_D2s_v3"
     storage_mb                = 32768
     version                   = "16"
-    subnet_prefixes           = ["10.0.30.0/24"]
     databases                 = { osmo = { collation = "en_US.utf8", charset = "utf8" } }
     zone                      = null
     high_availability_enabled = false

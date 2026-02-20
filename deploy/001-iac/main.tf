@@ -97,10 +97,10 @@ module "platform" {
   should_deploy_postgresql = var.should_deploy_postgresql
   should_deploy_redis      = var.should_deploy_redis
   postgresql_config = {
+    location                  = coalesce(var.postgresql_location, var.location)
     sku_name                  = var.postgresql_sku_name
     storage_mb                = var.postgresql_storage_mb
     version                   = var.postgresql_version
-    subnet_prefixes           = var.postgresql_subnet_address_prefixes
     databases                 = var.postgresql_databases
     zone                      = var.postgresql_zone
     high_availability_enabled = var.postgresql_high_availability.enabled
