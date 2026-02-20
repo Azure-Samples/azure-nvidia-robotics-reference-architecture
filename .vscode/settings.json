@@ -77,14 +77,15 @@
         "editor.tabSize": 2,
     },
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
         "editor.tabSize": 4,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        }
     },
-    "black-formatter.args": [
-        "--line-length",
-        "120"
-    ],
+
     "python.analysis.extraPaths": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/external/IsaacLab/source/isaaclab",
