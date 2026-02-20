@@ -79,19 +79,16 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=xml",
-    "pytest-mock",
-    "pytest-cov",
-    "ruff",
 ]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
 markers = []
 
 [tool.ruff]
