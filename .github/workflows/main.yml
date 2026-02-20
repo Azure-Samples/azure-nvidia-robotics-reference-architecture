@@ -90,6 +90,13 @@ jobs:
       contents: read
       id-token: write
 
+  # Python pytest test execution
+  pytest-tests:
+    name: Pytest Tests
+    uses: ./.github/workflows/pytest-tests.yml
+    permissions:
+      contents: read
+
   # Automated release PR management via release-please
   release-please:
     if: "${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
@@ -104,6 +111,7 @@ jobs:
       - markdown-link-check
       - dependency-pinning
       - pester-tests
+      - pytest-tests
     name: Release Please
     runs-on: ubuntu-latest
     concurrency:
