@@ -88,6 +88,13 @@ resource "azurerm_kubernetes_cluster" "main" {
     admin_group_object_ids = []
   }
 
+  dynamic "microsoft_defender" {
+    for_each = var.aks_config.should_enable_microsoft_defender ? [1] : []
+    content {
+      log_analytics_workspace_id = var.log_analytics_workspace.id
+    }
+  }
+
   oms_agent {
     log_analytics_workspace_id      = var.log_analytics_workspace.id
     msi_auth_for_monitoring_enabled = true
@@ -127,8 +134,19 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
   max_count             = each.value.enable_auto_scaling ? each.value.max_count : null
   priority              = each.value.priority
   zones                 = each.value.zones
-  eviction_policy       = each.value.eviction_policy
+  eviction_policy       = each.value.priority == "Spot" ? each.value.eviction_policy : null
   gpu_driver            = each.value.gpu_driver
+  node_labels           = each.value.node_labels
+
+  // Spot pools do not support upgrade_settings (Azure rejects maxUnavailable for Spot)
+  dynamic "upgrade_settings" {
+    for_each = each.value.priority != "Spot" ? [1] : []
+    content {
+      max_surge                     = "10%"
+      drain_timeout_in_minutes      = 0
+      node_soak_duration_in_minutes = 0
+    }
+  }
 
   depends_on = [
     azurerm_subnet_nat_gateway_association.gpu_node_pool,

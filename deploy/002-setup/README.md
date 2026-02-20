@@ -183,6 +183,17 @@ See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_
 | `03-deploy-osmo-control-plane.sh` | OSMO service, router, web-ui          |
 | `04-deploy-osmo-backend.sh`       | Backend operator, workflow storage    |
 
+### RTX PRO 6000 GRID Driver
+
+RTX PRO 6000 BSE nodes use SR-IOV vGPU passthrough and require the Microsoft GRID driver instead of the NVIDIA datacenter driver. The deploy script detects nodes labeled `nvidia.com/gpu.deploy.driver=false` (set via Terraform `node_labels`) and applies a DaemonSet that installs the GRID driver on each matching node.
+
+| Component              | Path                                                                     |
+|------------------------|--------------------------------------------------------------------------|
+| DaemonSet manifest     | `manifests/gpu-grid-driver-installer.yaml`                               |
+| Node label (Terraform) | `node_labels = { "nvidia.com/gpu.deploy.driver" = "false" }`             |
+
+The DaemonSet uses an init container that runs `nsenter` into the host namespace to download and compile the Microsoft GRID driver (`580.105.08-grid-azure`). After installation, the GPU Operator's toolkit, device-plugin, and validator detect the pre-installed driver. New nodes added by the cluster autoscaler receive the driver automatically.
+
 ## 🚩 Script Flags
 
 | Flag                | Scripts                                                        | Description                                       |

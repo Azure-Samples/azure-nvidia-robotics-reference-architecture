@@ -3,8 +3,10 @@
 set -o errexit -o nounset
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck disable=SC1091
 # shellcheck source=defaults.conf
 source "$SCRIPT_DIR/defaults.conf"
 
@@ -31,6 +33,7 @@ OPTIONS:
     --regenerate-token      Force creation of a fresh service token
     --expires-at DATE       Token expiry date YYYY-MM-DD (default: +1 year)
     --config-preview        Print configuration and exit
+    --skip-preflight        Skip preflight version checks
     --skip-configure-datasets  Skip dataset bucket configuration
     --dataset-container NAME   Container name for datasets (default: datasets)
     --dataset-bucket NAME      OSMO bucket name (default: training)
@@ -45,6 +48,8 @@ EOF
 tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
 chart_version="$OSMO_CHART_VERSION"
 image_version="$OSMO_IMAGE_VERSION"
+[[ "$OSMO_USE_PRERELEASE" == "true" ]] && chart_version="$OSMO_PRERELEASE_CHART_VERSION"
+[[ "$OSMO_USE_PRERELEASE" == "true" ]] && image_version="$OSMO_PRERELEASE_IMAGE_VERSION"
 backend_name="default"
 backend_description="Default backend pool"
 container_name="osmo"
@@ -56,17 +61,20 @@ osmo_identity_client_id=""
 regenerate_token=false
 custom_expiry=""
 config_preview=false
+skip_preflight=false
 skip_configure_datasets=false
 dataset_container="${DATASET_CONTAINER_NAME}"
 dataset_bucket="${DATASET_BUCKET_NAME}"
+chart_version_set=false
+image_version_set=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)             show_help; exit 0 ;;
     -t|--tf-dir)           tf_dir="$2"; shift 2 ;;
     --service-url)         service_url="$2"; shift 2 ;;
-    --chart-version)       chart_version="$2"; shift 2 ;;
-    --image-version)       image_version="$2"; shift 2 ;;
+    --chart-version)       chart_version="$2"; chart_version_set=true; shift 2 ;;
+    --image-version)       image_version="$2"; image_version_set=true; shift 2 ;;
     --backend-name)        backend_name="$2"; shift 2 ;;
     --backend-description) backend_description="$2"; shift 2 ;;
     --container-name)      container_name="$2"; shift 2 ;;
@@ -77,6 +85,7 @@ while [[ $# -gt 0 ]]; do
     --regenerate-token)    regenerate_token=true; shift ;;
     --expires-at)          custom_expiry="$2"; shift 2 ;;
     --config-preview)      config_preview=true; shift ;;
+    --skip-preflight)      skip_preflight=true; shift ;;
     --skip-configure-datasets) skip_configure_datasets=true; shift ;;
     --dataset-container)   dataset_container="$2"; shift 2 ;;
     --dataset-bucket)      dataset_bucket="$2"; shift 2 ;;
@@ -85,6 +94,89 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_tools terraform osmo kubectl helm jq az envsubst
+
+is_prerelease_tag() {
+  local tag="${1:?image tag required}"
+  [[ "$tag" =~ (rc|beta|alpha) ]]
+}
+
+validate_version_pair() {
+  [[ -n "$chart_version" ]] || fatal "Chart version cannot be empty"
+  [[ -n "$image_version" ]] || fatal "Image version cannot be empty"
+
+  if [[ "$chart_version_set" != "$image_version_set" ]]; then
+    fatal "Use --chart-version and --image-version together to keep a tested chart/image pair"
+  fi
+
+  if is_prerelease_tag "$image_version"; then
+    if [[ "$chart_version" != "$OSMO_PRERELEASE_CHART_VERSION" || "$image_version" != "$OSMO_PRERELEASE_IMAGE_VERSION" ]]; then
+      fatal "Unsupported prerelease pair: chart=${chart_version}, image=${image_version}. Set OSMO_PRERELEASE_CHART_VERSION/OSMO_PRERELEASE_IMAGE_VERSION to a tested pair, then retry."
+    fi
+
+    if [[ "$OSMO_USE_PRERELEASE" != "true" && "$chart_version_set" != "true" ]]; then
+      fatal "Prerelease image requires explicit opt-in. Set OSMO_USE_PRERELEASE=true or provide both --chart-version and --image-version."
+    fi
+  fi
+}
+
+verify_chart_exists() {
+  local chart_ref="${1:?chart reference required}"
+  helm show chart "$chart_ref" --version "$chart_version" >/dev/null 2>&1 || \
+    fatal "Chart ${chart_ref}:${chart_version} not found. For prerelease fallback, set OSMO_PRERELEASE_* to the previous tested pair and retry."
+}
+
+verify_image_exists() {
+  local image_name="${1:?image name required}"
+  if [[ "$use_acr" == "true" ]]; then
+    az acr repository show-tags --name "$acr_name" --repository "osmo/${image_name}" --query "contains(@, '${image_version}')" -o tsv | grep -qi '^true$' || \
+      fatal "Image osmo/${image_name}:${image_version} not found in ACR ${acr_name}. Import the image or use a tested prerelease fallback pair."
+    return
+  fi
+
+  if command -v docker >/dev/null 2>&1; then
+    if ! docker manifest inspect "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1; then
+      if is_prerelease_tag "$image_version"; then
+        warn "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not verified. Prerelease images may require NGC authentication (docker login nvcr.io)."
+      else
+        fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
+      fi
+    fi
+    return
+  fi
+
+  if command -v crane >/dev/null 2>&1; then
+    if ! crane manifest "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1; then
+      if is_prerelease_tag "$image_version"; then
+        warn "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not verified. Prerelease images may require NGC authentication."
+      else
+        fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
+      fi
+    fi
+    return
+  fi
+
+  if is_prerelease_tag "$image_version"; then
+    warn "Cannot validate nvcr.io image tag without docker or crane. Prerelease images may require NGC authentication or --use-acr."
+  fi
+
+  warn "Skipping nvcr.io image preflight for ${image_name}:${image_version} because docker/crane is unavailable"
+}
+
+run_preflight_checks() {
+  section "Preflight Version Checks"
+  validate_version_pair
+
+  if [[ "$use_acr" == "true" ]]; then
+    verify_chart_exists "oci://${acr_login_server}/helm/backend-operator"
+  else
+    verify_chart_exists "osmo/backend-operator"
+  fi
+
+  backend_images=(backend-worker backend-listener delayed-job-monitor client init-container)
+  for image_name in "${backend_images[@]}"; do
+    verify_image_exists "$image_name"
+  done
+}
 
 az account show &>/dev/null || fatal "Azure CLI not logged in; run 'az login'"
 
@@ -130,6 +222,23 @@ fi
 account_key=""
 [[ "$use_access_keys" == "true" ]] && account_key=$(az storage account keys list -g "$rg" -n "$storage_name" --query '[0].value' -o tsv)
 
+auth_mode="workload-identity"
+[[ "$use_access_keys" == "true" ]] && auth_mode="access-keys"
+dataset_template="$CONFIG_DIR/dataset-config-${auth_mode}.template.json"
+
+if [[ "$use_access_keys" == "true" ]]; then
+  workflow_template="$CONFIG_DIR/workflow-config-access-keys.template.json"
+  workflow_template_mode="access-keys"
+elif [[ "$OSMO_USE_PRERELEASE" == "true" ]] || is_prerelease_tag "$image_version"; then
+  workflow_template="$CONFIG_DIR/workflow-config-workload-identity-v6.1.template.json"
+  workflow_template_mode="workload-identity-v6.1-keyless"
+else
+  workflow_template="$CONFIG_DIR/workflow-config-workload-identity.template.json"
+  workflow_template_mode="workload-identity-legacy-compatible"
+fi
+
+info "Workflow template selected (${workflow_template_mode}): ${workflow_template}"
+
 if [[ "$config_preview" == "true" ]]; then
   section "Configuration Preview"
   print_kv "Service URL" "$service_url"
@@ -140,6 +249,7 @@ if [[ "$config_preview" == "true" ]]; then
   print_kv "Container" "$container_name"
   print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
   print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
+  print_kv "Workflow Template" "$workflow_template"
   print_kv "Token Expiry" "$expiry_date"
   print_kv "Dataset Container" "$dataset_container"
   print_kv "Dataset Bucket" "$dataset_bucket"
@@ -156,11 +266,6 @@ scheduler_template="$CONFIG_DIR/scheduler-config.template.json"
 pod_template_file="$CONFIG_DIR/pod-template-config.template.json"
 default_pool_template="$CONFIG_DIR/default-pool-config.template.json"
 account_secret="osmo-operator-token"
-
-auth_mode="workload-identity"
-[[ "$use_access_keys" == "true" ]] && auth_mode="access-keys"
-workflow_template="$CONFIG_DIR/workflow-config-${auth_mode}.template.json"
-dataset_template="$CONFIG_DIR/dataset-config-${auth_mode}.template.json"
 
 required_files=("$values_file" "$scheduler_template" "$pod_template_file" "$default_pool_template" "$workflow_template")
 [[ "$skip_configure_datasets" == "false" ]] && required_files+=("$dataset_template")
@@ -216,6 +321,18 @@ else
 fi
 
 #------------------------------------------------------------------------------
+# Configure NGC Authentication (pre-release images)
+#------------------------------------------------------------------------------
+
+nvcr_auth_active=false
+if [[ "$use_acr" == "false" ]] && is_prerelease_tag "$image_version"; then
+  [[ -z "$NGC_API_KEY" ]] && fatal "NGC_API_KEY required for pre-release images from nvcr.io. Export NGC_API_KEY or use --use-acr."
+  section "Configure NGC Authentication"
+  create_nvcr_pull_secret "$NS_OSMO_OPERATOR" "$NGC_API_KEY" "$NVCR_PULL_SECRET"
+  nvcr_auth_active=true
+fi
+
+#------------------------------------------------------------------------------
 # Deploy Backend Operator
 #------------------------------------------------------------------------------
 section "Deploy Backend Operator"
@@ -226,6 +343,12 @@ else
   helm repo list -o json | jq -e '.[] | select(.name == "osmo")' >/dev/null 2>&1 || \
     helm repo add osmo https://helm.ngc.nvidia.com/nvidia/osmo >/dev/null
   helm repo update >/dev/null
+fi
+
+if [[ "$skip_preflight" == "true" ]]; then
+  warn "Skipping preflight version checks (--skip-preflight)"
+else
+  run_preflight_checks
 fi
 
 helm_args=(
@@ -244,6 +367,7 @@ helm_args=(
 if [[ "$use_acr" == "true" ]]; then
   helm_args+=(--set "global.osmoImageLocation=${acr_login_server}/osmo")
 fi
+[[ "$nvcr_auth_active" == "true" ]] && helm_args+=(--set "global.imagePullSecret=$NVCR_PULL_SECRET")
 
 if [[ "$use_access_keys" == "false" ]]; then
   helm_args+=(-f "$identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
@@ -261,7 +385,7 @@ fi
 section "Configure OSMO Backend"
 
 # Export variables for template rendering
-export GPU_INSTANCE_TYPE WORKFLOW_SERVICE_ACCOUNT
+export GPU_INSTANCE_TYPE GPU_INSTANCE_TYPE_RTXPRO GPU_INSTANCE_TYPE_H100 DEFAULT_PLATFORM WORKFLOW_SERVICE_ACCOUNT
 export BACKEND_NAME="$backend_name"
 export BACKEND_DESCRIPTION="$backend_description"
 export K8S_NAMESPACE="$NS_OSMO_WORKFLOWS"

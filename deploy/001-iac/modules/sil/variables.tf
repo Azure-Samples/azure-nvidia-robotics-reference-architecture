@@ -66,6 +66,7 @@ variable "aks_config" {
     system_node_pool_max_count           = optional(number)
     is_private_cluster                   = bool
     system_node_pool_zones               = optional(list(string))
+    should_enable_microsoft_defender      = optional(bool, false)
   })
   description = "AKS cluster configuration for the system node pool"
   default = {
@@ -85,6 +86,7 @@ variable "node_pools" {
     node_count              = optional(number, null)
     subnet_address_prefixes = list(string)
     node_taints             = optional(list(string), [])
+    node_labels             = optional(map(string), {})
     gpu_driver              = optional(string)
     priority                = optional(string, "Regular")
     enable_auto_scaling     = optional(bool, false)

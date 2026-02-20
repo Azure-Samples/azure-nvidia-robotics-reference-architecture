@@ -175,6 +175,19 @@ print_kv() {
   printf '%-18s %s\n' "$1:" "$2"
 }
 
+# Create NVCR image pull secret for NGC-authenticated registries
+create_nvcr_pull_secret() {
+  local ns="${1:?namespace required}" api_key="${2:?NGC API key required}" name="${3:-nvcr-pull-secret}"
+  info "Creating NVCR pull secret $name in namespace $ns..."
+  # shellcheck disable=SC2016
+  kubectl create secret docker-registry "$name" \
+    --namespace="$ns" \
+    --docker-server=nvcr.io \
+    --docker-username='$oauthtoken' \
+    --docker-password="$api_key" \
+    --dry-run=client -o yaml | kubectl apply -f -
+}
+
 # Apply SecretProviderClass for Azure Key Vault secrets sync
 # Usage: apply_secret_provider_class <namespace> <keyvault> <client_id> <tenant_id>
 apply_secret_provider_class() {

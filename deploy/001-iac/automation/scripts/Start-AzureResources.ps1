@@ -45,9 +45,9 @@ try {
     Write-Output ""
 
     Write-Output "Connecting to Azure using managed identity..."
-    $AzureContext = (Connect-AzAccount -Identity).Context
-    Set-AzContext -SubscriptionId $AzureContext.Subscription.Id | Out-Null
-    Write-Output "Connected to subscription: $($AzureContext.Subscription.Name)"
+    # $AzureContext = (Connect-AzAccount -Identity).Context
+    # Set-AzContext -SubscriptionId $AzureContext.Subscription.Id | Out-Null
+    # Write-Output "Connected to subscription: $($AzureContext.Subscription.Name)"
 
     # Start PostgreSQL first (dependency for AKS workloads)
     if ($PostgresServerName -and $PostgresServerName -ne "") {

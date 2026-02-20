@@ -1,7 +1,7 @@
 {
     "name": "${BACKEND_NAME}",
     "backend": "${BACKEND_NAME}",
-    "default_platform": "a10_platform",
+    "default_platform": "${DEFAULT_PLATFORM}",
     "platforms": {
         "a10_platform": {
             "description": "A10 GPU platform with spot instance support",
@@ -11,6 +11,30 @@
             "resource_validations": [],
             "override_pod_template": [
                 "aks_a10",
+                "workload_identity"
+            ],
+            "allowed_mounts": []
+        },
+        "rtxpro_platform": {
+            "description": "RTX PRO 6000 BSE v6 GPU platform (Regular priority)",
+            "host_network_allowed": false,
+            "privileged_allowed": true,
+            "default_variables": {},
+            "resource_validations": [],
+            "override_pod_template": [
+                "aks_rtxpro",
+                "workload_identity"
+            ],
+            "allowed_mounts": []
+        },
+        "h100_platform": {
+            "description": "H100 NVL GPU platform with Spot instance support (94 GB VRAM)",
+            "host_network_allowed": false,
+            "privileged_allowed": true,
+            "default_variables": {},
+            "resource_validations": [],
+            "override_pod_template": [
+                "aks_h100",
                 "workload_identity"
             ],
             "allowed_mounts": []

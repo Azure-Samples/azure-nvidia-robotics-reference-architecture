@@ -1,0 +1,34 @@
+{
+    "workflow_data": {
+        "credential": {
+            "endpoint": "${WORKFLOW_DATA_ENDPOINT}",
+            "region": "${AZURE_REGION}"
+        },
+        "base_url": "${WORKFLOW_BASE_URL}"
+    },
+    "workflow_log": {
+        "credential": {
+            "endpoint": "${WORKFLOW_LOG_ENDPOINT}",
+            "region": "${AZURE_REGION}"
+        }
+    },
+    "workflow_app": {
+        "credential": {
+            "endpoint": "${WORKFLOW_APP_ENDPOINT}",
+            "region": "${AZURE_REGION}"
+        }
+    },
+    "workflow_info": {
+        "tags": [],
+        "max_name_length": 64
+    },
+    "credential_config": {
+        "disable_registry_validation": [
+            "ghcr.io",
+            "${ACR_LOGIN_SERVER}"
+        ],
+        "disable_data_validation": [
+            "azure"
+        ]
+    }
+}

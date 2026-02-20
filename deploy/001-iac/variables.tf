@@ -92,10 +92,10 @@ variable "postgresql_databases" {
   }
 }
 
-variable "postgresql_subnet_address_prefixes" {
-  type        = list(string)
-  description = "Address prefixes for the PostgreSQL delegated subnet"
-  default     = ["10.0.12.0/24"]
+variable "postgresql_location" {
+  type        = string
+  description = "Location for PostgreSQL Flexible Server. Defaults to the main location. Set to a different region when PostgreSQL provisioning is restricted in the primary location"
+  default     = null
 }
 
 variable "postgresql_sku_name" {
@@ -291,6 +291,7 @@ variable "node_pools" {
     vm_size                 = string
     subnet_address_prefixes = list(string)
     node_taints             = optional(list(string), [])
+    node_labels             = optional(map(string), {})
     enable_auto_scaling     = optional(bool, false)
     min_count               = optional(number, null)
     max_count               = optional(number, null)
@@ -340,4 +341,10 @@ variable "should_enable_public_network_access" {
   type        = bool
   description = "Whether to enable public network access to the Azure ML workspace"
   default     = true
+}
+
+variable "should_enable_microsoft_defender" {
+  type        = bool
+  description = "Whether to enable Microsoft Defender for Containers on the AKS cluster"
+  default     = false
 }

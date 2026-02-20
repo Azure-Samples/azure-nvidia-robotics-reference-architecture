@@ -125,6 +125,19 @@ if [[ "$skip_gpu" == "false" ]]; then
   fi
 
   info "GPU Operator installed successfully"
+
+  # Install Microsoft GRID driver on RTX PRO 6000 nodes (vGPU/SR-IOV)
+  # These nodes have nvidia.com/gpu.deploy.driver=false and need the GRID driver
+  # instead of the datacenter driver managed by the GPU Operator.
+  grid_manifest="$MANIFESTS_DIR/gpu-grid-driver-installer.yaml"
+  if [[ -f "$grid_manifest" ]]; then
+    rtx_nodes=$(kubectl get nodes -l nvidia.com/gpu.deploy.driver=false -o name 2>/dev/null || true)
+    if [[ -n "$rtx_nodes" ]]; then
+      info "vGPU nodes detected (nvidia.com/gpu.deploy.driver=false) — applying GRID driver DaemonSet..."
+      kubectl apply -f "$grid_manifest"
+      info "GRID driver DaemonSet applied. Monitor with: kubectl logs -n gpu-operator -l app.kubernetes.io/name=gpu-grid-driver-installer -c installer"
+    fi
+  fi
 else
   info "Skipping GPU Operator (--skip-gpu-operator)"
 fi

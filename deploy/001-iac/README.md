@@ -59,6 +59,102 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | `system_node_pool_min_count`           | Minimum nodes when auto-scaling enabled  | `null`             |
 | `system_node_pool_max_count`           | Maximum nodes when auto-scaling enabled  | `null`             |
 
+### GPU Node Pools
+
+The `node_pools` variable defines one or more GPU node pools. Each pool specifies VM size, networking, scheduling, and driver configuration.
+
+| Attribute                 | Description                                   | Default        |
+|---------------------------|-----------------------------------------------|----------------|
+| `vm_size`                 | Azure VM size (must have GPU)                 | Required       |
+| `subnet_address_prefixes` | CIDR for the pool's dedicated subnet          | Required       |
+| `node_taints`             | Kubernetes taints applied to nodes            | `[]`           |
+| `node_labels`             | Kubernetes labels applied at provision time   | `{}`           |
+| `gpu_driver`              | AKS GPU driver: `"Install"`, `"None"`, `null` | `null`         |
+| `priority`                | `"Regular"` or `"Spot"`                       | `"Regular"`    |
+| `enable_auto_scaling`     | Enable cluster autoscaler for this pool       | `false`        |
+| `min_count`               | Minimum nodes when auto-scaling enabled       | `null`         |
+| `max_count`               | Maximum nodes when auto-scaling enabled       | `null`         |
+| `zones`                   | Availability zones                            | `null`         |
+| `eviction_policy`         | Spot eviction: `"Delete"` or `"Deallocate"`   | `"Deallocate"` |
+
+#### GPU Driver Modes
+
+Different GPU hardware requires different driver strategies:
+
+| GPU Type                      | `gpu_driver` | Driver Source                       |
+|-------------------------------|--------------|-------------------------------------|
+| A10 (Ada Lovelace)            | `"Install"`  | AKS-managed                         |
+| H100 (Hopper)                 | `"None"`     | GPU Operator datacenter driver      |
+| RTX PRO 6000 (Blackwell vGPU) | `"None"`     | Microsoft GRID driver via DaemonSet |
+
+RTX PRO 6000 nodes additionally require `node_labels = { "nvidia.com/gpu.deploy.driver" = "false" }` to skip GPU Operator driver management.
+
+> [!IMPORTANT]
+> RTX PRO 6000 BSE nodes use **SR-IOV vGPU passthrough** and require the Microsoft GRID driver (`580.105.08-grid-azure`) instead of the NVIDIA datacenter driver. Set `gpu_driver = "None"` and add the `nvidia.com/gpu.deploy.driver = "false"` node label to skip GPU Operator driver management on these nodes. The GRID driver is installed automatically by the DaemonSet in `deploy/002-setup/manifests/gpu-grid-driver-installer.yaml`.
+
+Spot node pools require `node_labels = { "kubernetes.azure.com/scalesetpriority" = "spot" }` to match the label Azure auto-applies and prevent terraform plan drift.
+
+#### Single Pool Example
+
+```hcl
+node_pools = {
+  gpu = {
+    vm_size                 = "Standard_NV36ads_A10_v5"
+    subnet_address_prefixes = ["10.0.7.0/24"]
+    node_taints             = ["nvidia.com/gpu:NoSchedule"]
+    gpu_driver              = "Install"
+    node_labels = {
+      "kubernetes.azure.com/scalesetpriority" = "spot"
+    }
+    priority                = "Spot"
+    enable_auto_scaling     = true
+    min_count               = 1
+    max_count               = 1
+    zones                   = []
+    eviction_policy         = "Delete"
+  }
+}
+```
+
+#### Multi-Pool Example (RTX PRO 6000 + H100)
+
+```hcl
+node_pools = {
+  rtxprogpu = {
+    vm_size                 = "Standard_NC128ds_xl_RTXPRO6000BSE_v6"
+    subnet_address_prefixes = ["10.0.7.0/24"]
+    node_taints             = ["nvidia.com/gpu:NoSchedule"]
+    gpu_driver              = "None"
+    node_labels = {
+      "nvidia.com/gpu.deploy.driver" = "false"
+    }
+    priority            = "Regular"
+    enable_auto_scaling = true
+    min_count           = 1
+    max_count           = 1
+    zones               = []
+  }
+  h100gpu = {
+    vm_size                 = "Standard_NC40ads_H100_v5"
+    subnet_address_prefixes = ["10.0.8.0/24"]
+    node_taints = [
+      "nvidia.com/gpu:NoSchedule",
+      "kubernetes.azure.com/scalesetpriority=spot:NoSchedule"
+    ]
+    gpu_driver = "None"
+    node_labels = {
+      "kubernetes.azure.com/scalesetpriority" = "spot"
+    }
+    priority            = "Spot"
+    eviction_policy     = "Delete"
+    enable_auto_scaling = true
+    min_count           = 1
+    max_count           = 1
+    zones               = []
+  }
+}
+```
+
 ### Feature Flags
 
 | Variable                              | Description                                               | Default |
@@ -67,6 +163,7 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | `should_enable_private_endpoint`      | Deploy private endpoints and DNS zones for Azure services | `true`  |
 | `should_enable_private_aks_cluster`   | Make AKS API endpoint private (requires VPN for kubectl)  | `true`  |
 | `should_enable_public_network_access` | Allow public access to resources                          | `true`  |
+| `should_enable_microsoft_defender`    | Enable Microsoft Defender for Containers on AKS           | `false` |
 | `should_deploy_postgresql`            | Deploy PostgreSQL Flexible Server for OSMO                | `true`  |
 | `should_deploy_redis`                 | Deploy Azure Managed Redis for OSMO                       | `true`  |
 
@@ -198,12 +295,13 @@ Root Module (001-iac/)
 
 ### Conditional Resources
 
-| Condition                        | Resources Created                                        |
-|----------------------------------|----------------------------------------------------------|
-| `should_enable_private_endpoint` | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS    |
-| `should_enable_nat_gateway`      | NAT Gateway, Public IP, subnet associations              |
-| `should_deploy_postgresql`       | PostgreSQL server, databases, delegated subnet, DNS zone |
-| `should_deploy_redis`            | Redis cache, private endpoint (if PE enabled), DNS zone  |
+| Condition                            | Resources Created                                        |
+|--------------------------------------|----------------------------------------------------------|
+| `should_enable_private_endpoint`     | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS    |
+| `should_enable_nat_gateway`          | NAT Gateway, Public IP, subnet associations              |
+| `should_enable_microsoft_defender`   | Microsoft Defender for Containers on the AKS cluster     |
+| `should_deploy_postgresql`           | PostgreSQL server, databases, delegated subnet, DNS zone |
+| `should_deploy_redis`               | Redis cache, private endpoint (if PE enabled), DNS zone  |
 
 ## 📦 Modules
 

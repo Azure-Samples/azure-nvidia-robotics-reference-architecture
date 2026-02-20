@@ -1,10 +1,13 @@
 # NVIDIA GPU Operator Helm values for Azure AKS
-# Configured for AKS with gpu_driver = "Install" (Azure-managed driver/toolkit)
+# Configured for AKS with mixed GPU node pools:
+#   - H100: datacenter driver managed by GPU Operator (driver.enabled: true)
+#   - RTX PRO 6000: Microsoft GRID driver pre-installed on host via
+#     gpu-grid-driver-installer DaemonSet (node label nvidia.com/gpu.deploy.driver=false
+#     skips GPU Operator driver management on these nodes)
 
-# Operator settings - use containerd runtime with AKS-compatible handler name
+# Operator settings
 operator:
-  defaultRuntime: containerd
-  runtimeClass: nvidia-container-runtime
+  runtimeClass: nvidia
 
 # Common tolerations for spot GPU nodes
 # Applied to all GPU Operator components that need to run on GPU nodes
@@ -18,16 +21,37 @@ daemonsets:
       value: spot
       effect: NoSchedule
 
-# Driver is managed by AKS GPU node pools (gpu_driver = "Install" in Terraform)
+# Driver managed by GPU Operator for datacenter GPUs (H100).
+# RTX PRO 6000 nodes have nvidia.com/gpu.deploy.driver=false label set via
+# Terraform node_labels, which causes the GPU Operator to skip driver deployment
+# on those nodes. The Microsoft GRID driver (580.105.08-grid-azure) is installed
+# separately via the gpu-grid-driver-installer DaemonSet (manifests/gpu-grid-driver-installer.yaml).
+# kernelModuleType: proprietary required for Azure vGPU (RTX PRO 6000 BSE open modules unsupported)
 driver:
-  enabled: false
+  enabled: true
+  kernelModuleType: proprietary
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
-# Toolkit is managed by AKS - do NOT enable as it will crash containerd
+# Toolkit managed by GPU Operator (gpu_driver = "Skip" in Terraform)
 toolkit:
-  enabled: false
+  enabled: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
 # Device plugin - required to advertise GPU resources to kubelet
-# AKS gpu_driver="Install" does NOT include the device plugin
 devicePlugin:
   enabled: true
   tolerations:
