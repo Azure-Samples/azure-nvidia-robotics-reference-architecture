@@ -261,7 +261,7 @@ fi
 section "Configure OSMO Backend"
 
 # Export variables for template rendering
-export GPU_INSTANCE_TYPE WORKFLOW_SERVICE_ACCOUNT
+export GPU_INSTANCE_TYPE GPU_INSTANCE_TYPE_RTXPRO GPU_INSTANCE_TYPE_H100 DEFAULT_PLATFORM WORKFLOW_SERVICE_ACCOUNT
 export BACKEND_NAME="$backend_name"
 export BACKEND_DESCRIPTION="$backend_description"
 export K8S_NAMESPACE="$NS_OSMO_WORKFLOWS"
