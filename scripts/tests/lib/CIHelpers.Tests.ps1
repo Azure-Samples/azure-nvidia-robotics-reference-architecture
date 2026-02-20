@@ -1,6 +1,13 @@
-#Requires -Modules Pester
+#!/usr/bin/env pwsh
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
+#
+# CIHelpers.Tests.ps1
+#
+# Purpose: Pester tests for CIHelpers module CI/CD abstraction functions
+# Author: HVE Core Team
+
+#Requires -Modules Pester
 
 BeforeAll {
     $modulePath = Join-Path $PSScriptRoot '../../lib/Modules/CIHelpers.psm1'
