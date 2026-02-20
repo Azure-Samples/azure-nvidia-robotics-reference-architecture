@@ -11,6 +11,7 @@ dependencies = [
     "ipython>=9.7.0",
     "ipywidgets>=8.1.8",
     "pytest>=8.4.2",
+    "pytest-cov>=6.2.1",
     "tqdm>=4.67.1",
     # Core Isaac Lab dependencies
     "numpy<3",
@@ -80,4 +81,12 @@ dev = [
     "ipywidgets>=8.1.8",
     "black>=25.9.0",
     "pytest>=8.4.2",
+    "pytest-cov>=6.2.1",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
 ]

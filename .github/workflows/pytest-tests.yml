@@ -28,3 +28,9 @@ jobs:
 
       - name: Run pytest
         run: pytest -v
+
+      - name: Upload coverage.xml artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        with:
+          name: pytest-coverage-xml
+          path: coverage.xml
