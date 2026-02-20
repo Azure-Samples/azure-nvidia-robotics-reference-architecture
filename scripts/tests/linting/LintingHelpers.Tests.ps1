@@ -7,9 +7,13 @@ BeforeAll {
     Import-Module $modulePath -Force
 }
 
+AfterAll {
+    Remove-Module 'LintingHelpers' -Force -ErrorAction SilentlyContinue
+}
+
 #region Get-ChangedFilesFromGit Tests
 
-Describe 'Get-ChangedFilesFromGit' {
+Describe 'Get-ChangedFilesFromGit' -Tag 'Unit' {
     Context 'Merge-base succeeds' {
         BeforeEach {
             $changedFiles = @('scripts/test.ps1', 'docs/readme.md', 'config/settings.json')
@@ -224,13 +228,94 @@ Describe 'Get-ChangedFilesFromGit' {
             $result | Should -BeNullOrEmpty
         }
     }
+
+    Context 'Third fallback explicit staged+unstaged diff' {
+        BeforeEach {
+            Mock git {
+                $global:LASTEXITCODE = 128
+                return $null
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'merge-base' }
+
+            Mock git {
+                $global:LASTEXITCODE = 128
+                return $null
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'rev-parse' }
+
+            Mock git {
+                $global:LASTEXITCODE = 0
+                return @('docs/new.md')
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'diff' }
+
+            Mock Test-Path { return $true } -ModuleName 'LintingHelpers' -ParameterFilter { $PathType -eq 'Leaf' }
+        }
+
+        It 'Falls through to staged+unstaged diff when merge-base and HEAD~1 both fail' {
+            $result = Get-ChangedFilesFromGit -BaseBranch 'origin/main' -FileExtensions @('*.md')
+            $result | Should -Contain 'docs/new.md'
+        }
+    }
+
+    Context 'FileExtensions wildcard default' {
+        BeforeEach {
+            Mock git {
+                $global:LASTEXITCODE = 0
+                return 'abc123def456789'
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'merge-base' }
+
+            Mock git {
+                $global:LASTEXITCODE = 0
+                return @('file.py', 'file.md', 'file.js')
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'diff' }
+
+            Mock Test-Path { return $true } -ModuleName 'LintingHelpers' -ParameterFilter { $PathType -eq 'Leaf' }
+        }
+
+        It 'Returns all file types when FileExtensions defaults to wildcard' {
+            $result = Get-ChangedFilesFromGit -BaseBranch 'origin/main'
+            $result | Should -HaveCount 3
+        }
+    }
+
+    Context 'Absolute and relative path handling' {
+        BeforeEach {
+            Mock git {
+                $global:LASTEXITCODE = 0
+                return 'abc123def456789'
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'merge-base' }
+
+            Mock git {
+                $global:LASTEXITCODE = 0
+                return @('/absolute/path/file.md', 'relative/file.md')
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'diff' }
+
+            Mock Test-Path { return $true } -ModuleName 'LintingHelpers' -ParameterFilter { $PathType -eq 'Leaf' }
+        }
+
+        It 'Handles mixed absolute and relative paths from git diff' {
+            $result = Get-ChangedFilesFromGit -BaseBranch 'origin/main' -FileExtensions @('*.md')
+            $result | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'Git diff output parsing exception' {
+        BeforeEach {
+            Mock git {
+                throw 'unexpected error during diff'
+            } -ModuleName 'LintingHelpers' -ParameterFilter { $args[0] -eq 'merge-base' }
+        }
+
+        It 'Returns empty array when git diff output cannot be parsed' {
+            $result = Get-ChangedFilesFromGit -BaseBranch 'origin/main'
+            $result | Should -BeNullOrEmpty
+        }
+    }
 }
 
 #endregion
 
 #region Get-FilesRecursive Tests
 
-Describe 'Get-FilesRecursive' {
+Describe 'Get-FilesRecursive' -Tag 'Unit' {
     Context 'Basic file enumeration' {
         BeforeEach {
             New-Item -Path 'TestDrive:/scripts' -ItemType Directory -Force | Out-Null
@@ -313,13 +398,34 @@ Describe 'Get-FilesRecursive' {
             $result.Count | Should -Be 1
         }
     }
+
+    Context 'Empty Include array' {
+        BeforeEach {
+            New-Item -Path 'TestDrive:/emptyinc' -ItemType Directory -Force | Out-Null
+            New-Item -Path 'TestDrive:/emptyinc/file.txt' -ItemType File -Force | Out-Null
+        }
+
+        It 'Throws when Include is empty' {
+            { Get-FilesRecursive -Path 'TestDrive:/emptyinc' -Include @() } | Should -Throw
+        }
+    }
+
+    Context 'File path instead of directory' {
+        BeforeEach {
+            New-Item -Path 'TestDrive:/single-file.ps1' -ItemType File -Force | Out-Null
+        }
+
+        It 'Handles file path gracefully' {
+            { Get-FilesRecursive -Path 'TestDrive:/single-file.ps1' -Include @('*.ps1') } | Should -Not -Throw
+        }
+    }
 }
 
 #endregion
 
 #region Get-GitIgnorePatterns Tests
 
-Describe 'Get-GitIgnorePatterns' {
+Describe 'Get-GitIgnorePatterns' -Tag 'Unit' {
     Context 'Non-existent file' {
         It 'Returns empty for non-existent file' {
             $result = Get-GitIgnorePatterns -GitIgnorePath 'TestDrive:/nonexistent/.gitignore'
@@ -396,6 +502,22 @@ Describe 'Get-GitIgnorePatterns' {
             @('node_modules/', 'dist/', '*.tmp', 'logs/debug.log') | Set-Content 'TestDrive:/.gitignore-multi'
             $result = Get-GitIgnorePatterns -GitIgnorePath 'TestDrive:/.gitignore-multi'
             $result.Count | Should -Be 4
+        }
+    }
+
+    Context 'Negation and special patterns' {
+        It 'Handles negation patterns without error' {
+            $gitignorePath = Join-Path $TestDrive '.gitignore-negation'
+            @('*.log', '!important.log') | Set-Content $gitignorePath
+            $result = @(Get-GitIgnorePatterns -GitIgnorePath $gitignorePath)
+            $result.Count | Should -BeGreaterOrEqual 1
+        }
+
+        It 'Handles nested glob patterns' {
+            $gitignorePath = Join-Path $TestDrive '.gitignore-nested'
+            @('**/build/**', 'src/**/temp') | Set-Content $gitignorePath
+            $result = @(Get-GitIgnorePatterns -GitIgnorePath $gitignorePath)
+            $result.Count | Should -Be 2
         }
     }
 }

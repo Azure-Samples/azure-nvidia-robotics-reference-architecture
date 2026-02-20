@@ -97,6 +97,15 @@ jobs:
     permissions:
       contents: read
 
+  # CodeQL security analysis
+  codeql-analysis:
+    name: CodeQL Analysis
+    uses: ./.github/workflows/codeql-analysis.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
   # Automated release PR management via release-please
   release-please:
     needs:
@@ -111,6 +120,7 @@ jobs:
       - dependency-pinning
       - pester-tests
       - python-lint
+      - codeql-analysis
     name: Release Please
     runs-on: ubuntu-latest
     concurrency:
