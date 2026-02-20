@@ -1,0 +1,37 @@
+# Azure Blob Storage configuration
+blob_storage:
+  account_url: "https://stosmorbt3dev001.blob.core.windows.net"
+  container: "datasets"
+  rosbag_prefix: "houston_recordings/"     # Blob prefix for source rosbags
+  lerobot_prefix: "houston_lerobot_fixed/" # Blob prefix for output datasets
+
+# LeRobot dataset configuration
+dataset:
+  repo_id: "hve-robo/ur10e-rosbag-converted"
+  robot_type: "ur10e"
+  fps: 30
+  task_description: "UR10e manipulation task"
+  vcodec: "libsvtav1"                      # Video codec: libsvtav1 | h264 | hevc
+
+# ROS topic mapping
+topics:
+  joint_states: "/joint_states"
+  camera: "/camera/camera/depth/image_rect_raw"
+
+# Joint coordinate convention handling
+conventions:
+  apply_joint_sign: true                   # Apply RTDE → training sign flip
+  joint_sign: [1.0, -1.0, -1.0, 1.0, 1.0, 1.0]  # Negate shoulder + elbow
+  wrap_angles: true                        # Wrap joint angles to (-π, π]
+  image_resize: [480, 848]                 # Resize images to [height, width]
+
+# ROS bag reading settings
+ros:
+  distro: "ROS2_HUMBLE"                   # rosbags typestore: ROS2_HUMBLE | ROS2_IRON | LATEST
+
+# Processing settings
+processing:
+  temp_dir: null                           # Temp directory for downloads (null = system temp)
+  cleanup_temp: true                       # Delete temp files after upload
+  episode_gap_threshold_s: 2.0            # Time gap to split episodes within a bag
+  split_episodes: false                    # Whether to detect episode boundaries within bags

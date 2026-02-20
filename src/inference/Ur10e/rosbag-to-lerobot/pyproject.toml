@@ -1,0 +1,39 @@
+[project]
+name = "rosbag-to-lerobot"
+version = "0.1.0"
+description = "Convert ROS bag recordings to LeRobot v3 datasets with Azure Blob Storage integration"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "rosbags>=0.10.0",
+    "lerobot>=0.1.0",
+    "azure-storage-blob>=12.20.0",
+    "azure-identity>=1.17.0",
+    "numpy>=1.24.0",
+    "opencv-python>=4.8.0",
+    "pillow>=10.0.0",
+    "pyyaml>=6.0",
+    "torch>=2.0.0",
+    "tqdm>=4.65.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+
+[project.scripts]
+rosbag-to-lerobot = "rosbag_to_lerobot.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["rosbag_to_lerobot*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

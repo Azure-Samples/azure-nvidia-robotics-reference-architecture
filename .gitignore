@@ -458,3 +458,9 @@ venv/
 .DS_Store
 .beads/
 external/
+*.parquet
+*.mp4
+/src/inference/Ur10e/checkpoint
+/src/inference/Ur10e/hve-robo-act-train
+/src/inference/Ur10e/pretrained_model
+/src/inference/Ur10e/template/hve-robo

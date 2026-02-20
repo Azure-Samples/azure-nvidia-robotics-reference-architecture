@@ -1,0 +1,39 @@
+# UR10e ACT Policy Deployment Configuration
+# -------------------------------------------
+# Edit this file to match your setup.
+# All values shown are defaults.
+
+robot:
+  ip: "192.168.2.102"
+  rtde_frequency: 500.0            # Hz — native RTDE rate
+
+  # Safety limits
+  max_delta_rad: 0.05              # Max per-step joint delta (~2.86 deg)
+  max_joint_vel: 1.0               # Max joint velocity (rad/s)
+  max_drift_rad: 1.5               # Max cumulative drift from start (~85.9 deg)
+
+  # servoJ tuning
+  servo_lookahead: 0.1             # seconds
+  servo_gain: 300                  # 100–2000
+
+camera:
+  backend: "realsense"             # "opencv" or "realsense"
+  device_id: 0
+  capture_width: 640               # Native sensor resolution
+  capture_height: 480
+  width: 848                       # Policy input resolution
+  height: 480
+  fps: 30
+
+policy:
+  checkpoint_dir: "../checkpoint/houston-ur10e-act/pretrained_model"
+  device: "cuda"                   # cuda, cpu, or mps
+  action_mode: "delta"             # "delta" or "absolute"
+  chunk_size: 100
+  n_action_steps: 100
+  temporal_ensemble_coeff: 0.01    # null to disable, 0.01 for smooth blending
+
+control_hz: 30.0
+enable_control: true               # Start with dry-run; set true for live
+log_dir: "./logs"
+max_episode_steps: 3000            # ~100 s at 30 Hz

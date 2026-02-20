@@ -1,0 +1,41 @@
+[project]
+name = "ur10e-act-deploy"
+version = "0.1.0"
+description = "Deploy LeRobot ACT policy on UR10e via RTDE"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "ur-rtde>=1.5.0",
+    "lerobot>=0.1.0",
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+    "safetensors>=0.4",
+    "huggingface-hub>=0.19",
+    "pyyaml>=6.0",
+    "flask>=3.0",
+    "pyarrow>=14.0",
+    "rosbags>=0.11",
+]
+
+[project.optional-dependencies]
+realsense = ["pyrealsense2>=2.54"]
+dev = ["pytest", "ruff", "mypy"]
+
+[project.scripts]
+ur10e-deploy = "ur10e_deploy.main:main"
+ur10e-replay = "ur10e_deploy.replay:main"
+ur10e-rosbag-replay = "ur10e_deploy.rosbag_replay:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ur10e_deploy*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

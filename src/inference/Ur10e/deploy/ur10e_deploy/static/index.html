@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UR10e ACT Policy Dashboard</title>
+<script src="/static/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --panel: #151921;
+    --panel-hover: #1a2030;
+    --border: #252a36;
+    --text: #e8eaed;
+    --muted: #7c8091;
+    --accent: #4d8bf5;
+    --accent-dim: #2d5bb5;
+    --green: #2dd47a;
+    --green-dim: #1a7a46;
+    --red: #f0535a;
+    --red-dim: #8a2028;
+    --yellow: #f0c030;
+    --orange: #f09030;
+    --mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+    --sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(8px);
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .live-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .live-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .connection-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--green-dim);
+    color: var(--green);
+    font-weight: 500;
+  }
+  .connection-badge.disconnected { background: var(--red-dim); color: var(--red); }
+
+  .status-bar {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--muted);
+  }
+  .status-item .ind {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .status-item .ind.ok { background: var(--green); box-shadow: 0 0 4px var(--green-dim); }
+  .status-item .ind.warn { background: var(--yellow); }
+  .status-item .ind.err { background: var(--red); }
+
+  /* ---------- Grid ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 10px 16px 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    transition: border-color 0.2s;
+  }
+  .panel:hover { border-color: var(--accent-dim); }
+  .panel h2 {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .panel h2 .icon { font-size: 13px; }
+
+  /* ---------- Camera ---------- */
+  .camera-panel { grid-column: 1; grid-row: 1; }
+  .camera-wrapper {
+    position: relative;
+    background: #000;
+    border-radius: 6px;
+    overflow: hidden;
+    aspect-ratio: 848/480;
+  }
+  .camera-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .camera-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 6px 10px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    font-family: var(--mono);
+    display: flex; justify-content: space-between;
+  }
+  .no-camera-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .no-camera-msg.hidden { display: none; }
+
+  /* ---------- Joint table ---------- */
+  .joint-panel { grid-column: 2; grid-row: 1; }
+  .joint-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .joint-table th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .joint-table th.r { text-align: right; }
+  .joint-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .joint-table tr:last-child td { border-bottom: none; }
+  .joint-table .r { text-align: right; }
+  .jn { color: var(--accent); font-weight: 600; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .warn-val { color: var(--orange); font-weight: 600; }
+
+  /* ---------- Stats row ---------- */
+  .stats-panel { grid-column: 1 / -1; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+  .stat {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+  .stat:hover { border-color: var(--border); }
+  .stat .lbl {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .stat .val {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono);
+    line-height: 1.1;
+  }
+  .stat .unit {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 1px;
+    font-weight: 400;
+  }
+
+  /* ---------- Chart ---------- */
+  .chart-panel { grid-column: 1 / -1; }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .chart-tabs {
+    display: flex;
+    gap: 3px;
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .chart-tab {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: var(--sans);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .chart-tab:hover { color: var(--text); }
+  .chart-tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .chart-container { position: relative; height: 240px; }
+
+  /* ---------- Drift ---------- */
+  .drift-panel { grid-column: 1; }
+  .drift-rows { display: flex; flex-direction: column; gap: 5px; }
+  .drift-row { display: flex; align-items: center; gap: 6px; }
+  .drift-lbl { width: 56px; font-size: 11px; color: var(--muted); text-align: right; font-family: var(--mono); }
+  .drift-track {
+    flex: 1; height: 16px; background: var(--bg); border-radius: 3px;
+    overflow: hidden; position: relative;
+  }
+  .drift-fill {
+    height: 100%; border-radius: 3px;
+    transition: width 0.25s ease, background 0.25s;
+    min-width: 1px;
+  }
+  .drift-num {
+    width: 64px; font-size: 11px; font-family: var(--mono); text-align: right;
+  }
+
+  /* ---------- Norm diagnostics ---------- */
+  .norm-panel { grid-column: 2; }
+  .norm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    font-family: var(--mono);
+  }
+  .norm-table th {
+    text-align: left; color: var(--muted); padding: 3px 6px;
+    font-size: 10px; border-bottom: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .norm-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .norm-help {
+    margin-top: 10px; font-size: 10px; color: var(--muted);
+    padding: 8px; background: var(--bg); border-radius: 4px;
+    line-height: 1.5;
+  }
+
+  /* ---------- Idle overlay ---------- */
+  .idle-overlay {
+    position: fixed;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 13px;
+    color: var(--muted);
+    z-index: 100;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  .idle-overlay.hidden { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(20px); }
+  .spin {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Error banner ---------- */
+  .error-banner {
+    position: fixed;
+    top: 48px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    z-index: 200;
+    display: none;
+    gap: 8px;
+    align-items: center;
+  }
+  .error-banner.show { display: flex; }
+
+  /* ---------- Footer ---------- */
+  footer {
+    text-align: center; padding: 10px;
+    font-size: 10px; color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 960px) {
+    .grid { grid-template-columns: 1fr; }
+    .camera-panel, .joint-panel, .chart-panel,
+    .stats-panel, .drift-panel, .norm-panel { grid-column: 1; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Error banner -->
+<div class="error-banner" id="error-banner">
+  <span>&#9888;</span>
+  <span id="error-msg">Connection lost — reconnecting...</span>
+</div>
+
+<header>
+  <div class="header-left">
+    <div class="live-dot" id="live-dot"></div>
+    <h1>UR10e ACT Policy Dashboard</h1>
+    <span class="connection-badge disconnected" id="conn-badge">Connecting</span>
+  </div>
+  <div class="status-bar" id="status-bar">
+    <div class="status-item"><span class="ind" id="st-robot"></span>Robot</div>
+    <div class="status-item"><span class="ind" id="st-camera"></span>Camera</div>
+    <div class="status-item"><span class="ind" id="st-policy"></span>Policy</div>
+    <div class="status-item"><span class="ind" id="st-control"></span>Control</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Camera -->
+  <div class="panel camera-panel">
+    <h2><span class="icon">&#128247;</span> Policy Camera Input</h2>
+    <div class="camera-wrapper">
+      <img id="camera-feed" alt="Camera feed" />
+      <div class="no-camera-msg" id="no-camera">
+        <span style="font-size:24px;">&#128247;</span>
+        <span>No camera feed</span>
+      </div>
+      <div class="camera-overlay">
+        <span id="cam-res">848 &times; 480</span>
+        <span id="cam-step">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Joints -->
+  <div class="panel joint-panel">
+    <h2><span class="icon">&#9881;</span> Joint State <span style="font-weight:400;color:var(--muted)">(radians)</span></h2>
+    <table class="joint-table">
+      <thead>
+        <tr>
+          <th>Joint</th>
+          <th class="r">Current</th>
+          <th class="r">Target</th>
+          <th class="r">Delta</th>
+          <th class="r">Drift</th>
+        </tr>
+      </thead>
+      <tbody id="joint-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Stats -->
+  <div class="panel stats-panel">
+    <h2><span class="icon">&#128200;</span> Episode Statistics</h2>
+    <div class="stats-grid">
+      <div class="stat"><div class="lbl">Step</div><div class="val" id="s-step">—</div></div>
+      <div class="stat"><div class="lbl">Loop Hz</div><div class="val" id="s-hz">—<span class="unit">Hz</span></div></div>
+      <div class="stat"><div class="lbl">Inference</div><div class="val" id="s-inf">—<span class="unit">ms</span></div></div>
+      <div class="stat"><div class="lbl">Buffer</div><div class="val" id="s-buf">—</div></div>
+      <div class="stat"><div class="lbl">Violations</div><div class="val" id="s-viol" style="color:var(--green)">0</div></div>
+      <div class="stat"><div class="lbl">Max |&Delta;|</div><div class="val" id="s-maxd">—<span class="unit">rad</span></div></div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="panel chart-panel">
+    <div class="chart-header">
+      <h2 style="margin-bottom:0"><span class="icon">&#128200;</span> Joint Trajectories</h2>
+      <div class="chart-tabs" id="chart-tabs">
+        <button class="chart-tab active" data-mode="position">Position</button>
+        <button class="chart-tab" data-mode="delta">Raw Delta</button>
+        <button class="chart-tab" data-mode="error">Target Error</button>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="traj-chart"></canvas>
+    </div>
+  </div>
+
+  <!-- Drift -->
+  <div class="panel drift-panel">
+    <h2><span class="icon">&#8596;</span> Cumulative Drift from Start</h2>
+    <div class="drift-rows" id="drift-rows"></div>
+  </div>
+
+  <!-- Norm -->
+  <div class="panel norm-panel">
+    <h2><span class="icon">&#128290;</span> Normalization Diagnostics</h2>
+    <table class="norm-table">
+      <thead><tr><th>Joint</th><th>Norm Input</th><th>Norm Output</th></tr></thead>
+      <tbody id="norm-tbody"></tbody>
+    </table>
+    <div class="norm-help">
+      Values should be roughly in [&minus;3, 3] for properly normalized data.<br>
+      Extreme values indicate a normalization mismatch.
+    </div>
+  </div>
+
+</div>
+
+<div class="idle-overlay" id="idle-overlay">
+  <div class="spin"></div>
+  <span>Waiting for episode data &mdash; start a run with <code style="background:var(--bg);padding:1px 6px;border-radius:3px">--config deploy.yaml</code></span>
+</div>
+
+<footer>UR10e ACT Policy Deployment &mdash; Diagnostic Dashboard</footer>
+
+<script>
+"use strict";
+
+// ============================================================
+// Constants
+// ============================================================
+const JN = ["base", "shoulder", "elbow", "wrist1", "wrist2", "wrist3"];
+const JC = ["#4d8bf5", "#2dd47a", "#f0c030", "#f0535a", "#b06df0", "#f09030"];
+
+// ============================================================
+// State
+// ============================================================
+let chartMode = "position";
+let sseOk = false;
+let lastDataTime = 0;
+
+// ============================================================
+// DOM helpers
+// ============================================================
+const $ = (id) => document.getElementById(id);
+const Q = (sel) => document.querySelectorAll(sel);
+
+// ============================================================
+// Init joint table rows
+// ============================================================
+function initJointTable() {
+  const tb = $("joint-tbody");
+  tb.innerHTML = JN.map(n =>
+    `<tr><td class="jn">${n}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`
+  ).join("");
+}
+initJointTable();
+
+// ============================================================
+// Init norm table rows
+// ============================================================
+function initNormTable() {
+  const tb = $("norm-tbody");
+  tb.innerHTML = JN.map(n => `<tr><td>${n}</td><td>—</td><td>—</td></tr>`).join("");
+}
+initNormTable();
+
+// ============================================================
+// Init drift bars
+// ============================================================
+function initDrift() {
+  const c = $("drift-rows");
+  c.innerHTML = JN.map((n, i) => `
+    <div class="drift-row">
+      <div class="drift-lbl">${n}</div>
+      <div class="drift-track"><div class="drift-fill" id="df-${i}" style="width:0;background:${JC[i]}"></div></div>
+      <div class="drift-num" id="dv-${i}">0.000</div>
+    </div>
+  `).join("");
+}
+initDrift();
+
+// ============================================================
+// Chart.js
+// ============================================================
+let chart = null;
+
+function initChart() {
+  if (typeof Chart === "undefined") {
+    console.error("Chart.js not loaded");
+    return;
+  }
+  const ctx = $("traj-chart").getContext("2d");
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: JN.map((name, i) => ({
+        label: name,
+        data: [],
+        borderColor: JC[i],
+        backgroundColor: JC[i] + "18",
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.25,
+        fill: false,
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "nearest", intersect: false, axis: "x" },
+      scales: {
+        x: {
+          display: true,
+          title: { display: true, text: "Time (s)", color: "#7c8091", font: { size: 11 } },
+          ticks: { color: "#7c8091", maxTicksLimit: 10, callback: function(v) { return typeof v === 'number' ? v.toFixed(1) : v; } },
+          grid: { color: "rgba(255,255,255,0.04)" },
+        },
+        y: {
+          display: true,
+          title: { display: true, text: "rad", color: "#7c8091", font: { size: 11 } },
+          ticks: { color: "#7c8091" },
+          grid: { color: "rgba(255,255,255,0.04)" },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: { color: "#e8eaed", usePointStyle: true, pointStyle: "circle", padding: 12, font: { size: 11 } },
+        },
+        tooltip: {
+          backgroundColor: "#151921",
+          borderColor: "#252a36",
+          borderWidth: 1,
+          titleColor: "#e8eaed",
+          bodyColor: "#7c8091",
+          bodyFont: { family: "'Cascadia Code', monospace", size: 11 },
+          padding: 8,
+        },
+      },
+    },
+  });
+}
+
+// Defer chart init until after script load
+try { initChart(); } catch(e) { console.error("Chart init failed:", e); }
+
+// Chart tab clicks
+$("chart-tabs").addEventListener("click", function(e) {
+  const btn = e.target.closest(".chart-tab");
+  if (!btn) return;
+  chartMode = btn.dataset.mode;
+  Q(".chart-tab").forEach(b => b.classList.toggle("active", b === btn));
+  const titles = { position: "rad", delta: "rad/step", error: "rad" };
+  if (chart) chart.options.scales.y.title.text = titles[chartMode] || "rad";
+});
+
+// ============================================================
+// Camera feed — MJPEG stream with reconnection
+// ============================================================
+let cameraOk = false;
+let camReconnectTimer = null;
+
+function startCamera() {
+  const img = $("camera-feed");
+  const noMsg = $("no-camera");
+
+  // Use MJPEG multipart stream — browser handles frame updates natively
+  img.src = "/api/camera/mjpeg?t=" + Date.now();
+
+  img.onload = function() {
+    if (!cameraOk) {
+      cameraOk = true;
+      noMsg.classList.add("hidden");
+    }
+  };
+
+  img.onerror = function() {
+    cameraOk = false;
+    noMsg.classList.remove("hidden");
+    // Schedule reconnection attempt
+    if (!camReconnectTimer) {
+      camReconnectTimer = setTimeout(() => {
+        camReconnectTimer = null;
+        startCamera();
+      }, 2000);
+    }
+  };
+}
+startCamera();
+
+// ============================================================
+// SSE with robust reconnection + REST polling fallback
+// ============================================================
+let evtSource = null;
+let retryMs = 1000;
+let lastSSEUpdate = 0;
+
+function showError(msg) {
+  $("error-msg").textContent = msg;
+  $("error-banner").classList.add("show");
+}
+function hideError() { $("error-banner").classList.remove("show"); }
+
+function connectSSE() {
+  if (evtSource) { try { evtSource.close(); } catch(_) {} }
+
+  try {
+    evtSource = new EventSource("/api/stream");
+  } catch(e) {
+    showError("Cannot connect to server");
+    setTimeout(connectSSE, retryMs);
+    retryMs = Math.min(retryMs * 2, 10000);
+    return;
+  }
+
+  evtSource.onopen = () => {
+    sseOk = true;
+    retryMs = 1000;
+    hideError();
+    const badge = $("conn-badge");
+    badge.textContent = "Connected";
+    badge.classList.remove("disconnected");
+  };
+
+  evtSource.onmessage = (ev) => {
+    lastDataTime = Date.now();
+    lastSSEUpdate = Date.now();
+    try {
+      const data = JSON.parse(ev.data);
+      updateDashboard(data);
+    } catch(e) { console.error("SSE parse error:", e, ev.data?.substring(0, 200)); }
+  };
+
+  evtSource.onerror = () => {
+    sseOk = false;
+    evtSource.close();
+    const badge = $("conn-badge");
+    badge.textContent = "Reconnecting";
+    badge.classList.add("disconnected");
+    showError("Connection lost — reconnecting...");
+    setTimeout(connectSSE, retryMs);
+    retryMs = Math.min(retryMs * 2, 10000);
+  };
+}
+connectSSE();
+
+// REST polling fallback — fires when SSE hasn't delivered data recently
+setInterval(async () => {
+  if (Date.now() - lastSSEUpdate < 2000) return; // SSE is working, skip poll
+  try {
+    const r = await fetch("/api/latest?t=" + Date.now());
+    if (!r.ok) return;
+    const data = await r.json();
+    updateDashboard(data);
+    // If fallback is providing data, update connection badge
+    if (data && (data.step || data.status)) {
+      hideError();
+      const badge = $("conn-badge");
+      badge.textContent = "Polling";
+      badge.classList.remove("disconnected");
+      lastDataTime = Date.now();
+    }
+  } catch(_) {}
+}, 500);
+
+// Stale-data watchdog: if no SSE message for 5s, force reconnect
+setInterval(() => {
+  if (sseOk && lastDataTime > 0 && Date.now() - lastDataTime > 5000) {
+    console.warn("No data for 5s, reconnecting SSE");
+    if (evtSource) { try { evtSource.close(); } catch(_) {} }
+    sseOk = false;
+    connectSSE();
+  }
+}, 3000);
+
+// ============================================================
+// Trajectory fetch (1 Hz)
+// ============================================================
+setInterval(async () => {
+  try {
+    const r = await fetch("/api/trajectories?n=600");
+    if (!r.ok) return;
+    const d = await r.json();
+    updateChart(d);
+  } catch(_) {}
+}, 1000);
+
+// ============================================================
+// Dashboard update
+// ============================================================
+function updateDashboard(data) {
+  if (!data) return;
+  const st = data.status || {};
+  const step = data.step;
+
+  // Live dot
+  $("live-dot").classList.toggle("active", !!st.episode_active);
+
+  // Status indicators
+  setInd("st-robot",   st.robot_connected);
+  setInd("st-camera",  st.camera_connected);
+  setInd("st-policy",  st.policy_loaded);
+  setInd("st-control", st.control_enabled, true);
+
+  // Idle overlay
+  const connected = st.robot_connected || st.policy_loaded;
+  $("idle-overlay").classList.toggle("hidden", !!connected);
+
+  // Camera overlay — show/hide based on whether frames have arrived
+  if (st.has_image) {
+    $("no-camera").classList.add("hidden");
+  }
+
+  if (!step) return;
+
+  // Stats
+  $("s-step").textContent = step.step;
+
+  const hz = step.loop_dt_ms > 0 ? (1000 / step.loop_dt_ms).toFixed(1) : "—";
+  $("s-hz").innerHTML = hz + '<span class="unit">Hz</span>';
+  $("s-inf").innerHTML = (step.inference_dt_ms != null ? step.inference_dt_ms.toFixed(1) : "—") + '<span class="unit">ms</span>';
+  $("s-buf").textContent = step.buffer_depth != null ? step.buffer_depth : "—";
+
+  const viol = st.total_safety_violations || 0;
+  const violEl = $("s-viol");
+  violEl.textContent = viol;
+  violEl.style.color = viol > 0 ? "var(--red)" : "var(--green)";
+
+  const absDelta = (step.raw_action || []).map(Math.abs);
+  const maxD = absDelta.length > 0 ? Math.max(...absDelta) : 0;
+  $("s-maxd").innerHTML = maxD.toFixed(4) + '<span class="unit">rad</span>';
+
+  // Joint table
+  updateJoints(step, st.cumulative_delta || []);
+
+  // Drift bars
+  updateDrift(st.cumulative_delta || []);
+
+  // Norm diagnostics
+  updateNorm(data.norm_input_state, data.norm_output_action);
+
+  // Camera overlay
+  $("cam-step").textContent = "Step " + step.step + " | " + hz + " Hz";
+}
+
+function setInd(id, ok, isCtrl) {
+  const el = $(id);
+  if (!el) return;
+  el.className = "ind";
+  if (isCtrl) {
+    el.classList.add(ok ? "warn" : "ok");
+  } else {
+    el.classList.add(ok ? "ok" : "err");
+  }
+}
+
+function updateJoints(step, drift) {
+  const tb = $("joint-tbody");
+  if (!tb) return;
+  const rows = tb.querySelectorAll("tr");
+  JN.forEach((name, i) => {
+    const tr = rows[i];
+    if (!tr) return;
+    const cur = step.current_q ? step.current_q[i] : null;
+    const tgt = step.target_q  ? step.target_q[i]  : null;
+    const dlt = step.raw_action? step.raw_action[i] : null;
+    const dri = drift[i] || 0;
+
+    const fC = cur != null ? cur.toFixed(4) : "—";
+    const fT = tgt != null ? tgt.toFixed(4) : "—";
+    const fD = dlt != null ? ((dlt >= 0 ? "+" : "") + dlt.toFixed(5)) : "—";
+    const fR = (dri >= 0 ? "+" : "") + dri.toFixed(3);
+
+    const dcls = dlt != null ? (dlt >= 0 ? "pos" : "neg") : "";
+    const rcls = Math.abs(dri) > 0.5 ? "warn-val" : (dri >= 0 ? "pos" : "neg");
+
+    tr.innerHTML = `<td class="jn">${name}</td><td class="r">${fC}</td><td class="r">${fT}</td><td class="r ${dcls}">${fD}</td><td class="r ${rcls}">${fR}</td>`;
+  });
+}
+
+function updateDrift(drift) {
+  const maxD = Math.max(0.1, ...drift.map(Math.abs));
+  drift.forEach((v, i) => {
+    const bar = $("df-" + i);
+    const num = $("dv-" + i);
+    if (!bar || !num) return;
+    const pct = Math.min(100, (Math.abs(v) / maxD) * 100);
+    bar.style.width = pct + "%";
+    const a = Math.abs(v);
+    bar.style.background = a > 1.0 ? "var(--red)" : a > 0.3 ? "var(--yellow)" : JC[i];
+    num.textContent = (v >= 0 ? "+" : "") + v.toFixed(3);
+    num.style.color = a > 1.0 ? "var(--red)" : "var(--text)";
+  });
+}
+
+function updateNorm(inp, out) {
+  const tb = $("norm-tbody");
+  if (!tb) return;
+  const rows = tb.querySelectorAll("tr");
+  JN.forEach((name, i) => {
+    const tr = rows[i];
+    if (!tr) return;
+    const iv = inp ? inp[i] : null;
+    const ov = out ? out[i] : null;
+    tr.innerHTML = `<td>${name}</td><td>${normColor(iv)}</td><td>${normColor(ov)}</td>`;
+  });
+}
+
+function normColor(v) {
+  if (v == null) return "—";
+  const a = Math.abs(v);
+  const c = a > 5 ? "var(--red)" : a > 3 ? "var(--orange)" : a > 2 ? "var(--yellow)" : "var(--text)";
+  return '<span style="color:' + c + '">' + v.toFixed(4) + '</span>';
+}
+
+// ============================================================
+// Chart update
+// ============================================================
+function updateChart(traj) {
+  if (!chart || !traj || !traj.timestamps || traj.timestamps.length === 0) return;
+
+  chart.data.labels = traj.timestamps;
+
+  JN.forEach((name, i) => {
+    let vals;
+    if (chartMode === "position") {
+      vals = traj.current ? traj.current[name] : [];
+    } else if (chartMode === "delta") {
+      vals = traj.raw_delta ? traj.raw_delta[name] : [];
+    } else {
+      // error = target - current
+      const t = traj.target ? traj.target[name] : [];
+      const c = traj.current ? traj.current[name] : [];
+      vals = t.map((tv, j) => tv - (c[j] || 0));
+    }
+    chart.data.datasets[i].data = vals || [];
+  });
+
+  chart.update("none");
+}
+</script>
+
+</body>
+</html>

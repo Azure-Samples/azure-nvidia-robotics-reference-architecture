@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UR10e Episode Replay</title>
+<script src="/static/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --panel: #151921;
+    --panel-hover: #1a2030;
+    --border: #252a36;
+    --text: #e8eaed;
+    --muted: #7c8091;
+    --accent: #4d8bf5;
+    --accent-dim: #2d5bb5;
+    --green: #2dd47a;
+    --green-dim: #1a7a46;
+    --red: #f0535a;
+    --red-dim: #8a2028;
+    --yellow: #f0c030;
+    --orange: #f09030;
+    --purple: #b06df0;
+    --mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    --sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ---- Header ---- */
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-yellow { background: rgba(240,192,48,0.15); color: var(--yellow); }
+  .badge-muted { background: rgba(124,128,145,0.15); color: var(--muted); }
+
+  .status-dots { display: flex; gap: 14px; font-size: 12px; }
+  .status-dot { display: flex; align-items: center; gap: 5px; color: var(--muted); }
+  .status-dot .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted); transition: background 0.3s;
+  }
+  .status-dot .dot.ok { background: var(--green); box-shadow: 0 0 4px var(--green-dim); }
+
+  /* ---- Layout ---- */
+  .layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 44px);
+  }
+
+  /* ---- Sidebar ---- */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-header h2 {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  .dataset-info {
+    font-size: 11px; color: var(--muted); font-family: var(--mono);
+    line-height: 1.6;
+  }
+  .episode-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .episode-item {
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .episode-item:hover { background: var(--panel-hover); }
+  .episode-item.active {
+    background: rgba(77,139,245,0.12);
+    border-color: var(--accent-dim);
+  }
+  .ep-title {
+    font-size: 13px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .ep-meta {
+    font-size: 11px; color: var(--muted); margin-top: 3px;
+    font-family: var(--mono);
+  }
+
+  /* ---- Main ---- */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---- Controls bar ---- */
+  .controls-bar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .ctrl-group { display: flex; align-items: center; gap: 6px; }
+  .ctrl-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 500;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .ctrl-btn:hover { border-color: var(--accent); background: var(--panel-hover); }
+  .ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ctrl-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ctrl-btn.primary:hover { background: var(--accent-dim); }
+  .ctrl-btn.danger { border-color: var(--red-dim); color: var(--red); }
+  .ctrl-btn.danger:hover { background: var(--red-dim); color: #fff; }
+
+  .ctrl-label { font-size: 11px; color: var(--muted); }
+  .speed-display {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--bg); padding: 4px 8px; border-radius: 4px;
+    min-width: 40px; text-align: center;
+    border: 1px solid var(--border);
+  }
+  .speed-slider {
+    width: 100px;
+    accent-color: var(--accent);
+  }
+
+  .frame-display {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .frame-display strong { color: var(--text); }
+
+  /* ---- Scrubber ---- */
+  .scrubber-bar {
+    padding: 0 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 36px;
+  }
+  .scrubber-time {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    min-width: 55px;
+  }
+  .scrubber-time.right { text-align: right; }
+  .scrubber {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+    cursor: pointer;
+  }
+
+  /* ---- Content grid ---- */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .panel h2 {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ---- Chart ---- */
+  .chart-panel { min-height: 320px; }
+  .chart-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .chart-tabs {
+    display: flex; gap: 3px;
+    background: var(--bg); border-radius: 6px; padding: 2px;
+  }
+  .chart-tab {
+    background: transparent; border: none; color: var(--muted);
+    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+    font-size: 11px; font-family: var(--sans); font-weight: 500;
+    transition: all 0.15s;
+  }
+  .chart-tab:hover { color: var(--text); }
+  .chart-tab.active { background: var(--accent); color: #fff; }
+  .chart-container { position: relative; height: 280px; }
+
+  /* Joint toggles */
+  .joint-toggles {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .joint-toggle {
+    display: flex; align-items: center; gap: 4px; cursor: pointer;
+    font-size: 11px; font-family: var(--mono);
+    padding: 2px 6px; border-radius: 3px;
+    transition: opacity 0.15s;
+  }
+  .joint-toggle.off { opacity: 0.3; }
+  .joint-toggle .swatch {
+    width: 10px; height: 10px; border-radius: 2px;
+  }
+
+  /* ---- Bottom row ---- */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  /* Joint table */
+  .joint-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px; font-family: var(--mono);
+  }
+  .joint-table th {
+    text-align: left; color: var(--muted); font-weight: 500;
+    padding: 4px 6px; border-bottom: 1px solid var(--border);
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .joint-table th.r { text-align: right; }
+  .joint-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .joint-table .r { text-align: right; }
+  .jn { font-weight: 600; }
+
+  /* Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+  }
+  .stat .lbl {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .stat .val {
+    font-size: 20px; font-weight: 700;
+    font-family: var(--mono); line-height: 1.1;
+  }
+  .stat .unit {
+    font-size: 10px; color: var(--muted); font-weight: 400;
+  }
+
+  /* ---- Log ---- */
+  .log-panel { max-height: 120px; }
+  .log-area {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    max-height: 80px;
+    overflow-y: auto;
+    background: var(--bg);
+    border-radius: 4px;
+    padding: 8px;
+    line-height: 1.5;
+  }
+  .log-area .log-msg { white-space: pre-wrap; }
+
+  /* ---- Empty state ---- */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--muted);
+    gap: 10px;
+    font-size: 14px;
+    padding: 40px;
+  }
+  .empty-state .icon { font-size: 40px; }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { max-height: 200px; }
+    .bottom-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>&#9654; UR10e Episode Replay</h1>
+    <span class="badge badge-muted" id="conn-badge">Loading</span>
+  </div>
+  <div class="status-dots">
+    <div class="status-dot"><span class="dot" id="st-robot"></span>Robot</div>
+    <div class="status-dot"><span class="dot" id="st-playing"></span>Replay</div>
+    <div class="status-dot"><span class="dot" id="st-control"></span>Control</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar: Episode list -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>&#128196; Dataset</h2>
+      <div class="dataset-info" id="dataset-info">Loading...</div>
+    </div>
+    <div class="episode-list" id="episode-list">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main" id="main-content">
+
+    <!-- Empty state (shown when no episode selected) -->
+    <div class="empty-state" id="empty-state">
+      <div class="icon">&#128200;</div>
+      <div>Select an episode from the sidebar to visualize its trajectory</div>
+    </div>
+
+    <!-- Controls bar (hidden until episode selected) -->
+    <div class="controls-bar" id="controls-bar" style="display:none">
+      <div class="ctrl-group">
+        <button class="ctrl-btn" id="btn-play" disabled title="Start replay on robot">&#9654; Play</button>
+        <button class="ctrl-btn danger" id="btn-stop" disabled title="Stop replay">&#9632; Stop</button>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Speed:</span>
+        <input type="range" class="speed-slider" id="speed-slider" min="10" max="200" value="100" step="10" />
+        <span class="speed-display" id="speed-display">1.0x</span>
+      </div>
+      <div class="frame-display" id="frame-display">
+        Frame <strong>0</strong> / 0 &nbsp;|&nbsp; <strong>0.0</strong>s
+      </div>
+    </div>
+
+    <!-- Scrubber (hidden until episode selected) -->
+    <div class="scrubber-bar" id="scrubber-bar" style="display:none">
+      <span class="scrubber-time" id="scrub-time-left">0.00s</span>
+      <input type="range" class="scrubber" id="scrubber" min="0" max="0" value="0" step="1" />
+      <span class="scrubber-time right" id="scrub-time-right">0.00s</span>
+    </div>
+
+    <!-- Content (hidden until episode selected) -->
+    <div class="content" id="content-area" style="display:none">
+
+      <!-- Chart -->
+      <div class="panel chart-panel">
+        <div class="chart-header">
+          <h2 style="margin-bottom:0">&#128200; Joint Trajectories</h2>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <div class="joint-toggles" id="joint-toggles"></div>
+            <div class="chart-tabs" id="chart-tabs">
+              <button class="chart-tab active" data-mode="position">Position (rad)</button>
+              <button class="chart-tab" data-mode="degrees">Position (°)</button>
+              <button class="chart-tab" data-mode="delta">Delta (°/step)</button>
+            </div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="traj-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Bottom row -->
+      <div class="bottom-row">
+
+        <!-- Joint positions at current frame -->
+        <div class="panel">
+          <h2>&#9881; Joint Positions at Current Frame</h2>
+          <table class="joint-table">
+            <thead>
+              <tr>
+                <th>Joint</th>
+                <th class="r">RTDE (rad)</th>
+                <th class="r">Degrees</th>
+                <th class="r">Robot (rad)</th>
+                <th class="r">Error (°)</th>
+              </tr>
+            </thead>
+            <tbody id="joint-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Episode stats -->
+        <div class="panel">
+          <h2>&#128200; Episode Info</h2>
+          <div class="stats-grid" id="stats-grid">
+            <div class="stat"><div class="lbl">Frames</div><div class="val" id="st-frames">—</div></div>
+            <div class="stat"><div class="lbl">Duration</div><div class="val" id="st-duration">—<span class="unit">s</span></div></div>
+            <div class="stat"><div class="lbl">FPS</div><div class="val" id="st-fps">—</div></div>
+            <div class="stat"><div class="lbl">Loop</div><div class="val" id="st-loop">—<span class="unit">ms</span></div></div>
+            <div class="stat"><div class="lbl">Violations</div><div class="val" id="st-violations" style="color:var(--green)">0</div></div>
+            <div class="stat"><div class="lbl">Progress</div><div class="val" id="st-progress">—<span class="unit">%</span></div></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Log -->
+      <div class="panel log-panel">
+        <h2>&#128203; Activity Log</h2>
+        <div class="log-area" id="log-area"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ============================================================
+// Constants
+// ============================================================
+const JN = ["base", "shoulder", "elbow", "wrist1", "wrist2", "wrist3"];
+const JC = ["#4d8bf5", "#2dd47a", "#f0c030", "#f0535a", "#b06df0", "#f09030"];
+const RAD2DEG = 180 / Math.PI;
+
+// ============================================================
+// State
+// ============================================================
+let currentEpisode = -1;
+let trajectoryData = null;   // from /api/episode/<id>/trajectory
+let chartMode = "position";
+let jointVisible = [true, true, true, true, true, true];
+let scrubFrame = 0;
+let chart = null;
+let sseSource = null;
+let replayStatus = {};
+
+// ============================================================
+// DOM helpers
+// ============================================================
+const $ = id => document.getElementById(id);
+const Q = sel => document.querySelectorAll(sel);
+
+// ============================================================
+// Init joint toggles
+// ============================================================
+function initJointToggles() {
+  const c = $("joint-toggles");
+  c.innerHTML = JN.map((name, i) =>
+    `<div class="joint-toggle" data-idx="${i}">
+      <span class="swatch" style="background:${JC[i]}"></span>${name}
+    </div>`
+  ).join("");
+  c.addEventListener("click", e => {
+    const t = e.target.closest(".joint-toggle");
+    if (!t) return;
+    const idx = parseInt(t.dataset.idx);
+    jointVisible[idx] = !jointVisible[idx];
+    t.classList.toggle("off", !jointVisible[idx]);
+    if (chart) {
+      chart.data.datasets[idx].hidden = !jointVisible[idx];
+      // Also toggle playhead dataset if it exists
+      if (chart.data.datasets[6 + idx]) {
+        chart.data.datasets[6 + idx].hidden = !jointVisible[idx];
+      }
+      chart.update("none");
+    }
+  });
+}
+initJointToggles();
+
+// ============================================================
+// Init joint table
+// ============================================================
+function initJointTable() {
+  const tb = $("joint-tbody");
+  tb.innerHTML = JN.map((n, i) =>
+    `<tr><td class="jn" style="color:${JC[i]}">${n}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`
+  ).join("");
+}
+initJointTable();
+
+// ============================================================
+// Chart.js initialization
+// ============================================================
+function initChart() {
+  if (typeof Chart === "undefined") return;
+  const ctx = $("traj-chart").getContext("2d");
+
+  // 6 trajectory line datasets + 6 playhead point datasets
+  const datasets = [];
+
+  // Trajectory lines
+  JN.forEach((name, i) => {
+    datasets.push({
+      label: name,
+      data: [],
+      borderColor: JC[i],
+      backgroundColor: JC[i] + "18",
+      borderWidth: 1.5,
+      pointRadius: 0,
+      tension: 0.2,
+      fill: false,
+      order: 2,
+    });
+  });
+
+  // Playhead points (large dots showing current frame position)
+  JN.forEach((name, i) => {
+    datasets.push({
+      label: name + " (now)",
+      data: [],
+      borderColor: "#ffffff",
+      backgroundColor: JC[i],
+      borderWidth: 2,
+      pointRadius: 7,
+      pointHoverRadius: 9,
+      showLine: false,
+      order: 1,
+      // Hide from legend
+    });
+  });
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: { labels: [], datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "nearest", intersect: false, axis: "x" },
+      scales: {
+        x: {
+          display: true,
+          title: { display: true, text: "Time (s)", color: "#7c8091", font: { size: 11 } },
+          ticks: { color: "#7c8091", maxTicksLimit: 15, callback: v => typeof v === "number" ? v.toFixed(1) : v },
+          grid: { color: "rgba(255,255,255,0.04)" },
+        },
+        y: {
+          display: true,
+          title: { display: true, text: "rad", color: "#7c8091", font: { size: 11 } },
+          ticks: { color: "#7c8091" },
+          grid: { color: "rgba(255,255,255,0.04)" },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: {
+            color: "#e8eaed",
+            usePointStyle: true,
+            pointStyle: "circle",
+            padding: 12,
+            font: { size: 11 },
+            filter: item => item.datasetIndex < 6, // hide playhead from legend
+          },
+        },
+        tooltip: {
+          backgroundColor: "#151921",
+          borderColor: "#252a36",
+          borderWidth: 1,
+          titleColor: "#e8eaed",
+          bodyColor: "#7c8091",
+          bodyFont: { family: "'Cascadia Code', monospace", size: 11 },
+          filter: item => item.datasetIndex < 6,
+        },
+      },
+    },
+  });
+}
+try { initChart(); } catch(e) { console.error("Chart init failed:", e); }
+
+// Chart tab clicks
+$("chart-tabs").addEventListener("click", e => {
+  const btn = e.target.closest(".chart-tab");
+  if (!btn) return;
+  chartMode = btn.dataset.mode;
+  Q(".chart-tab").forEach(b => b.classList.toggle("active", b === btn));
+  updateChartData();
+});
+
+// ============================================================
+// Load dataset + episodes
+// ============================================================
+async function loadDataset() {
+  try {
+    const r = await fetch("/api/dataset");
+    const d = await r.json();
+    $("dataset-info").innerHTML =
+      `${d.robot_type} &bull; ${d.total_episodes} episodes &bull; ${d.total_frames} frames &bull; ${d.fps} fps`;
+
+    const list = $("episode-list");
+    list.innerHTML = d.episodes.map(ep =>
+      `<div class="episode-item" data-ep="${ep.index}">
+        <div class="ep-title">
+          <span>Episode ${ep.index}</span>
+          <span style="font-size:11px;color:var(--muted)">${ep.duration}s</span>
+        </div>
+        <div class="ep-meta">${ep.length} frames &bull; ${ep.task}</div>
+      </div>`
+    ).join("");
+
+    // Click handler
+    list.addEventListener("click", e => {
+      const item = e.target.closest(".episode-item");
+      if (!item) return;
+      const ep = parseInt(item.dataset.ep);
+      selectEpisode(ep);
+    });
+
+    $("conn-badge").textContent = "Connected";
+    $("conn-badge").className = "badge badge-green";
+  } catch(e) {
+    $("conn-badge").textContent = "Error";
+    $("conn-badge").className = "badge badge-red";
+    console.error("Failed to load dataset:", e);
+  }
+}
+
+// ============================================================
+// Select and load episode
+// ============================================================
+async function selectEpisode(epIdx) {
+  if (epIdx === currentEpisode && trajectoryData) return;
+  currentEpisode = epIdx;
+
+  // Highlight sidebar
+  Q(".episode-item").forEach(el =>
+    el.classList.toggle("active", parseInt(el.dataset.ep) === epIdx)
+  );
+
+  // Show UI
+  $("empty-state").style.display = "none";
+  $("controls-bar").style.display = "flex";
+  $("scrubber-bar").style.display = "flex";
+  $("content-area").style.display = "flex";
+
+  // Load trajectory
+  try {
+    const r = await fetch(`/api/episode/${epIdx}/trajectory`);
+    trajectoryData = await r.json();
+
+    // Update scrubber
+    const scr = $("scrubber");
+    scr.max = trajectoryData.num_frames - 1;
+    scr.value = 0;
+    scrubFrame = 0;
+
+    $("scrub-time-right").textContent = trajectoryData.duration + "s";
+
+    // Update stats
+    $("st-frames").textContent = trajectoryData.num_frames;
+    $("st-duration").innerHTML = trajectoryData.duration + '<span class="unit">s</span>';
+    $("st-fps").textContent = trajectoryData.fps;
+
+    // Update chart
+    updateChartData();
+    updateFrameDisplay();
+    updateJointTable();
+
+    addLog(`Loaded episode ${epIdx}: ${trajectoryData.num_frames} frames, ${trajectoryData.duration}s`);
+  } catch(e) {
+    console.error("Failed to load episode:", e);
+    addLog(`Error loading episode ${epIdx}: ${e.message}`);
+  }
+}
+
+// ============================================================
+// Chart data update
+// ============================================================
+function updateChartData() {
+  if (!chart || !trajectoryData) return;
+
+  const ts = trajectoryData.timestamps;
+  chart.data.labels = ts;
+
+  const yTitle = { position: "rad", degrees: "degrees", delta: "°/step" };
+  chart.options.scales.y.title.text = yTitle[chartMode] || "rad";
+
+  JN.forEach((name, i) => {
+    let vals;
+    if (chartMode === "position") {
+      vals = trajectoryData.rtde[name];
+    } else if (chartMode === "degrees") {
+      vals = trajectoryData.rtde[name].map(v => v * RAD2DEG);
+    } else {
+      vals = trajectoryData.deltas_deg[name];
+    }
+    chart.data.datasets[i].data = vals || [];
+    chart.data.datasets[i].hidden = !jointVisible[i];
+  });
+
+  updatePlayhead();
+  chart.update("none");
+}
+
+// ============================================================
+// Playhead update — shows large dots at the current frame
+// ============================================================
+function updatePlayhead() {
+  if (!chart || !trajectoryData) return;
+
+  const ts = trajectoryData.timestamps;
+  const t = ts[scrubFrame] || 0;
+
+  JN.forEach((name, i) => {
+    let val;
+    if (chartMode === "position") {
+      val = trajectoryData.rtde[name][scrubFrame];
+    } else if (chartMode === "degrees") {
+      val = trajectoryData.rtde[name][scrubFrame] * RAD2DEG;
+    } else {
+      val = trajectoryData.deltas_deg[name][scrubFrame];
+    }
+    // Single point at current time
+    chart.data.datasets[6 + i].data = [{ x: t, y: val }];
+    chart.data.datasets[6 + i].hidden = !jointVisible[i];
+  });
+}
+
+// ============================================================
+// Scrubber interaction
+// ============================================================
+$("scrubber").addEventListener("input", e => {
+  scrubFrame = parseInt(e.target.value);
+  updateFrameDisplay();
+  updateJointTable();
+  updatePlayhead();
+  chart.update("none");
+});
+
+// ============================================================
+// Frame display update
+// ============================================================
+function updateFrameDisplay() {
+  if (!trajectoryData) return;
+  const t = (scrubFrame / trajectoryData.fps).toFixed(2);
+  $("frame-display").innerHTML =
+    `Frame <strong>${scrubFrame}</strong> / ${trajectoryData.num_frames} &nbsp;|&nbsp; <strong>${t}</strong>s`;
+  $("scrub-time-left").textContent = t + "s";
+}
+
+// ============================================================
+// Joint table at current frame
+// ============================================================
+function updateJointTable() {
+  if (!trajectoryData) return;
+  const tb = $("joint-tbody");
+  const rows = tb.querySelectorAll("tr");
+  const robotQ = replayStatus.robot_q || null;
+
+  JN.forEach((name, i) => {
+    const tr = rows[i];
+    if (!tr) return;
+    const rtde_val = trajectoryData.rtde[name][scrubFrame];
+    const deg_val = rtde_val * RAD2DEG;
+
+    let robot_str = "—";
+    let error_str = "—";
+    if (robotQ && replayStatus.is_connected) {
+      robot_str = robotQ[i].toFixed(4);
+      const err = (robotQ[i] - rtde_val) * RAD2DEG;
+      const errAbs = Math.abs(err);
+      const errColor = errAbs > 5 ? "var(--red)" : errAbs > 2 ? "var(--orange)" : "var(--text)";
+      error_str = `<span style="color:${errColor}">${err >= 0 ? "+" : ""}${err.toFixed(2)}°</span>`;
+    }
+
+    tr.innerHTML = `
+      <td class="jn" style="color:${JC[i]}">${name}</td>
+      <td class="r">${rtde_val.toFixed(4)}</td>
+      <td class="r">${deg_val.toFixed(1)}°</td>
+      <td class="r">${robot_str}</td>
+      <td class="r">${error_str}</td>`;
+  });
+}
+
+// ============================================================
+// Speed slider
+// ============================================================
+$("speed-slider").addEventListener("input", e => {
+  const pct = parseInt(e.target.value);
+  const factor = pct / 100;
+  $("speed-display").textContent = factor.toFixed(1) + "x";
+});
+
+// ============================================================
+// SSE for replay status
+// ============================================================
+function connectSSE() {
+  if (sseSource) { try { sseSource.close(); } catch(_) {} }
+  sseSource = new EventSource("/api/replay/stream");
+
+  sseSource.onmessage = ev => {
+    try {
+      replayStatus = JSON.parse(ev.data);
+      updateReplayStatus();
+    } catch(e) {}
+  };
+
+  sseSource.onerror = () => {
+    sseSource.close();
+    setTimeout(connectSSE, 2000);
+  };
+}
+
+function updateReplayStatus() {
+  const s = replayStatus;
+
+  // Status dots
+  const robotDot = $("st-robot");
+  const playDot = $("st-playing");
+  const ctrlDot = $("st-control");
+  robotDot.className = "dot" + (s.is_connected ? " ok" : "");
+  playDot.className = "dot" + (s.is_playing ? " ok" : "");
+  ctrlDot.className = "dot" + (s.enable_control ? " ok" : "");
+
+  // If replay is active and same episode, sync scrubber
+  if (s.is_playing && s.current_episode === currentEpisode && trajectoryData) {
+    scrubFrame = Math.min(s.current_frame, trajectoryData.num_frames - 1);
+    $("scrubber").value = scrubFrame;
+    updateFrameDisplay();
+    updateJointTable();
+    updatePlayhead();
+    chart.update("none");
+
+    // Progress
+    const pct = trajectoryData.num_frames > 0
+      ? ((scrubFrame + 1) / trajectoryData.num_frames * 100).toFixed(1)
+      : "0";
+    $("st-progress").innerHTML = pct + '<span class="unit">%</span>';
+  }
+
+  // Update stats
+  $("st-loop").innerHTML = s.loop_dt_ms > 0 ? s.loop_dt_ms.toFixed(1) + '<span class="unit">ms</span>' : '—<span class="unit">ms</span>';
+  const violEl = $("st-violations");
+  violEl.textContent = s.safety_violations;
+  violEl.style.color = s.safety_violations > 0 ? "var(--red)" : "var(--green)";
+
+  // Buttons
+  $("btn-play").disabled = s.is_playing || currentEpisode < 0;
+  $("btn-stop").disabled = !s.is_playing;
+
+  // Messages
+  if (s.messages && s.messages.length) {
+    const area = $("log-area");
+    const last = area.dataset.lastMsg || "";
+    const latest = s.messages[s.messages.length - 1];
+    if (latest !== last) {
+      s.messages.forEach(m => {
+        if (m !== last) addLog(m);
+      });
+      area.dataset.lastMsg = latest;
+    }
+  }
+}
+
+// ============================================================
+// Log
+// ============================================================
+function addLog(msg) {
+  const area = $("log-area");
+  const now = new Date().toLocaleTimeString();
+  const el = document.createElement("div");
+  el.className = "log-msg";
+  el.textContent = `[${now}] ${msg}`;
+  area.appendChild(el);
+  area.scrollTop = area.scrollHeight;
+  // Limit
+  while (area.children.length > 50) area.removeChild(area.firstChild);
+}
+
+// ============================================================
+// Boot
+// ============================================================
+loadDataset();
+connectSSE();
+addLog("Dashboard initialized");
+</script>
+
+</body>
+</html>

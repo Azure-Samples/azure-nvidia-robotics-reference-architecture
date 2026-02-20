@@ -1,0 +1,25 @@
+# Downloaded rosbags (large binary files)
+local_bags/
+
+# Converted LeRobot datasets
+local_datasets/
+
+# Batch output directory
+batch_output/
+
+# Temp directories
+temp_bag/
+temp_meta/
+
+# Python
+__pycache__/
+*.egg-info/
+*.pyc
+.venv/
+
+# Checkpoint
+.checkpoint.json
+
+# OS
+.DS_Store
+Thumbs.db

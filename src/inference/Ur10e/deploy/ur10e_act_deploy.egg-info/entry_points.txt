@@ -1,0 +1,2 @@
+[console_scripts]
+ur10e-deploy = ur10e_deploy.main:main
