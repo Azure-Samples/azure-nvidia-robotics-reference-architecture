@@ -116,6 +116,31 @@ Describe 'ValidationIssue Class' -Tag 'Unit' {
             $issue.ToString() | Should -Be 'docs/test.md: [Warning] author: Empty author'
         }
     }
+
+    Context 'ToString with Line property set' {
+        It 'preserves line number on the object' {
+            $issue = & $script:FVModule {
+                param($t, $f, $m, $fp)
+                $i = [ValidationIssue]::new($t, $f, $m, $fp)
+                $i.Line = 42
+                $i
+            } 'Error' 'title' 'Missing title' 'docs/test.md'
+            $issue.Line | Should -Be 42
+        }
+
+        It 'includes all components in formatted string' {
+            $issue = & $script:FVModule {
+                param($t, $f, $m, $fp)
+                $i = [ValidationIssue]::new($t, $f, $m, $fp)
+                $i.Line = 10
+                $i
+            } 'Warning' 'author' 'Empty author' 'README.md'
+            $str = $issue.ToString()
+            $str | Should -Match 'README\.md'
+            $str | Should -Match 'Warning'
+            $str | Should -Match 'author'
+        }
+    }
 }
 
 #endregion
@@ -191,6 +216,54 @@ Describe 'FileValidationResult Class' -Tag 'Unit' {
             $result.ErrorCount | Should -Be 2
             $result.WarningCount | Should -Be 1
             $result.Issues.Count | Should -Be 3
+        }
+    }
+
+    Context 'ScriptProperties' {
+        It 'reports HasErrors true when errors exist' {
+            $result = New-FileValidationResult
+            $result.AddError('title', 'Missing')
+            $result.HasErrors | Should -BeTrue
+        }
+
+        It 'reports HasErrors false when no errors' {
+            $result = New-FileValidationResult
+            $result.AddWarning('author', 'Empty')
+            $result.HasErrors | Should -BeFalse
+        }
+
+        It 'reports HasWarnings true when warnings exist' {
+            $result = New-FileValidationResult
+            $result.AddWarning('author', 'Empty')
+            $result.HasWarnings | Should -BeTrue
+        }
+
+        It 'reports IsValid true when no errors' {
+            $result = New-FileValidationResult
+            $result.AddWarning('author', 'Empty')
+            $result.IsValid | Should -BeTrue
+        }
+
+        It 'reports IsValid false when errors present' {
+            $result = New-FileValidationResult
+            $result.AddError('title', 'Missing')
+            $result.IsValid | Should -BeFalse
+        }
+
+        It 'returns correct ErrorCount' {
+            $result = New-FileValidationResult
+            $result.AddError('title', 'Missing')
+            $result.AddError('description', 'Empty')
+            $result.AddWarning('author', 'Empty')
+            $result.ErrorCount | Should -Be 2
+        }
+
+        It 'returns correct WarningCount' {
+            $result = New-FileValidationResult
+            $result.AddError('title', 'Missing')
+            $result.AddWarning('author', 'Empty')
+            $result.AddWarning('ms.date', 'Invalid')
+            $result.WarningCount | Should -Be 2
         }
     }
 }
@@ -314,6 +387,60 @@ Describe 'ValidationSummary Class' -Tag 'Unit' {
             $ht = $summary.ToHashtable()
             $ht.TotalFiles | Should -Be 0
             $ht.Passed | Should -BeTrue
+        }
+    }
+
+    Context 'Complete with zero results' {
+        It 'returns passed state with zero counts' {
+            $summary = New-ValidationSummary
+            $summary.Complete()
+            $summary.TotalFiles | Should -Be 0
+            $summary.PassedFiles | Should -Be 0
+            $summary.FailedFiles | Should -Be 0
+            $summary.Passed | Should -BeTrue
+        }
+    }
+
+    Context 'GetExitCode behavior' {
+        It 'returns 0 when no errors' {
+            $summary = New-ValidationSummary
+            $r = New-FileValidationResult -FilePath 'a.md' -RelativePath 'a.md'
+            $summary.AddResult($r)
+            $summary.Complete()
+            $summary.GetExitCode() | Should -Be 0
+        }
+
+        It 'returns 1 when errors present' {
+            $summary = New-ValidationSummary
+            $r = New-FileValidationResult -FilePath 'a.md' -RelativePath 'a.md'
+            $r.AddError('title', 'Missing')
+            $summary.AddResult($r)
+            $summary.Complete()
+            $summary.GetExitCode() | Should -Be 1
+        }
+
+        It 'returns 0 when only warnings present' {
+            $summary = New-ValidationSummary
+            $r = New-FileValidationResult -FilePath 'a.md' -RelativePath 'a.md'
+            $r.AddWarning('author', 'Missing')
+            $summary.AddResult($r)
+            $summary.Complete()
+            $summary.GetExitCode() | Should -Be 0
+        }
+    }
+
+    Context 'ToHashtable field completeness' {
+        It 'includes all expected keys' {
+            $summary = New-ValidationSummary
+            $summary.Complete()
+            $ht = $summary.ToHashtable()
+            $ht.Keys | Should -Contain 'TotalFiles'
+            $ht.Keys | Should -Contain 'PassedFiles'
+            $ht.Keys | Should -Contain 'FailedFiles'
+            $ht.Keys | Should -Contain 'TotalErrors'
+            $ht.Keys | Should -Contain 'TotalWarnings'
+            $ht.Keys | Should -Contain 'Passed'
+            $ht.Keys | Should -Contain 'Duration'
         }
     }
 }
@@ -553,6 +680,35 @@ Describe 'Test-DateField' -Tag 'Unit' {
         $issues = Test-DateField -Frontmatter $fm
         $issues | Should -HaveCount 1
     }
+
+    Context 'Edge case date formats' {
+        It 'rejects ISO date with time component' {
+            $fm = @{ 'ms.date' = '2025-01-15T10:30:00' }
+            $issues = Test-DateField -Frontmatter $fm
+            $issues | Should -HaveCount 1
+            $issues[0].Type | Should -Be 'Error'
+        }
+
+        It 'rejects date with timezone offset' {
+            $fm = @{ 'ms.date' = '2025-01-15+05:00' }
+            $issues = Test-DateField -Frontmatter $fm
+            $issues | Should -HaveCount 1
+            $issues[0].Type | Should -Be 'Error'
+        }
+
+        It 'rejects placeholder date string' {
+            $fm = @{ 'ms.date' = 'YYYY-MM-DD' }
+            $issues = Test-DateField -Frontmatter $fm
+            $issues | Should -HaveCount 1
+            $issues[0].Type | Should -Be 'Error'
+        }
+
+        It 'accepts valid ISO date' {
+            $fm = @{ 'ms.date' = '2025-06-15' }
+            $issues = Test-DateField -Frontmatter $fm
+            $issues | Should -HaveCount 0
+        }
+    }
 }
 
 #endregion
@@ -618,6 +774,20 @@ Describe 'Test-ApplyToField' -Tag 'Unit' {
         $issues = Test-ApplyToField -Frontmatter $fm
         $issues | Should -HaveCount 1
         $issues[0].Type | Should -Be 'Error'
+    }
+
+    Context 'Glob edge cases' {
+        It 'accepts complex multi-pattern globs' {
+            $fm = @{ applyTo = '**/*.{ts,tsx,js,jsx}' }
+            $issues = Test-ApplyToField -Frontmatter $fm
+            $issues | Should -HaveCount 0
+        }
+
+        It 'accepts negation pattern globs' {
+            $fm = @{ applyTo = '!**/node_modules/**' }
+            $issues = Test-ApplyToField -Frontmatter $fm
+            $issues | Should -HaveCount 0
+        }
     }
 }
 
@@ -827,6 +997,26 @@ Describe 'Test-SingleFileFrontmatter' -Tag 'Unit' {
         $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath $relPath
         $result.FilePath | Should -Be $filePath
         $result.RelativePath | Should -Be $relPath
+    }
+
+    Context 'Non-requiring file types return empty results' {
+        It 'returns valid with no issues for nested non-matching path' {
+            $content = "# Test`nSome content"
+            $tempFile = Join-Path $TestDrive 'helper.md'
+            Set-Content -Path $tempFile -Value $content
+            $result = Test-SingleFileFrontmatter -FilePath $tempFile -RelativePath 'src/utils/helper.md'
+            $result.IsValid | Should -BeTrue
+            $result.Issues.Count | Should -Be 0
+        }
+
+        It 'returns valid with no issues for deeply nested script path' {
+            $content = "# Deep`nNested content"
+            $tempFile = Join-Path $TestDrive 'deep.md'
+            Set-Content -Path $tempFile -Value $content
+            $result = Test-SingleFileFrontmatter -FilePath $tempFile -RelativePath 'deploy/modules/internal/deep.md'
+            $result.IsValid | Should -BeTrue
+            $result.Issues.Count | Should -Be 0
+        }
     }
 }
 

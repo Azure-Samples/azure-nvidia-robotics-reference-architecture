@@ -99,7 +99,7 @@ No workflow files to lint.
     try {
         $jsonOutput = & actionlint -format '{{json .}}' @filesToLint 2>&1
     } catch {
-        # actionlint returns non-zero on lint errors; capture output regardless
+        Write-Verbose "actionlint returned non-zero exit code: $_"
     }
 
     # Parse results
