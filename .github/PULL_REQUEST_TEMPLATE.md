@@ -42,6 +42,14 @@ Closes #
 - [ ] Documentation updated in this PR
 - [ ] Documentation issue filed
 
+## Bug Fix Checklist
+
+*Complete this section for bug fix PRs. Skip for other contribution types.*
+
+- [ ] Linked to issue being fixed
+- [ ] Regression test included, OR
+- [ ] Justification for no regression test:
+
 ## Checklist
 
 - [ ] My code follows the [project conventions](copilot-instructions.md)
