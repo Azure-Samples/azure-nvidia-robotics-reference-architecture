@@ -1,0 +1,21 @@
+{
+  "mappings": [
+    {
+      "glob": "docs/**/*.md",
+      "schema": "docs-frontmatter.schema.json"
+    },
+    {
+      "glob": ".github/instructions/*.instructions.md",
+      "schema": "instruction-frontmatter.schema.json"
+    },
+    {
+      "glob": ".github/prompts/*.prompt.md",
+      "schema": "prompt-frontmatter.schema.json"
+    },
+    {
+      "glob": "*.md",
+      "schema": "root-community-frontmatter.schema.json"
+    }
+  ],
+  "defaultSchema": "base-frontmatter.schema.json"
+}

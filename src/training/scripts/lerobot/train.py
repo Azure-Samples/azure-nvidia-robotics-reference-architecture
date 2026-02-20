@@ -20,6 +20,7 @@ Environment variables:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import signal
@@ -215,10 +216,8 @@ def run_training(cmd: list[str], source: str = "osmo-lerobot-training") -> int:
 
                 if system_collector and current_time - last_system_check > SYSTEM_METRICS_INTERVAL:
                     last_system_check = current_time
-                    try:
+                    with contextlib.suppress(Exception):
                         metrics.update(system_collector.collect_metrics())
-                    except Exception:
-                        pass  # Non-critical: system metrics failure must not interrupt training
 
                 mlflow.log_metrics(metrics, step=step)
 
@@ -228,10 +227,8 @@ def run_training(cmd: list[str], source: str = "osmo-lerobot-training") -> int:
 
             val_match = _VAL_PATTERN.search(line)
             if val_match:
-                try:
+                with contextlib.suppress(Exception):
                     mlflow.log_metric("val/loss", float(val_match.group(1)))
-                except Exception:
-                    pass  # Non-critical: validation metric logging failure must not interrupt training
 
         process.wait()
 

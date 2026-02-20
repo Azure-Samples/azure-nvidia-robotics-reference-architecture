@@ -24,8 +24,12 @@ permissions:
 
 jobs:
   pester:
-    name: PowerShell Tests
-    runs-on: ubuntu-latest
+    name: PowerShell Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
     permissions:
       contents: read
       id-token: write
@@ -121,11 +125,12 @@ jobs:
           # Filter to specific test files if running changed-files-only
           $testPaths = '${{ steps.changed-files.outputs.test-paths }}'
           if ($testPaths -and '${{ inputs.changed-files-only }}' -eq 'true') {
-            $configParams['TestPaths'] = $testPaths -split ','
+            $configParams['TestPath'] = $testPaths -split ','
           }
 
           try {
-            $config = & scripts/tests/pester.config.ps1 @configParams
+            $config = & scripts/tests/pester.config.ps1 -CI @configParams
+            $config.Run.Exit = $false
             $result = Invoke-Pester -Configuration $config
 
             if ($result.FailedCount -gt 0) {
@@ -148,20 +153,20 @@ jobs:
         if: always() && steps.pester.outcome != 'skipped'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
         with:
-          name: pester-results
+          name: pester-results-${{ matrix.os }}
           path: logs/pester-results.xml
           retention-days: 30
 
       - name: Upload Coverage Report
-        if: inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
+        if: matrix.os == 'ubuntu-latest' && inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
         with:
-          name: coverage-report
+          name: coverage-report-${{ matrix.os }}
           path: logs/coverage.xml
           retention-days: 30
 
       - name: Upload to Codecov
-        if: inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
+        if: matrix.os == 'ubuntu-latest' && inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           use_oidc: true
@@ -170,12 +175,12 @@ jobs:
           fail_ci_if_error: false
 
       - name: Coverage Threshold Check
-        if: inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
+        if: matrix.os == 'ubuntu-latest' && inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
         shell: pwsh
         run: |
           if (Test-Path logs/coverage.xml) {
             [xml]$coverage = Get-Content logs/coverage.xml
-            $lineRate = [double]$coverage.report.counter |
+            $lineRate = $coverage.report.counter |
               Where-Object { $_.type -eq 'LINE' } |
               ForEach-Object {
                 $missed = [int]$_.missed

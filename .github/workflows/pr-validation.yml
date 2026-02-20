@@ -34,10 +34,28 @@ jobs:
     permissions:
       contents: read
 
+  # Frontmatter validation for markdown files
+  frontmatter-validation:
+    name: Frontmatter Validation
+    uses: ./.github/workflows/frontmatter-validation.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
   # PowerShell script analysis
   psscriptanalyzer:
     name: PSScriptAnalyzer
     uses: ./.github/workflows/ps-script-analyzer.yml
+    with:
+      changed-files-only: true
+    permissions:
+      contents: read
+
+  # YAML/actionlint workflow linting
+  yaml-lint:
+    name: YAML Lint
+    uses: ./.github/workflows/yaml-lint.yml
     with:
       changed-files-only: true
     permissions:
@@ -82,3 +100,19 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
+  # Python linting using ruff
+  python-lint:
+    name: Python Lint
+    uses: ./.github/workflows/python-lint.yml
+    permissions:
+      contents: read
+
+  # CodeQL security analysis
+  codeql-analysis:
+    name: CodeQL Analysis
+    uses: ./.github/workflows/codeql-analysis.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read

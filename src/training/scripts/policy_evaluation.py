@@ -264,10 +264,7 @@ def evaluate(env: Any, agent: Any, num_episodes: int, framework: str) -> Metrics
 
     while metrics.count < num_episodes:
         with torch.inference_mode():
-            if framework == "skrl":
-                actions = agent.act(obs, timestep=step, timesteps=0)[0]
-            else:  # rsl_rl
-                actions = agent.act_inference(obs)
+            actions = agent.act(obs, timestep=step, timesteps=0)[0] if framework == "skrl" else agent.act_inference(obs)
 
         obs, rewards, terminated, truncated, info = env.step(actions)
         ep_rewards += rewards.squeeze()
@@ -325,9 +322,7 @@ def find_checkpoint(model_path: str) -> str:
         if model_path_obj.suffix in (".pt", ".pth"):
             _LOGGER.info("Model path is a checkpoint file: %s", model_path)
             return str(model_path_obj)
-        raise FileNotFoundError(
-            f"Model path is a file but not a checkpoint: {model_path}"
-        )
+        raise FileNotFoundError(f"Model path is a file but not a checkpoint: {model_path}")
 
     # Case 2: model_path is a directory - search for checkpoints
     if model_path_obj.is_dir():
@@ -415,8 +410,7 @@ def main() -> int:
     )
     if not meta.task:
         _LOGGER.error(
-            "Task not specified. Provide --task argument or ensure the submission "
-            "script fetched it from model tags."
+            "Task not specified. Provide --task argument or ensure the submission script fetched it from model tags."
         )
         return 1
 
@@ -431,22 +425,16 @@ def main() -> int:
     # Launch simulation
     from isaaclab.app import AppLauncher
 
-    app = AppLauncher(
-        argparse.Namespace(headless=args.headless, enable_cameras=False)
-    )
+    app = AppLauncher(argparse.Namespace(headless=args.headless, enable_cameras=False))
 
     try:
         import gymnasium as gym
-
+        import isaaclab_tasks  # noqa: F401 - Required for task registration
         from isaaclab_rl.skrl import SkrlVecEnvWrapper
         from isaaclab_tasks.utils.parse_cfg import parse_env_cfg
 
-        import isaaclab_tasks  # noqa: F401 - Required for task registration
-
         # Create environment
-        env_cfg = parse_env_cfg(
-            meta.task, "cuda:0", args.num_envs, use_fabric=True
-        )
+        env_cfg = parse_env_cfg(meta.task, "cuda:0", args.num_envs, use_fabric=True)
         env_cfg.seed = args.seed
         env = gym.make(meta.task, cfg=env_cfg, render_mode=None)
         if meta.framework == "skrl":
@@ -491,7 +479,8 @@ def main() -> int:
         def _timeout_handler(signum, frame):
             _LOGGER.warning("App close timed out, forcing exit")
             import os
-            os._exit(exit_code if 'exit_code' in dir() else 1)
+
+            os._exit(exit_code if "exit_code" in dir() else 1)
 
         try:
             signal.signal(signal.SIGALRM, _timeout_handler)

@@ -18,11 +18,12 @@ import random
 import shutil
 import sys
 import time
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator, NamedTuple, Sequence
+from typing import Any, NamedTuple
 
 from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
 from training.utils import AzureMLContext, set_env_defaults
@@ -108,7 +109,10 @@ def _build_parser(app_launcher_cls: Any) -> argparse.ArgumentParser:
         "--mlflow_log_interval",
         type=str,
         default="balanced",
-        help="MLflow metric logging interval: 'step' (every step), 'balanced' (every 10 steps), 'rollout' (per rollout), or integer",
+        help=(
+            "MLflow metric logging interval: 'step' (every step),"
+            " 'balanced' (every 10 steps), 'rollout' (per rollout), or integer"
+        ),
     )
     app_launcher_cls.add_app_launcher_args(parser)
     return parser
@@ -215,9 +219,8 @@ def _log_artifacts(mlflow: Any, log_dir: Path, resume_path: str | None) -> str |
         mlflow.log_artifacts(str(checkpoint_dir), artifact_path="skrl-run/checkpoints")
         latest_file: Path | None = None
         for candidate in checkpoint_dir.rglob("*"):
-            if candidate.is_file():
-                if latest_file is None or candidate.stat().st_mtime > latest_file.stat().st_mtime:
-                    latest_file = candidate
+            if candidate.is_file() and (latest_file is None or candidate.stat().st_mtime > latest_file.stat().st_mtime):
+                latest_file = candidate
         if active_run and latest_file:
             run_id = active_run.info.run_id
             relative_path = latest_file.relative_to(checkpoint_dir)
@@ -577,10 +580,7 @@ def mlflow_run_context(
     env_experiment_id = os.environ.get("MLFLOW_EXPERIMENT_ID")
 
     # Log all relevant MLflow environment variables for debugging
-    mlflow_env_vars = {
-        k: v for k, v in os.environ.items()
-        if k.startswith(("MLFLOW_", "AZURE_"))
-    }
+    mlflow_env_vars = {k: v for k, v in os.environ.items() if k.startswith(("MLFLOW_", "AZURE_"))}
     _LOGGER.debug("MLflow-related environment variables: %s", mlflow_env_vars)
 
     # When Azure ML manages the run, we must set the experiment BEFORE any other MLflow calls
@@ -619,23 +619,27 @@ def mlflow_run_context(
             exc,
             type(exc).__name__,
         )
-        _LOGGER.error("MLflow environment state: MLFLOW_RUN_ID=%s, MLFLOW_EXPERIMENT_NAME=%s",
-                      os.environ.get("MLFLOW_RUN_ID"),
-                      os.environ.get("MLFLOW_EXPERIMENT_NAME"))
+        _LOGGER.error(
+            "MLflow environment state: MLFLOW_RUN_ID=%s, MLFLOW_EXPERIMENT_NAME=%s",
+            os.environ.get("MLFLOW_RUN_ID"),
+            os.environ.get("MLFLOW_EXPERIMENT_NAME"),
+        )
         _LOGGER.error("Active run before start_run: %s", mlflow.active_run())
         raise
 
     # Log parameters and tags
     log_interval = _parse_mlflow_log_interval(cli_args.mlflow_log_interval, rollouts)
-    mlflow.log_params({
-        "algorithm": cli_args.algorithm,
-        "ml_framework": cli_args.ml_framework,
-        "num_envs": _resolve_env_count(env_cfg),
-        "distributed": cli_args.distributed,
-        "resume_checkpoint": bool(resume_path),
-        "seed": random_seed,
-        "mlflow_log_interval": log_interval,
-    })
+    mlflow.log_params(
+        {
+            "algorithm": cli_args.algorithm,
+            "ml_framework": cli_args.ml_framework,
+            "num_envs": _resolve_env_count(env_cfg),
+            "distributed": cli_args.distributed,
+            "resume_checkpoint": bool(resume_path),
+            "seed": random_seed,
+            "mlflow_log_interval": log_interval,
+        }
+    )
 
     tags = {
         "log_dir": str(log_dir),
@@ -761,7 +765,7 @@ def _initialize_simulation(
 ) -> tuple[Any, Any]:
     """Launch IsaacLab simulation application using parsed arguments."""
 
-    sys.argv = [sys.argv[0]] + list(unparsed_args)
+    sys.argv = [sys.argv[0], *list(unparsed_args)]
     app_launcher = app_launcher_cls(cli_args)
     simulation_app = app_launcher.app
     kit_log_dir = getattr(getattr(simulation_app, "config", None), "log_dir", None)
@@ -776,11 +780,9 @@ def _load_training_modules(
 ) -> TrainingModules:
     """Import IsaacLab, SKRL, and optional MLflow modules."""
 
-    import isaaclab_tasks  # noqa: F401
-    from isaaclab_tasks.utils.hydra import hydra_task_config
     import gymnasium as gym_module
+    import isaaclab_tasks  # noqa: F401
     import skrl as skrl_module
-
     from isaaclab.envs import (
         DirectMARLEnv,
         DirectMARLEnvCfg,
@@ -791,6 +793,7 @@ def _load_training_modules(
     from isaaclab.utils.assets import retrieve_file_path
     from isaaclab.utils.dict import print_dict
     from isaaclab.utils.io import dump_yaml
+    from isaaclab_tasks.utils.hydra import hydra_task_config
 
     try:
         from isaaclab.utils.io import dump_pickle
@@ -985,7 +988,9 @@ def _run_training_with_mlflow(
     """Execute training loop with optional MLflow tracking."""
     if modules.mlflow_module is None:
         # No MLflow - just run training
-        descriptor = _build_run_descriptor(cli_args, state.log_dir, state.resume_path, state.agent_dict, state.rollouts, None)
+        descriptor = _build_run_descriptor(
+            cli_args, state.log_dir, state.resume_path, state.agent_dict, state.rollouts, None
+        )
         _execute_training_loop(runner, descriptor)
         return
 

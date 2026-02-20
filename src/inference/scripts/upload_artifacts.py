@@ -58,8 +58,9 @@ def upload_to_mlflow(
 ) -> bool:
     """Upload artifacts to MLflow via Azure ML integration."""
     try:
-        from training.utils import AzureConfigError, bootstrap_azure_ml
         import mlflow
+
+        from training.utils import AzureConfigError, bootstrap_azure_ml
     except ImportError as e:
         print(f"[WARNING] training.utils not available: {e}")
         return False
@@ -90,10 +91,10 @@ def upload_to_mlflow(
             )
             mlflow.log_params(
                 {
-                    "num_envs": os.environ.get("NUM_ENVS", "4"),
-                    "max_steps": os.environ.get("MAX_STEPS", "500"),
-                    "video_length": os.environ.get("VIDEO_LENGTH", "200"),
-                    "inference_format": os.environ.get("INFERENCE_FORMAT", "both"),
+                    "num_envs": os.environ["NUM_ENVS"],
+                    "max_steps": os.environ["MAX_STEPS"],
+                    "video_length": os.environ["VIDEO_LENGTH"],
+                    "inference_format": os.environ["INFERENCE_FORMAT"],
                 }
             )
 
@@ -155,7 +156,7 @@ def upload_to_mlflow(
                         videos_logged += 1
 
             print(f"\n{'=' * 60}")
-            print(f"[MLflow] Artifacts logged to Azure ML Studio!")
+            print("[MLflow] Artifacts logged to Azure ML Studio!")
             print(f"[MLflow] Run ID: {run.info.run_id}")
             print(f"[MLflow] Experiment: {experiment_name}")
             print(f"[MLflow] Run name: {run_name}")
@@ -194,12 +195,11 @@ def upload_to_blob_fallback(
     timestamp: str,
 ) -> bool:
     """Upload artifacts directly to Azure Blob Storage as fallback."""
-    if not blob_account and checkpoint_uri.startswith("https://"):
-        if ".blob.core.windows.net" in checkpoint_uri:
-            parsed = urlparse(checkpoint_uri)
-            blob_account = parsed.netloc.split(".")[0]
-            path_parts = parsed.path.lstrip("/").split("/", 1)
-            blob_container = path_parts[0] if path_parts else "inference-outputs"
+    if not blob_account and checkpoint_uri.startswith("https://") and ".blob.core.windows.net" in checkpoint_uri:
+        parsed = urlparse(checkpoint_uri)
+        blob_account = parsed.netloc.split(".")[0]
+        path_parts = parsed.path.lstrip("/").split("/", 1)
+        blob_container = path_parts[0] if path_parts else "inference-outputs"
 
     if not blob_account:
         blob_account = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME", "")
@@ -267,14 +267,29 @@ def main() -> None:
     if src_root and src_root not in sys.path:
         sys.path.insert(0, src_root)
 
-    task = os.environ.get("TASK", "unknown")
-    export_dir = Path(os.environ.get("EXPORT_DIR", "/tmp/exported"))
+    from training.utils import set_env_defaults
+
+    set_env_defaults(
+        {
+            "TASK": "unknown",
+            "EXPORT_DIR": "/tmp/exported",
+            "ONNX_SUCCESS": "0",
+            "JIT_SUCCESS": "0",
+            "NUM_ENVS": "4",
+            "MAX_STEPS": "500",
+            "VIDEO_LENGTH": "200",
+            "INFERENCE_FORMAT": "both",
+        }
+    )
+
+    task = os.environ["TASK"]
+    export_dir = Path(os.environ["EXPORT_DIR"])
     metrics_dir = Path(os.environ.get("METRICS_DIR", str(export_dir / "metrics")))
     checkpoint_uri = os.environ.get("CHECKPOINT_URI", "")
     blob_account = os.environ.get("BLOB_STORAGE_ACCOUNT", "")
     blob_container = os.environ.get("BLOB_CONTAINER", "")
-    onnx_success = os.environ.get("ONNX_SUCCESS", "0") == "1"
-    jit_success = os.environ.get("JIT_SUCCESS", "0") == "1"
+    onnx_success = os.environ["ONNX_SUCCESS"] == "1"
+    jit_success = os.environ["JIT_SUCCESS"] == "1"
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
     onnx_metrics, jit_metrics = load_metrics(metrics_dir)

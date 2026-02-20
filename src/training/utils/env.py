@@ -23,9 +23,7 @@ def require_env(name: str, *, error_type: type[Exception] = RuntimeError) -> str
     """
     value = os.environ.get(name)
     if not value:
-        raise error_type(
-            f"Environment variable {name} is required for Azure ML bootstrap"
-        )
+        raise error_type(f"Environment variable {name} is required for Azure ML bootstrap")
     return value
 
 

@@ -1,0 +1,64 @@
+name: YAML Lint
+
+on:
+  workflow_call:
+    inputs:
+      soft-fail:
+        description: 'Whether to continue on actionlint violations'
+        required: false
+        type: boolean
+        default: false
+      changed-files-only:
+        description: 'Only lint changed workflow files'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  yaml-lint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Create logs directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path logs | Out-Null
+
+      - name: Install actionlint
+        run: |
+          ACTIONLINT_VERSION="1.7.10"
+          ACTIONLINT_SHA256="f4c76b71db5755a713e6055cbb0857ed07e103e028bda117817660ebadb4386f"
+          curl -sSfL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" -o /tmp/actionlint.tar.gz
+          echo "${ACTIONLINT_SHA256} /tmp/actionlint.tar.gz" | sha256sum -c --quiet -
+          sudo tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint
+          rm /tmp/actionlint.tar.gz
+          actionlint --version
+
+      - name: Run YAML Lint
+        shell: pwsh
+        continue-on-error: ${{ inputs.soft-fail }}
+        run: |
+          $lintArgs = @{}
+          if ('${{ inputs.changed-files-only }}' -eq 'true') {
+            $lintArgs['ChangedFilesOnly'] = $true
+          }
+          & scripts/linting/Invoke-YamlLint.ps1 @lintArgs
+
+      - name: Upload YAML lint results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        with:
+          name: yaml-lint-results
+          path: logs/
+          retention-days: 30

@@ -10,6 +10,10 @@ permissions:
   contents: read
   security-events: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   analyze:
     name: CodeQL Analysis
@@ -46,9 +50,14 @@ jobs:
 
       - name: Add job summary
         if: always()
+        shell: pwsh
         run: |
-          echo "## CodeQL Security Analysis Complete" >> $GITHUB_STEP_SUMMARY
-          echo "**Language:** ${{ matrix.language }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Queries:** security-extended, security-and-quality" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📊 View results in the Security tab under Code Scanning" >> $GITHUB_STEP_SUMMARY
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+          $md = @(
+            '## CodeQL Security Analysis Complete'
+            '**Language:** ${{ matrix.language }}'
+            '**Queries:** security-extended, security-and-quality'
+            ''
+            '📊 View results in the Security tab under Code Scanning'
+          )
+          Write-CIStepSummary -Content ($md -join "`n")

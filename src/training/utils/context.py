@@ -2,25 +2,25 @@
 
 Provides ``bootstrap_azure_ml`` to initialize an Azure ML workspace
 connection, configure MLflow tracking, and optionally set up Azure
-Blob Storage for checkpoint uploads.
+Blob Storage for blob uploads.
 
 Required dependencies: ``azure-ai-ml``, ``azure-identity``, ``mlflow``.
-Optional: ``azure-storage-blob`` (for checkpoint uploads via
+Optional: ``azure-storage-blob`` (for blob uploads via
 ``AzureStorageContext``).
 """
 
 from __future__ import annotations
 
+import contextlib
 import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import mlflow  # type: ignore[import-not-found]
 from azure.ai.ml import MLClient
 from azure.identity import DefaultAzureCredential
-import mlflow  # type: ignore[import-not-found]
-
 
 if TYPE_CHECKING:  # pragma: no cover - optional dependency import guard
     from azure.storage.blob import BlobServiceClient
@@ -45,7 +45,7 @@ class AzureStorageContext:
         container_name: Target container for all upload operations.
     """
 
-    blob_client: "BlobServiceClient"
+    blob_client: BlobServiceClient
     container_name: str
 
     def upload_file(self, *, local_path: str, blob_name: str) -> str:
@@ -68,7 +68,7 @@ class AzureStorageContext:
         """
         file_path = Path(local_path)
         if not file_path.is_file():
-            raise FileNotFoundError(f"Checkpoint file not found: {local_path}")
+            raise FileNotFoundError(f"File not found: {local_path} (destination: {self.container_name}/{blob_name})")
 
         blob = self.blob_client.get_blob_client(
             container=self.container_name,
@@ -110,7 +110,7 @@ class AzureStorageContext:
             }
 
             for future in as_completed(future_to_file):
-                local_path, blob_name = future_to_file[future]
+                local_path, _blob_name = future_to_file[future]
                 try:
                     result = future.result()
                     uploaded_blobs.append(result)
@@ -131,7 +131,7 @@ class AzureStorageContext:
         *,
         local_path: str,
         model_name: str,
-        step: Optional[int] = None,
+        step: int | None = None,
     ) -> str:
         """Upload a training checkpoint with an auto-generated blob name.
 
@@ -180,10 +180,10 @@ class AzureMLContext:
     client: MLClient
     tracking_uri: str
     workspace_name: str
-    storage: Optional[AzureStorageContext] = None
+    storage: AzureStorageContext | None = None
 
 
-def _optional_env(name: str) -> Optional[str]:
+def _optional_env(name: str) -> str | None:
     """Return the value of an environment variable, or ``None`` when unset or empty.
 
     Args:
@@ -197,7 +197,7 @@ def _optional_env(name: str) -> Optional[str]:
     return value or None
 
 
-def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
+def _build_storage_context(credential: Any) -> AzureStorageContext | None:
     """Build an Azure Blob Storage context if storage is configured.
 
     Creates a ``BlobServiceClient`` using the provided credential and
@@ -229,7 +229,8 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
         from azure.storage.blob import BlobServiceClient
     except ImportError as exc:  # pragma: no cover - optional dependency guard
         raise AzureConfigError(
-            "azure-storage-blob is required to upload checkpoints. Install the package or unset AZURE_STORAGE_ACCOUNT_NAME."
+            "azure-storage-blob is required for Azure Blob Storage uploads. "
+            "Install the package or unset AZURE_STORAGE_ACCOUNT_NAME."
         ) from exc
 
     container_name = _optional_env("AZURE_STORAGE_CONTAINER_NAME") or "isaaclab-training-logs"
@@ -238,11 +239,8 @@ def _build_storage_context(credential: Any) -> Optional[AzureStorageContext]:
     try:
         blob_client = BlobServiceClient(account_url=account_url, credential=credential)
         container_client = blob_client.get_container_client(container_name)
-        try:
+        with contextlib.suppress(ResourceExistsError):
             container_client.create_container()
-        except ResourceExistsError:
-            # Container already exists; safe to ignore.
-            pass
         return AzureStorageContext(blob_client=blob_client, container_name=container_name)
     except AzureError as exc:
         raise AzureConfigError(
@@ -356,7 +354,6 @@ def bootstrap_azure_ml(
     except Exception as exc:
         raise AzureConfigError(f"Failed to access workspace {workspace_name}: {exc}") from exc
 
-    workspace = client.workspaces.get(workspace_name)
     tracking_uri = getattr(workspace, "mlflow_tracking_uri", None)
     if not tracking_uri:
         raise AzureConfigError("Azure ML workspace does not expose an MLflow tracking URI")

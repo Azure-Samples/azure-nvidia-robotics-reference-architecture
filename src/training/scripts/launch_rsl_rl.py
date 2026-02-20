@@ -5,14 +5,13 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import logging
-import os
 import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Sequence
 
 from training.utils import AzureConfigError, AzureMLContext, bootstrap_azure_ml
 
@@ -184,7 +183,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     _validate_mlflow_flags(args)
 
     try:
-        context, experiment_name = _initialize_mlflow_context(args)
+        _context, _experiment_name = _initialize_mlflow_context(args)
     except AzureConfigError as exc:
         raise SystemExit(str(exc)) from exc
 
