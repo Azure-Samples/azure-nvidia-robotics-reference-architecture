@@ -322,40 +322,40 @@ Describe 'Set-CIOutput' {
     Context 'Azure DevOps platform' {
         BeforeEach {
             $env:TF_BUILD = 'True'
-            Mock Write-Host { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits setvariable logging command' {
             Set-CIOutput -Name 'test-var' -Value 'test-value'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '*##vso[task.setvariable variable=test-var]*test-value*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '##vso\[task\.setvariable variable=test-var.*test-value'
             }
         }
 
         It 'Escapes special characters in variable name' {
             Set-CIOutput -Name 'test;var' -Value 'value'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*variable=test%AZP3Bvar*'
             }
         }
 
         It 'Escapes special characters in value' {
             Set-CIOutput -Name 'var' -Value 'value[test]'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*value%AZP5Btest%AZP5D*'
             }
         }
 
         It 'Includes isOutput flag when IsOutput is specified' {
             Set-CIOutput -Name 'output-var' -Value 'value' -IsOutput
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*variable=output-var;isOutput=true*'
             }
         }
 
         It 'Does not include isOutput flag by default' {
             Set-CIOutput -Name 'regular-var' -Value 'value'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -notlike '*isOutput=true*'
             }
         }
@@ -363,12 +363,12 @@ Describe 'Set-CIOutput' {
 
     Context 'Local platform' {
         BeforeEach {
-            Mock Write-Verbose { } -Verifiable
+            Mock Write-Verbose { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Logs via Write-Verbose' {
             Set-CIOutput -Name 'local-var' -Value 'local-value'
-            Should -Invoke -CommandName Write-Verbose -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*local-var=local-value*'
             }
         }
@@ -441,26 +441,26 @@ Describe 'Set-CIEnv' {
     Context 'Azure DevOps platform' {
         BeforeEach {
             $env:TF_BUILD = 'True'
-            Mock Write-Host { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits setvariable logging command' {
             Set-CIEnv -Name 'TEST_VAR' -Value 'test-value'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '*##vso[task.setvariable variable=TEST_VAR]*test-value*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '##vso\[task\.setvariable variable=TEST_VAR.*test-value'
             }
         }
 
         It 'Escapes special characters in variable name' {
             Set-CIEnv -Name 'TEST_VAR_NAME' -Value 'value'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*variable=TEST_VAR_NAME*'
             }
         }
 
         It 'Escapes special characters in value' {
             Set-CIEnv -Name 'VAR' -Value "value`nwith newline"
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*value%AZP0Awith newline*'
             }
         }
@@ -468,12 +468,12 @@ Describe 'Set-CIEnv' {
 
     Context 'Local platform' {
         BeforeEach {
-            Mock Write-Verbose { } -Verifiable
+            Mock Write-Verbose { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Logs via Write-Verbose' {
             Set-CIEnv -Name 'LOCAL_VAR' -Value 'local-value'
-            Should -Invoke -CommandName Write-Verbose -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*LOCAL_VAR=local-value*'
             }
         }
@@ -481,37 +481,37 @@ Describe 'Set-CIEnv' {
 
     Context 'Invalid variable names' {
         BeforeEach {
-            Mock Write-Warning { } -Verifiable
+            Mock Write-Warning { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Warns and returns for name starting with digit' {
             Set-CIEnv -Name '9VAR' -Value 'value'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*Invalid environment variable name*'
             }
         }
 
         It 'Warns and returns for name with invalid characters' {
             Set-CIEnv -Name 'VAR-NAME' -Value 'value'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*Invalid environment variable name*'
             }
         }
 
         It 'Warns and returns for name with spaces' {
             Set-CIEnv -Name 'VAR NAME' -Value 'value'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*Invalid environment variable name*'
             }
         }
 
         It 'Accepts valid name with underscores' {
-            Mock Write-Verbose { }
+            Mock Write-Verbose { } -ModuleName 'CIHelpers'
             { Set-CIEnv -Name 'VALID_VAR_NAME' -Value 'value' } | Should -Not -Throw
         }
 
         It 'Accepts valid name starting with underscore' {
-            Mock Write-Verbose { }
+            Mock Write-Verbose { } -ModuleName 'CIHelpers'
             { Set-CIEnv -Name '_PRIVATE_VAR' -Value 'value' } | Should -Not -Throw
         }
     }
@@ -571,9 +571,9 @@ Describe 'Write-CIStepSummary' {
         }
 
         It 'Warns and returns when Path file does not exist' {
-            Mock Write-Warning { } -Verifiable
+            Mock Write-Warning { } -ModuleName 'CIHelpers' -Verifiable
             Write-CIStepSummary -Path 'TestDrive:/nonexistent.md'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*not found*'
             }
             $script:testSummaryFile | Should -Not -Exist
@@ -583,38 +583,38 @@ Describe 'Write-CIStepSummary' {
     Context 'Azure DevOps platform' {
         BeforeEach {
             $env:TF_BUILD = 'True'
-            Mock Write-Host { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits section header and markdown content' {
             $markdown = "# Summary`n- Result: Pass"
             Write-CIStepSummary -Content $markdown
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -eq '##[section]Step Summary'
             }
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*# Summary*'
             }
         }
 
         It 'Escapes vso logging commands in content' {
             Write-CIStepSummary -Content 'Test ##vso[task.complete] in summary'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '*`##vso[task.complete]*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '`##vso\[task\.complete\]'
             }
         }
 
         It 'Escapes generic logging commands in content' {
             Write-CIStepSummary -Content 'Test ##[debug] in summary'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '*`##[*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '`##\['
             }
         }
 
         It 'Reads markdown from file when Path parameter is used' {
             '# ADO Summary' | Set-Content -Path $script:testMarkdownFile
             Write-CIStepSummary -Path $script:testMarkdownFile
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*# ADO Summary*'
             }
         }
@@ -622,12 +622,12 @@ Describe 'Write-CIStepSummary' {
 
     Context 'Local platform' {
         BeforeEach {
-            Mock Write-Verbose { } -Verifiable
+            Mock Write-Verbose { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Logs via Write-Verbose' {
             Write-CIStepSummary -Content 'Local summary content'
-            Should -Invoke -CommandName Write-Verbose -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*Local summary content*'
             }
         }
@@ -650,96 +650,96 @@ Describe 'Write-CIAnnotation' {
     Context 'GitHub Actions platform' {
         BeforeEach {
             $env:GITHUB_ACTIONS = 'true'
-            Mock Write-Host { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits warning annotation' {
             Write-CIAnnotation -Message 'Test warning' -Level 'Warning'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::warning::Test warning'
             }
         }
 
         It 'Emits error annotation' {
             Write-CIAnnotation -Message 'Test error' -Level 'Error'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::error::Test error'
             }
         }
 
         It 'Emits notice annotation' {
             Write-CIAnnotation -Message 'Test notice' -Level 'Notice'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::notice::Test notice'
             }
         }
 
         It 'Defaults to warning level' {
             Write-CIAnnotation -Message 'Default level'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::warning::Default level'
             }
         }
 
         It 'Includes file property when specified' {
             Write-CIAnnotation -Message 'Error in file' -Level 'Error' -File 'scripts/test.ps1'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::error file=scripts/test.ps1::Error in file'
             }
         }
 
         It 'Normalizes Windows backslashes to forward slashes in file path' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'scripts\test\file.ps1'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*file=scripts/test/file.ps1*'
             }
         }
 
         It 'Includes line property when specified' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'test.ps1' -Line 42
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*line=42*'
             }
         }
 
         It 'Includes column property when specified' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'test.ps1' -Line 42 -Column 10
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*col=10*'
             }
         }
 
         It 'Combines file, line, and column properties' {
             Write-CIAnnotation -Message 'Syntax error' -Level 'Error' -File 'src/app.ps1' -Line 100 -Column 5
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::error file=src/app.ps1,line=100,col=5::Syntax error'
             }
         }
 
         It 'Escapes special characters in message' {
             Write-CIAnnotation -Message "Error with`nnewline" -Level 'Error'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*Error with%0Anewline*'
             }
         }
 
         It 'Escapes special characters in file property' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'path:with:colons.ps1'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*file=path%3Awith%3Acolons.ps1*'
             }
         }
 
         It 'Skips line and column when value is 0 or negative' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'test.ps1' -Line 0 -Column -1
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -notlike '*line=*' -and $Object -notlike '*col=*'
             }
         }
 
         It 'Handles empty message' {
             Write-CIAnnotation -Message '' -Level 'Warning'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -eq '::warning::'
             }
         }
@@ -748,75 +748,75 @@ Describe 'Write-CIAnnotation' {
     Context 'Azure DevOps platform' {
         BeforeEach {
             $env:TF_BUILD = 'True'
-            Mock Write-Host { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits warning logissue' {
             Write-CIAnnotation -Message 'Test warning' -Level 'Warning'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '##vso[task.logissue type=warning]*Test warning*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '##vso\[task\.logissue type=warning\].*Test warning'
             }
         }
 
         It 'Emits error logissue' {
             Write-CIAnnotation -Message 'Test error' -Level 'Error'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '##vso[task.logissue type=error]*Test error*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '##vso\[task\.logissue type=error\].*Test error'
             }
         }
 
         It 'Maps Notice to info type' {
             Write-CIAnnotation -Message 'Test notice' -Level 'Notice'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '##vso[task.logissue type=info]*Test notice*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '##vso\[task\.logissue type=info\].*Test notice'
             }
         }
 
         It 'Includes sourcepath property when File is specified' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'scripts/test.ps1'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*sourcepath=scripts/test.ps1*'
             }
         }
 
         It 'Normalizes Windows backslashes to forward slashes in sourcepath' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'scripts\test\file.ps1'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*sourcepath=scripts/test/file.ps1*'
             }
         }
 
         It 'Includes linenumber property when Line is specified' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'test.ps1' -Line 42
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*linenumber=42*'
             }
         }
 
         It 'Includes columnnumber property when Column is specified' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'test.ps1' -Line 42 -Column 10
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*columnnumber=10*'
             }
         }
 
         It 'Combines all properties' {
             Write-CIAnnotation -Message 'Syntax error' -Level 'Error' -File 'src/app.ps1' -Line 100 -Column 5
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*type=error;sourcepath=src/app.ps1;linenumber=100;columnnumber=5*Syntax error*'
             }
         }
 
         It 'Escapes special characters in message' {
             Write-CIAnnotation -Message 'Error[test]' -Level 'Error'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*Error%AZP5Btest%AZP5D*'
             }
         }
 
         It 'Escapes special characters in sourcepath property' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'path;with;semicolons.ps1'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*sourcepath=path%AZP3Bwith%AZP3Bsemicolons.ps1*'
             }
         }
@@ -824,33 +824,33 @@ Describe 'Write-CIAnnotation' {
 
     Context 'Local platform' {
         BeforeEach {
-            Mock Write-Warning { } -Verifiable
+            Mock Write-Warning { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Logs warning via Write-Warning' {
             Write-CIAnnotation -Message 'Local warning' -Level 'Warning'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*[Warning]*Local warning*'
             }
         }
 
         It 'Logs error via Write-Warning with Error prefix' {
             Write-CIAnnotation -Message 'Local error' -Level 'Error'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*[Error]*Local error*'
             }
         }
 
         It 'Includes file location when specified' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'test.ps1'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*test.ps1*'
             }
         }
 
         It 'Includes line and column when specified' {
             Write-CIAnnotation -Message 'Error' -Level 'Error' -File 'test.ps1' -Line 42 -Column 10
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*test.ps1:42:10*'
             }
         }
@@ -865,7 +865,7 @@ Describe 'Write-CIAnnotations' {
     BeforeEach {
         Save-CIEnvironment
         $env:GITHUB_ACTIONS = 'true'
-        Mock Write-Host { }
+        Mock Write-Host { } -ModuleName 'CIHelpers'
     }
 
     AfterEach {
@@ -898,7 +898,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 2
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 2
         }
 
         It 'Maps Error severity to Error level' {
@@ -917,7 +917,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::error*'
             }
         }
@@ -938,7 +938,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '::warning*'
             }
         }
@@ -969,7 +969,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 0
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 0
         }
 
         It 'Includes file, line, and column properties when available' {
@@ -990,7 +990,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*file=src/test.ps1*' -and
                 $Object -like '*line=100*' -and
                 $Object -like '*col=25*'
@@ -1027,7 +1027,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 3
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 3
         }
 
         It 'Handles summary with no issues' {
@@ -1040,7 +1040,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 0
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 0
         }
 
         It 'Handles summary with empty Results array' {
@@ -1049,7 +1049,7 @@ Describe 'Write-CIAnnotations' {
             }
 
             Write-CIAnnotations -Summary $summary
-            Should -Invoke -CommandName Write-Host -Times 0
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 0
         }
     }
 }
@@ -1070,27 +1070,27 @@ Describe 'Set-CITaskResult' {
     Context 'GitHub Actions platform' {
         BeforeEach {
             $env:GITHUB_ACTIONS = 'true'
-            Mock Write-Host { }
-            Mock Write-Verbose { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
+            Mock Write-Verbose { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits error annotation for Failed result' {
             Set-CITaskResult -Result 'Failed'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -eq '::error::Task failed'
             }
         }
 
         It 'Logs via Write-Verbose for Succeeded result' {
             Set-CITaskResult -Result 'Succeeded'
-            Should -Invoke -CommandName Write-Verbose -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*Succeeded*'
             }
         }
 
         It 'Logs via Write-Verbose for SucceededWithIssues result' {
             Set-CITaskResult -Result 'SucceededWithIssues'
-            Should -Invoke -CommandName Write-Verbose -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*SucceededWithIssues*'
             }
         }
@@ -1099,26 +1099,26 @@ Describe 'Set-CITaskResult' {
     Context 'Azure DevOps platform' {
         BeforeEach {
             $env:TF_BUILD = 'True'
-            Mock Write-Host { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits task.complete for Failed result' {
             Set-CITaskResult -Result 'Failed'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -eq '##vso[task.complete result=Failed]'
             }
         }
 
         It 'Emits task.complete for Succeeded result' {
             Set-CITaskResult -Result 'Succeeded'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -eq '##vso[task.complete result=Succeeded]'
             }
         }
 
         It 'Emits task.complete for SucceededWithIssues result' {
             Set-CITaskResult -Result 'SucceededWithIssues'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -eq '##vso[task.complete result=SucceededWithIssues]'
             }
         }
@@ -1126,18 +1126,18 @@ Describe 'Set-CITaskResult' {
 
     Context 'Local platform' {
         BeforeEach {
-            Mock Write-Verbose { } -Verifiable
+            Mock Write-Verbose { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Logs all results via Write-Verbose' {
             Set-CITaskResult -Result 'Succeeded'
-            Should -Invoke -CommandName Write-Verbose -Times 1
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1
 
             Set-CITaskResult -Result 'SucceededWithIssues'
-            Should -Invoke -CommandName Write-Verbose -Times 2
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 2
 
             Set-CITaskResult -Result 'Failed'
-            Should -Invoke -CommandName Write-Verbose -Times 3
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 3
         }
     }
 }
@@ -1168,7 +1168,7 @@ Describe 'Publish-CIArtifact' {
         BeforeEach {
             $env:GITHUB_ACTIONS = 'true'
             $env:GITHUB_OUTPUT = $script:testOutputFile
-            Mock Write-Verbose { }
+            Mock Write-Verbose { } -ModuleName 'CIHelpers'
         }
 
         It 'Sets output variables for artifact path and name' {
@@ -1180,7 +1180,7 @@ Describe 'Publish-CIArtifact' {
 
         It 'Logs confirmation via Write-Verbose' {
             Publish-CIArtifact -Path $script:testArtifactFile -Name 'my-artifact'
-            Should -Invoke -CommandName Write-Verbose -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*my-artifact*'
             }
         }
@@ -1189,62 +1189,63 @@ Describe 'Publish-CIArtifact' {
     Context 'Azure DevOps platform' {
         BeforeEach {
             $env:TF_BUILD = 'True'
-            Mock Write-Host { }
+            Mock Write-Host { } -ModuleName 'CIHelpers'
         }
 
         It 'Emits artifact.upload logging command' {
             Publish-CIArtifact -Path $script:testArtifactFile -Name 'test-artifact'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '##vso[artifact.upload containerfolder=test-artifact;artifactname=test-artifact]*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match '##vso\[artifact\.upload containerfolder=test-artifact;artifactname=test-artifact\]'
             }
         }
 
         It 'Uses ContainerFolder parameter when specified' {
             Publish-CIArtifact -Path $script:testArtifactFile -Name 'my-artifact' -ContainerFolder 'custom-folder'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*containerfolder=custom-folder*'
             }
         }
 
         It 'Defaults ContainerFolder to Name when not specified' {
             Publish-CIArtifact -Path $script:testArtifactFile -Name 'default-name'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*containerfolder=default-name*'
             }
         }
 
         It 'Escapes special characters in container folder' {
             Publish-CIArtifact -Path $script:testArtifactFile -Name 'name' -ContainerFolder 'folder;name'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*containerfolder=folder%AZP3Bname*'
             }
         }
 
         It 'Escapes special characters in artifact name' {
             Publish-CIArtifact -Path $script:testArtifactFile -Name 'artifact[test]'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Object -like '*artifactname=artifact%AZP5Btest%AZP5D*'
             }
         }
 
         It 'Escapes special characters in path' {
             $pathWithChars = Join-Path $TestDrive 'path[with]brackets.zip'
-            New-Item -Path $pathWithChars -ItemType File -Force | Out-Null
+            Mock Test-Path { $true } -ModuleName 'CIHelpers'
+            $env:TF_BUILD = 'True'
             Publish-CIArtifact -Path $pathWithChars -Name 'artifact'
-            Should -Invoke -CommandName Write-Host -Times 1 -ParameterFilter {
-                $Object -like '*path%AZP5Bwith%AZP5Dbrackets.zip*'
+            Should -Invoke -CommandName Write-Host -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
+                $Object -match 'path%AZP5Bwith%AZP5Dbrackets\.zip'
             }
         }
     }
 
     Context 'Local platform' {
         BeforeEach {
-            Mock Write-Verbose { } -Verifiable
+            Mock Write-Verbose { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Logs via Write-Verbose' {
             Publish-CIArtifact -Path $script:testArtifactFile -Name 'local-artifact'
-            Should -Invoke -CommandName Write-Verbose -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Verbose -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*local-artifact*'
             }
         }
@@ -1252,12 +1253,12 @@ Describe 'Publish-CIArtifact' {
 
     Context 'Path validation' {
         BeforeEach {
-            Mock Write-Warning { } -Verifiable
+            Mock Write-Warning { } -ModuleName 'CIHelpers' -Verifiable
         }
 
         It 'Warns and returns when path does not exist' {
             Publish-CIArtifact -Path 'TestDrive:/nonexistent.zip' -Name 'artifact'
-            Should -Invoke -CommandName Write-Warning -Times 1 -ParameterFilter {
+            Should -Invoke -CommandName Write-Warning -ModuleName 'CIHelpers' -Times 1 -ParameterFilter {
                 $Message -like '*not found*'
             }
         }
@@ -1265,7 +1266,7 @@ Describe 'Publish-CIArtifact' {
         It 'Publishes when path is a directory' {
             $testDir = Join-Path $TestDrive 'artifact-dir'
             New-Item -Path $testDir -ItemType Directory -Force | Out-Null
-            Mock Write-Verbose { }
+            Mock Write-Verbose { } -ModuleName 'CIHelpers'
             $env:GITHUB_ACTIONS = 'true'
             $env:GITHUB_OUTPUT = $script:testOutputFile
 
