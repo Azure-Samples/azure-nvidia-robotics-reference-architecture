@@ -79,7 +79,7 @@ Decisions follow a tiered model based on impact and reversibility.
 
 Standard pull requests for bug fixes, documentation updates, and minor enhancements:
 
-* Require two maintainers approval
+* Require one maintainer approval
 * Merged after CI checks pass
 * No waiting period unless review comments are pending
 
@@ -182,7 +182,9 @@ Reopening rules:
 
 ### Discussions
 
-The same 60-day warning and 14-day closure thresholds apply to GitHub Discussions in principle. The same exemptions that prevent automatic closure for issues (pinned, security, do-not-close, or assigned to a milestone) and the same reopening behavior (reopening clears any stale status and resets the inactivity clock) apply to Discussions. Because current automation tooling (actions/stale) does not support Discussions, enforcement is manual through periodic triage until dedicated tooling is implemented.
+The same 60-day warning and 14-day closure thresholds apply to GitHub Discussions in principle. The same exemptions that prevent automatic closure for issues (pinned, security, do-not-close, or assigned to a milestone) and the same reopening behavior (reopening clears any stale status and resets the inactivity clock) apply to Discussions.
+
+Because current automation tooling (actions/stale) does not support Discussions, enforcement is manual through periodic triage until dedicated tooling is implemented.
 
 ## Access Continuity
 
@@ -209,7 +211,3 @@ Changes to this governance document follow the governance changes process:
 2. Allow one-week comment period for community input
 3. Obtain maintainer consensus
 4. Merge and communicate changes to the community
-
-📜 This governance document was created to meet [OSSF Best Practices Badge](https://www.bestpractices.dev/) Silver-level requirements.
-
-🤖 *Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.*
