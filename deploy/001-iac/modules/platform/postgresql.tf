@@ -102,6 +102,8 @@ resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.main[0].id
   value     = "HSTORE,UUID-OSSP,PG_STAT_STATEMENTS"
+
+  depends_on = [azurerm_private_endpoint.postgresql]
 }
 
 // ============================================================
@@ -115,4 +117,6 @@ resource "azurerm_postgresql_flexible_server_database" "databases" {
   server_id = azurerm_postgresql_flexible_server.main[0].id
   collation = each.value.collation
   charset   = each.value.charset
+
+  depends_on = [azurerm_postgresql_flexible_server_configuration.extensions]
 }

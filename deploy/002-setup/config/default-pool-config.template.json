@@ -16,7 +16,7 @@
             "allowed_mounts": []
         },
         "rtxpro_platform": {
-            "description": "RTX PRO 6000 BSE v6 GPU platform with Spot instance support",
+            "description": "RTX PRO 6000 BSE v6 GPU platform (Regular priority)",
             "host_network_allowed": false,
             "privileged_allowed": true,
             "default_variables": {},

@@ -127,7 +127,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
   max_count             = each.value.enable_auto_scaling ? each.value.max_count : null
   priority              = each.value.priority
   zones                 = each.value.zones
-  eviction_policy       = each.value.eviction_policy
+  eviction_policy       = each.value.priority == "Spot" ? each.value.eviction_policy : null
   gpu_driver            = each.value.gpu_driver
 
   depends_on = [

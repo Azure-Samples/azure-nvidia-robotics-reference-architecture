@@ -20,17 +20,16 @@ Items in **HIGHEST PRIORITY** sections from attached instructions files override
 
 **Conventions and Styling:** Always follow conventions and styling in this codebase FIRST for all changes, edits, updates, and new files.
 
-* Conventions and styling are in instruction files and must be read in with the `read_file` tool if not already added as an `<attachment>`.
-
 **Proactive fixes:** Always fix problems and errors you encounter, even if unrelated to the original request. Prefer root-cause, constructive fixes over symptom-only patches.
 
 * Always correct all incorrect or problematic conventions, styling, and redundant and/or misleading comments.
 
-**Deleting files and folders:** Use `rm` with the run_in_terminal tool when needing to delete files or folders.
-
 **Edit tools:** Never use `insert_edit_into_file` tool when other edit and file modification tools are available.
 
-**Memory and tracking work**: Always track work in Beads instead of Markdown.
+## Local Terraform and Script instructions
 
-* All upcoming work, tracked work, issues, plans, todos, phases, tasks, and memory must always use the mcp_beads tools.
-* Don't ever use git commands for anything related to the mcp_beads tools and beads in general, its at the user's discretion when to use git commands and tools.
+Always run `source {{file-path-to}}/az-sub-init.sh` in your terminal at least once, before doing any of the following:
+* Running any `terraform` commands in the terminal.
+* Running any of the scripts in the codebase.
+
+If the user has not already previously done an `az login` then az-sub-init.sh will require input from the user.

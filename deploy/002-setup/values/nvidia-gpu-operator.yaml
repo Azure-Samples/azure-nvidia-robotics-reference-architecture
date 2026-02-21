@@ -1,5 +1,5 @@
 # NVIDIA GPU Operator Helm values for Azure AKS
-# Configured for AKS with gpu_driver = "Install" (Azure-managed driver/toolkit)
+# Configured for AKS with gpu_driver = "Skip" (GPU Operator-managed driver/toolkit)
 
 # Operator settings - use containerd runtime with AKS-compatible handler name
 operator:
@@ -18,16 +18,31 @@ daemonsets:
       value: spot
       effect: NoSchedule
 
-# Driver is managed by AKS GPU node pools (gpu_driver = "Install" in Terraform)
+# Driver managed by GPU Operator (gpu_driver = "Skip" in Terraform)
 driver:
-  enabled: false
+  enabled: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
-# Toolkit is managed by AKS - do NOT enable as it will crash containerd
+# Toolkit managed by GPU Operator (gpu_driver = "Skip" in Terraform)
 toolkit:
-  enabled: false
+  enabled: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
 # Device plugin - required to advertise GPU resources to kubelet
-# AKS gpu_driver="Install" does NOT include the device plugin
 devicePlugin:
   enabled: true
   tolerations:

@@ -23,12 +23,6 @@
         "spec": {
             "tolerations": [
                 {
-                    "key": "kubernetes.azure.com/scalesetpriority",
-                    "value": "spot",
-                    "effect": "NoSchedule",
-                    "operator": "Equal"
-                },
-                {
                     "key": "nvidia.com/gpu",
                     "effect": "NoSchedule",
                     "operator": "Exists"
