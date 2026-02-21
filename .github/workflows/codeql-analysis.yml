@@ -14,6 +14,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   analyze:
     name: CodeQL Analysis
@@ -50,7 +54,6 @@ jobs:
 
       - name: Add job summary
         if: always()
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           $md = @(

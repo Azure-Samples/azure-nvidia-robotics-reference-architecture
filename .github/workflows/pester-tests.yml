@@ -22,6 +22,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   pester:
     name: PowerShell Tests (${{ matrix.os }})
@@ -29,6 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Single OS for now; expand when cross-platform coverage is needed
         os: [ubuntu-latest]
     permissions:
       contents: read
@@ -41,25 +46,23 @@ jobs:
           persist-credentials: false
 
       - name: Create logs directory
-        shell: pwsh
         run: New-Item -ItemType Directory -Force -Path logs | Out-Null
 
       - name: Install Pester
-        shell: pwsh
         run: |
           Install-Module -Name Pester -RequiredVersion 5.7.1 -Force -SkipPublisherCheck -Scope CurrentUser
           Import-Module Pester -RequiredVersion 5.7.1
 
       - name: Install PowerShell-Yaml
-        shell: pwsh
         run: |
           Install-Module -Name powershell-yaml -Force -SkipPublisherCheck -Scope CurrentUser
 
       - name: Get changed files
         id: changed-files
         if: inputs.changed-files-only
-        shell: pwsh
         run: |
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+
           # Determine base ref for comparison
           if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
             $baseRef = "origin/${{ github.base_ref }}"
@@ -71,11 +74,11 @@ jobs:
           $changedFiles = git diff --name-only $baseRef -- '*.ps1' '*.psm1' '*.psd1' 2>$null
           if (-not $changedFiles) {
             Write-Host "No PowerShell files changed"
-            "has-changes=false" >> $env:GITHUB_OUTPUT
+            Set-CIOutput -Name 'has-changes' -Value 'false'
             return
           }
 
-          "has-changes=true" >> $env:GITHUB_OUTPUT
+          Set-CIOutput -Name 'has-changes' -Value 'true'
 
           # Map source files to test files
           $testPaths = @()
@@ -102,19 +105,20 @@ jobs:
           if ($uniquePaths) {
             Write-Host "Test files to run:"
             $uniquePaths | ForEach-Object { Write-Host "  $_" }
-            "test-paths=$($uniquePaths -join ',')" >> $env:GITHUB_OUTPUT
+            Set-CIOutput -Name 'test-paths' -Value ($uniquePaths -join ',')
           }
           else {
             Write-Host "No matching test files found for changed source files"
-            "has-changes=false" >> $env:GITHUB_OUTPUT
+            Set-CIOutput -Name 'has-changes' -Value 'false'
           }
 
       - name: Run Pester Tests
         id: pester
         if: "!inputs.changed-files-only || steps.changed-files.outputs.has-changes == 'true'"
-        shell: pwsh
         continue-on-error: ${{ inputs.soft-fail }}
         run: |
+          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+
           $env:PESTER_FAILED = 'false'
 
           $configParams = @{}
@@ -135,17 +139,17 @@ jobs:
 
             if ($result.FailedCount -gt 0) {
               $env:PESTER_FAILED = 'true'
-              "pester-failed=true" >> $env:GITHUB_OUTPUT
+              Set-CIOutput -Name 'pester-failed' -Value 'true'
               Write-Warning "$($result.FailedCount) test(s) failed"
             }
             else {
-              "pester-failed=false" >> $env:GITHUB_OUTPUT
+              Set-CIOutput -Name 'pester-failed' -Value 'false'
               Write-Host "All $($result.PassedCount) tests passed"
             }
           }
           catch {
             $env:PESTER_FAILED = 'true'
-            "pester-failed=true" >> $env:GITHUB_OUTPUT
+            Set-CIOutput -Name 'pester-failed' -Value 'true'
             Write-Error "Pester execution failed: $_"
           }
 
@@ -176,7 +180,6 @@ jobs:
 
       - name: Coverage Threshold Check
         if: matrix.os == 'ubuntu-latest' && inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
-        shell: pwsh
         run: |
           if (Test-Path logs/coverage.xml) {
             [xml]$coverage = Get-Content logs/coverage.xml
@@ -196,6 +199,7 @@ jobs:
             
             if ($lineRate -lt $threshold) {
               Write-Warning "Coverage $lineRate% is below threshold $threshold%"
+              exit 1
             }
             else {
               Write-Host "Coverage $lineRate% meets threshold $threshold%"
@@ -207,7 +211,6 @@ jobs:
 
       - name: Check results
         if: always() && steps.pester.outcome != 'skipped'
-        shell: pwsh
         run: |
           $failed = '${{ steps.pester.outputs.pester-failed }}'
           $softFail = '${{ inputs.soft-fail }}'

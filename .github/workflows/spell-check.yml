@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   spell-check:
     name: Spell Check
@@ -24,33 +28,25 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4.1.0
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Setup Node.js and install dependencies
+        uses: ./.github/actions/setup-node-deps
 
       - name: Create logs directory
-        run: mkdir -p logs
+        run: New-Item -ItemType Directory -Force -Path logs | Out-Null
 
       - name: Run spell check
         id: spell-check
         run: |
-          npm run spell-check > logs/spell-check-results.txt 2>&1
-          EXIT_CODE=$?
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "SPELL_CHECK_FAILED=true" >> "$GITHUB_ENV"
-          fi
-          cat logs/spell-check-results.txt
-          exit "$EXIT_CODE"
+          npm run spell-check 2>&1 | Tee-Object -FilePath logs/spell-check-results.txt
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            'SPELL_CHECK_FAILED=true' >> $env:GITHUB_ENV
+          }
+          exit $exitCode
         continue-on-error: true
 
       - name: Create annotations
         if: env.SPELL_CHECK_FAILED == 'true'
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           foreach ($line in (Get-Content logs/spell-check-results.txt -ErrorAction SilentlyContinue)) {
@@ -70,7 +66,6 @@ jobs:
 
       - name: Add job summary
         if: always()
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           if ($env:SPELL_CHECK_FAILED -eq 'true') {
@@ -102,7 +97,6 @@ jobs:
 
       - name: Fail job if errors found
         if: env.SPELL_CHECK_FAILED == 'true' && !inputs.soft-fail
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           Write-CIAnnotation -Level Error -Message 'Spell check found errors — see step summary and spell-check-results artifact for details'
