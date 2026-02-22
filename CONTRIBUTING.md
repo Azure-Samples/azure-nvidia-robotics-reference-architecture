@@ -323,6 +323,12 @@ Documentation stays current through update triggers, ownership rules, and freshn
 
 This project uses a corporate-sponsored maintainer model. See [GOVERNANCE.md](GOVERNANCE.md) for decision-making processes, roles, and how governance can change.
 
+## Internationalization
+
+This project currently produces no user-facing applications or localizable content. All technical documentation is maintained in English.
+
+If user-facing components are added in the future, follow [W3C Internationalization](https://www.w3.org/International/) guidelines and [Unicode CLDR](https://cldr.unicode.org/) for locale data. Use [BCP 47](https://www.rfc-editor.org/info/bcp47) language tags for locale identifiers.
+
 ## Code of Conduct
 
 This project adopts the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). See [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) for details, or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions.
