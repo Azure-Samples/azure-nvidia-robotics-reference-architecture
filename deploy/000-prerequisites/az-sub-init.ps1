@@ -44,7 +44,7 @@ function Test-AzureToken {
     return $LASTEXITCODE -eq 0
 }
 
-function Test-CorrectTenant {
+function Test-CorrectTenant([string]$Tenant) {
     if ([string]::IsNullOrEmpty($Tenant)) {
         return $true
     }
@@ -59,7 +59,7 @@ function Test-CorrectTenant {
     return $Tenant -eq $currentTenant
 }
 
-function Invoke-AzureLogin {
+function Invoke-AzureLogin([string]$Tenant) {
     Write-Host 'Logging into Azure...'
 
     if ($Tenant) {
@@ -82,8 +82,8 @@ if ($currentSubscriptionId -and -not (Test-AzureToken)) {
     $currentSubscriptionId = $null
 }
 
-if (-not $currentSubscriptionId -or -not (Test-CorrectTenant)) {
-    Invoke-AzureLogin
+if (-not $currentSubscriptionId -or -not (Test-CorrectTenant $Tenant)) {
+    Invoke-AzureLogin $Tenant
 
     $currentSubscriptionId = Get-CurrentSubscriptionId
     if (-not $currentSubscriptionId) {
