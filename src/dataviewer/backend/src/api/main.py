@@ -1,0 +1,57 @@
+"""FastAPI application entry point."""
+
+import logging
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# Configure logging to show INFO level
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_path)
+
+from .routers import analysis, annotations, datasets, detection, export, labels
+from .routes import ai_analysis
+
+app = FastAPI(
+    title="LeRobot Annotation API",
+    description="API for episode annotation in robot demonstration datasets",
+    version="0.1.0",
+)
+
+# Configure CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "http://localhost:5177",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers - export must come before datasets to match longer paths first
+app.include_router(export.router, prefix="/api/datasets", tags=["export"])
+app.include_router(detection.router, prefix="/api/datasets", tags=["detection"])
+app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"])
+app.include_router(annotations.router, prefix="/api", tags=["annotations"])
+app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
+app.include_router(ai_analysis.router, prefix="/api", tags=["ai"])
+app.include_router(labels.router, prefix="/api/datasets", tags=["labels"])
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}
