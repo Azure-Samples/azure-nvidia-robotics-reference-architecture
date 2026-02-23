@@ -181,7 +181,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 Review security guidance before deploying this reference architecture:
 
 - [SECURITY.md](SECURITY.md) - vulnerability reporting and security considerations for deployers
-- [Security Guide](docs/security-guide.md) - detailed security configuration inventory, deployment responsibilities, and checklist
+- [Security Guide](docs/security/security-guide.md) - detailed security configuration inventory, deployment responsibilities, and checklist
 
 ## 🤝 Support
 

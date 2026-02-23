@@ -95,6 +95,6 @@ Refer to official [Azure security documentation](https://learn.microsoft.com/azu
 
 <!-- cspell:words deployers -->
 
-- [Security Guide for Deployers](docs/security-guide.md) - detailed security configuration inventory and deployment checklist
+- [Security Guide for Deployers](docs/security/security-guide.md) - detailed security configuration inventory and deployment checklist
 - [Azure security documentation](https://learn.microsoft.com/azure/security/) - authoritative security guidance for Azure services
 - [AKS baseline architecture](https://learn.microsoft.com/azure/architecture/reference-architectures/containers/aks/baseline-aks) - production-ready AKS security patterns
