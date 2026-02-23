@@ -14,6 +14,7 @@ sys.path.insert(0, str(_SRC_DIR))
 from isaaclab.app import AppLauncher
 
 from common import cli_args  # isort: skip
+from training.simulation_shutdown import prepare_for_shutdown
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Run inference from a trained RSL-RL checkpoint.")
@@ -219,9 +220,10 @@ def main(
             time.sleep(sleep_time)
 
     # close the simulator
+    prepare_for_shutdown()
     env.close()
 
 
 if __name__ == "__main__":
     main()
-    simulation_app.close()
+    os._exit(0)

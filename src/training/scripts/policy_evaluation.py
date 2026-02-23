@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,6 +34,8 @@ from typing import Any
 
 import numpy as np
 import torch
+
+from training.simulation_shutdown import prepare_for_shutdown
 
 _LOGGER = logging.getLogger("isaaclab.eval")
 
@@ -427,6 +430,7 @@ def main() -> int:
 
     app = AppLauncher(argparse.Namespace(headless=args.headless, enable_cameras=False))
 
+    exit_code = 1
     try:
         import gymnasium as gym
         import isaaclab_tasks  # noqa: F401 - Required for task registration
@@ -465,7 +469,8 @@ def main() -> int:
             print(f"\n❌ FAILED: {success_rate:.2f} < {threshold}", flush=True)
             exit_code = 1
 
-        # Explicit environment cleanup before app close
+        # Explicit environment cleanup before exit
+        prepare_for_shutdown()
         env.close()
         return exit_code
 
@@ -473,21 +478,7 @@ def main() -> int:
         _LOGGER.exception("Evaluation failed: %s", e)
         return 1
     finally:
-        # Close simulation app - use timeout to prevent hang
-        import signal
-
-        def _timeout_handler(signum, frame):
-            _LOGGER.warning("App close timed out, forcing exit")
-            import os
-
-            os._exit(exit_code if "exit_code" in dir() else 1)
-
-        try:
-            signal.signal(signal.SIGALRM, _timeout_handler)
-            signal.alarm(30)  # 30 second timeout for cleanup
-            app.app.close()
-        except Exception as close_err:
-            _LOGGER.warning("Error during app close: %s", close_err)
+        os._exit(exit_code)
 
 
 if __name__ == "__main__":

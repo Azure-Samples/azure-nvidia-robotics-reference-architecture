@@ -5,9 +5,9 @@ workflow:
   resources:
     default:
       gpu: 1
-      cpu: 4
-      memory: 32Gi
-      storage: 40Gi
+      cpu: 120
+      memory: 480Gi
+      storage: 200Gi
   tasks:
     - name: isaac-inference
       image: "{{ image }}"
@@ -15,6 +15,7 @@ workflow:
         - /bin/bash
         - /tmp/entry.sh
       environment:
+        NVIDIA_DRIVER_CAPABILITIES: "all"
         TASK: "{{ task }}"
         NUM_ENVS: "{{ num_envs }}"
         MAX_STEPS: "{{ max_steps }}"

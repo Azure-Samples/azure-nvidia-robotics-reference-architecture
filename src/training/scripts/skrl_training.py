@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
+from training.simulation_shutdown import prepare_for_shutdown
 from training.utils import AzureMLContext, set_env_defaults
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
@@ -418,6 +419,7 @@ def _configure_agent_training(
         trainer_cfg["timesteps"] = cli_args.max_iterations * rollouts
 
     trainer_cfg["close_environment_at_exit"] = False
+    trainer_cfg["disable_progressbar"] = True
     agent_dict["seed"] = random_seed
     return rollouts
 
@@ -830,13 +832,11 @@ def _load_training_modules(
 
 
 def _close_simulation(simulation_app: Any | None) -> None:
-    """Close simulation app and suppress expected shutdown issues."""
-    if simulation_app is None:
-        return
-    try:
-        simulation_app.close()
-    except Exception as exc:  # noqa: BLE001
-        _LOGGER.info("Simulation app close raised exception (expected during shutdown): %s", exc)
+    """Exit the process; Kit's shutdown hangs on vGPU nodes.
+
+    See docs/gpu-configuration.md § "Isaac Sim 4.x Shutdown Fix".
+    """
+    os._exit(0)
 
 
 def _build_run_descriptor(
@@ -969,6 +969,7 @@ def _run_hydra_training(
                 modules=modules,
             )
         finally:
+            prepare_for_shutdown()
             env.close()
 
     _launch()

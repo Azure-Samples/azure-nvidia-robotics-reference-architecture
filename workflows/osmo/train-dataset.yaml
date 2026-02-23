@@ -5,9 +5,9 @@ workflow:
   resources:
     default:
       gpu: 1
-      cpu: 8
-      memory: 48Gi
-      storage: 80Gi
+      cpu: 120
+      memory: 480Gi
+      storage: 200Gi
   tasks:
     - name: isaac-training
       image: "{{ image }}"
@@ -15,6 +15,7 @@ workflow:
         - /bin/bash
         - /tmp/entry.sh
       environment:
+        NVIDIA_DRIVER_CAPABILITIES: "all"
         TASK: "{{ task }}"
         NUM_ENVS: "{{ num_envs }}"
         MAX_ITERATIONS: "{{ max_iterations }}"
