@@ -31,13 +31,36 @@ azure_module.ai = azure_ai_module
 azure_module.identity = azure_identity_module
 azure_ai_module.ml = azure_ai_ml_module
 
-sys.modules.setdefault("azure", azure_module)
-sys.modules.setdefault("azure.ai", azure_ai_module)
-sys.modules.setdefault("azure.ai.ml", azure_ai_ml_module)
-sys.modules.setdefault("azure.identity", azure_identity_module)
-sys.modules.setdefault("mlflow", mlflow_module)
 
-context_module = importlib.import_module("training.utils.context")
+def _import_context_module_with_mocked_dependencies() -> types.ModuleType:
+    dependency_modules = {
+        "azure": azure_module,
+        "azure.ai": azure_ai_module,
+        "azure.ai.ml": azure_ai_ml_module,
+        "azure.identity": azure_identity_module,
+        "mlflow": mlflow_module,
+    }
+    previous_dependencies = {name: sys.modules.get(name) for name in dependency_modules}
+    previous_context_module = sys.modules.pop("training.utils.context", None)
+
+    try:
+        for name, module in dependency_modules.items():
+            sys.modules[name] = module
+        return importlib.import_module("training.utils.context")
+    finally:
+        for name, previous_module in previous_dependencies.items():
+            if previous_module is None:
+                sys.modules.pop(name, None)
+                continue
+            sys.modules[name] = previous_module
+
+        if previous_context_module is None:
+            sys.modules.pop("training.utils.context", None)
+        else:
+            sys.modules["training.utils.context"] = previous_context_module
+
+
+context_module = _import_context_module_with_mocked_dependencies()
 
 
 def test_bootstrap_azure_ml_success_returns_context(monkeypatch: pytest.MonkeyPatch) -> None:
