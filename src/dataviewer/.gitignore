@@ -1,0 +1,42 @@
+
+# HVE-Core AI workflow artifacts (local only)
+.copilot-tracking/
+
+# Windows reserved names (cannot be files)
+nul
+backend/nul
+
+# Temp debug files
+backend/test_yolo.py
+backend/test_api.py
+backend/nohup.out
+backend/test_yolo_results.txt
+
+# Test data and large binary files
+*.hdf5
+backend/test-*/
+backend/data/test-*/
+backend/yolo*.pt
+
+# Node modules (should never be committed)
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Debug / scratch scripts
+check_structure.py
+**/check_hdf5.py
+
+# local data
+data/
+
+# env
+.env
