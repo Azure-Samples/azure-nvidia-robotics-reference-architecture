@@ -3,13 +3,9 @@ from __future__ import annotations
 import importlib
 import sys
 import types
-from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 azure_module = types.ModuleType("azure")
 azure_ai_module = types.ModuleType("azure.ai")
