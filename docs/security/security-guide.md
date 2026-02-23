@@ -14,7 +14,7 @@ Security configurations included in this reference architecture and responsibili
 > This document provides security guidance for informational purposes only. It does
 > not constitute professional security advice and is not a substitute for your own
 > security assessment. This reference architecture is licensed under the
-> [MIT License](../LICENSE), provided "AS IS" without warranty of any kind. You are
+> [MIT License](../../LICENSE), provided "AS IS" without warranty of any kind. You are
 > solely responsible for the security of your deployment, including configuration,
 > operational practices, and compliance with applicable regulations. The project
 > maintainers accept no liability for security incidents arising from the use of
@@ -124,4 +124,12 @@ For team environments or production deployments, consider migrating to a remote 
 | [AKS baseline architecture](https://learn.microsoft.com/azure/architecture/reference-architectures/containers/aks/baseline-aks) | Production-ready AKS security and networking patterns |
 | [Azure compliance documentation](https://learn.microsoft.com/azure/compliance/)                                                 | Compliance offerings and certifications               |
 | [Terraform Azure backend](https://developer.hashicorp.com/terraform/language/backend/azurerm)                                   | Remote state backend configuration                    |
-| [Contributing security review](contributing/security-review.md)                                                                 | Contributor security checklist for pull requests      |
+| [Threat Model](threat-model.md)                                                                                                 | STRIDE-based threat analysis and remediation roadmap  |
+| [Contributing security review](../contributing/security-review.md)                                                              | Contributor security checklist for pull requests      |
+
+---
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

@@ -6,6 +6,8 @@ ms.date: 2026-02-22
 ms.topic: concept
 ---
 
+STRIDE-based threat analysis of the Azure NVIDIA Robotics Reference Architecture covering infrastructure-as-code components, trust boundaries, and a prioritized remediation roadmap.
+
 ## Executive Summary
 
 This threat model applies the STRIDE framework to the Azure NVIDIA Robotics Reference Architecture. The architecture deploys AKS clusters with GPU node pools, Azure Machine Learning, and NVIDIA OSMO for robotics training and inference workloads. All components are infrastructure-as-code artifacts; no hosted service or user-facing application exists.
@@ -414,3 +416,10 @@ Goal Structuring Notation (GSN) elements supporting the security posture claim.
 * [STRIDE Threat Modeling](https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats) — Microsoft STRIDE reference
 * [OpenSSF Best Practices](https://www.bestpractices.dev/en/criteria) — badge criteria
 * [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes) — AKS hardening baseline
+
+---
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->
