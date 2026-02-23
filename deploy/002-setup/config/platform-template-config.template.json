@@ -1,0 +1,19 @@
+{
+    "pod_template": {
+        "spec": {
+            "tolerations": [],
+            "nodeSelector": {
+                "node.kubernetes.io/instance-type": ""
+            }
+        }
+    },
+    "pool_platform": {
+        "description": "",
+        "host_network_allowed": false,
+        "privileged_allowed": true,
+        "default_variables": {},
+        "resource_validations": [],
+        "override_pod_template": [],
+        "allowed_mounts": []
+    }
+}

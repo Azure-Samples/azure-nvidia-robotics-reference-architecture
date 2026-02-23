@@ -831,12 +831,11 @@ def _load_training_modules(
 
 def _close_simulation(simulation_app: Any | None) -> None:
     """Close simulation app and suppress expected shutdown issues."""
-
     if simulation_app is None:
         return
     try:
         simulation_app.close()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _LOGGER.info("Simulation app close raised exception (expected during shutdown): %s", exc)
 
 

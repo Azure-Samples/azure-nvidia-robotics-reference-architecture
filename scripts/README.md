@@ -78,8 +78,8 @@ Values resolve in order: **CLI arguments → environment variables → Terraform
 | Option                         | Default                            | Description                                     | Source                                  |
 |--------------------------------|------------------------------------|-------------------------------------------------|-----------------------------------------|
 | `--environment-name`           | `isaaclab-training-env`            | AzureML environment name                        | CLI                                     |
-| `--environment-version`        | `2.2.0`                            | AzureML environment version                     | CLI                                     |
-| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                                 | CLI                                     |
+| `--environment-version`        | `2.3.2`                            | AzureML environment version                     | CLI                                     |
+| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.3.2`   | Container image                                 | CLI                                     |
 | `--assets-only`                | `false`                            | Register environment without submitting a job   | CLI                                     |
 | `--job-file` / `-w`            | `workflows/azureml/train.yaml`     | Job YAML template                               | CLI                                     |
 | `--task` / `-t`                | `Isaac-Velocity-Rough-Anymal-C-v0` | IsaacLab task                                   | `TASK`                                  |
@@ -122,8 +122,8 @@ Example:
 | `--model-name`          | derived from task                  | Azure ML model name                              | CLI                           |
 | `--model-version`       | `latest`                           | Azure ML model version                           | CLI                           |
 | `--environment-name`    | `isaaclab-training-env`            | AzureML environment name                         | CLI                           |
-| `--environment-version` | `2.2.0`                            | AzureML environment version                      | CLI                           |
-| `--image`               | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                                  | CLI                           |
+| `--environment-version` | `2.3.2`                            | AzureML environment version                      | CLI                           |
+| `--image`               | `nvcr.io/nvidia/isaac-lab:2.3.2`   | Container image                                  | CLI                           |
 | `--task`                | `Isaac-Velocity-Rough-Anymal-C-v0` | Override task ID                                 | `TASK`                        |
 | `--framework`           | unset                              | Override framework                               | CLI                           |
 | `--eval-episodes`       | `100`                              | Evaluation episodes                              | CLI                           |
@@ -158,7 +158,7 @@ Example:
 | `--task` / `-t`                | `Isaac-Velocity-Rough-Anymal-C-v0` | IsaacLab task                                    | `TASK`                        |
 | `--num-envs` / `-n`            | `2048`                             | Number of parallel environments                  | `NUM_ENVS`                    |
 | `--max-iterations` / `-m`      | unset                              | Max iterations (empty to unset)                  | `MAX_ITERATIONS`              |
-| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                                  | `IMAGE`                       |
+| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.3.2`   | Container image                                  | `IMAGE`                       |
 | `--payload-root` / `-p`        | `/workspace/isaac_payload`         | Runtime extraction root                          | `PAYLOAD_ROOT`                |
 | `--backend` / `-b`             | `skrl`                             | Training backend: `skrl` (default), `rsl_rl`     | `TRAINING_BACKEND`            |
 | `--checkpoint-uri` / `-c`      | unset                              | MLflow checkpoint artifact URI                   | `CHECKPOINT_URI`              |
@@ -189,7 +189,7 @@ Example:
 | `--task` / `-t`                | `Isaac-Velocity-Rough-Anymal-C-v0`  | IsaacLab task                                    | `TASK`                        |
 | `--num-envs` / `-n`            | `2048`                              | Number of parallel environments                  | `NUM_ENVS`                    |
 | `--max-iterations` / `-m`      | unset                               | Max iterations (empty to unset)                  | `MAX_ITERATIONS`              |
-| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.2.0`    | Container image                                  | `IMAGE`                       |
+| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.3.2`    | Container image                                  | `IMAGE`                       |
 | `--backend` / `-b`             | `skrl`                              | Training backend: `skrl` (default), `rsl_rl`     | `TRAINING_BACKEND`            |
 | `--dataset-bucket`             | `training`                          | OSMO bucket name                                 | `OSMO_DATASET_BUCKET`         |
 | `--dataset-name`               | `training-code`                     | Dataset name (auto-versioned)                    | `OSMO_DATASET_NAME`           |

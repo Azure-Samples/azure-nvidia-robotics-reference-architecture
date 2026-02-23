@@ -32,6 +32,7 @@ OPTIONS:
     --mek-config-file PATH  Use existing MEK config file
     --skip-service-config   Skip service_base_url configuration
     --skip-preflight        Skip preflight version checks
+    --use-local-osmo        Use local osmo-dev CLI instead of production osmo
     --config-preview        Print configuration and exit
 
 EXAMPLES:
@@ -55,6 +56,7 @@ force_mek=false
 mek_config_file=""
 skip_service_config=false
 skip_preflight=false
+use_local_osmo=false
 config_preview=false
 chart_version_set=false
 image_version_set=false
@@ -74,10 +76,13 @@ while [[ $# -gt 0 ]]; do
     --mek-config-file)     mek_config_file="$2"; shift 2 ;;
     --skip-service-config) skip_service_config=true; shift ;;
     --skip-preflight)      skip_preflight=true; shift ;;
+    --use-local-osmo)      use_local_osmo=true; shift ;;
     --config-preview)      config_preview=true; shift ;;
     *)                     fatal "Unknown option: $1" ;;
   esac
 done
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools az terraform kubectl helm jq openssl envsubst
 
@@ -153,9 +158,9 @@ run_preflight_checks() {
   validate_version_pair
 
   if [[ "$use_acr" == "true" ]]; then
-    verify_chart_exists "oci://${acr_login_server}/helm/osmo"
+    verify_chart_exists "oci://${acr_login_server}/helm/service"
     verify_chart_exists "oci://${acr_login_server}/helm/router"
-    verify_chart_exists "oci://${acr_login_server}/helm/ui"
+    verify_chart_exists "oci://${acr_login_server}/helm/web-ui"
   else
     verify_chart_exists "osmo/service"
     verify_chart_exists "osmo/router"
@@ -358,7 +363,7 @@ helm_args=("${base_helm_args[@]}" -f "$service_values" --set "services.postgres.
 [[ -n "$osmo_identity_client_id" ]] && helm_args+=(-f "$service_identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
 
 if [[ "$use_acr" == "true" ]]; then
-  helm upgrade -i service "oci://${acr_login_server}/helm/osmo" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i service "oci://${acr_login_server}/helm/service" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 else
   helm upgrade -i service osmo/service "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 fi
@@ -379,7 +384,7 @@ info "Deploying osmo/web-ui..."
 helm_args=("${base_helm_args[@]}" -f "$ui_values")
 
 if [[ "$use_acr" == "true" ]]; then
-  helm upgrade -i ui "oci://${acr_login_server}/helm/ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i ui "oci://${acr_login_server}/helm/web-ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 else
   helm upgrade -i ui osmo/web-ui "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 fi
@@ -397,6 +402,8 @@ if [[ "$skip_service_config" == "false" ]]; then
     [[ -f "$service_config_template" ]] || fatal "Service config template not found: $service_config_template"
     export SERVICE_BASE_URL="$service_url"
     envsubst < "$service_config_template" > "$CONFIG_DIR/out/service-config.json"
+    info "Logging into OSMO at ${service_url}..."
+    osmo login "${service_url}/" --method dev --username guest
     info "Applying service configuration (service_base_url: $service_url)..."
     osmo config update SERVICE --file "$CONFIG_DIR/out/service-config.json" --description "Set service base URL for UI"
   else

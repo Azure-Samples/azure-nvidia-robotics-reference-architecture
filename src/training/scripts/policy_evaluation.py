@@ -486,7 +486,6 @@ def main() -> int:
             signal.signal(signal.SIGALRM, _timeout_handler)
             signal.alarm(30)  # 30 second timeout for cleanup
             app.app.close()
-            signal.alarm(0)  # Cancel alarm
         except Exception as close_err:
             _LOGGER.warning("Error during app close: %s", close_err)
 

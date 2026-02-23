@@ -39,3 +39,7 @@ sidecars:
 
   logAgent:
     enabled: false
+
+  # OAuth2 Proxy configuration (requires OIDC setup)
+  oauth2Proxy:
+    enabled: false

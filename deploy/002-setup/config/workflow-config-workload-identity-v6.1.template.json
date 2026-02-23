@@ -1,6 +1,8 @@
 {
     "workflow_data": {
         "credential": {
+            "access_key_id": "${STORAGE_ACCESS_KEY_ID}",
+            "access_key": "${STORAGE_ACCESS_KEY}",
             "endpoint": "${WORKFLOW_DATA_ENDPOINT}",
             "region": "${AZURE_REGION}"
         },
@@ -8,12 +10,16 @@
     },
     "workflow_log": {
         "credential": {
+            "access_key_id": "${STORAGE_ACCESS_KEY_ID}",
+            "access_key": "${STORAGE_ACCESS_KEY}",
             "endpoint": "${WORKFLOW_LOG_ENDPOINT}",
             "region": "${AZURE_REGION}"
         }
     },
     "workflow_app": {
         "credential": {
+            "access_key_id": "${STORAGE_ACCESS_KEY_ID}",
+            "access_key": "${STORAGE_ACCESS_KEY}",
             "endpoint": "${WORKFLOW_APP_ENDPOINT}",
             "region": "${AZURE_REGION}"
         }

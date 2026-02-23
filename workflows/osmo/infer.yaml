@@ -69,7 +69,7 @@ workflow:
             bash "${INFERENCE_ROOT}/scripts/infer.sh" "${infer_args[@]}"
 
 default-values:
-  image: nvcr.io/nvidia/isaac-lab:2.2.0
+  image: nvcr.io/nvidia/isaac-lab:2.3.2
   task: Isaac-Ant-v0
   num_envs: "4"
   max_steps: "500"

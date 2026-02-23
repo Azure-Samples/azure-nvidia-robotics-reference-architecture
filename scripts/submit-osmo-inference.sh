@@ -22,6 +22,9 @@ fi
 source "${SCRIPT_DIR}/lib/terraform-outputs.sh"
 read_terraform_outputs "${REPO_ROOT}/deploy/001-iac" 2>/dev/null || true
 
+# shellcheck source=../deploy/002-setup/lib/common.sh
+source "${REPO_ROOT}/deploy/002-setup/lib/common.sh"
+
 usage() {
   cat <<'EOF'
 Usage: submit-osmo-inference.sh [options] [-- osmo-submit-flags]
@@ -50,6 +53,7 @@ Azure context overrides (resolved from Terraform outputs if not provided):
       --azure-workspace-name NAME   Azure ML workspace name
 
 General:
+      --use-local-osmo        Use local osmo-dev CLI instead of production osmo
   -h, --help              Show this help message and exit
 
 Environment overrides:
@@ -77,6 +81,8 @@ if ! command -v base64 >/dev/null 2>&1; then
   exit 1
 fi
 
+use_local_osmo=false
+
 WORKFLOW_TEMPLATE=${WORKFLOW_TEMPLATE:-"$REPO_ROOT/workflows/osmo/infer.yaml"}
 TMP_DIR=${TMP_DIR:-"$SCRIPT_DIR/.tmp"}
 ARCHIVE_PATH=${ARCHIVE_PATH:-"$TMP_DIR/osmo-inference.zip"}
@@ -85,7 +91,7 @@ TASK_VALUE=${TASK:-Isaac-Ant-v0}
 NUM_ENVS_VALUE=${NUM_ENVS:-4}
 MAX_STEPS_VALUE=${MAX_STEPS:-500}
 VIDEO_LENGTH_VALUE=${VIDEO_LENGTH:-200}
-IMAGE_VALUE=${IMAGE:-nvcr.io/nvidia/isaac-lab:2.2.0}
+IMAGE_VALUE=${IMAGE:-nvcr.io/nvidia/isaac-lab:2.3.2}
 PAYLOAD_ROOT_VALUE=${PAYLOAD_ROOT:-/workspace/isaac_payload}
 CHECKPOINT_URI_VALUE=${CHECKPOINT_URI:-}
 INFERENCE_FORMAT_VALUE=${INFERENCE_FORMAT:-both}
@@ -150,6 +156,10 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    --use-local-osmo)
+      use_local_osmo=true
+      shift
+      ;;
     --)
       shift
       forward_args+=("$@")
@@ -161,6 +171,8 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 if [[ -z "$CHECKPOINT_URI_VALUE" ]]; then
   echo "Error: --checkpoint-uri is required" >&2

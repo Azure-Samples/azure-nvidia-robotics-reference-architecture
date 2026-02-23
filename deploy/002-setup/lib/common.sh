@@ -2,6 +2,17 @@
 # Shared functions for 002-setup deployment scripts
 # Follows k3s/Docker/Homebrew conventions for user-facing scripts
 
+# Source repo-root .env.local for local environment overrides (not committed to git)
+_common_sh_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_env_local="$(cd "$_common_sh_dir/../../.." 2>/dev/null && pwd)/.env.local"
+if [[ -f "$_env_local" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$_env_local"
+  set +a
+fi
+unset _common_sh_dir _env_local
+
 # Logging functions with color support (NO_COLOR standard: https://no-color.org)
 if [[ -z "${NO_COLOR+x}" ]]; then
   info()  { printf '\033[1;34m[INFO]\033[0m  %s\n' "$*"; }
@@ -21,6 +32,24 @@ require_tools() {
     command -v "$tool" &>/dev/null || missing+=("$tool")
   done
   [[ ${#missing[@]} -eq 0 ]] || fatal "Missing required tools: ${missing[*]}"
+}
+
+# Override the osmo command with the local osmo-dev.sh Bazel wrapper.
+# Requires OSMO_SOURCE_DIR in .env.local or environment (see optional/osmo-dev.sh --help).
+activate_local_osmo() {
+  local lib_dir
+  lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  OSMO_DEV_CLI="${lib_dir}/../optional/osmo-dev.sh"
+
+  if [[ ! -x "$OSMO_DEV_CLI" ]]; then
+    fatal "osmo-dev.sh not found at $OSMO_DEV_CLI"
+  fi
+
+  info "Using local OSMO CLI: $OSMO_DEV_CLI"
+
+  osmo() { "$OSMO_DEV_CLI" "$@"; }
+  export OSMO_DEV_CLI
+  export -f osmo
 }
 
 # Ensure Azure CLI extension is installed
