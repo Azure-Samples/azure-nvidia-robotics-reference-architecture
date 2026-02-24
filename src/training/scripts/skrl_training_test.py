@@ -42,9 +42,11 @@ import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
 from training.simulation_shutdown import prepare_for_shutdown
+from training.stream import install_ansi_stripping
 
 
 def main() -> None:
+    install_ansi_stripping()
     wall_start = time.perf_counter()
 
     print(f"task={args.task}  num_envs={args.num_envs}  max_iterations={args.max_iterations}", flush=True)
@@ -65,6 +67,7 @@ def main() -> None:
         rollouts = agent_dict.get("agent", {}).get("rollouts", 1)
         trainer_cfg["timesteps"] = args.max_iterations * rollouts
         trainer_cfg["close_environment_at_exit"] = False
+        trainer_cfg["disable_progressbar"] = False
 
         print(
             f"Training: {args.max_iterations} iterations x {rollouts} rollouts = {trainer_cfg['timesteps']} timesteps",

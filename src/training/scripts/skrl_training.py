@@ -27,6 +27,7 @@ from typing import Any, NamedTuple
 
 from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
 from training.simulation_shutdown import prepare_for_shutdown
+from training.stream import install_ansi_stripping
 from training.utils import AzureMLContext, set_env_defaults
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
@@ -419,7 +420,7 @@ def _configure_agent_training(
         trainer_cfg["timesteps"] = cli_args.max_iterations * rollouts
 
     trainer_cfg["close_environment_at_exit"] = False
-    trainer_cfg["disable_progressbar"] = True
+    trainer_cfg["disable_progressbar"] = False
     agent_dict["seed"] = random_seed
     return rollouts
 
@@ -1045,6 +1046,7 @@ def run_training(
     cli_args, unparsed_args = _prepare_cli_arguments(parser, args, hydra_args)
 
     app_launcher, simulation_app = _initialize_simulation(AppLauncher, cli_args, unparsed_args)
+    install_ansi_stripping()
     try:
         modules = _load_training_modules(cli_args, context)
         _run_hydra_training(

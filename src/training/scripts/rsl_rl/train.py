@@ -12,9 +12,7 @@ the RSL-RL library with IsaacLab simulation environments. It handles:
 from __future__ import annotations
 
 import argparse
-import io
 import os
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +28,7 @@ from isaaclab.app import AppLauncher
 
 from common import cli_args
 from training.simulation_shutdown import prepare_for_shutdown
+from training.stream import install_ansi_stripping
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
@@ -183,32 +182,6 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
-
-_ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
-
-
-class _AnsiStrippingStream(io.TextIOBase):
-    """Wraps a text stream to strip ANSI escape sequences before writing."""
-
-    def __init__(self, wrapped: io.TextIOBase) -> None:
-        self._wrapped = wrapped
-
-    def write(self, s: str) -> int:
-        cleaned = _ANSI_ESCAPE_PATTERN.sub("", s)
-        return self._wrapped.write(cleaned)
-
-    def flush(self) -> None:
-        self._wrapped.flush()
-
-    def fileno(self) -> int:
-        return self._wrapped.fileno()
-
-    def isatty(self) -> bool:
-        return False
-
-    @property
-    def encoding(self) -> str:
-        return getattr(self._wrapped, "encoding", "utf-8")
 
 
 class RslRl3xCompatWrapper:
@@ -741,7 +714,7 @@ def main(
     if is_primary_process and mlflow_module and mlflow_run_active:
         _log_config_artifacts(mlflow_module, log_dir)
 
-    sys.stdout = _AnsiStrippingStream(sys.stdout)
+    install_ansi_stripping()
 
     if is_primary_process and azure_context is not None:
         runner.log = _create_enhanced_log(runner.log, mlflow_module, mlflow_run_active, runner)
