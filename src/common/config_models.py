@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -111,7 +111,7 @@ class VrTriggerConfig(BaseModel):
 
 
 TriggerConfig = Annotated[
-    Union[GpioTriggerConfig, PositionTriggerConfig, VrTriggerConfig],
+    GpioTriggerConfig | PositionTriggerConfig | VrTriggerConfig,
     Field(discriminator="type"),
 ]
 

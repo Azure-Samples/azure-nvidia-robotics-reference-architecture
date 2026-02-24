@@ -120,7 +120,7 @@ class TestPositionTriggerConfig:
 
     def test_position_trigger_mismatched_lengths(self):
         """joint_indices and tolerances must have same length."""
-        with pytest.raises(ValidationError, match="Tolerance count .* must match joint index count"):
+        with pytest.raises(ValidationError, match=r"Tolerance count .* must match joint index count"):
             PositionTriggerConfig(
                 joint_indices=[0, 1, 2],
                 tolerances=[0.01, 0.01],
@@ -182,12 +182,12 @@ class TestDiskThresholds:
 
     def test_disk_thresholds_warning_equals_critical(self):
         """Warning threshold must be less than critical."""
-        with pytest.raises(ValidationError, match="Warning threshold .* must be less than critical"):
+        with pytest.raises(ValidationError, match=r"Warning threshold .* must be less than critical"):
             DiskThresholds(warning_percent=90, critical_percent=90)
 
     def test_disk_thresholds_warning_exceeds_critical(self):
         """Warning threshold cannot exceed critical."""
-        with pytest.raises(ValidationError, match="Warning threshold .* must be less than critical"):
+        with pytest.raises(ValidationError, match=r"Warning threshold .* must be less than critical"):
             DiskThresholds(warning_percent=95, critical_percent=80)
 
     def test_disk_thresholds_boundary_values(self):
@@ -331,7 +331,6 @@ class TestRecordingConfig:
 
     def test_recording_config_custom_output_dir(self, tmp_path):
         """Custom output directory is preserved."""
-        from pathlib import Path
 
         custom_dir = tmp_path / "custom" / "path"
         custom_dir.mkdir(parents=True)
