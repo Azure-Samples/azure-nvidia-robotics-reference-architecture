@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../recording_config.schema.json
+# ROS 2 Edge Recording Configuration - Mobile Manipulator Platform
+#
+# Example configuration for mobile manipulator robots with 6-DOF arm mounted on
+# a mobile base. Demonstrates multi-modal sensing (RGB-D vision, LiDAR, odometry)
+# with position-based episode triggering for demonstration recording workflows.
+
+# Topics to record - compression strategy balances CPU overhead across sensor modalities
+topics:
+  - name: /joint_states
+    frequency_hz: 100.0
+    compression: lz4
+
+  - name: /camera/color/image_raw
+    frequency_hz: 30.0
+    compression: zstd        # RGB frames benefit from higher compression ratio
+
+  - name: /camera/depth/image_raw
+    frequency_hz: 30.0
+    compression: zstd        # Depth maps compress well with zstd
+
+  - name: /scan
+    frequency_hz: 10.0
+    compression: lz4         # LiDAR scans are sparse, lz4 sufficient
+
+  - name: /odom
+    frequency_hz: 50.0
+    compression: lz4
+
+  - name: /imu/data
+    frequency_hz: 200.0
+    compression: lz4
+
+# Position trigger - start recording when arm reaches demonstration start pose
+trigger:
+  type: position
+  joint_indices: [0, 1, 2, 3, 4, 5]
+  tolerances: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]  # 0.01 rad (~0.57°) per joint
+
+# Conservative thresholds for mobile platforms with limited onboard storage
+disk_thresholds:
+  warning_percent: 75        # Early warning allows offload before critical
+  critical_percent: 90
+
+# Strict gap detection - mobile manipulator trajectories require high data quality
+gap_detection:
+  threshold_ms: 100.0
+  severity: error            # Gaps may indicate localization or sensor failures
+
+output_dir: /data/recordings

@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=./recording_config.schema.json
+# ROS 2 Edge Recording Configuration - UR10E 6-DOF Robotic Arm
+#
+# Default configuration for recording episodes from a UR10E 6-degree-of-freedom
+# robotic arm with vision and IMU sensors. Episodes start/stop via GPIO trigger.
+
+# Topics to record - lz4 compression for high-frequency streams, zstd for images
+topics:
+  - name: /joint_states
+    frequency_hz: 100.0
+    compression: lz4         # Fast compression for 100 Hz joint state stream
+
+  - name: /camera/color/image_raw
+    frequency_hz: 30.0
+    compression: zstd        # Higher compression ratio for RGB frames
+
+  - name: /imu/data
+    frequency_hz: 200.0
+    compression: lz4         # Fast compression for 200 Hz IMU stream
+
+# GPIO trigger - physical button/switch for episode recording
+trigger:
+  type: gpio
+  pin: 17                    # BCM GPIO 17 (physical pin 11 on 40-pin header)
+  active_high: true          # Trigger on rising edge
+
+# Disk monitoring - prevents storage exhaustion during long recording sessions
+disk_thresholds:
+  warning_percent: 80
+  critical_percent: 95
+
+# Gap detection - identifies missing messages for quality assurance
+gap_detection:
+  threshold_ms: 100.0        # 100ms threshold balances sensitivity with false positives
+  severity: warning
+
+output_dir: /data/recordings

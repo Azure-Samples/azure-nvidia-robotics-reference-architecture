@@ -41,6 +41,7 @@ dependencies = [
     "azureml-mlflow",
     "mlflow",
     "psutil>=5.9.0",
+    "pydantic>=2.10.5",
     "pynvml>=11.5.0",
     "azure-core==1.38.2",
     "azure-storage-blob>=12.5.0,<=12.28.0",
