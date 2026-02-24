@@ -21,7 +21,7 @@ LeRobot behavioral cloning training for ACT and Diffusion policy architectures. 
 | Component        | Requirement                                                                  |
 |------------------|------------------------------------------------------------------------------|
 | Infrastructure   | AKS cluster deployed via [Infrastructure Guide](../../deploy/README.md)      |
-| Azure ML or OSMO | At least one platform configured (see [Platform Selection](#-platform-selection)) |
+| Azure ML or OSMO | At least one platform configured (see Platform Selection section)            |
 | HuggingFace token| Required for private datasets (`hf_token` credential)                        |
 | WANDB API key    | Required when `--wandb-enable` is set (default on OSMO)                      |
 
@@ -55,9 +55,9 @@ Train, evaluate, and register in one command:
 ## 🧠 Policy Architectures
 
 | Architecture | Type                                  | Strengths                                 |
-|-------------|---------------------------------------|-------------------------------------------|
-| ACT         | Action Chunking with Transformers     | Multi-step prediction, temporal coherence |
-| Diffusion   | Denoising Diffusion Policy            | Multi-modal action distributions          |
+|--------------|---------------------------------------|-------------------------------------------|
+| ACT          | Action Chunking with Transformers     | Multi-step prediction, temporal coherence |
+| Diffusion    | Denoising Diffusion Policy            | Multi-modal action distributions          |
 
 Select the architecture with `--policy-type`:
 

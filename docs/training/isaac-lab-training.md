@@ -86,9 +86,9 @@ Values resolve in order: CLI arguments → environment variables → Terraform o
 
 ### Training Backends
 
-| Backend  | Algorithms                     | Use Case                           |
-|----------|--------------------------------|------------------------------------|
-| SKRL     | PPO, IPPO, MAPPO, AMP, SAC    | General-purpose RL with MLflow     |
+| Backend  | Algorithms                     | Use Case                            |
+|----------|--------------------------------|-------------------------------------|
+| SKRL     | PPO, IPPO, MAPPO, AMP, SAC     | General-purpose RL with MLflow      |
 | RSL-RL   | PPO, Distillation              | Locomotion-focused, teacher-student |
 
 SKRL is the default backend and supports automatic MLflow metric logging via monkey-patching. See [MLflow Integration](mlflow-integration.md) for metric details.
@@ -100,7 +100,7 @@ Four checkpoint modes control how training initializes:
 | Mode           | Behavior                                                    |
 |----------------|-------------------------------------------------------------|
 | `from-scratch` | Default. No checkpoint loaded, training starts fresh.       |
-| `warm-start`   | Load weights only. Resets optimizer and iteration counters.  |
+| `warm-start`   | Load weights only. Resets optimizer and iteration counters. |
 | `resume`       | Load full state. Continues from exact training position.    |
 | `fresh`        | Load model architecture only. Reinitializes all parameters. |
 
