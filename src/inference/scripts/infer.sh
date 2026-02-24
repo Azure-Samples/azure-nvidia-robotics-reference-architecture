@@ -122,16 +122,23 @@ else
   export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
 fi
 
-TRAINING_REQS="${SRC_DIR}/training/requirements.txt"
-if [[ -f "${TRAINING_REQS}" ]]; then
-  echo "Installing training requirements..."
-  run_python -m pip install --no-cache-dir -r "${TRAINING_REQS}" --quiet || true
-fi
+INFERENCE_MANIFEST="${INFERENCE_DIR}/pyproject.toml"
+INFERENCE_REQS="$(mktemp)"
+cleanup() {
+  rm -rf "${CHECKPOINT_DIR:-}" "${INFERENCE_REQS}"
+}
+trap cleanup EXIT
 
-echo "Installing ONNX runtime and export dependencies..."
-run_python -m pip install --no-cache-dir toml onnxscript onnx 2>/dev/null || true
-run_python -m pip install --no-cache-dir onnxruntime-gpu 2>/dev/null || \
-  run_python -m pip install --no-cache-dir onnxruntime || true
+if command -v uv &>/dev/null; then
+  echo "Installing inference workflow dependencies from manifest..."
+  uv pip compile "${INFERENCE_MANIFEST}" -o "${INFERENCE_REQS}"
+  uv pip install --no-cache-dir --system --requirement "${INFERENCE_REQS}" || \
+    uv pip install --no-cache-dir --system --requirement "${INFERENCE_REQS}" --index-strategy first-index \
+      --extra-index-url https://download.pytorch.org/whl/cu124
+else
+  echo "Error: uv is required to compile workflow manifest dependencies" >&2
+  exit 1
+fi
 
 CHECKPOINT_DIR=$(mktemp -d)
 echo "=============================================="
@@ -140,7 +147,6 @@ echo "=============================================="
 
 BLOB_STORAGE_ACCOUNT=""
 BLOB_CONTAINER=""
-
 download_checkpoint() {
   local uri="$1"
   local dst_dir="$2"

@@ -117,9 +117,11 @@ done
 #------------------------------------------------------------------------------
 
 require_tools osmo
+require_tools osmo zip base64
 
 [[ -z "$policy_repo_id" ]] && fatal "--policy-repo-id is required"
 [[ -f "$workflow" ]] || fatal "Workflow template not found: $workflow"
+[[ -d "$REPO_ROOT/src/training" ]] || fatal "Directory src/training not found"
 
 case "$policy_type" in
   act|diffusion) ;;
@@ -133,12 +135,46 @@ if [[ -n "$register_model" ]]; then
 fi
 
 #------------------------------------------------------------------------------
+# Package Runtime Payload
+#------------------------------------------------------------------------------
+
+TMP_DIR="$SCRIPT_DIR/.tmp"
+ARCHIVE_PATH="$TMP_DIR/osmo-lerobot-inference.zip"
+B64_PATH="$TMP_DIR/osmo-lerobot-inference.b64"
+payload_root="${PAYLOAD_ROOT:-/workspace/lerobot_payload}"
+
+info "Packaging LeRobot runtime payload..."
+mkdir -p "$TMP_DIR"
+rm -f "$ARCHIVE_PATH" "$B64_PATH"
+
+(cd "$REPO_ROOT" && zip -qr "$ARCHIVE_PATH" src/training src/common \
+  -x "**/__pycache__/*" \
+  -x "*.pyc" \
+  -x "*.pyo" \
+  -x "**/.pytest_cache/*" \
+  -x "**/.mypy_cache/*" \
+  -x "**/*.egg-info/*") || fatal "Failed to create runtime archive"
+
+[[ -f "$ARCHIVE_PATH" ]] || fatal "Archive not created: $ARCHIVE_PATH"
+
+if base64 --help 2>&1 | grep -q '\-\-input'; then
+  base64 --input "$ARCHIVE_PATH" | tr -d '\n' > "$B64_PATH"
+else
+  base64 -i "$ARCHIVE_PATH" | tr -d '\n' > "$B64_PATH"
+fi
+
+[[ -s "$B64_PATH" ]] || fatal "Failed to encode archive"
+encoded_payload=$(<"$B64_PATH")
+
+#------------------------------------------------------------------------------
 # Build Submission Command
 #------------------------------------------------------------------------------
 
 submit_args=(
   workflow submit "$workflow"
   --set-string "image=$image"
+  "encoded_archive=$encoded_payload"
+  "payload_root=$payload_root"
   "policy_repo_id=$policy_repo_id"
   "policy_type=$policy_type"
   "job_name=$job_name"

@@ -79,20 +79,20 @@ else
   run_python -m pip install --upgrade "numpy>=1.26.0,<2.0.0" --quiet
 fi
 
-# Use uv pip install if uv is available, otherwise fall back to pip
-if command -v uv &> /dev/null; then
-  echo "uv detected, installing requirements with uv..."
-  uv pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+runtime_manifest="${TRAINING_DIR}/pyproject.toml"
+runtime_requirements="$(mktemp)"
+cleanup() {
+  rm -f "${runtime_requirements}"
+}
+trap cleanup EXIT
+
+if command -v uv &>/dev/null; then
+  echo "uv detected, compiling and installing training manifest dependencies..."
+  uv pip compile "${runtime_manifest}" -o "${runtime_requirements}"
+  uv pip install --no-cache-dir --system --requirement "${runtime_requirements}"
 else
-  if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
-    if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
-      "${python_cmd[@]}" -m ensurepip --upgrade
-    else
-      echo "Error: pip not available and ensurepip failed" >&2
-      exit 1
-    fi
-  fi
-  "${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+  echo "Error: uv is required to compile workflow manifest dependencies" >&2
+  exit 1
 fi
 
 backend="${TRAINING_BACKEND:-skrl}"

@@ -22,19 +22,19 @@ fi
 
 export PYTHONPATH="${SRC_DIR}:${PYTHONPATH:-}"
 
-# Use uv pip install if uv is available, otherwise fall back to pip
-if command -v uv &> /dev/null; then
-  uv pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+runtime_manifest="${TRAINING_DIR}/pyproject.toml"
+runtime_requirements="$(mktemp)"
+cleanup() {
+  rm -f "${runtime_requirements}"
+}
+trap cleanup EXIT
+
+if command -v uv &>/dev/null; then
+  uv pip compile "${runtime_manifest}" -o "${runtime_requirements}"
+  uv pip install --no-cache-dir --system --requirement "${runtime_requirements}"
 else
-  if ! "${python_cmd[@]}" -m pip --version >/dev/null 2>&1; then
-    if "${python_cmd[@]}" -m ensurepip --version >/dev/null 2>&1; then
-      "${python_cmd[@]}" -m ensurepip --upgrade
-    else
-      echo "Error: pip not available and ensurepip failed" >&2
-      exit 1
-    fi
-  fi
-  "${python_cmd[@]}" -m pip install --no-cache-dir -r "${TRAINING_DIR}/requirements.txt"
+  echo "Error: uv is required to compile workflow manifest dependencies" >&2
+  exit 1
 fi
 
 exec "${python_cmd[@]}" -m training.scripts.policy_evaluation "$@"
