@@ -51,7 +51,7 @@ LeRobot behavioral cloning on OSMO:
 
 ## 📚 Related Documentation
 
-- [Deployment Guide](../deploy/README.md) for infrastructure setup
+- [Deployment Guide](../../deploy/README.md) for infrastructure setup
 - [LeRobot Inference](../lerobot-inference.md) for running trained policies
 - [AzureML Workflows](../../workflows/azureml/README.md) for job template reference
 - [OSMO Workflows](../../workflows/osmo/README.md) for workflow template reference

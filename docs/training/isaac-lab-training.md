@@ -20,7 +20,7 @@ Isaac Lab reinforcement learning training with SKRL and RSL-RL backends. Both Az
 
 | Component            | Requirement                                                                    |
 |----------------------|--------------------------------------------------------------------------------|
-| Infrastructure       | AKS cluster deployed via [Infrastructure Guide](../deploy/infrastructure.md)   |
+| Infrastructure       | AKS cluster deployed via [Infrastructure Guide](../../deploy/README.md)        |
 | Azure ML             | Extension installed via `02-deploy-azureml-extension.sh`                       |
 | OSMO                 | Control plane and backend via `03-deploy-osmo-control-plane.sh`                |
 | Terraform outputs    | Available in `deploy/001-iac/` (or provide values via CLI / environment vars)  |
