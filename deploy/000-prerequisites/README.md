@@ -1,55 +1,37 @@
-# Prerequisites
+---
+title: Prerequisites
+description: Azure subscription initialization and resource provider registration
+author: Microsoft Robotics-AI Team
+ms.date: 2026-02-23
+ms.topic: how-to
+keywords:
+  - prerequisites
+  - azure
+  - resource-providers
+---
 
-Azure CLI initialization and subscription setup for Terraform deployments.
+Azure subscription initialization and resource provider registration. Configures subscription context and registers required Azure resource providers for the robotics reference architecture.
 
-## 📜 Scripts
+> [!NOTE]
+> Complete prerequisites including tooling requirements, version constraints, and Azure quota checks are in the [Prerequisites](../../docs/deploy/prerequisites.md) guide.
 
-| Script                        | Purpose                                      |
-|-------------------------------|----------------------------------------------|
-| `az-sub-init.sh`              | Azure login and `ARM_SUBSCRIPTION_ID` export |
-| `register-azure-providers.sh` | Register required Azure resource providers   |
-
-## 🚀 Usage
-
-Source the initialization script to set `ARM_SUBSCRIPTION_ID` for Terraform:
+## 🚀 Quick Start
 
 ```bash
 source az-sub-init.sh
 ```
 
-For a specific tenant:
+## 📖 Documentation
 
-```bash
-source az-sub-init.sh --tenant your-tenant.onmicrosoft.com
-```
-
-### New Subscriptions
-
-For new Azure subscriptions or subscriptions that haven't deployed AKS, AzureML, or similar resources, register the required providers:
-
-```bash
-./register-azure-providers.sh
-```
-
-The script reads providers from `robotics-azure-resource-providers.txt` and waits for registration to complete. This is a one-time operation per subscription.
-
-## ⚙️ What It Does
-
-### az-sub-init.sh
-
-1. Checks for existing Azure CLI session
-2. Prompts for login if needed (optionally with tenant)
-3. Exports `ARM_SUBSCRIPTION_ID` to current shell
-
-The subscription ID is required by Terraform's Azure provider when not running in a managed identity context.
-
-### register-azure-providers.sh
-
-1. Reads required providers from `robotics-azure-resource-providers.txt`
-2. Checks current registration state via Azure CLI
-3. Registers unregistered providers
-4. Polls until all providers reach `Registered` state
+| Guide                                               | Description                                          |
+|-----------------------------------------------------|------------------------------------------------------|
+| [Prerequisites](../../docs/deploy/prerequisites.md) | Full prerequisites, tooling, and Azure configuration |
 
 ## ➡️ Next Step
 
-After initialization, proceed to [001-iac](../001-iac/) to deploy infrastructure.
+Proceed to [Infrastructure as Code](../001-iac/).
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->
