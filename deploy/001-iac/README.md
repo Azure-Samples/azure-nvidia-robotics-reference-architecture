@@ -14,9 +14,13 @@ Terraform configuration for the robotics reference architecture. Deploys Azure r
 
 > [!NOTE]
 > Complete configuration reference, architecture diagrams, and troubleshooting are in the [Infrastructure Deployment](../../docs/deploy/infrastructure.md) guide.
->
+
+<!-- markdownlint-disable MD028 -->
+
 > [!IMPORTANT]
 > Private AKS clusters require VPN connectivity. Deploy [VPN Gateway](vpn/) before accessing cluster resources.
+
+<!-- markdownlint-enable MD028 -->
 
 ## 🚀 Quick Start
 
@@ -24,7 +28,7 @@ Terraform configuration for the robotics reference architecture. Deploys Azure r
 cd deploy/001-iac
 source ../000-prerequisites/az-sub-init.sh
 cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply -var-file=terraform.tfvars
+terraform init && terraform apply
 ```
 
 ## 📖 Documentation
