@@ -1,5 +1,4 @@
 ---
-title: ROS 2 Edge Recording Configuration
 description: Configuration reference for topic recording, episode triggers, disk monitoring, and gap detection
 author: Microsoft
 ms.date: 2026-02-20
@@ -12,11 +11,11 @@ Configuration schema for ROS 2 edge recording system controlling topic selection
 
 ## 📋 Configuration Files
 
-| File | Purpose |
-|------|---------|
-| [recording_config.yaml](recording_config.yaml) | Default configuration for UR10E 6-DOF robotic arm |
-| [recording_config.schema.json](recording_config.schema.json) | JSON Schema for IDE autocomplete and validation |
-| [examples/mobile-manipulator.yaml](examples/mobile-manipulator.yaml) | Mobile manipulator platform example |
+| File                                                                 | Purpose                                           |
+|----------------------------------------------------------------------|---------------------------------------------------|
+| [recording_config.yaml](recording_config.yaml)                       | Default configuration for UR10E 6-DOF robotic arm |
+| [recording_config.schema.json](recording_config.schema.json)         | JSON Schema for IDE autocomplete and validation   |
+| [examples/mobile-manipulator.yaml](examples/mobile-manipulator.yaml) | Mobile manipulator platform example               |
 
 Place configuration files at `config/recording_config.yaml` on edge devices. The recording service validates configuration at startup and exits with descriptive errors if validation fails.
 
@@ -26,19 +25,19 @@ Topics define which ROS 2 messages to record during episodes with frequency down
 
 ### Field Reference
 
-| Name | Type | Default | Valid Range | Description |
-|------|------|---------|-------------|-------------|
-| `name` | string | required | ROS 2 topic path | Topic name starting with `/` |
-| `frequency_hz` | float | required | (0, 1000] | Target recording frequency in Hz |
-| `compression` | string | `none` | `none`, `lz4`, `zstd` | Compression algorithm |
+| Name            | Type   | Default  | Valid Range           | Description                          |
+|-----------------|--------|----------|-----------------------|--------------------------------------|
+| `name`          | string | required | ROS 2 topic path      | Topic name starting with `/`         |
+| `frequency_hz`  | float  | required | (0, 1000]             | Target recording frequency in Hz     |
+| `compression`   | string | `none`   | `none`, `lz4`, `zstd` | Compression algorithm                |
 
 ### Compression Algorithms
 
-| Algorithm | Ratio | CPU Overhead | Use Case |
-|-----------|-------|--------------|----------|
-| `none` | 1x | 0% | Uncompressed recording, maximum write speed |
-| `lz4` | 2-3x | <10% | High-frequency topics (joint states, IMU) |
-| `zstd` | 3-5x | 20-30% | Images and low-frequency data |
+| Algorithm | Ratio | CPU Overhead | Use Case                                     |
+|-----------|-------|--------------|----------------------------------------------|
+| `none`    | 1x    | 0%           | Uncompressed recording, maximum write speed  |
+| `lz4`     | 2-3x  | <10%         | High-frequency topics (joint states, IMU)    |
+| `zstd`    | 3-5x  | 20-30%       | Images and low-frequency data                |
 
 ### Example
 
@@ -61,11 +60,11 @@ Triggers control episode start/stop. Configure one trigger type per recording se
 
 Hardware button or switch connected to GPIO pin.
 
-| Name | Type | Default | Valid Range | Description |
-|------|------|---------|-------------|-------------|
-| `type` | string | required | `gpio` | Trigger discriminator |
-| `pin` | integer | required | [0, 27] | GPIO pin number (BCM numbering) |
-| `active_high` | boolean | `true` | `true`, `false` | Trigger on HIGH if true, LOW if false |
+| Name          | Type    | Default  | Valid Range     | Description                           |
+|---------------|---------|----------|-----------------|---------------------------------------|
+| `type`        | string  | required | `gpio`          | Trigger discriminator                 |
+| `pin`         | integer | required | [0, 27]         | GPIO pin number (BCM numbering)       |
+| `active_high` | boolean | `true`   | `true`, `false` | Trigger on HIGH if true, LOW if false |
 
 ```yaml
 trigger:
@@ -78,11 +77,11 @@ trigger:
 
 Episodes start when robot reaches target pose within tolerance.
 
-| Name | Type | Default | Valid Range | Description |
-|------|------|---------|-------------|-------------|
-| `type` | string | required | `position` | Trigger discriminator |
-| `joint_indices` | array[integer] | required | min length 1 | Joint indices to monitor |
-| `tolerances` | array[float] | required | min length 1 | Position tolerance per joint (radians or meters) |
+| Name            | Type           | Default  | Valid Range  | Description                                          |
+|-----------------|----------------|----------|--------------|------------------------------------------------------|
+| `type`          | string         | required | `position`   | Trigger discriminator                                |
+| `joint_indices` | array[integer] | required | min length 1 | Joint indices to monitor                             |
+| `tolerances`    | array[float]   | required | min length 1 | Position tolerance per joint (radians or meters)     |
 
 Array lengths must match. Validation fails if `tolerances` count differs from `joint_indices` count.
 
@@ -97,11 +96,11 @@ trigger:
 
 VR controller button for demonstration recording workflows.
 
-| Name | Type | Default | Valid Range | Description |
-|------|------|---------|-------------|-------------|
-| `type` | string | required | `vr` | Trigger discriminator |
-| `controller` | string | required | `left`, `right` | VR controller side |
-| `button` | string | required | `trigger`, `grip`, `primary`, `secondary` | Button name to monitor |
+| Name         | Type   | Default  | Valid Range                               | Description            |
+|--------------|--------|----------|-------------------------------------------|------------------------|
+| `type`       | string | required | `vr`                                      | Trigger discriminator  |
+| `controller` | string | required | `left`, `right`                           | VR controller side     |
+| `button`     | string | required | `trigger`, `grip`, `primary`, `secondary` | Button name to monitor |
 
 ```yaml
 trigger:
@@ -114,10 +113,10 @@ trigger:
 
 Disk monitoring prevents storage exhaustion during recording sessions.
 
-| Name | Type | Default | Valid Range | Description |
-|------|------|---------|-------------|-------------|
-| `warning_percent` | integer | 80 | [0, 100] | Warning threshold percentage |
-| `critical_percent` | integer | 95 | [0, 100] | Critical threshold percentage |
+| Name               | Type    | Default | Valid Range | Description                   |
+|--------------------|---------|---------|-------------|-------------------------------|
+| `warning_percent`  | integer | 80      | [0, 100]    | Warning threshold percentage  |
+| `critical_percent` | integer | 95      | [0, 100]    | Critical threshold percentage |
 
 Validation enforces `warning_percent < critical_percent`. Recording system logs warnings when disk usage exceeds `warning_percent` and halts new episodes when usage exceeds `critical_percent`.
 
@@ -131,10 +130,10 @@ disk_thresholds:
 
 Gap detection identifies missing messages during recording for quality assurance.
 
-| Name | Type | Default | Valid Range | Description |
-|------|------|---------|-------------|-------------|
-| `threshold_ms` | float | 100.0 | >0 | Gap detection threshold in milliseconds |
-| `severity` | string | `warning` | `warning`, `error`, `critical` | Severity level for gap events |
+| Name           | Type   | Default   | Valid Range                    | Description                                 |
+|----------------|--------|-----------|--------------------------------|---------------------------------------------|
+| `threshold_ms` | float  | 100.0     | >0                             | Gap detection threshold in milliseconds     |
+| `severity`     | string | `warning` | `warning`, `error`, `critical` | Severity level for gap events               |
 
 The system tracks last message timestamp per topic and flags gaps exceeding `threshold_ms`. Gap events are logged with configured severity and stored in episode metadata for post-processing analysis.
 
@@ -160,13 +159,13 @@ Configuration files are validated using Pydantic models at service startup. Vali
 
 ### Validation Rules
 
-| Rule | Error Message Pattern |
-|------|----------------------|
-| Topic name format | `Topic name must start with /: <name>` |
-| Topic uniqueness | `Duplicate topic names found: [<names>]` |
-| Frequency range | `frequency_hz out of range: <value>` |
-| Threshold ordering | `Warning threshold (<n>%) must be less than critical (<m>%)` |
-| Array length match | `Tolerance count (<n>) must match joint index count (<m>)` |
+| Rule               | Error Message Pattern                                               |
+|--------------------|---------------------------------------------------------------------|
+| Topic name format  | `Topic name must start with /: <name>`                              |
+| Topic uniqueness   | `Duplicate topic names found: [<names>]`                            |
+| Frequency range    | `frequency_hz out of range: <value>`                                |
+| Threshold ordering | `Warning threshold (<n>%) must be less than critical (<m>%)`        |
+| Array length match | `Tolerance count (<n>) must match joint index count (<m>)`          |
 
 ### JSON Schema Integration
 
@@ -231,9 +230,11 @@ The schema generation script:
 ### CI/CD Validation
 
 The CI/CD pipeline validates that the schema is up-to-date with the pydantic models. If you see a validation failure, regenerate the schema using the command above.
+
+```txt
 ```
 
-## �🔗 Related Documentation
+## 🔗 Related Documentation
 
 * [LeRobot Integration](../docs/lerobot-inference.md) - Dataset structure and feature mapping
 * [AzureML Validation Job Debugging](../docs/azureml-validation-job-debugging.md) - Training pipeline integration
