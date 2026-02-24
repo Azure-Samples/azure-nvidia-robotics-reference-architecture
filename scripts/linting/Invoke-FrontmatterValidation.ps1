@@ -65,6 +65,12 @@ param(
     [switch]$EnableSchemaValidation,
 
     [Parameter()]
+    [string[]]$FooterExcludePaths = @('dependency-pinning-artifacts/**'),
+
+    [Parameter()]
+    [switch]$SkipFooterValidation,
+
+    [Parameter()]
     [switch]$SoftFail
 )
 
@@ -551,7 +557,7 @@ function Invoke-Validation {
         } elseif ([System.IO.Path]::IsPathRooted($filePath)) {
             $relativePath = [System.IO.Path]::GetFileName($filePath)
         }
-        $fileResult = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath $relativePath
+        $fileResult = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath $relativePath -FooterExcludePaths $FooterExcludePaths -SkipFooterValidation:$SkipFooterValidation
         $results.Add($fileResult)
     }
 
