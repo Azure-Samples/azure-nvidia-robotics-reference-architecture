@@ -557,7 +557,7 @@ function Invoke-Validation {
         } elseif ([System.IO.Path]::IsPathRooted($filePath)) {
             $relativePath = [System.IO.Path]::GetFileName($filePath)
         }
-        $fileResult = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath $relativePath -FooterExcludePaths $FooterExcludePaths -SkipFooterValidation:$SkipFooterValidation
+        $fileResult = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath $relativePath -FooterExcludePaths $script:FooterExcludePaths -SkipFooterValidation:$script:SkipFooterValidation
         $results.Add($fileResult)
     }
 
