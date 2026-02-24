@@ -182,6 +182,7 @@ ros2 run lerobot_inference act_inference_node \
 
 ## 🔗 Related Documentation
 
-- [MLflow Integration](mlflow-integration.md) for experiment tracking during training
+- [MLflow Integration](training/mlflow-integration.md) for experiment tracking during training
+- [LeRobot Training Guide](training/lerobot-training.md) for training workflow configuration
 - [Workflows README](../workflows/README.md) for training workflow definitions
 - [Scripts README](../scripts/README.md) for submission script usage
