@@ -6,8 +6,7 @@ compatible with JSON Schema Draft 2020-12. The schema enables IDE autocomplete,
 validation, and documentation for recording configuration YAML files.
 
 Usage:
-    python scripts/generate_config_schema.py
-    uv run scripts/generate_config_schema.py
+    PYTHONPATH=. python config/generate_config_schema.py
 """
 
 from __future__ import annotations

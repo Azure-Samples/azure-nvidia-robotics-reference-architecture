@@ -5,7 +5,7 @@ on:
     paths:
       - 'src/common/config_models.py'
       - 'config/recording_config.schema.json'
-      - 'scripts/generate_config_schema.py'
+      - 'config/generate_config_schema.py'
   push:
     branches: [main]
     paths:
@@ -33,13 +33,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install pydantic PyYAML
+        run: pip install pydantic
 
       - name: Regenerate schema
-        run: |
-          export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$(pwd)"
-          python scripts/generate_config_schema.py
+        run: PYTHONPATH=. python config/generate_config_schema.py
 
       - name: Check for schema drift
         run: |
@@ -50,7 +47,7 @@ jobs:
             echo "The JSON Schema file does not match the current pydantic models."
             echo "If the models have changed intentionally, regenerate the schema by running the following command locally:"
             echo ""
-            echo "  python scripts/generate_config_schema.py"
+            echo "  pip install pydantic && PYTHONPATH=. python config/generate_config_schema.py"
             echo ""
             echo "Then commit the updated schema file."
             echo ""
