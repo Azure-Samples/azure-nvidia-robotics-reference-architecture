@@ -5,11 +5,15 @@ Provides read-only access to LeRobot datasets hosted on the Hugging Face Hub.
 Annotations are stored separately using another storage adapter.
 """
 
+from __future__ import annotations
+
+import asyncio
 import json
 from pathlib import Path
 
+from ..models.annotations import EpisodeAnnotationFile
 from ..models.datasources import DatasetInfo, EpisodeData, EpisodeMeta, FeatureSchema, TaskInfo
-from .base import StorageError
+from .base import StorageAdapter, StorageError
 
 # Hugging Face SDK imports are optional
 try:
@@ -17,10 +21,12 @@ try:
 
     HF_AVAILABLE = True
 except ImportError:
+    HfFileSystem = None
+    hf_hub_download = None
     HF_AVAILABLE = False
 
 
-class HuggingFaceHubAdapter:
+class HuggingFaceHubAdapter(StorageAdapter):
     """
     Hugging Face Hub adapter for reading LeRobot datasets.
 
@@ -66,10 +72,11 @@ class HuggingFaceHubAdapter:
             self._fs = HfFileSystem(token=self.token)
         return self._fs
 
-    def _download_file(self, filename: str) -> Path:
+    async def _download_file(self, filename: str) -> Path:
         """Download a file from the Hub and return the local path."""
         try:
-            local_path = hf_hub_download(
+            local_path = await asyncio.to_thread(
+                hf_hub_download,
                 repo_id=self.repo_id,
                 filename=filename,
                 revision=self.revision,
@@ -83,6 +90,11 @@ class HuggingFaceHubAdapter:
                 f"Failed to download {filename} from {self.repo_id}: {e}", cause=e
             )
 
+    def _read_json_file(self, path: str) -> dict:
+        """Read and parse a JSON file synchronously."""
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+
     async def get_dataset_info(self) -> DatasetInfo:
         """
         Get dataset metadata from info.json.
@@ -92,9 +104,8 @@ class HuggingFaceHubAdapter:
         """
         try:
             # Download and parse info.json
-            info_path = self._download_file("meta/info.json")
-            with open(info_path, encoding="utf-8") as f:
-                info_data = json.load(f)
+            info_path = await self._download_file("meta/info.json")
+            info_data = await asyncio.to_thread(self._read_json_file, str(info_path))
 
             self._info_cache = info_data
 
@@ -273,3 +284,15 @@ class HuggingFaceHubAdapter:
             f"https://huggingface.co/datasets/{self.repo_id}/resolve/"
             f"{self.revision}/{video_path}"
         )
+
+    async def get_annotation(self, dataset_id: str, episode_index: int) -> EpisodeAnnotationFile | None:
+        raise NotImplementedError("HuggingFaceHubAdapter is read-only")
+
+    async def save_annotation(self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile) -> None:
+        raise NotImplementedError("HuggingFaceHubAdapter is read-only")
+
+    async def list_annotated_episodes(self, dataset_id: str) -> list[int]:
+        raise NotImplementedError("HuggingFaceHubAdapter is read-only")
+
+    async def delete_annotation(self, dataset_id: str, episode_index: int) -> bool:
+        raise NotImplementedError("HuggingFaceHubAdapter is read-only")

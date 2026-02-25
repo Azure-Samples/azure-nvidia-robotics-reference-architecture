@@ -5,10 +5,10 @@ Stores annotations in the dataset's annotations/ directory structure
 following the LeRobot v3 format specification.
 """
 
+import asyncio
 import json
 import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 import aiofiles
@@ -16,15 +16,7 @@ import aiofiles.os
 
 from ..models.annotations import EpisodeAnnotationFile
 from .base import StorageAdapter, StorageError
-
-
-class DateTimeEncoder(json.JSONEncoder):
-    """JSON encoder that handles datetime objects."""
-
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
+from .serializers import DateTimeEncoder
 
 
 class LocalStorageAdapter(StorageAdapter):
@@ -46,7 +38,10 @@ class LocalStorageAdapter(StorageAdapter):
 
     def _get_annotations_dir(self, dataset_id: str) -> Path:
         """Get the annotations directory for a dataset."""
-        return self.base_path / dataset_id / "annotations" / "episodes"
+        resolved = (self.base_path / dataset_id / "annotations" / "episodes").resolve()
+        if not resolved.is_relative_to(self.base_path.resolve()):
+            raise StorageError(f"Invalid dataset_id: path traversal detected in '{dataset_id}'")
+        return resolved
 
     def _get_annotation_path(self, dataset_id: str, episode_index: int) -> Path:
         """Get the file path for an episode's annotations."""
@@ -123,20 +118,23 @@ class LocalStorageAdapter(StorageAdapter):
             )
 
             # Write to temp file first, then rename for atomicity
-            temp_fd, temp_path = tempfile.mkstemp(
-                dir=annotations_dir, suffix=".tmp", prefix="annotation_"
+            temp_fd, temp_path = await asyncio.to_thread(
+                tempfile.mkstemp,
+                dir=str(annotations_dir),
+                suffix=".tmp",
+                prefix="annotation_",
             )
             try:
                 async with aiofiles.open(temp_fd, "w", encoding="utf-8") as f:
                     await f.write(json_content)
 
                 # Atomic rename
-                os.replace(temp_path, file_path)
+                await asyncio.to_thread(os.replace, temp_path, str(file_path))
 
             except Exception:
                 # Clean up temp file on failure
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
+                if await asyncio.to_thread(os.path.exists, temp_path):
+                    await asyncio.to_thread(os.unlink, temp_path)
                 raise
 
         except StorageError:
@@ -163,7 +161,7 @@ class LocalStorageAdapter(StorageAdapter):
                 return []
 
             episode_indices = []
-            for entry in os.listdir(annotations_dir):
+            for entry in await asyncio.to_thread(os.listdir, str(annotations_dir)):
                 if entry.startswith("episode_") and entry.endswith(".json"):
                     # Extract episode index from filename
                     try:
