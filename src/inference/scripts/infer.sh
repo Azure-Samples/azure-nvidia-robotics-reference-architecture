@@ -132,9 +132,15 @@ trap cleanup EXIT
 if command -v uv &>/dev/null; then
   echo "Installing inference workflow dependencies from manifest..."
   uv pip compile "${INFERENCE_MANIFEST}" -o "${INFERENCE_REQS}"
-  uv pip install --no-cache-dir --system --requirement "${INFERENCE_REQS}" || \
-    uv pip install --no-cache-dir --system --requirement "${INFERENCE_REQS}" --index-strategy first-index \
-      --extra-index-url https://download.pytorch.org/whl/cu124
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    uv pip install --no-cache-dir --requirement "${INFERENCE_REQS}" || \
+      uv pip install --no-cache-dir --requirement "${INFERENCE_REQS}" --index-strategy first-index \
+        --extra-index-url https://download.pytorch.org/whl/cu124
+  else
+    uv pip install --no-cache-dir --system --requirement "${INFERENCE_REQS}" || \
+      uv pip install --no-cache-dir --system --requirement "${INFERENCE_REQS}" --index-strategy first-index \
+        --extra-index-url https://download.pytorch.org/whl/cu124
+  fi
 else
   echo "Error: uv is required to compile workflow manifest dependencies" >&2
   exit 1

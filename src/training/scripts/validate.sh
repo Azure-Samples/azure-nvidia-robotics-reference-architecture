@@ -31,7 +31,11 @@ trap cleanup EXIT
 
 if command -v uv &>/dev/null; then
   uv pip compile "${runtime_manifest}" -o "${runtime_requirements}"
-  uv pip install --no-cache-dir --system --requirement "${runtime_requirements}"
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    uv pip install --no-cache-dir --requirement "${runtime_requirements}"
+  else
+    uv pip install --no-cache-dir --system --requirement "${runtime_requirements}"
+  fi
 else
   echo "Error: uv is required to compile workflow manifest dependencies" >&2
   exit 1
