@@ -21,6 +21,9 @@ Train reinforcement learning policies for robotics tasks using Isaac Lab with SK
 
 | Guide                                              | Description                                           |
 |----------------------------------------------------|-------------------------------------------------------|
+| [LeRobot Training](lerobot-training.md)            | Behavioral cloning with ACT and Diffusion policies    |
+| [Azure ML Training](azureml-training.md)           | Submit training jobs to Azure Machine Learning        |
+| [OSMO Training](osmo-training.md)                  | Submit training jobs to NVIDIA OSMO                   |
 | [MLflow Integration](mlflow-integration.md)        | Automatic metric logging from SKRL agents to Azure ML |
 | [Inference Guide](../inference/README.md)          | Deploy trained policies in simulation or on hardware  |
 
@@ -61,6 +64,9 @@ LeRobot ACT training via OSMO:
 
 ## 📚 Related Documentation
 
+- [LeRobot Training](lerobot-training.md)
+- [Azure ML Training](azureml-training.md)
+- [OSMO Training](osmo-training.md)
 - [MLflow Integration](mlflow-integration.md)
 - [Inference Guide](../inference/README.md)
 - [Workflow Templates](../../workflows/README.md)

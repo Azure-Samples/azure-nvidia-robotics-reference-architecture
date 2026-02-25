@@ -214,119 +214,52 @@ The training script handles MLflow setup and monkey-patching automatically. To c
 
 **Symptom:** Training runs complete but no metrics appear in MLflow.
 
-**Possible Causes:**
+| Cause                       | Resolution                                                                                                            |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| MLflow not configured       | Verify `mlflow.set_tracking_uri()` with correct Azure ML workspace URI and authentication                             |
+| Monkey-patching not applied | Call `create_mlflow_logging_wrapper` after Runner instantiation, replace `runner.agent._update` before `runner.run()` |
+| Short training run          | Metrics capture after rollouts complete, not after every environment step                                             |
 
-1. MLflow not configured or authenticated
-   * Verify `mlflow.set_tracking_uri()` is called with correct Azure ML workspace URI
-   * Check Azure authentication is valid
-   * Confirm MLflow experiment exists
+### Missing or Empty Metrics
 
-2. Monkey-patching not applied correctly
-   * Ensure `create_mlflow_logging_wrapper` is called after Runner instantiation
-   * Verify `runner.agent._update` is replaced with the wrapper function before `runner.run()`
-   * Confirm `mlflow_module` parameter is the actual mlflow module, not None
+**Symptom:** Some expected metrics are missing, or the integration extracts zero metrics.
 
-3. Training completed before metrics logged
-   * If training runs are very short, metrics may not be captured
-   * Training updates occur after rollouts complete, not after every environment step
-
-### Missing Specific Metrics
-
-**Symptom:** Some expected metrics are not logged while others are.
-
-**Possible Causes:**
-
-1. Metric not available in agent
-   * Different SKRL algorithms expose different metrics
-   * Check `agent.tracking_data` to see what the agent actually tracks
-   * Some metrics only appear after certain training phases
-
-2. Metric filtered out
-   * If using `metric_filter`, ensure desired metric names are included
-   * Check spelling and casing of metric names in filter set
-
-3. Metric extraction failed
-   * Check logs for warnings about failed metric extraction
-   * Some metrics may have incompatible types or structures
+| Cause                     | Resolution                                                                                   |
+|---------------------------|----------------------------------------------------------------------------------------------|
+| Metric not in agent       | Different SKRL algorithms expose different metrics; check `agent.tracking_data`              |
+| Metric filtered out       | Verify `metric_filter` set contains correct metric names and spelling                        |
+| Agent not tracking yet    | Training updates occur after rollouts; wait for first rollout to complete                    |
+| Extraction depth exceeded | Nested metrics beyond `max_depth=2` are skipped; increase in `_extract_from_tracking_data()` |
 
 ### AttributeError on Agent
 
 **Symptom:** `AttributeError: Agent must have 'tracking_data' attribute`
 
-**Possible Causes:**
-
-1. Incompatible agent type
-   * Ensure the agent is a SKRL agent with `tracking_data` attribute
-   * Verify SKRL version is compatible
-
-2. Agent not fully initialized
-   * Apply monkey-patch after Runner instantiation
-   * Ensure the agent has been configured with all required parameters
-
-3. Monkey-patching timing issue
-   * Verify `runner.agent` exists before calling `create_mlflow_logging_wrapper`
-   * Check that `runner.agent._update` method exists before replacement
+| Cause                   | Resolution                                                                         |
+|-------------------------|------------------------------------------------------------------------------------|
+| Incompatible agent type | Use a SKRL agent with `tracking_data` attribute; verify SKRL version compatibility |
+| Agent not initialized   | Apply monkey-patch after Runner instantiation with all required parameters         |
+| Timing issue            | Verify `runner.agent` and `runner.agent._update` exist before replacement          |
 
 ### High MLflow API Load
 
 **Symptom:** Training slows down due to excessive MLflow API calls.
 
-**Solutions:**
-
-1. Increase logging interval
-   * Use `--mlflow_log_interval 100` or higher to reduce API calls
-   * Balance between metric granularity and performance
-
-2. Use `metric_filter`
-   * Log only essential metrics to reduce payload size
-   * Remove high-cardinality or nested metrics
-
-3. Batch metric logging
-   * The integration already batches metrics per training update
-   * Ensure MLflow is using asynchronous logging if available
+| Solution                  | Details                                                                          |
+|---------------------------|----------------------------------------------------------------------------------|
+| Increase logging interval | Use `--mlflow_log_interval 100` or higher                                        |
+| Use `metric_filter`       | Log only essential metrics to reduce payload size                                |
+| Verify batch logging      | Integration already batches per update; enable asynchronous logging if available |
 
 ### Metric Extraction Warnings
 
 **Symptom:** Log messages like `"Failed to extract or log metrics at step X"`
 
-**Possible Causes:**
-
-1. Transient data structure changes
-   * Some algorithms modify `tracking_data` structure during training
-   * Usually harmless if only occasional warnings appear
-
-2. Incompatible metric types
-   * The integration attempts to convert all metrics to float
-   * Some complex objects cannot be converted and are skipped
-
-**Solutions:**
-
-1. Check warning details in logs
-   * Warnings include the exception message for debugging
-   * Determine if the failed metric is critical
-
-2. Add custom extraction logic
-   * Modify `_extract_from_value()` in `skrl_mlflow_agent.py` for specific metric types
-   * Contribute improvements back to the integration module
-
-### Empty Metrics Dictionary
-
-**Symptom:** Integration runs but extracts zero metrics.
-
-**Possible Causes:**
-
-1. Agent `tracking_data` is empty
-   * Agent may not have started tracking yet
-   * Training updates occur after rollouts, not after every environment step
-   * Check agent initialization and training state
-
-2. All metrics filtered out
-   * If using `metric_filter` with no matching metric names
-   * Verify filter set contains correct metric names
-
-3. Metric extraction depth exceeded
-   * Nested metrics beyond `max_depth=2` are not extracted
-   * Increase `max_depth` in `_extract_from_tracking_data()` if needed
+| Cause                     | Resolution                                                                            |
+|---------------------------|---------------------------------------------------------------------------------------|
+| Transient data changes    | Algorithms may modify `tracking_data` during training; usually harmless if occasional |
+| Incompatible metric types | Integration converts to float; complex objects are skipped                            |
+| Custom metric types       | Modify `_extract_from_value()` in `skrl_mlflow_agent.py` for specific types           |
 
 ## Related Documentation
 
