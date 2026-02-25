@@ -1,5 +1,5 @@
 """
-Integration tests for LeRobotLoader against a sample LeRobot dataset.
+Integration tests for LeRobotLoader against a LeRobot dataset.
 
 Tests dataset info loading, episode listing, episode data loading,
 video path resolution, and camera discovery.
@@ -19,15 +19,10 @@ from src.api.services.lerobot_loader import (
 
 
 @pytest.fixture(scope="module")
-def dataset_dir():
-    """Path to the test LeRobot dataset directory."""
-    base = os.environ.get(
-        "TEST_DATASET_PATH",
-        "/home/alizaidi/dev/rl/azure-nvidia-robotics-reference-architecture/datasets",
-    )
-    dataset_id = os.environ.get("TEST_DATASET_ID", "sample_lerobot")
-    path = os.path.join(base, dataset_id)
-    assert os.path.isdir(path), f"LeRobot dataset not found: {path}"
+def dataset_dir(dataset_base_path, dataset_id):
+    """Path to the LeRobot dataset directory."""
+    path = os.path.join(dataset_base_path, dataset_id)
+    assert os.path.isdir(path), f"Dataset not found: {path}"
     return path
 
 
@@ -61,34 +56,34 @@ class TestDatasetInfo:
 
     def test_load_info(self, loader):
         info = loader.get_dataset_info()
-        assert info.codebase_version == "v3.0"
-        assert isinstance(info.robot_type, str) and info.robot_type
-        assert info.total_episodes == 64
-        assert info.total_frames == 20251
-        assert info.fps == 30.0
-        assert info.total_tasks == 1
-        assert info.total_chunks == 64
+        assert info.codebase_version
+        assert info.robot_type
+        assert info.total_episodes > 0
+        assert info.total_frames > 0
+        assert info.fps > 0
+        assert info.total_tasks >= 1
+        assert info.total_chunks >= 1
 
     def test_features_contains_state(self, loader):
         info = loader.get_dataset_info()
         assert "observation.state" in info.features
         state = info.features["observation.state"]
-        assert state["dtype"] == "float32"
-        assert state["shape"] == [16]
+        assert "dtype" in state
+        assert "shape" in state
 
     def test_features_contains_action(self, loader):
         info = loader.get_dataset_info()
         assert "action" in info.features
         action = info.features["action"]
-        assert action["dtype"] == "float32"
-        assert action["shape"] == [16]
+        assert "dtype" in action
+        assert "shape" in action
 
     def test_features_contains_video(self, loader):
         info = loader.get_dataset_info()
-        assert "observation.images.il-camera" in info.features
-        cam = info.features["observation.images.il-camera"]
-        assert cam["dtype"] == "video"
-        assert cam["shape"] == [480, 640, 3]
+        video_features = [
+            k for k, v in info.features.items() if v.get("dtype") == "video"
+        ]
+        assert len(video_features) > 0
 
     def test_data_and_video_path_templates(self, loader):
         info = loader.get_dataset_info()
@@ -99,9 +94,9 @@ class TestDatasetInfo:
 class TestListEpisodes:
     """Test episode enumeration."""
 
-    def test_returns_64_episodes(self, loader):
+    def test_returns_episodes(self, loader):
         episodes = loader.list_episodes()
-        assert episodes == list(range(64))
+        assert len(episodes) > 0
 
     def test_returns_sorted_list(self, loader):
         episodes = loader.list_episodes()
@@ -117,8 +112,10 @@ class TestLoadEpisode:
         assert ep.length > 0
 
     def test_load_last_episode(self, loader):
-        ep = loader.load_episode(63)
-        assert ep.episode_index == 63
+        episodes = loader.list_episodes()
+        last = episodes[-1]
+        ep = loader.load_episode(last)
+        assert ep.episode_index == last
         assert ep.length > 0
 
     def test_timestamps_are_monotonic(self, loader):
@@ -136,29 +133,29 @@ class TestLoadEpisode:
         ep = loader.load_episode(0)
         assert ep.joint_positions.ndim == 2
         assert ep.joint_positions.shape[0] == ep.length
-        assert ep.joint_positions.shape[1] == 16
+        assert ep.joint_positions.shape[1] > 0
 
     def test_actions_shape(self, loader):
         ep = loader.load_episode(0)
         assert ep.actions.ndim == 2
         assert ep.actions.shape[0] == ep.length
-        assert ep.actions.shape[1] == 16
+        assert ep.actions.shape[1] > 0
 
-    def test_task_index_is_zero(self, loader):
+    def test_task_index_is_valid(self, loader):
         ep = loader.load_episode(0)
-        assert ep.task_index == 0
+        assert ep.task_index >= 0
 
     def test_metadata_fields(self, loader):
         ep = loader.load_episode(0)
         assert isinstance(ep.metadata["robot_type"], str)
-        assert ep.metadata["fps"] == 30.0
+        assert ep.metadata["fps"] > 0
 
     def test_video_paths_resolved(self, loader):
         ep = loader.load_episode(0)
-        assert "observation.images.il-camera" in ep.video_paths
-        path = ep.video_paths["observation.images.il-camera"]
-        assert path.exists(), f"Video file not found: {path}"
-        assert path.suffix == ".mp4"
+        assert len(ep.video_paths) > 0
+        first_path = next(iter(ep.video_paths.values()))
+        assert first_path.exists(), f"Video file not found: {first_path}"
+        assert first_path.suffix == ".mp4"
 
     def test_invalid_episode_raises(self, loader):
         with pytest.raises(LeRobotLoaderError):
