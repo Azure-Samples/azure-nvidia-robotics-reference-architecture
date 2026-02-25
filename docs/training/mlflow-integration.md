@@ -13,7 +13,7 @@ keywords:
   - experiment tracking
 ---
 
-# MLflow Integration for SKRL Training
+## MLflow Integration for SKRL Training
 
 MLflow metric logging integration with SKRL agent training during Isaac Lab training runs.
 
@@ -330,9 +330,9 @@ The training script handles MLflow setup and monkey-patching automatically. To c
 
 ## Related Documentation
 
-- [Training Guide](README.md)
-- [Inference Guide](../inference/README.md)
-- [Workflow Templates](../../workflows/README.md)
+* [Training Guide](README.md)
+* [Inference Guide](../inference/README.md)
+* [Workflow Templates](../../workflows/README.md)
 
 ---
 

@@ -26,10 +26,10 @@ Train reinforcement learning policies for robotics tasks using Isaac Lab with SK
 
 ## ⚙️ Training Pipelines
 
-| Pipeline         | Framework | Orchestration | Submission Script                   |
-|------------------|-----------|---------------|-------------------------------------|
-| Isaac Lab + SKRL | SKRL      | Azure ML      | `scripts/submit-azureml-training.sh`  |
-| Isaac Lab + SKRL | SKRL      | OSMO          | `scripts/submit-osmo-training.sh`     |
+| Pipeline         | Framework | Orchestration | Submission Script                            |
+|------------------|-----------|---------------|----------------------------------------------|
+| Isaac Lab + SKRL | SKRL      | Azure ML      | `scripts/submit-azureml-training.sh`         |
+| Isaac Lab + SKRL | SKRL      | OSMO          | `scripts/submit-osmo-training.sh`            |
 | LeRobot ACT      | LeRobot   | Azure ML      | `scripts/submit-azureml-lerobot-training.sh` |
 | LeRobot ACT      | LeRobot   | OSMO          | `scripts/submit-osmo-lerobot-training.sh`    |
 
