@@ -3,6 +3,8 @@ Unit tests for local filesystem storage adapter.
 """
 
 import asyncio
+import json
+import os
 import tempfile
 from pathlib import Path
 from unittest import TestCase
@@ -28,7 +30,6 @@ class TestLocalStorageAdapter(TestCase):
     def tearDown(self):
         """Clean up test fixtures."""
         import shutil
-
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_get_annotation_not_found(self):

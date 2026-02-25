@@ -66,7 +66,9 @@ class AzureBlobStorageAdapter(StorageAdapter):
             )
 
         if not sas_token and not use_managed_identity:
-            raise ValueError("Either sas_token or use_managed_identity must be specified")
+            raise ValueError(
+                "Either sas_token or use_managed_identity must be specified"
+            )
 
         self.account_name = account_name
         self.container_name = container_name
@@ -130,14 +132,18 @@ class AzureBlobStorageAdapter(StorageAdapter):
         except ResourceNotFoundError:
             return None
         except json.JSONDecodeError as e:
-            raise StorageError(f"Invalid JSON in blob {blob_path}: {e}", cause=e)
+            raise StorageError(
+                f"Invalid JSON in blob {blob_path}: {e}", cause=e
+            )
         except HttpResponseError as e:
             raise StorageError(
                 f"Azure HTTP error reading blob {blob_path}: status={e.status_code} error_code={e.error_code}",
                 cause=e,
             )
         except Exception as e:
-            raise StorageError(f"Failed to read blob {blob_path}: {e}", cause=e)
+            raise StorageError(
+                f"Failed to read blob {blob_path}: {e}", cause=e
+            )
 
     async def save_annotation(self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile) -> None:
         """
@@ -178,7 +184,9 @@ class AzureBlobStorageAdapter(StorageAdapter):
                 cause=e,
             )
         except Exception as e:
-            raise StorageError(f"Failed to save blob {blob_path}: {e}", cause=e)
+            raise StorageError(
+                f"Failed to save blob {blob_path}: {e}", cause=e
+            )
 
     async def list_annotated_episodes(self, dataset_id: str) -> list[int]:
         """
@@ -218,7 +226,9 @@ class AzureBlobStorageAdapter(StorageAdapter):
                 cause=e,
             )
         except Exception as e:
-            raise StorageError(f"Failed to list annotations for {dataset_id}: {e}", cause=e)
+            raise StorageError(
+                f"Failed to list annotations for {dataset_id}: {e}", cause=e
+            )
 
     async def delete_annotation(self, dataset_id: str, episode_index: int) -> bool:
         """
@@ -249,7 +259,9 @@ class AzureBlobStorageAdapter(StorageAdapter):
                 cause=e,
             )
         except Exception as e:
-            raise StorageError(f"Failed to delete blob {blob_path}: {e}", cause=e)
+            raise StorageError(
+                f"Failed to delete blob {blob_path}: {e}", cause=e
+            )
 
     async def close(self) -> None:
         """Close the blob service client."""
