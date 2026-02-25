@@ -8,6 +8,8 @@ safetensors>=0.4
 huggingface-hub>=0.19
 pyyaml>=6.0
 flask>=3.0
+pyarrow>=14.0
+rosbags>=0.11
 
 [dev]
 pytest

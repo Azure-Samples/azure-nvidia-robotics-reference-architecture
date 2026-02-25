@@ -1,0 +1,45 @@
+# OSMO Workflow: UR10e ACT Training from Rosbag Data
+# ---------------------------------------------------
+# Submit with:
+#   osmo workflow submit osmo/osmo-workflow.yaml
+#
+# Data and code are baked into the Docker image.
+
+version: 2
+workflow:
+  name: ur10e-act-train
+
+  resources:
+    default:
+      gpu: 1
+      cpu: 8
+      memory: 32Gi
+      storage: 40Gi
+
+  groups:
+  - name: ur10e-act-group
+    tasks:
+    - name: train-act
+      lead: true
+      image: 192.168.1.100:5000/ur10e-act-train:v4
+
+      command:
+      - /bin/bash
+      - -c
+      - |
+        echo "=== UR10e ACT Training ==="
+        echo "Config: /workspace/config.yaml"
+        echo "Data: /data/rosbags"
+        echo "Output: /osmo/data/output/"
+        nvidia-smi
+        python train.py --config /workspace/config.yaml
+        echo "=== Training Complete ==="
+        ls -la /osmo/data/output/train-rosbag-act/ 2>/dev/null || true
+
+      environment:
+        PYTHONUNBUFFERED: "1"
+        TORCH_HOME: "/workspace/.cache/torch"
+
+  timeout:
+    exec_timeout: 12h
+    queue_timeout: 1h

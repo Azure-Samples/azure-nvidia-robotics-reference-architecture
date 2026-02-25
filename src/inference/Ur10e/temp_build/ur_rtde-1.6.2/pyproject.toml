@@ -1,0 +1,26 @@
+[build-system]
+requires = [
+    "setuptools",
+    "setuptools_scm",
+    "pybind11>=2.5.0"
+    ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ur_rtde"
+version = "1.6.2"
+authors = [{name = "Anders Prier Lindvig", email = "anpl@mmmi.sdu.dk"}]
+maintainers = [{name = "Anders Prier Lindvig", email = "anpl@mmmi.sdu.dk"}]
+description = "A Python interface for controlling and receiving data from a UR robot using the Real-Time Data Exchange (RTDE) interface of the robot."
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+
+[project.urls]
+Homepage = "https://gitlab.com/sdurobotics/ur_rtde"
+Documentation = "https://sdurobotics.gitlab.io/ur_rtde/"
+Repository = "https://gitlab.com/sdurobotics/ur_rtde.git"

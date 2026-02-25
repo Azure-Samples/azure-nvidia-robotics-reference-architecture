@@ -10,9 +10,14 @@ ur10e_deploy/__init__.py
 ur10e_deploy/camera.py
 ur10e_deploy/config.py
 ur10e_deploy/dashboard.py
+ur10e_deploy/dataset_reader.py
 ur10e_deploy/main.py
+ur10e_deploy/offline_eval.py
 ur10e_deploy/policy_runner.py
+ur10e_deploy/replay.py
+ur10e_deploy/replay_dashboard.py
 ur10e_deploy/robot.py
+ur10e_deploy/rosbag_replay.py
 ur10e_deploy/safety.py
 ur10e_deploy/telemetry.py
 ur10e_deploy/test_camera.py

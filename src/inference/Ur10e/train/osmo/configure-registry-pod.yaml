@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configure-registry
+  namespace: kube-system
+spec:
+  nodeSelector:
+    node_group: compute
+  hostPID: true
+  hostNetwork: true
+  tolerations:
+  - operator: Exists
+  containers:
+  - name: nsenter
+    image: busybox:latest
+    command:
+    - nsenter
+    - "--target"
+    - "1"
+    - "--mount"
+    - "--uts"
+    - "--ipc"
+    - "--net"
+    - "--pid"
+    - "--"
+    - python3
+    - "-c"
+    - |
+      import os, subprocess
+      d = '/etc/containerd/certs.d/192.168.1.100:5000'
+      os.makedirs(d, exist_ok=True)
+      content = 'server = "http://192.168.1.100:5000"\n\n[host."http://192.168.1.100:5000"]\n  capabilities = ["pull", "resolve"]\n  skip_verify = true\n'
+      with open(d + '/hosts.toml', 'w') as f:
+          f.write(content)
+      with open(d + '/hosts.toml') as f:
+          print(f.read())
+      subprocess.run(['systemctl', 'restart', 'containerd'], check=True)
+      print('REGISTRY_CONFIG_DONE')
+    securityContext:
+      privileged: true
+  restartPolicy: Never

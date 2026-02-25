@@ -1,0 +1,58 @@
+# OSMO Workflow: UR10e ACT Training — with Wandb Logging
+# -------------------------------------------------------
+# Logs training metrics to Weights & Biases.
+#
+# Prerequisites:
+#   osmo secret create wandb-api-key --value "<your-wandb-api-key>"
+#
+# Submit with:
+#   osmo workflow submit osmo/osmo-workflow-wandb.yaml --pool <your-pool>
+#
+# Run from the train/ directory so localpath references resolve correctly.
+
+workflow:
+  name: ur10e-act-train-wandb
+
+  resources:
+    gpu-train:
+      gpu: 1
+      cpu: 8
+      memory: 32Gi
+
+  tasks:
+  - name: train-act-wandb
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        --override wandb.enabled=true \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-checkpoint
+
+    credentials:
+      WANDB_API_KEY:
+        secret: wandb-api-key
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"

@@ -28,7 +28,7 @@ import numpy as np
 from .camera import create_camera
 from .config import DeployConfig, load_config
 from .dashboard import start_dashboard
-from .policy_runner import PolicyRunner, _wrap_to_pi
+from .standalone_policy_runner import StandalonePolicyRunner, _wrap_to_pi
 from .robot import UR10eRTDE
 from .safety import SafetyGuard
 from .telemetry import StepRecord, TelemetryStore
@@ -58,24 +58,24 @@ def policy_to_rtde_delta(delta: np.ndarray) -> np.ndarray:
 
 # Training-mean home position **in training convention** (from preprocessor).
 TRAINING_HOME_Q = np.array([
-    -1.529079,   # base
-     2.133681,   # shoulder  (training convention)
-    -2.233993,   # elbow     (training convention)
-    -1.552526,   # wrist1
-    -1.437930,   # wrist2
-    -0.149820,   # wrist3
+    -0.096657,   # base
+     1.591970,   # shoulder  (training convention)
+    -2.219511,   # elbow     (training convention)
+    -2.264566,   # wrist1
+    -1.561125,   # wrist2
+    -1.222813,   # wrist3
 ])
 
 # Same position in RTDE convention (for moveJ commands).
 RTDE_HOME_Q = TRAINING_HOME_Q * _JOINT_SIGN
 
 TRAINING_STD_Q = np.array([
-    0.157801,
-    0.174243,
-    0.073973,
-    0.051418,
-    1.276485,
-    0.167053,
+    0.135972,
+    0.105676,
+    0.148260,
+    0.076862,
+    0.029440,
+    1.301848,
 ])
 
 JOINT_NAMES = ["base", "shoulder", "elbow", "wrist1", "wrist2", "wrist3"]
@@ -131,7 +131,7 @@ def _signal_handler(signum, frame):
 def run_episode(
     robot: UR10eRTDE,
     camera,
-    policy: PolicyRunner,
+    policy: StandalonePolicyRunner,
     safety: SafetyGuard,
     cfg: DeployConfig,
     telemetry: TelemetryStore | None = None,
@@ -176,9 +176,6 @@ def run_episode(
             # Record initial position for drift tracking
             if step == 0 and telemetry_active:
                 telemetry.set_initial_q(current_q)
-            if step == 0:
-                safety.set_initial_q(current_q)
-
             # --- 2. Capture image ---
             try:
                 image = camera.grab_rgb()
@@ -225,10 +222,6 @@ def run_episode(
             # --- 7. Check robot safety ---
             if robot.is_protective_stopped() or robot.is_emergency_stopped():
                 logger.error("Robot safety stop detected — aborting episode")
-                break
-
-            if safety.drift_triggered:
-                logger.error("Drift watchdog triggered — aborting episode")
                 break
 
             # --- 8. Timing measurement ---
@@ -415,7 +408,7 @@ def main() -> None:
         telemetry = TelemetryStore()  # still track data for logging
 
     # 1. Load policy
-    policy = PolicyRunner(cfg.policy)
+    policy = StandalonePolicyRunner(cfg.policy)
     policy.load()
     telemetry.set_status(policy_loaded=True)
 

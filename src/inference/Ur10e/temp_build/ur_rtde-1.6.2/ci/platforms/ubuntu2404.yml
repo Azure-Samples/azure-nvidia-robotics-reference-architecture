@@ -1,0 +1,15 @@
+build-ubuntu-2404:
+  extends: .linux-build
+  image: registry.gitlab.sdu.dk/sdurobotics/docker-images/ur_rtde-build:ubuntu-2404
+
+examples-ubuntu-2404:
+  extends: .linux-build-examples
+  image: registry.gitlab.sdu.dk/sdurobotics/docker-images/ur_rtde-build:ubuntu-2404
+  dependencies:
+    - build-ubuntu-2404
+  needs: ["build-ubuntu-2404"]
+
+build_docs:
+  extends: .linux-doc
+  image: registry.gitlab.sdu.dk/sdurobotics/docker-images/ur_rtde-build:ubuntu-2404-doc
+

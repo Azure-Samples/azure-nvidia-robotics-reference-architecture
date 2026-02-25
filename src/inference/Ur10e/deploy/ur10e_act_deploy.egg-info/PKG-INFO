@@ -15,6 +15,8 @@ Requires-Dist: safetensors>=0.4
 Requires-Dist: huggingface-hub>=0.19
 Requires-Dist: pyyaml>=6.0
 Requires-Dist: flask>=3.0
+Requires-Dist: pyarrow>=14.0
+Requires-Dist: rosbags>=0.11
 Provides-Extra: realsense
 Requires-Dist: pyrealsense2>=2.54; extra == "realsense"
 Provides-Extra: dev

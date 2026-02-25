@@ -8,9 +8,8 @@ robot:
   rtde_frequency: 500.0            # Hz — native RTDE rate
 
   # Safety limits
-  max_delta_rad: 0.05              # Max per-step joint delta (~2.86 deg)
-  max_joint_vel: 1.0               # Max joint velocity (rad/s)
-  max_drift_rad: 1.5               # Max cumulative drift from start (~85.9 deg)
+  max_delta_rad: 0.1               # Max per-step joint delta (~5.73 deg)
+  max_joint_vel: 2.0               # Max joint velocity (rad/s)
 
   # servoJ tuning
   servo_lookahead: 0.1             # seconds

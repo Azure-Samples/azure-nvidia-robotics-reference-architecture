@@ -1,0 +1,61 @@
+# OSMO Workflow: UR10e ACT Training — Multi-GPU DDP
+# --------------------------------------------------
+# Distributed data-parallel training using torchrun across OSMO groups.
+#
+# Submit with:
+#   osmo workflow submit osmo/osmo-workflow-ddp.yaml --pool <your-pool>
+#
+# Run from the train/ directory so localpath references resolve correctly.
+
+workflow:
+  name: ur10e-act-train-ddp
+
+  resources:
+    gpu-node:
+      gpu: 1
+      cpu: 8
+      memory: 32Gi
+
+  tasks:
+  - name: train-act-ddp
+    image: ur10e-act-train:latest
+    resource: gpu-node
+
+    groups:
+    - name: workers
+      count: 4
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      torchrun \
+        --nproc_per_node=1 \
+        --nnodes=${WORKERS_COUNT} \
+        --node_rank=${WORKERS_RANK} \
+        --master_addr=${WORKERS_0_HOST} \
+        --master_port=29500 \
+        train.py --config /workspace/config.yaml \
+      && if [ "${WORKERS_RANK}" = "0" ]; then cp -r /output/train-rosbag-act/* {{output}}/; fi
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config-ddp.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-checkpoint-ddp
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+      NCCL_DEBUG: "INFO"

@@ -1,0 +1,73 @@
+stages:
+  - build
+  - build_examples
+  - build_wheels
+  - build_docs
+  - test
+  - deploy
+
+include:
+# templates
+  - '/ci/gitlab-ci-common.yml'
+  - '/ci/gitlab-ci-linux.yml'
+  - '/ci/gitlab-ci-windows.yml'
+  - '/ci/gitlab-ci-mac.yml'
+# jobs
+  - '/ci/platforms/ubuntu2004.yml'
+  - '/ci/platforms/ubuntu2204.yml'
+  - '/ci/platforms/ubuntu2404.yml'
+  - '/ci/platforms/windows10-vs16.yml'
+  - '/ci/platforms/mac-sequoia.yml'
+
+############################################
+#                  Test                    #
+############################################
+
+wheels:
+  stage: deploy
+  image: python:3.8
+  when: 
+    manual
+  dependencies:
+    - cibuildwheel-linux
+    - cibuildwheel-windows
+
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    TWINE_USERNAME: $PYPI_USERNAME
+    TWINE_PASSWORD: $PYPI_PASSWORD
+  script:
+    - ls wheelhouse || echo "wheelhouse does not exist"
+    - python -m pip install pip -U
+    - python -m pip install build -U
+    - python -m pip install setuptools -U
+    - python -m pip install twine wheel
+    - python -m build --sdist -o wheelhouse/
+    - twine upload --skip-existing wheelhouse/*
+  tags:
+    - linux
+    - sdur
+
+pages:
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  only:
+    refs:
+      - master
+  dependencies:
+    - build_docs
+  image: registry.gitlab.sdu.dk/sdurobotics/docker-images/ur_rtde-build:ubuntu-2404-doc
+  script:
+    - mv build/doc/html/_static/googled5bfdc1684e49924.html build/doc/html/googled5bfdc1684e49924.html
+    - mv build/doc/html public
+    
+  artifacts:
+    paths:
+      - public
+  tags:
+    - linux
+    - sdur
+
+
+    

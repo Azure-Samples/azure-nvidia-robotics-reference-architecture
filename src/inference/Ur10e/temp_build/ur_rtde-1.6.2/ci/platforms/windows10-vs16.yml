@@ -1,0 +1,19 @@
+
+build-windows10-vs16:
+  extends: .windows-build
+
+examples-windows10-vs16:
+  extends: .windows-build-examples
+  dependencies:
+    - build-windows10-vs16
+  needs: ["build-windows10-vs16"]
+
+cibuildwheel-windows:
+  extends: .windows-cibuildwheel
+  when:
+    manual
+  tags:
+    - sdur-windows
+  dependencies:
+    - build-windows10-vs16
+  needs: ["build-windows10-vs16"]

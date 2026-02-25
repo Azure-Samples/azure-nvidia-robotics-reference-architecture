@@ -47,9 +47,8 @@ class RobotConfig:
     rtde_frequency: float = 500.0  # RTDE native frequency (Hz)
 
     # Safety limits
-    max_delta_rad: float = 0.05  # Max per-step joint delta (radians) (~2.86 deg)
-    max_joint_vel: float = 1.0  # Max joint velocity (rad/s)
-    max_drift_rad: float = 0.5  # Max cumulative drift from start per joint (~28.6 deg)
+    max_delta_rad: float = 0.1  # Max per-step joint delta (radians) (~5.73 deg)
+    max_joint_vel: float = 2.0  # Max joint velocity (rad/s)
     joint_lower: list[float] = field(default_factory=lambda: list(UR10E_SAFE_JOINT_LOWER))
     joint_upper: list[float] = field(default_factory=lambda: list(UR10E_SAFE_JOINT_UPPER))
 

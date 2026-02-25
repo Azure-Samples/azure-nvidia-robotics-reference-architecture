@@ -1,19 +1,17 @@
 [project]
 name = "ur10e-act-deploy"
 version = "0.1.0"
-description = "Deploy LeRobot ACT policy on UR10e via RTDE"
+description = "Deploy standalone ACT policy on UR10e via RTDE"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 dependencies = [
     "ur-rtde>=1.5.0",
-    "lerobot>=0.1.0",
     "torch>=2.0",
     "torchvision>=0.15",
     "opencv-python>=4.8",
     "numpy>=1.24",
     "safetensors>=0.4",
-    "huggingface-hub>=0.19",
     "pyyaml>=6.0",
     "flask>=3.0",
     "pyarrow>=14.0",

@@ -1,0 +1,278 @@
+# OSMO Workflow: UR10e ACT Training — Hyperparameter Sweep
+# --------------------------------------------------------
+# Runs multiple training jobs in parallel, each with different
+# hyperparameter overrides via the --override CLI mechanism.
+#
+# Edit the sweep grid below by changing the --override args
+# on each task.
+#
+# Prerequisites:
+#   - Same as base workflow (image pushed, data uploaded)
+#   - Optional: osmo secret create wandb-api-key --value "<key>"
+#
+# Submit with:
+#   osmo workflow submit osmo/osmo-workflow-sweep.yaml --pool <your-pool>
+#
+# Run from the train/ directory so localpath references resolve correctly.
+
+workflow:
+  name: ur10e-act-sweep
+
+  resources:
+    gpu-train:
+      gpu: 1
+      cpu: 8
+      memory: 32Gi
+
+  tasks:
+  # --- Sweep Arm 1: lr=1e-5, kl_weight=10.0 (baseline) ---
+  - name: sweep-lr1e5-kl10
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        --override training.lr=1e-5 \
+        --override training.kl_weight=10.0 \
+        --override wandb.enabled=true \
+        --override wandb.run_name=sweep-lr1e5-kl10 \
+        --override wandb.tags='["osmo","sweep"]' \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-sweep-lr1e5-kl10
+
+    credentials:
+      WANDB_API_KEY:
+        secret: wandb-api-key
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+
+  # --- Sweep Arm 2: lr=5e-5, kl_weight=10.0 ---
+  - name: sweep-lr5e5-kl10
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        --override training.lr=5e-5 \
+        --override training.kl_weight=10.0 \
+        --override wandb.enabled=true \
+        --override wandb.run_name=sweep-lr5e5-kl10 \
+        --override wandb.tags='["osmo","sweep"]' \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-sweep-lr5e5-kl10
+
+    credentials:
+      WANDB_API_KEY:
+        secret: wandb-api-key
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+
+  # --- Sweep Arm 3: lr=1e-4, kl_weight=10.0 ---
+  - name: sweep-lr1e4-kl10
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        --override training.lr=1e-4 \
+        --override training.kl_weight=10.0 \
+        --override wandb.enabled=true \
+        --override wandb.run_name=sweep-lr1e4-kl10 \
+        --override wandb.tags='["osmo","sweep"]' \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-sweep-lr1e4-kl10
+
+    credentials:
+      WANDB_API_KEY:
+        secret: wandb-api-key
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+
+  # --- Sweep Arm 4: lr=1e-5, kl_weight=1.0 ---
+  - name: sweep-lr1e5-kl1
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        --override training.lr=1e-5 \
+        --override training.kl_weight=1.0 \
+        --override wandb.enabled=true \
+        --override wandb.run_name=sweep-lr1e5-kl1 \
+        --override wandb.tags='["osmo","sweep"]' \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-sweep-lr1e5-kl1
+
+    credentials:
+      WANDB_API_KEY:
+        secret: wandb-api-key
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+
+  # --- Sweep Arm 5: lr=5e-5, kl_weight=1.0 ---
+  - name: sweep-lr5e5-kl1
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        --override training.lr=5e-5 \
+        --override training.kl_weight=1.0 \
+        --override wandb.enabled=true \
+        --override wandb.run_name=sweep-lr5e5-kl1 \
+        --override wandb.tags='["osmo","sweep"]' \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-sweep-lr5e5-kl1
+
+    credentials:
+      WANDB_API_KEY:
+        secret: wandb-api-key
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+
+  # --- Sweep Arm 6: lr=1e-4, kl_weight=1.0 ---
+  - name: sweep-lr1e4-kl1
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        --override training.lr=1e-4 \
+        --override training.kl_weight=1.0 \
+        --override wandb.enabled=true \
+        --override wandb.run_name=sweep-lr1e4-kl1 \
+        --override wandb.tags='["osmo","sweep"]' \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-sweep-lr1e4-kl1
+
+    credentials:
+      WANDB_API_KEY:
+        secret: wandb-api-key
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"

@@ -1,0 +1,61 @@
+# OSMO Workflow: UR10e ACT Training — Azure Blob Data Source
+# -----------------------------------------------------------
+# Downloads rosbag data from Azure Blob Storage before training.
+#
+# Prerequisites:
+#   osmo secret create azure-storage-account --value "stosmorbt3dev001"
+#   osmo secret create azure-storage-sas --value "<SAS-token>"
+#
+# Submit with:
+#   osmo workflow submit osmo/osmo-workflow-blob.yaml --pool <your-pool>
+#
+# Run from the train/ directory so localpath references resolve correctly.
+
+workflow:
+  name: ur10e-act-train-blob
+
+  resources:
+    gpu-train:
+      gpu: 1
+      cpu: 8
+      memory: 32Gi
+
+  tasks:
+  - name: train-act-blob
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      bash /workspace/download-blob.sh \
+        && python train.py --config /workspace/config.yaml \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+    - localpath: osmo/download-blob.sh
+      path: /workspace/download-blob.sh
+
+    # No localpath input — data comes from Azure Blob
+    outputs:
+    - dataset:
+        name: ur10e-act-checkpoint
+
+    credentials:
+      AZURE_STORAGE_ACCOUNT:
+        secret: azure-storage-account
+      AZURE_STORAGE_SAS:
+        secret: azure-storage-sas
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+      AZURE_BLOB_CONTAINER: "datasets"
+      AZURE_BLOB_PREFIX: "houston_recordings/"
+      BLOB_DEST_DIR: "/data/rosbags"

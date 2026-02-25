@@ -89,6 +89,41 @@ class PolicyRunner:
         """
         from lerobot.policies.act.modeling_act import ACTPolicy
 
+        # Workaround: on Windows, NamedTemporaryFile holds an exclusive lock
+        # that prevents draccus from reopening the file.  Monkey-patch
+        # PreTrainedConfig.from_pretrained to use delete=False instead.
+        import lerobot.configs.policies as _pol_cfg
+        _orig_from_pretrained = _pol_cfg.PreTrainedConfig.from_pretrained.__func__
+
+        @classmethod  # type: ignore[misc]
+        def _patched_from_pretrained(cls, pretrained_name_or_path, **kwargs):
+            import json, os, tempfile, draccus
+            model_id = str(pretrained_name_or_path)
+            config_name = "config.json"
+            config_file = None
+            if Path(model_id).is_dir():
+                if config_name in os.listdir(model_id):
+                    config_file = os.path.join(model_id, config_name)
+            if config_file is None:
+                return _orig_from_pretrained(cls, pretrained_name_or_path, **kwargs)
+            with draccus.config_type("json"):
+                orig_config = draccus.parse(cls, config_file, args=[])
+            with open(config_file) as fp:
+                config = json.load(fp)
+            config.pop("type", None)
+            tmp = tempfile.NamedTemporaryFile("w+", suffix=".json", delete=False)
+            try:
+                json.dump(config, tmp)
+                tmp.flush()
+                tmp.close()
+                cli_overrides = kwargs.pop("cli_overrides", [])
+                with draccus.config_type("json"):
+                    return draccus.parse(orig_config.__class__, tmp.name, args=cli_overrides)
+            finally:
+                os.unlink(tmp.name)
+
+        _pol_cfg.PreTrainedConfig.from_pretrained = _patched_from_pretrained
+
         checkpoint_dir = Path(self.cfg.checkpoint_dir).resolve()
         if not checkpoint_dir.exists():
             raise FileNotFoundError(f"Checkpoint directory not found: {checkpoint_dir}")

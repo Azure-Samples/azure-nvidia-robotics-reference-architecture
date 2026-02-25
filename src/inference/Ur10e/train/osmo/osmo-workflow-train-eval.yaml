@@ -1,0 +1,98 @@
+# OSMO Workflow: UR10e ACT Training → Offline Evaluation Chain
+# -------------------------------------------------------------
+# Two-task workflow:
+#   1. train-act:  Train ACT policy from rosbag data
+#   2. eval-act:   Run offline evaluation on trained checkpoint
+#
+# Prerequisites:
+#   - Build and push both images:
+#       docker build -t ur10e-act-train:latest -f osmo/Dockerfile .
+#       docker build -t ur10e-act-eval:latest -f osmo/Dockerfile.eval \
+#           --build-context deploy=../deploy .
+#   - Upload evaluation dataset:
+#       osmo dataset upload ur10e-eval-dataset ./path/to/lerobot-dataset
+#
+# Submit with:
+#   osmo workflow submit osmo/osmo-workflow-train-eval.yaml --pool <your-pool>
+
+workflow:
+  name: ur10e-act-train-eval
+
+  resources:
+    gpu-train:
+      gpu: 1
+      cpu: 8
+      memory: 32Gi
+    gpu-eval:
+      gpu: 1
+      cpu: 4
+      memory: 16Gi
+
+  tasks:
+  # ── Task 1: Training ──────────────────────────────────────────
+  - name: train-act
+    image: ur10e-act-train:latest
+    resource: gpu-train
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      python train.py --config /workspace/config.yaml \
+        && cp -r /output/train-rosbag-act/* {{output}}/
+
+    files:
+    - localpath: train.py
+      path: /workspace/train.py
+    - localpath: act_model.py
+      path: /workspace/act_model.py
+    - localpath: osmo/osmo-config.yaml
+      path: /workspace/config.yaml
+
+    inputs:
+    - dataset:
+        name: ur10e-rosbag-data
+        localpath: local_bags
+      path: /data/rosbags
+
+    outputs:
+    - dataset:
+        name: ur10e-act-checkpoint
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TORCH_HOME: "/workspace/.cache/torch"
+
+  # ── Task 2: Offline Evaluation ────────────────────────────────
+  - name: eval-act
+    image: ur10e-act-eval:latest
+    resource: gpu-eval
+    depends_on:
+    - train-act
+
+    command: ["bash", "-c"]
+    args:
+    - |
+      /workspace/eval-entrypoint.sh \
+        && cp -r /output/eval-results/* {{output}}/
+
+    inputs:
+    # Trained checkpoint from Task 1
+    - dataset:
+        name: ur10e-act-checkpoint
+      path: /data/checkpoint
+    # LeRobot-format evaluation dataset
+    - dataset:
+        name: ur10e-eval-dataset
+      path: /data/eval-dataset
+
+    outputs:
+    - dataset:
+        name: ur10e-eval-results
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      CHECKPOINT_DIR: "/data/checkpoint"
+      EVAL_DATASET_DIR: "/data/eval-dataset"
+      EVAL_OUTPUT_DIR: "/output/eval-results"
+      EVAL_EPISODES: "0 1 2 3"
+      EVAL_DEVICE: "cuda"

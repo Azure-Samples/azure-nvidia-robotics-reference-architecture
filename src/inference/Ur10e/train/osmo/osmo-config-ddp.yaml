@@ -1,0 +1,63 @@
+# ACT Training Configuration — OSMO Multi-GPU DDP
+# -------------------------------------------------
+# Batch size and workers tuned for distributed training.
+# Each GPU gets this batch_size — effective batch = batch_size * world_size.
+
+# Rosbag data source
+data:
+  bag_dir: "/data/rosbags"
+  ros_distro: "ROS2_HUMBLE"
+  joint_topic: "/joint_states"
+  camera_topic: "/camera/camera/depth/image_rect_raw"
+  fps: 30
+  max_offset_ms: 50.0
+
+# Joint convention conversion (RTDE → training convention)
+conventions:
+  apply_joint_sign: true
+  joint_sign: [1.0, -1.0, -1.0, 1.0, 1.0, 1.0]
+  wrap_angles: true
+  image_resize: [480, 848]
+
+# ACT model architecture
+model:
+  state_dim: 6
+  action_dim: 6
+  chunk_size: 100
+  dim_model: 512
+  n_heads: 8
+  dim_feedforward: 3200
+  n_encoder_layers: 4
+  n_decoder_layers: 1
+  n_vae_encoder_layers: 4
+  latent_dim: 32
+  dropout: 0.1
+  use_vae: true
+  vision_backbone: "resnet18"
+  pretrained_backbone: true
+
+# Training parameters — scaled for DDP
+training:
+  device: "cuda"
+  seed: 1000
+  batch_size: 4
+  num_workers: 4
+  steps: 5000
+  lr: 1.0e-5
+  lr_backbone: 1.0e-5
+  weight_decay: 1.0e-4
+  grad_clip_norm: 10.0
+  kl_weight: 10.0
+  log_freq: 100
+  save_freq: 1000
+  output_dir: "/output/train-rosbag-act"
+  scheduler: "cosine"
+  warmup_steps: 500
+  min_lr: 1.0e-7
+
+# Wandb experiment tracking
+wandb:
+  enabled: false
+  project: "ur10e-act-train"
+  run_name: null
+  tags: ["osmo", "ddp"]

@@ -1,0 +1,33 @@
+
+build-mac-sequoia:
+  extends: .mac-build
+  tags:
+    - Sequoia
+    - sdur
+    - mac
+
+
+examples-mac-sequoia:
+  extends: .mac-build-examples
+  tags:
+    - Sequoia
+    - sdur
+    - mac
+  dependencies:
+    - build-mac-sequoia
+  needs: ["build-mac-sequoia"]
+
+cibuildwheel-mac:
+  extends: .mac-cibuildwheel
+  when:
+    manual
+  tags:
+    - Sequoia
+    - sdur
+    - mac
+  dependencies:
+    - build-mac-sequoia
+  needs: ["build-mac-sequoia"]
+
+
+

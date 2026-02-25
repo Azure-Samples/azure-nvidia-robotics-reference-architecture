@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1
+# ------------------------------------------------------------------
+# UR10e ACT Offline Evaluation — OSMO Container Image
+# ------------------------------------------------------------------
+# Base: NVIDIA PyTorch NGC image (CUDA 12.4 + PyTorch 2.4)
+# Usage:
+#   docker build -t ur10e-act-eval:latest -f osmo/Dockerfile.eval \
+#       --build-context deploy=../deploy .
+# ------------------------------------------------------------------
+
+FROM nvcr.io/nvidia/pytorch:24.07-py3
+
+LABEL maintainer="HVE Robotics"
+LABEL description="UR10e ACT offline evaluation from LeRobot dataset"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Install Python dependencies for evaluation
+RUN pip install --no-cache-dir \
+        "lerobot==0.3.2" \
+        "pyarrow>=14.0" \
+        "av>=12.0" \
+        "safetensors>=0.4" \
+        "opencv-python-headless>=4.5" \
+        "pyyaml>=6.0" \
+        "numpy<2"
+
+# Copy evaluation modules from the deploy package
+COPY --from=deploy ur10e_deploy/__init__.py /workspace/ur10e_deploy/__init__.py
+COPY --from=deploy ur10e_deploy/config.py /workspace/ur10e_deploy/config.py
+COPY --from=deploy ur10e_deploy/policy_runner.py /workspace/ur10e_deploy/policy_runner.py
+COPY --from=deploy ur10e_deploy/offline_eval.py /workspace/ur10e_deploy/offline_eval.py
+
+# Copy entrypoint
+COPY osmo/eval-entrypoint.sh /workspace/eval-entrypoint.sh
+RUN chmod +x /workspace/eval-entrypoint.sh
+
+ENTRYPOINT ["/workspace/eval-entrypoint.sh"]

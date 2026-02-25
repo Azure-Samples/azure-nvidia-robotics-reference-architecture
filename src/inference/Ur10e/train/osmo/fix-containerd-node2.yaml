@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fix-containerd-node2
+  namespace: kube-system
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: workstation3-us-desktop-vision-elite-rs
+  hostPID: true
+  hostNetwork: true
+  restartPolicy: Never
+  containers:
+  - name: fix
+    image: ubuntu:22.04
+    securityContext:
+      privileged: true
+    command:
+    - nsenter
+    - "--target"
+    - "1"
+    - "--mount"
+    - "--uts"
+    - "--ipc"
+    - "--net"
+    - "--pid"
+    - "--"
+    - python3
+    - "-c"
+    - |
+      import os, subprocess, time
+
+      config_path = "/etc/containerd/config.toml"
+
+      with open(config_path) as f:
+          content = f.read()
+
+      changed = False
+
+      # Fix 1: Set transfer plugin config_path
+      marker = '[plugins."io.containerd.transfer.v1.local"]'
+      parts = content.split(marker)
+      if len(parts) == 2:
+          if 'config_path = ""' in parts[1]:
+              after = parts[1].replace('config_path = ""',
+                  'config_path = "/etc/containerd/certs.d:/etc/docker/certs.d"', 1)
+              content = parts[0] + marker + after
+              changed = True
+              print("FIX1: Updated transfer plugin config_path")
+          else:
+              print("FIX1: transfer config_path already set")
+      else:
+          print("FIX1: WARNING - transfer section not found")
+
+      # Fix 2: Enable use_local_image_pull
+      if "use_local_image_pull = false" in content:
+          content = content.replace("use_local_image_pull = false", "use_local_image_pull = true")
+          changed = True
+          print("FIX2: Set use_local_image_pull = true")
+      else:
+          print("FIX2: use_local_image_pull already true or not found")
+
+      if changed:
+          with open(config_path + ".bak", "w") as f2:
+              pass
+          with open(config_path, "w") as f:
+              f.write(content)
+          print("CONFIG: Written updated config.toml")
+
+      # Ensure hosts.toml
+      d = "/etc/containerd/certs.d/192.168.1.100:5000"
+      os.makedirs(d, exist_ok=True)
+      ht = 'server = "http://192.168.1.100:5000"\n\n[host."http://192.168.1.100:5000"]\n  capabilities = ["pull", "resolve", "push"]\n  skip_verify = true\n'
+      with open(os.path.join(d, "hosts.toml"), "w") as f:
+          f.write(ht)
+      print("HOSTS: Written hosts.toml")
+
+      # Restart containerd
+      r = subprocess.run(["systemctl", "restart", "containerd"], capture_output=True, text=True)
+      print(f"RESTART: exit={r.returncode}")
+      time.sleep(5)
+
+      # Test pull
+      r = subprocess.run(["crictl", "pull", "192.168.1.100:5000/ur10e-act-train:latest"],
+                         capture_output=True, text=True, timeout=300)
+      print(f"PULL: exit={r.returncode}")
+      if r.stdout:
+          print(f"PULL_OUT: {r.stdout.strip()}")
+      if r.stderr:
+          print(f"PULL_ERR: {r.stderr.strip()}")
+
+      print("DONE")
