@@ -73,7 +73,7 @@ class StorageAdapter(ABC):
         """
         pass
 
-    async def close(self) -> None:  # noqa: B027
+    async def close(self) -> None:
         """Release any held resources. Default implementation is a no-op."""
 
     async def get_annotations_batch(

@@ -3,6 +3,8 @@ Unit tests for local filesystem storage adapter.
 """
 
 import asyncio
+import json
+import os
 import tempfile
 from pathlib import Path
 from unittest import TestCase
@@ -28,7 +30,6 @@ class TestLocalStorageAdapter(TestCase):
     def tearDown(self):
         """Clean up test fixtures."""
         import shutil
-
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_get_annotation_not_found(self):
@@ -44,13 +45,7 @@ class TestLocalStorageAdapter(TestCase):
         asyncio.run(self.adapter.save_annotation(self.dataset_id, 5, annotation))
 
         # Verify file exists
-        expected_path = (
-            Path(self.temp_dir)
-            / self.dataset_id
-            / "annotations"
-            / "episodes"
-            / "episode_000005.json"
-        )
+        expected_path = Path(self.temp_dir) / self.dataset_id / "annotations" / "episodes" / "episode_000005.json"
         assert expected_path.exists()
 
         # Retrieve annotation
@@ -156,9 +151,7 @@ class TestLocalStorageAdapter(TestCase):
     def test_save_uses_async_tempfile(self):
         """Verify save_annotation delegates sync I/O to asyncio.to_thread."""
         annotation = create_test_annotation(episode_index=0)
-        with patch(
-            "src.api.storage.local.asyncio.to_thread", wraps=asyncio.to_thread
-        ) as mock_to_thread:
+        with patch("src.api.storage.local.asyncio.to_thread", wraps=asyncio.to_thread) as mock_to_thread:
             asyncio.run(self.adapter.save_annotation(self.dataset_id, 0, annotation))
             assert mock_to_thread.call_count >= 1
 

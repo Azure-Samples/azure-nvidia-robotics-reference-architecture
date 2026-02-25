@@ -12,6 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.api.storage.base import StorageError
+
 from .conftest import create_test_annotation
 
 
@@ -115,8 +117,13 @@ class TestAzureBlobStorageAdapter(TestCase):
         mock_blob.upload_blob.assert_called_once()
         call_args = mock_blob.upload_blob.call_args
         assert call_args[1]["overwrite"] is True
-        mock_content_settings.assert_called_once_with(content_type="application/json")
-        assert call_args[1]["content_settings"] == mock_content_settings.return_value
+        mock_content_settings.assert_called_once_with(
+            content_type="application/json"
+        )
+        assert (
+            call_args[1]["content_settings"]
+            == mock_content_settings.return_value
+        )
 
     @patch("src.api.storage.azure.AZURE_AVAILABLE", True)
     @patch("src.api.storage.azure.BlobServiceClient")
@@ -247,10 +254,8 @@ class TestAzureBlobStorageAdapter(TestCase):
             container_name="testcontainer",
             sas_token="test-sas",
         )
-        with (
-            unittest.mock.patch("src.api.storage.azure.BlobServiceClient") as mock_cls,
-            unittest.mock.patch("src.api.storage.azure.RetryPolicy"),
-        ):
+        with unittest.mock.patch("src.api.storage.azure.BlobServiceClient") as mock_cls, \
+             unittest.mock.patch("src.api.storage.azure.RetryPolicy") as mock_retry:
             asyncio.run(adapter._get_client())
             call_kwargs = mock_cls.call_args
             assert "retry_policy" in call_kwargs.kwargs
@@ -265,10 +270,8 @@ class TestAzureBlobStorageAdapter(TestCase):
             container_name="testcontainer",
             sas_token="test-sas",
         )
-        with (
-            unittest.mock.patch("src.api.storage.azure.BlobServiceClient"),
-            unittest.mock.patch("src.api.storage.azure.RetryPolicy") as mock_retry_cls,
-        ):
+        with unittest.mock.patch("src.api.storage.azure.BlobServiceClient") as mock_cls, \
+             unittest.mock.patch("src.api.storage.azure.RetryPolicy") as mock_retry_cls:
             asyncio.run(adapter._get_client())
             mock_retry_cls.assert_called_once_with(
                 retry_total=3,

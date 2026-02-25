@@ -86,7 +86,9 @@ class HuggingFaceHubAdapter(StorageAdapter):
             )
             return Path(local_path)
         except Exception as e:
-            raise StorageError(f"Failed to download {filename} from {self.repo_id}: {e}", cause=e)
+            raise StorageError(
+                f"Failed to download {filename} from {self.repo_id}: {e}", cause=e
+            )
 
     def _read_json_file(self, path: str) -> dict:
         """Read and parse a JSON file synchronously."""
@@ -121,12 +123,10 @@ class HuggingFaceHubAdapter(StorageAdapter):
             tasks_data = info_data.get("tasks", [])
             for i, task in enumerate(tasks_data):
                 if isinstance(task, dict):
-                    tasks.append(
-                        TaskInfo(
-                            task_index=task.get("task_index", i),
-                            description=task.get("description", f"Task {i}"),
-                        )
-                    )
+                    tasks.append(TaskInfo(
+                        task_index=task.get("task_index", i),
+                        description=task.get("description", f"Task {i}"),
+                    ))
                 elif isinstance(task, str):
                     tasks.append(TaskInfo(task_index=i, description=task))
 
@@ -142,7 +142,9 @@ class HuggingFaceHubAdapter(StorageAdapter):
         except StorageError:
             raise
         except Exception as e:
-            raise StorageError(f"Failed to parse dataset info for {self.repo_id}: {e}", cause=e)
+            raise StorageError(
+                f"Failed to parse dataset info for {self.repo_id}: {e}", cause=e
+            )
 
     async def list_episodes(self) -> list[EpisodeMeta]:
         """
@@ -177,14 +179,12 @@ class HuggingFaceHubAdapter(StorageAdapter):
                                     index_str = filename.replace("episode_", "")
                                     index_str = index_str.replace(".parquet", "")
                                     index = int(index_str)
-                                    episodes.append(
-                                        EpisodeMeta(
-                                            index=index,
-                                            length=0,  # Needs parquet read
-                                            task_index=0,
-                                            has_annotations=False,
-                                        )
-                                    )
+                                    episodes.append(EpisodeMeta(
+                                        index=index,
+                                        length=0,  # Would need to read parquet for actual length
+                                        task_index=0,
+                                        has_annotations=False,
+                                    ))
                                 except ValueError:
                                     continue
             except Exception:
@@ -208,7 +208,9 @@ class HuggingFaceHubAdapter(StorageAdapter):
         except StorageError:
             raise
         except Exception as e:
-            raise StorageError(f"Failed to list episodes for {self.repo_id}: {e}", cause=e)
+            raise StorageError(
+                f"Failed to list episodes for {self.repo_id}: {e}", cause=e
+            )
 
     async def get_episode_data(self, episode_index: int) -> EpisodeData:
         """
@@ -279,17 +281,14 @@ class HuggingFaceHubAdapter(StorageAdapter):
         video_path = f"videos/{chunk_name}/{feature_name}/episode_{episode_index:06d}.mp4"
 
         return (
-            f"https://huggingface.co/datasets/{self.repo_id}/resolve/{self.revision}/{video_path}"
+            f"https://huggingface.co/datasets/{self.repo_id}/resolve/"
+            f"{self.revision}/{video_path}"
         )
 
-    async def get_annotation(
-        self, dataset_id: str, episode_index: int
-    ) -> EpisodeAnnotationFile | None:
+    async def get_annotation(self, dataset_id: str, episode_index: int) -> EpisodeAnnotationFile | None:
         raise NotImplementedError("HuggingFaceHubAdapter is read-only")
 
-    async def save_annotation(
-        self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile
-    ) -> None:
+    async def save_annotation(self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile) -> None:
         raise NotImplementedError("HuggingFaceHubAdapter is read-only")
 
     async def list_annotated_episodes(self, dataset_id: str) -> list[int]:
