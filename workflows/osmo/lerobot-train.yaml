@@ -119,7 +119,6 @@ workflow:
                 "--dataset.root=${FULL_DATASET_PATH}"
                 "--dataset.use_imagenet_stats=false"
                 "--dataset.video_backend=pyav"
-                "--tolerance_s=0.04"
               )
             fi
 
