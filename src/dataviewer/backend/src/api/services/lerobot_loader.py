@@ -124,7 +124,7 @@ class LeRobotLoader:
         """
         if not PARQUET_AVAILABLE:
             raise ImportError(
-                "LeRobot support requires pyarrow package. Install with: pip install pyarrow"
+                "LeRobot support requires pyarrow package. " "Install with: pip install pyarrow"
             )
 
         self.base_path = Path(base_path)
