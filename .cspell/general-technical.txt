@@ -1472,9 +1472,11 @@ gpuinstancetype
 infotensor
 IPPO
 irewbuffer
+alizaidi
 isaaclab
 isaacsim
 lenbuffer
+lerobot
 MAPPO
 meks
 nvcr

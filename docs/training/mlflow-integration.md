@@ -1,6 +1,21 @@
+---
+title: MLflow Integration for SKRL Training
+description: MLflow metric logging integration with SKRL agent training during Isaac Lab training runs
+author: Microsoft Robotics-AI Team
+ms.date: 2026-02-24
+ms.topic: reference
+keywords:
+  - MLflow
+  - SKRL
+  - Isaac Lab
+  - training
+  - metrics
+  - experiment tracking
+---
+
 # MLflow Integration for SKRL Training
 
-This document explains how MLflow metric logging is integrated with SKRL agent training during Isaac Lab training runs.
+MLflow metric logging integration with SKRL agent training during Isaac Lab training runs.
 
 ## Overview
 
@@ -312,3 +327,15 @@ The training script handles MLflow setup and monkey-patching automatically. To c
 3. Metric extraction depth exceeded
    * Nested metrics beyond `max_depth=2` are not extracted
    * Increase `max_depth` in `_extract_from_tracking_data()` if needed
+
+## Related Documentation
+
+- [Training Guide](README.md)
+- [Inference Guide](../inference/README.md)
+- [Workflow Templates](../../workflows/README.md)
+
+---
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->
