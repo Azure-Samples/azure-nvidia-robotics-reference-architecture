@@ -79,13 +79,9 @@ class LocalStorageAdapter(StorageAdapter):
                 return EpisodeAnnotationFile.model_validate(data)
 
         except json.JSONDecodeError as e:
-            raise StorageError(
-                f"Invalid JSON in annotation file {file_path}: {e}", cause=e
-            )
+            raise StorageError(f"Invalid JSON in annotation file {file_path}: {e}", cause=e)
         except Exception as e:
-            raise StorageError(
-                f"Failed to read annotation file {file_path}: {e}", cause=e
-            )
+            raise StorageError(f"Failed to read annotation file {file_path}: {e}", cause=e)
 
     async def save_annotation(
         self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile
@@ -140,9 +136,7 @@ class LocalStorageAdapter(StorageAdapter):
         except StorageError:
             raise
         except Exception as e:
-            raise StorageError(
-                f"Failed to save annotation file {file_path}: {e}", cause=e
-            )
+            raise StorageError(f"Failed to save annotation file {file_path}: {e}", cause=e)
 
     async def list_annotated_episodes(self, dataset_id: str) -> list[int]:
         """
@@ -173,9 +167,7 @@ class LocalStorageAdapter(StorageAdapter):
             return sorted(episode_indices)
 
         except Exception as e:
-            raise StorageError(
-                f"Failed to list annotations for {dataset_id}: {e}", cause=e
-            )
+            raise StorageError(f"Failed to list annotations for {dataset_id}: {e}", cause=e)
 
     async def delete_annotation(self, dataset_id: str, episode_index: int) -> bool:
         """
@@ -198,6 +190,4 @@ class LocalStorageAdapter(StorageAdapter):
             return True
 
         except Exception as e:
-            raise StorageError(
-                f"Failed to delete annotation file {file_path}: {e}", cause=e
-            )
+            raise StorageError(f"Failed to delete annotation file {file_path}: {e}", cause=e)

@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .routers import analysis, annotations, datasets, detection, export, labels
+from .routes import ai_analysis
+
 # Configure logging to show INFO level
 logging.basicConfig(
     level=logging.INFO,
@@ -16,9 +19,6 @@ logging.basicConfig(
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_path)
-
-from .routers import analysis, annotations, datasets, detection, export, labels
-from .routes import ai_analysis
 
 app = FastAPI(
     title="LeRobot Annotation API",

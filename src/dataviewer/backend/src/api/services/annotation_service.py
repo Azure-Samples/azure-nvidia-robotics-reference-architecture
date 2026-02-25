@@ -169,10 +169,7 @@ class AnnotationService:
             )
 
         # Calculate smoothness from velocity changes
-        velocities = [
-            sum(abs(v) for v in point.joint_velocities)
-            for point in trajectory
-        ]
+        velocities = [sum(abs(v) for v in point.joint_velocities) for point in trajectory]
 
         # Detect jitter (high-frequency velocity changes)
         jitter_count = 0
@@ -212,9 +209,7 @@ class AnnotationService:
                 for j in range(len(trajectory[i].joint_positions))
             ]
             # Check for sign changes (direction reversal)
-            reversals = sum(
-                1 for p, c in zip(prev_delta, curr_delta) if p * c < 0
-            )
+            reversals = sum(1 for p, c in zip(prev_delta, curr_delta) if p * c < 0)
             if reversals > len(prev_delta) // 2:
                 correction_count += 1
 
@@ -255,9 +250,7 @@ class AnnotationService:
             flags=flags,
         )
 
-    async def get_summary(
-        self, dataset_id: str, total_episodes: int
-    ) -> AnnotationSummary:
+    async def get_summary(self, dataset_id: str, total_episodes: int) -> AnnotationSummary:
         """
         Get aggregated annotation metrics for a dataset.
 

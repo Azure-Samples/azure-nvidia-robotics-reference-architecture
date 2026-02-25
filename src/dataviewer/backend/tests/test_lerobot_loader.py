@@ -6,7 +6,6 @@ video path resolution, and camera discovery.
 """
 
 import os
-from pathlib import Path
 
 import numpy as np
 import pytest

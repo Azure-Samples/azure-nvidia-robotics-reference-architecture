@@ -330,7 +330,7 @@ def _namespace_snapshot(namespace: argparse.Namespace) -> tuple[dict[str, object
 
     payload: dict[str, object] = {}
     for key, value in vars(namespace).items():
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, str | int | float | bool) or value is None:
             payload[key] = value
         else:
             payload[key] = str(value)
@@ -393,7 +393,7 @@ def _configure_environment(
 
     if isinstance(env_cfg, manager_cfg_type):
         _set_num_envs_for_manager_cfg(env_cfg, cli_args.num_envs)
-    elif isinstance(env_cfg, (direct_cfg_type, direct_mar_cfg_type)):
+    elif isinstance(env_cfg, direct_cfg_type | direct_mar_cfg_type):
         _set_num_envs_for_direct_cfg(env_cfg, cli_args.num_envs)
 
     if cli_args.distributed:

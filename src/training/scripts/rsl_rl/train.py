@@ -280,7 +280,7 @@ def _start_mlflow_run(
             mlflow.set_tags(tags)
         if params:
             serializable_params = {
-                k: v for k, v in params.items() if isinstance(v, (int, float, str, bool)) or v is None
+                k: v for k, v in params.items() if isinstance(v, int | float | str | bool) or v is None
             }
             mlflow.log_params(serializable_params)
         print(f"[INFO] MLflow run started: experiment='{experiment_name}', run='{run_name}'")

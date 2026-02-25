@@ -13,7 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 if TYPE_CHECKING:
-    from ..models.datasources import FrameInsertion, TrajectoryPoint
+    from ..models.datasources import TrajectoryPoint
 
 __all__ = [
     "interpolate_trajectory",

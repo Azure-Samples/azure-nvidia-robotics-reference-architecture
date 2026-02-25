@@ -17,9 +17,7 @@ from src.api.models.annotations import (
 )
 
 
-def create_test_annotation(
-    episode_index: int, user_id: str = "test-user"
-) -> EpisodeAnnotationFile:
+def create_test_annotation(episode_index: int, user_id: str = "test-user") -> EpisodeAnnotationFile:
     """Create a test annotation file."""
     now = datetime.utcnow()
     annotation = EpisodeAnnotation(

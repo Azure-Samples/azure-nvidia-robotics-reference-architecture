@@ -96,9 +96,7 @@ class TestListEpisodes:
     @pytest.mark.asyncio
     async def test_filter_has_annotations_false(self, service):
         """With no annotations saved, all episodes should appear."""
-        episodes = await service.list_episodes(
-            DATASET_ID, has_annotations=False
-        )
+        episodes = await service.list_episodes(DATASET_ID, has_annotations=False)
         assert len(episodes) == 64
 
     @pytest.mark.asyncio
@@ -142,9 +140,10 @@ class TestGetEpisode:
     async def test_episode_has_video_urls(self, service):
         ep = await service.get_episode(DATASET_ID, 0)
         assert "observation.images.il-camera" in ep.video_urls
-        assert f"/api/datasets/{DATASET_ID}/episodes/0/video/" in ep.video_urls[
-            "observation.images.il-camera"
-        ]
+        assert (
+            f"/api/datasets/{DATASET_ID}/episodes/0/video/"
+            in ep.video_urls["observation.images.il-camera"]
+        )
 
     @pytest.mark.asyncio
     async def test_trajectory_length_matches_meta(self, service):
@@ -182,9 +181,7 @@ class TestVideoFilePath:
 
     def test_get_video_file_path(self, service):
         service._discover_dataset(DATASET_ID)
-        path = service.get_video_file_path(
-            DATASET_ID, 0, "observation.images.il-camera"
-        )
+        path = service.get_video_file_path(DATASET_ID, 0, "observation.images.il-camera")
         assert path is not None
         assert os.path.isfile(path)
         assert path.endswith(".mp4")

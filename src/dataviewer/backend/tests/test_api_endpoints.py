@@ -5,8 +5,6 @@ Tests the full HTTP round-trip through FastAPI routes, verifying response
 schemas, status codes, pagination, and data integrity.
 """
 
-import pytest
-
 from .conftest import TEST_DATASET_ID
 
 DATASET_ID = TEST_DATASET_ID
@@ -198,7 +196,5 @@ class TestGetVideo:
         assert "video" in resp.headers.get("content-type", "")
 
     def test_video_nonexistent_camera(self, client):
-        resp = client.get(
-            f"/api/datasets/{DATASET_ID}/episodes/0/video/fake_camera"
-        )
+        resp = client.get(f"/api/datasets/{DATASET_ID}/episodes/0/video/fake_camera")
         assert resp.status_code == 404
