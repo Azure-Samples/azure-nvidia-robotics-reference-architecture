@@ -163,11 +163,11 @@ All future enhancements, features, and functionality align to the eight lifecycl
 
 Domains roll out in three phases based on dependency order and infrastructure readiness:
 
-| Phase | Timeline      | Domains                                              |
-|-------|---------------|------------------------------------------------------|
-| 1     | Q2 2026       | Infrastructure, Training, Evaluation                 |
-| 2     | Q2 2026       | Data Pipeline, Data Management, Synthetic Data       |
-| 3     | Q3 2026       | Fleet Deployment, Fleet Intelligence                 |
+| Phase | Timeline | Domains                                        |
+|-------|----------|------------------------------------------------|
+| 1     | Q2 2026  | Infrastructure, Training, Evaluation           |
+| 2     | Q2 2026  | Data Pipeline, Data Management, Synthetic Data |
+| 3     | Q3 2026  | Fleet Deployment, Fleet Intelligence           |
 
 Phase 1 migrates existing `deploy/` and `src/` content into the Infrastructure and Training domains, then establishes the Evaluation domain for SiL and HiL validation pipelines. Phase 2 introduces data capture from physical robots, episodic data curation, and synthetic data generation using NVIDIA Cosmos. Phase 3 adds edge deployment through FluxCD GitOps and production telemetry through Azure IoT Operations and Fabric Real-Time Intelligence.
 
@@ -261,8 +261,8 @@ Q1 2027 (Jan-Mar) — Sustainability
 
 ## Version History
 
-| Date       | Version | Notes                                                     |
-|------------|---------|-----------------------------------------------------------|
-| 2026-02-10 | 1.0     | Initial 12-month roadmap                                  |
-| 2026-02-10 | 1.1     | Extend timeline to Q1 2027 for OpenSSF 12-month coverage  |
-| 2026-02-24 | 1.2     | Add Architecture Domain Rollout priority and timeline     |
+| Date       | Version | Notes                                                    |
+|------------|---------|----------------------------------------------------------|
+| 2026-02-10 | 1.0     | Initial 12-month roadmap                                 |
+| 2026-02-10 | 1.1     | Extend timeline to Q1 2027 for OpenSSF 12-month coverage |
+| 2026-02-24 | 1.2     | Add Architecture Domain Rollout priority and timeline    |

@@ -161,7 +161,7 @@ module "sil" {
     system_node_pool_max_count           = var.system_node_pool_max_count
     is_private_cluster                   = var.should_enable_private_aks_cluster
     system_node_pool_zones               = var.system_node_pool_zones
-    should_enable_microsoft_defender      = var.should_enable_microsoft_defender
+    should_enable_microsoft_defender     = var.should_enable_microsoft_defender
   }
 
   node_pools = var.node_pools

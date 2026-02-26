@@ -295,13 +295,13 @@ Root Module (001-iac/)
 
 ### Conditional Resources
 
-| Condition                            | Resources Created                                        |
-|--------------------------------------|----------------------------------------------------------|
-| `should_enable_private_endpoint`     | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS    |
-| `should_enable_nat_gateway`          | NAT Gateway, Public IP, subnet associations              |
-| `should_enable_microsoft_defender`   | Microsoft Defender for Containers on the AKS cluster     |
-| `should_deploy_postgresql`           | PostgreSQL server, databases, delegated subnet, DNS zone |
-| `should_deploy_redis`               | Redis cache, private endpoint (if PE enabled), DNS zone  |
+| Condition                          | Resources Created                                        |
+|------------------------------------|----------------------------------------------------------|
+| `should_enable_private_endpoint`   | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS    |
+| `should_enable_nat_gateway`        | NAT Gateway, Public IP, subnet associations              |
+| `should_enable_microsoft_defender` | Microsoft Defender for Containers on the AKS cluster     |
+| `should_deploy_postgresql`         | PostgreSQL server, databases, delegated subnet, DNS zone |
+| `should_deploy_redis`              | Redis cache, private endpoint (if PE enabled), DNS zone  |
 
 ## 📦 Modules
 

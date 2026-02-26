@@ -187,10 +187,10 @@ See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_
 
 RTX PRO 6000 BSE nodes use SR-IOV vGPU passthrough and require the Microsoft GRID driver instead of the NVIDIA datacenter driver. The deploy script detects nodes labeled `nvidia.com/gpu.deploy.driver=false` (set via Terraform `node_labels`) and applies a DaemonSet that installs the GRID driver on each matching node.
 
-| Component              | Path                                                                     |
-|------------------------|--------------------------------------------------------------------------|
-| DaemonSet manifest     | `manifests/gpu-grid-driver-installer.yaml`                               |
-| Node label (Terraform) | `node_labels = { "nvidia.com/gpu.deploy.driver" = "false" }`             |
+| Component              | Path                                                         |
+|------------------------|--------------------------------------------------------------|
+| DaemonSet manifest     | `manifests/gpu-grid-driver-installer.yaml`                   |
+| Node label (Terraform) | `node_labels = { "nvidia.com/gpu.deploy.driver" = "false" }` |
 
 The DaemonSet uses an init container that runs `nsenter` into the host namespace to download and compile the Microsoft GRID driver (`580.105.08-grid-azure`). After installation, the GPU Operator's toolkit, device-plugin, and validator detect the pre-installed driver. New nodes added by the cluster autoscaler receive the driver automatically.
 
@@ -210,13 +210,13 @@ For development and testing with a locally-built OSMO CLI, use `osmo-dev.sh` dir
 
 ### Prerequisites
 
-| Requirement | Purpose |
-|-------------|---------|
-| OSMO repository clone | CLI source code from GitHub |
-| Bazel | Builds and runs the CLI from source |
+| Requirement                  | Purpose                              |
+|------------------------------|--------------------------------------|
+| OSMO repository clone        | CLI source code from GitHub          |
+| Bazel                        | Builds and runs the CLI from source  |
 | `OSMO_SOURCE_DIR` configured | Points to the cloned OSMO repository |
 
-### Setup
+### Local OSMO Setup
 
 1. Clone the OSMO repository:
 
@@ -224,7 +224,7 @@ For development and testing with a locally-built OSMO CLI, use `osmo-dev.sh` dir
 git clone https://github.com/NVIDIA/OSMO.git ~/osmo
 ```
 
-2. Create `.env.local` at the repository root and set `OSMO_SOURCE_DIR`:
+1. Create `.env.local` at the repository root and set `OSMO_SOURCE_DIR`:
 
 ```bash
 cp .env.local.example .env.local
@@ -237,7 +237,7 @@ OSMO_SOURCE_DIR=~/osmo
 
 Use an absolute path or `~` for home directory. Relative paths are not supported.
 
-3. Install Bazel (if not already installed):
+1. Install Bazel (if not already installed):
 
 ```bash
 brew install bazel
@@ -432,12 +432,12 @@ kubectl describe sa osmo-service -n osmo-control-plane
 
 ## 🧩 Optional Scripts
 
-| Script                                    | Purpose                               |
-|-------------------------------------------|---------------------------------------|
-| `optional/osmo-dev.sh`                    | Run OSMO CLI from source via Bazel    |
-| `optional/deploy-volcano-scheduler.sh`    | Volcano (alternative to KAI)          |
-| `optional/uninstall-volcano-scheduler.sh` | Uninstall Volcano scheduler           |
-| `optional/add-user-to-platform.sh`        | Add user to OSMO platform             |
+| Script                                    | Purpose                            |
+|-------------------------------------------|------------------------------------|
+| `optional/osmo-dev.sh`                    | Run OSMO CLI from source via Bazel |
+| `optional/deploy-volcano-scheduler.sh`    | Volcano (alternative to KAI)       |
+| `optional/uninstall-volcano-scheduler.sh` | Uninstall Volcano scheduler        |
+| `optional/add-user-to-platform.sh`        | Add user to OSMO platform          |
 
 ## 🗑️ Cleanup
 

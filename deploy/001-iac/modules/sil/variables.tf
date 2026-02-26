@@ -66,7 +66,7 @@ variable "aks_config" {
     system_node_pool_max_count           = optional(number)
     is_private_cluster                   = bool
     system_node_pool_zones               = optional(list(string))
-    should_enable_microsoft_defender      = optional(bool, false)
+    should_enable_microsoft_defender     = optional(bool, false)
   })
   description = "AKS cluster configuration for the system node pool"
   default = {

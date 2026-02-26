@@ -36,10 +36,10 @@ Training scripts and Python code act as integration shims between NVIDIA's open-
 
 The root `pyproject.toml` and `requirements.txt` serve a dual purpose:
 
-| Context           | Usage                                                                                           |
-|-------------------|-------------------------------------------------------------------------------------------------|
-| OSMO/AzureML jobs | Installing additional dependencies not bundled with the Isaac Lab container image at startup    |
-| Local development | Providing module availability for intellisense and local verification                           |
+| Context           | Usage                                                                                        |
+|-------------------|----------------------------------------------------------------------------------------------|
+| OSMO/AzureML jobs | Installing additional dependencies not bundled with the Isaac Lab container image at startup |
+| Local development | Providing module availability for intellisense and local verification                        |
 
 These files are not intended for building publishable Python packages. The `pyproject.toml` build target only packages `src/training` into a wheel for in-container use.
 
@@ -51,16 +51,16 @@ This codebase will reorganize around eight lifecycle domains for robotics and ph
 
 Each domain maps to a root-level directory in this repository. Domains that require Azure infrastructure beyond what `infrastructure/` provides maintain their own IaC subdirectories.
 
-| Domain              | Directory              | Scope                                                                       |
-|---------------------|------------------------|-----------------------------------------------------------------------------|
-| Infrastructure      | `infrastructure/`      | Shared Azure services: AKS, AzureML, networking, storage, observability     |
-| Data Pipeline       | `data-pipeline/`       | Robot-to-cloud data capture via Azure Arc and ROS 2 episodic recording      |
-| Data Management     | `data-management/`     | Episodic data viewer, labeling, dataset curation, and job orchestration     |
-| Synthetic Data      | `synthetic-data/`      | SDG pipelines leveraging NVIDIA Cosmos world foundation models              |
-| Training            | `training/`            | Policy training, packaging to TensorRT/ONNX, and model registration         |
-| Evaluation          | `evaluation/`          | Software-in-the-loop and hardware-in-the-loop validation pipelines          |
-| Fleet Deployment    | `fleet-deployment/`    | Edge deployment via FluxCD GitOps on Azure Arc-enabled Kubernetes           |
-| Fleet Intelligence  | `fleet-intelligence/`  | Production telemetry, on-robot policy analytics, and fleet health reporting |
+| Domain             | Directory             | Scope                                                                       |
+|--------------------|-----------------------|-----------------------------------------------------------------------------|
+| Infrastructure     | `infrastructure/`     | Shared Azure services: AKS, AzureML, networking, storage, observability     |
+| Data Pipeline      | `data-pipeline/`      | Robot-to-cloud data capture via Azure Arc and ROS 2 episodic recording      |
+| Data Management    | `data-management/`    | Episodic data viewer, labeling, dataset curation, and job orchestration     |
+| Synthetic Data     | `synthetic-data/`     | SDG pipelines leveraging NVIDIA Cosmos world foundation models              |
+| Training           | `training/`           | Policy training, packaging to TensorRT/ONNX, and model registration         |
+| Evaluation         | `evaluation/`         | Software-in-the-loop and hardware-in-the-loop validation pipelines          |
+| Fleet Deployment   | `fleet-deployment/`   | Edge deployment via FluxCD GitOps on Azure Arc-enabled Kubernetes           |
+| Fleet Intelligence | `fleet-intelligence/` | Production telemetry, on-robot policy analytics, and fleet health reporting |
 
 ### Infrastructure
 
@@ -186,13 +186,13 @@ Each domain will contain specification documents alongside working examples. The
 
 Every domain directory will include:
 
-| Artifact                              | Purpose                                                                                     |
-|---------------------------------------|---------------------------------------------------------------------------------------------|
-| `README.md`                           | Domain overview, quick start, and usage guide                                               |
-| `examples/`                           | Complete, runnable examples with code, scripts, and configurations                          |
-| `specifications/`                     | Domain specifications describing capabilities, inputs, outputs, and contracts               |
-| `specifications/*.specification.md`   | Individual specifications that Agent Skills consume to generate customized implementations  |
-| `.github/skills/`                     | Agent Skill definitions referencing the domain's specifications                             |
+| Artifact                            | Purpose                                                                                    |
+|-------------------------------------|--------------------------------------------------------------------------------------------|
+| `README.md`                         | Domain overview, quick start, and usage guide                                              |
+| `examples/`                         | Complete, runnable examples with code, scripts, and configurations                         |
+| `specifications/`                   | Domain specifications describing capabilities, inputs, outputs, and contracts              |
+| `specifications/*.specification.md` | Individual specifications that Agent Skills consume to generate customized implementations |
+| `.github/skills/`                   | Agent Skill definitions referencing the domain's specifications                            |
 
 Domain documentation lives under the root `docs/` directory rather than inside each domain folder. Each domain has a corresponding subdirectory at `docs/<domain>/` containing detailed guidance, architecture decisions, and tutorials.
 

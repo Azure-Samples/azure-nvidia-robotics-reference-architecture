@@ -12,15 +12,15 @@ GPU driver management, MIG configuration, and runtime behavior for the mixed GPU
 
 This cluster uses two GPU node pool types with different driver and runtime profiles.
 
-| Property | H100 (`h100gpu`) | RTX PRO 6000 (`rtxprogpu`) |
-| --- | --- | --- |
-| Azure VM SKU | `Standard_NC40ads_H100_v5` | `Standard_NC128ds_xl_RTXPRO6000BSE_v6` |
-| GPU passthrough | PCIe passthrough | SR-IOV vGPU (PCI ID `10de:2bb5`) |
-| Driver source | GPU Operator datacenter driver | Custom GRID DaemonSet (`gpu-grid-driver-installer`) |
-| Driver branch | Standard datacenter | Microsoft GRID `580.105.08-grid-azure` |
-| MIG at hardware level | Disabled | Enabled by vGPU host |
-| Vulkan device creation | Supported | Supported (requires `NVIDIA_DRIVER_CAPABILITIES=all`) |
-| Kernel module type | Open (default) | Proprietary (required for vGPU) |
+| Property               | H100 (`h100gpu`)               | RTX PRO 6000 (`rtxprogpu`)                            |
+|------------------------|--------------------------------|-------------------------------------------------------|
+| Azure VM SKU           | `Standard_NC40ads_H100_v5`     | `Standard_NC128ds_xl_RTXPRO6000BSE_v6`                |
+| GPU passthrough        | PCIe passthrough               | SR-IOV vGPU (PCI ID `10de:2bb5`)                      |
+| Driver source          | GPU Operator datacenter driver | Custom GRID DaemonSet (`gpu-grid-driver-installer`)   |
+| Driver branch          | Standard datacenter            | Microsoft GRID `580.105.08-grid-azure`                |
+| MIG at hardware level  | Disabled                       | Enabled by vGPU host                                  |
+| Vulkan device creation | Supported                      | Supported (requires `NVIDIA_DRIVER_CAPABILITIES=all`) |
+| Kernel module type     | Open (default)                 | Proprietary (required for vGPU)                       |
 
 ## GPU Driver Management
 
@@ -49,10 +49,10 @@ The GPU Operator `mig.strategy` setting controls how GPUs are exposed to workloa
 
 The Azure vGPU host enables MIG mode on RTX PRO 6000 GPUs. When MIG is enabled at the hardware level, CUDA can only access the GPU through MIG device UUIDs, not bare GPU UUIDs.
 
-| Strategy | Device-plugin sets `NVIDIA_VISIBLE_DEVICES` to | CUDA result |
-| --- | --- | --- |
-| `single` | `MIG-<uuid>` (MIG device UUID) | Works |
-| `none` | `GPU-<uuid>` (bare GPU UUID) | Fails: `cuInit` returns `CUDA_ERROR_NO_DEVICE` |
+| Strategy | Device-plugin sets `NVIDIA_VISIBLE_DEVICES` to | CUDA result                                    |
+|----------|------------------------------------------------|------------------------------------------------|
+| `single` | `MIG-<uuid>` (MIG device UUID)                 | Works                                          |
+| `none`   | `GPU-<uuid>` (bare GPU UUID)                   | Fails: `cuInit` returns `CUDA_ERROR_NO_DEVICE` |
 
 With `strategy: none`, `nvidia-smi` works (it uses NVML, which is MIG-agnostic) but PyTorch/CUDA applications cannot initialize the GPU.
 
@@ -84,12 +84,12 @@ environment:
   NVIDIA_DRIVER_CAPABILITIES: "all"
 ```
 
-| Capability | APIs provided | Required by |
-| --- | --- | --- |
-| `compute` | CUDA, OpenCL | All GPU workloads |
-| `utility` | `nvidia-smi`, NVML | Monitoring |
-| `graphics` | Vulkan, OpenGL | Isaac Sim rendering and shutdown |
-| `all` | All of the above plus video/display | Recommended for simplicity |
+| Capability | APIs provided                       | Required by                      |
+|------------|-------------------------------------|----------------------------------|
+| `compute`  | CUDA, OpenCL                        | All GPU workloads                |
+| `utility`  | `nvidia-smi`, NVML                  | Monitoring                       |
+| `graphics` | Vulkan, OpenGL                      | Isaac Sim rendering and shutdown |
+| `all`      | All of the above plus video/display | Recommended for simplicity       |
 
 ### RTX PRO 6000 vGPU Profile
 
@@ -152,7 +152,7 @@ All training scripts call `prepare_for_shutdown()` from [`simulation_shutdown.py
 2. Unsubscribes the `_app_control_on_stop_handle` callback entirely, removing it from the timeline event stream so it cannot fire during Kit shutdown.
 3. Forks a watchdog process that sends `SIGKILL` after 30 seconds as a safety net. A forked process is required because neither Python threads nor `SIGALRM` signal handlers can execute while native C code holds the GIL.
 
-`detach_stage()` and `sim.stop()` are intentionally omitted. On vGPU nodes where Vulkan initialization fails (`vkCreateDevice` returns `ERROR_INITIALIZATION_FAILED`), both calls block indefinitely in native C code while holding the GIL. `detach_stage()` targets in-memory stages introduced in Isaac Sim 5.0 and has no effect on standard USD stages. `sim.stop()` triggers the timeline STOP event, which enters the Omniverse event dispatch layer and never returns when the rendering subsystem is in a degraded state.
+`detach_stage()` and `sim.stop()` are intentionally omitted. On vGPU nodes where Vulkan initialization fails (`vkCreateDevice` returns `ERROR_INITIALIZATION_FAILED`), both calls block indefinitely in native C code while holding the GIL. `detach_stage()` targets in-memory stages introduced in Isaac Sim 5.0 and has no effect on standard USD stages. `sim.stop()` triggers the timeline STOP event, which enters the Omniverse event dispatch layer and never returns when the rendering subsystem is degraded.
 
 After `env.close()`, training scripts call `os._exit(0)` instead of `simulation_app.close()`. Kit's native shutdown sequence also hangs on vGPU nodes with failed Vulkan initialization, and in a Kubernetes training pod the container runtime handles resource cleanup.
 
