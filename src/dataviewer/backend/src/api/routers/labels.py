@@ -110,9 +110,7 @@ async def get_episode_labels(dataset_id: str, episode_idx: int) -> EpisodeLabels
 
 
 @router.put("/{dataset_id}/episodes/{episode_idx}/labels")
-async def set_episode_labels(
-    dataset_id: str, episode_idx: int, body: BulkLabelUpdate
-) -> EpisodeLabels:
+async def set_episode_labels(dataset_id: str, episode_idx: int, body: BulkLabelUpdate) -> EpisodeLabels:
     """Set labels for a specific episode (replaces existing labels)."""
     labels_file = await _load_labels(dataset_id)
     key = str(episode_idx)

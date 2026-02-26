@@ -171,8 +171,7 @@ class DetectionService:
         # Load image
         image = Image.open(BytesIO(image_bytes))
         print(
-            f"[DETECT] Frame {frame_idx}: size={image.size}, "
-            f"mode={image.mode}, bytes={len(image_bytes)}",
+            f"[DETECT] Frame {frame_idx}: size={image.size}, mode={image.mode}, bytes={len(image_bytes)}",
             file=sys.stderr,
             flush=True,
         )
@@ -205,19 +204,14 @@ class DetectionService:
                 classes = [int(c.item()) for c in boxes.cls]
                 confs = [float(c.item()) for c in boxes.conf]
                 print(
-                    f"[DETECT] Frame {frame_idx}: classes={classes}, "
-                    f"confidences={[f'{c:.3f}' for c in confs]}",
+                    f"[DETECT] Frame {frame_idx}: classes={classes}, confidences={[f'{c:.3f}' for c in confs]}",
                     file=sys.stderr,
                     flush=True,
                 )
 
                 for i in range(len(boxes)):
                     class_id = int(boxes.cls[i].item())
-                    class_name = (
-                        COCO_CLASSES[class_id]
-                        if class_id < len(COCO_CLASSES)
-                        else f"class_{class_id}"
-                    )
+                    class_name = COCO_CLASSES[class_id] if class_id < len(COCO_CLASSES) else f"class_{class_id}"
                     conf = float(boxes.conf[i].item())
                     x1, y1, x2, y2 = boxes.xyxy[i].tolist()
                     detections.append(
@@ -254,8 +248,7 @@ class DetectionService:
         import sys
 
         print(
-            f"[DETECT] Starting: dataset={dataset_id}, "
-            f"episode={episode_idx}, frames={total_frames}",
+            f"[DETECT] Starting: dataset={dataset_id}, episode={episode_idx}, frames={total_frames}",
             file=sys.stderr,
             flush=True,
         )
@@ -317,8 +310,7 @@ class DetectionService:
 
         total_dets = sum(len(r.detections) for r in results_by_frame)
         print(
-            f"[DETECT] Complete: processed={len(results_by_frame)}, "
-            f"skipped={skipped_frames}, detections={total_dets}",
+            f"[DETECT] Complete: processed={len(results_by_frame)}, skipped={skipped_frames}, detections={total_dets}",
             file=sys.stderr,
             flush=True,
         )
