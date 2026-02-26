@@ -32,6 +32,12 @@ WORKFLOW OPTIONS:
     -i, --image IMAGE             Container image (default: nvcr.io/nvidia/isaac-lab:2.3.2)
     -b, --backend BACKEND         Training backend: skrl (default), rsl_rl
 
+RESOURCE OPTIONS:
+        --gpu COUNT               Number of GPUs (default: 1)
+        --cpu COUNT               CPU cores (default: 30)
+        --memory SIZE             Memory with unit (default: 400Gi)
+        --storage SIZE            Storage with unit (default: 200Gi)
+
 DATASET OPTIONS:
         --dataset-bucket NAME     OSMO bucket name (default: training)
         --dataset-name NAME       Dataset name (default: training-code)
@@ -103,6 +109,11 @@ max_iterations="${MAX_ITERATIONS:-}"
 image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.3.2}"
 backend="${TRAINING_BACKEND:-skrl}"
 
+gpu="${OSMO_GPU:-1}"
+cpu="${OSMO_CPU:-30}"
+memory="${OSMO_MEMORY:-400Gi}"
+storage="${OSMO_STORAGE:-200Gi}"
+
 # Dataset configuration
 dataset_bucket="${OSMO_DATASET_BUCKET:-training}"
 dataset_name="${OSMO_DATASET_NAME:-training-code}"
@@ -134,6 +145,10 @@ while [[ $# -gt 0 ]]; do
     -m|--max-iterations)          max_iterations="$2"; shift 2 ;;
     -i|--image)                   image="$2"; shift 2 ;;
     -b|--backend)                 backend="$2"; shift 2 ;;
+    --gpu)                        gpu="$2"; shift 2 ;;
+    --cpu)                        cpu="$2"; shift 2 ;;
+    --memory)                     memory="$2"; shift 2 ;;
+    --storage)                    storage="$2"; shift 2 ;;
     --dataset-bucket)             dataset_bucket="$2"; shift 2 ;;
     --dataset-name)               dataset_name="$2"; shift 2 ;;
     --training-path)              training_path="$2"; shift 2 ;;
@@ -215,6 +230,10 @@ submit_args=(
   "checkpoint_mode=$checkpoint_mode"
   "register_checkpoint=$register_checkpoint"
   "training_backend=$backend"
+  "gpu=$gpu"
+  "cpu=$cpu"
+  "memory=$memory"
+  "storage=$storage"
   "dataset_bucket=$dataset_bucket"
   "dataset_name=$dataset_name"
   "training_localpath=$rel_training_path"

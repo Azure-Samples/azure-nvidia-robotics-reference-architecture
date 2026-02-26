@@ -4,10 +4,10 @@ workflow:
     exec_timeout: 23h
   resources:
     default:
-      gpu: 1
-      cpu: 120
-      memory: 480Gi
-      storage: 200Gi
+      gpu: {{ gpu }}
+      cpu: {{ cpu }}
+      memory: {{ memory }}
+      storage: {{ storage }}
   tasks:
     - name: isaac-training
       image: "{{ image }}"
@@ -100,4 +100,8 @@ default-values:
   checkpoint_mode: "from-scratch"
   register_checkpoint: ""
   training_backend: "skrl"
+  gpu: "1"
+  cpu: "30"
+  memory: 400Gi
+  storage: 200Gi
 

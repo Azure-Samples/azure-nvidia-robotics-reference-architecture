@@ -4,10 +4,10 @@ workflow:
     exec_timeout: 1h
   resources:
     default:
-      gpu: 1
-      cpu: 120
-      memory: 480Gi
-      storage: 200Gi
+      gpu: {{ gpu }}
+      cpu: {{ cpu }}
+      memory: {{ memory }}
+      storage: {{ storage }}
   tasks:
     - name: skrl-training-test
       image: "{{ image }}"
@@ -77,3 +77,7 @@ default-values:
   dataset_bucket: training
   dataset_name: training-code
   training_localpath: ""
+  gpu: "1"
+  cpu: "30"
+  memory: 400Gi
+  storage: 200Gi

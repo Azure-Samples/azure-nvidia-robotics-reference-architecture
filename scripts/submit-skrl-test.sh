@@ -22,6 +22,10 @@ OPTIONS:
     -n, --num-envs COUNT      Number of environments (default: 16)
     -m, --max-iterations N    Maximum iterations (default: 5)
     -i, --image IMAGE         Container image (default: nvcr.io/nvidia/isaac-lab:2.3.2)
+        --gpu COUNT           Number of GPUs (default: 1)
+        --cpu COUNT           CPU cores (default: 30)
+        --memory SIZE         Memory with unit (default: 400Gi)
+        --storage SIZE        Storage with unit (default: 200Gi)
         --use-local-osmo      Use local osmo-dev CLI
     -h, --help                Show this help message
 EOF
@@ -31,6 +35,10 @@ task="${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}"
 num_envs="${NUM_ENVS:-16}"
 max_iterations="${MAX_ITERATIONS:-5}"
 image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.3.2}"
+gpu="${OSMO_GPU:-1}"
+cpu="${OSMO_CPU:-30}"
+memory="${OSMO_MEMORY:-400Gi}"
+storage="${OSMO_STORAGE:-200Gi}"
 use_local_osmo=false
 
 while [[ $# -gt 0 ]]; do
@@ -40,6 +48,10 @@ while [[ $# -gt 0 ]]; do
     -n|--num-envs)       num_envs="$2"; shift 2 ;;
     -m|--max-iterations) max_iterations="$2"; shift 2 ;;
     -i|--image)          image="$2"; shift 2 ;;
+    --gpu)               gpu="$2"; shift 2 ;;
+    --cpu)               cpu="$2"; shift 2 ;;
+    --memory)            memory="$2"; shift 2 ;;
+    --storage)           storage="$2"; shift 2 ;;
     --use-local-osmo)    use_local_osmo=true; shift ;;
     *)                   fatal "Unknown option: $1" ;;
   esac
@@ -86,6 +98,10 @@ osmo workflow submit "$workflow" \
   "task=$task" \
   "num_envs=$num_envs" \
   "max_iterations=$max_iterations" \
+  "gpu=$gpu" \
+  "cpu=$cpu" \
+  "memory=$memory" \
+  "storage=$storage" \
   "training_localpath=$rel_training_path"
 
 info "SKRL test workflow submitted"

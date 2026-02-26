@@ -29,6 +29,12 @@ WORKFLOW OPTIONS:
     -p, --payload-root DIR        Runtime extraction root (default: /workspace/isaac_payload)
     -b, --backend BACKEND         Training backend: skrl (default), rsl_rl
 
+RESOURCE OPTIONS:
+        --gpu COUNT               Number of GPUs (default: 1)
+        --cpu COUNT               CPU cores (default: 30)
+        --memory SIZE             Memory with unit (default: 400Gi)
+        --storage SIZE            Storage with unit (default: 200Gi)
+
 CHECKPOINT OPTIONS:
     -c, --checkpoint-uri URI      MLflow checkpoint artifact URI
     -M, --checkpoint-mode MODE    from-scratch, warm-start, resume, fresh (default: from-scratch)
@@ -86,6 +92,11 @@ image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.3.2}"
 payload_root="${PAYLOAD_ROOT:-/workspace/isaac_payload}"
 backend="${TRAINING_BACKEND:-skrl}"
 
+gpu="${OSMO_GPU:-1}"
+cpu="${OSMO_CPU:-30}"
+memory="${OSMO_MEMORY:-400Gi}"
+storage="${OSMO_STORAGE:-200Gi}"
+
 checkpoint_uri="${CHECKPOINT_URI:-}"
 checkpoint_mode="${CHECKPOINT_MODE:-from-scratch}"
 register_checkpoint="${REGISTER_CHECKPOINT:-}"
@@ -114,6 +125,10 @@ while [[ $# -gt 0 ]]; do
     -i|--image)                   image="$2"; shift 2 ;;
     -p|--payload-root)            payload_root="$2"; shift 2 ;;
     -b|--backend)                 backend="$2"; shift 2 ;;
+    --gpu)                        gpu="$2"; shift 2 ;;
+    --cpu)                        cpu="$2"; shift 2 ;;
+    --memory)                     memory="$2"; shift 2 ;;
+    --storage)                    storage="$2"; shift 2 ;;
     -c|--checkpoint-uri)          checkpoint_uri="$2"; shift 2 ;;
     -M|--checkpoint-mode)         checkpoint_mode="$2"; shift 2 ;;
     -r|--register-checkpoint)     register_checkpoint="$2"; shift 2 ;;
@@ -200,6 +215,10 @@ submit_args=(
   "register_checkpoint=$register_checkpoint"
   "sleep_after_unpack=$sleep_after_unpack"
   "training_backend=$backend"
+  "gpu=$gpu"
+  "cpu=$cpu"
+  "memory=$memory"
+  "storage=$storage"
 )
 
 [[ -n "$subscription_id" ]] && submit_args+=("azure_subscription_id=$subscription_id")

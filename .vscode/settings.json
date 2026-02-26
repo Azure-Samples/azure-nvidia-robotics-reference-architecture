@@ -115,11 +115,10 @@
         "tag:yaml.org,2002:python/name:pymdownx.superfences.fence_code_format",
         "tag:yaml.org,2002:python/object/apply:pymdownx.slugs.slugify mapping"
     ],
-    "github.copilot.chat.agent.thinkingTool": true,
     "github.copilot.chat.codesearch.enabled": true,
     "github.copilot.chat.commitMessageGeneration.instructions": [
-        {
-            "file": "./.github/instructions/commit-message.instructions.md"
-        }
+      {
+          "file": "./.github/instructions/commit-message.instructions.md"
+      }
     ],
 }
