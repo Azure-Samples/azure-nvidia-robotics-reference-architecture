@@ -86,91 +86,9 @@ done
 
 require_tools az terraform kubectl helm jq openssl envsubst
 
-is_prerelease_tag() {
-  local tag="${1:?image tag required}"
-  [[ "$tag" =~ (rc|beta|alpha) ]]
-}
-
-validate_version_pair() {
-  [[ -n "$chart_version" ]] || fatal "Chart version cannot be empty"
-  [[ -n "$image_version" ]] || fatal "Image version cannot be empty"
-
-  if [[ "$chart_version_set" != "$image_version_set" ]]; then
-    fatal "Use --chart-version and --image-version together to keep a tested chart/image pair"
-  fi
-
-  if is_prerelease_tag "$image_version"; then
-    if [[ "$chart_version" != "$OSMO_PRERELEASE_CHART_VERSION" || "$image_version" != "$OSMO_PRERELEASE_IMAGE_VERSION" ]]; then
-      fatal "Unsupported prerelease pair: chart=${chart_version}, image=${image_version}. Set OSMO_PRERELEASE_CHART_VERSION/OSMO_PRERELEASE_IMAGE_VERSION to a tested pair, then retry."
-    fi
-
-    if [[ "$OSMO_USE_PRERELEASE" != "true" && "$chart_version_set" != "true" ]]; then
-      fatal "Prerelease image requires explicit opt-in. Set OSMO_USE_PRERELEASE=true or provide both --chart-version and --image-version."
-    fi
-  fi
-}
-
-verify_chart_exists() {
-  local chart_ref="${1:?chart reference required}"
-  helm show chart "$chart_ref" --version "$chart_version" >/dev/null 2>&1 || \
-    fatal "Chart ${chart_ref}:${chart_version} not found. For prerelease fallback, set OSMO_PRERELEASE_* to the previous tested pair and retry."
-}
-
-verify_image_exists() {
-  local image_name="${1:?image name required}"
-  if [[ "$use_acr" == "true" ]]; then
-    az acr repository show-tags --name "$acr_name" --repository "osmo/${image_name}" --query "contains(@, '${image_version}')" -o tsv | grep -qi '^true$' || \
-      fatal "Image osmo/${image_name}:${image_version} not found in ACR ${acr_name}. Import the image or use a tested prerelease fallback pair."
-    return
-  fi
-
-  if command -v docker >/dev/null 2>&1; then
-    if ! docker manifest inspect "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1; then
-      if is_prerelease_tag "$image_version"; then
-        warn "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not verified. Prerelease images may require NGC authentication (docker login nvcr.io)."
-      else
-        fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
-      fi
-    fi
-    return
-  fi
-
-  if command -v crane >/dev/null 2>&1; then
-    if ! crane manifest "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1; then
-      if is_prerelease_tag "$image_version"; then
-        warn "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not verified. Prerelease images may require NGC authentication."
-      else
-        fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
-      fi
-    fi
-    return
-  fi
-
-  if is_prerelease_tag "$image_version"; then
-    warn "Cannot validate nvcr.io image tag without docker or crane. Prerelease images may require NGC authentication or --use-acr."
-  fi
-
-  warn "Skipping nvcr.io image preflight for ${image_name}:${image_version} because docker/crane is unavailable"
-}
-
 run_preflight_checks() {
   section "Preflight Version Checks"
-  validate_version_pair
-
-  if [[ "$use_acr" == "true" ]]; then
-    verify_chart_exists "oci://${acr_login_server}/helm/service"
-    verify_chart_exists "oci://${acr_login_server}/helm/router"
-    verify_chart_exists "oci://${acr_login_server}/helm/web-ui"
-  else
-    verify_chart_exists "osmo/service"
-    verify_chart_exists "osmo/router"
-    verify_chart_exists "osmo/web-ui"
-  fi
-
-  control_plane_images=(service router web-ui worker logger agent client init-container authz-sidecar delayed-job-monitor)
-  for image_name in "${control_plane_images[@]}"; do
-    verify_image_exists "$image_name"
-  done
+  validate_version_pair "$chart_version" "$image_version" "$chart_version_set" "$image_version_set"
 }
 
 #------------------------------------------------------------------------------
@@ -381,7 +299,7 @@ fi
 
 # Deploy web-ui
 info "Deploying osmo/web-ui..."
-helm_args=("${base_helm_args[@]}" -f "$ui_values")
+helm_args=("${base_helm_args[@]}" -f "$ui_values" --set "services.ui.apiHostname=osmo-service.${NS_OSMO_CONTROL_PLANE}.svc.cluster.local:80")
 
 if [[ "$use_acr" == "true" ]]; then
   helm upgrade -i ui "oci://${acr_login_server}/helm/web-ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
@@ -402,8 +320,7 @@ if [[ "$skip_service_config" == "false" ]]; then
     [[ -f "$service_config_template" ]] || fatal "Service config template not found: $service_config_template"
     export SERVICE_BASE_URL="$service_url"
     envsubst < "$service_config_template" > "$CONFIG_DIR/out/service-config.json"
-    info "Logging into OSMO at ${service_url}..."
-    osmo login "${service_url}/" --method dev --username guest
+    osmo_login_and_setup "$service_url"
     info "Applying service configuration (service_base_url: $service_url)..."
     osmo config update SERVICE --file "$CONFIG_DIR/out/service-config.json" --description "Set service base URL for UI"
   else

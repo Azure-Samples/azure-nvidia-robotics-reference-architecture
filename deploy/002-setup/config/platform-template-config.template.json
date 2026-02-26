@@ -4,7 +4,10 @@
             "tolerations": [],
             "nodeSelector": {
                 "node.kubernetes.io/instance-type": ""
-            }
+            },
+            "volumes": [],
+            "initContainers": [],
+            "env": []
         }
     },
     "pool_platform": {

@@ -33,8 +33,6 @@
             "ghcr.io",
             "${ACR_LOGIN_SERVER}"
         ],
-        "disable_data_validation": [
-            "azure"
-        ]
+        "disable_data_validation": []
     }
 }

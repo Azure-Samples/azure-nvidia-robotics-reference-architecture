@@ -103,37 +103,7 @@ verify_cluster_connectivity() {
   info "Verifying cluster connectivity..."
   if ! kubectl cluster-info &>/dev/null; then
     error "Cannot connect to Kubernetes cluster"
-    echo
-    echo "This typically means the AKS cluster has a private endpoint and your machine"
-    echo "cannot resolve the private DNS name. The error usually looks like:"
-    echo
-    echo "  dial tcp: lookup aks-xxx.privatelink.<region>.azmk8s.io: no such host"
-    echo
-    echo "To resolve this, you need to connect via VPN:"
-    echo
-    echo "  1. Deploy the VPN Gateway (if not already deployed):"
-    echo "     cd ../001-iac/vpn && terraform apply"
-    echo
-    echo "  2. Install Azure VPN Client:"
-    echo "     - Windows: Microsoft Store (search 'Azure VPN Client')"
-    echo "     - macOS:   App Store (search 'Azure VPN Client')"
-    echo "     - Linux:   https://learn.microsoft.com/azure/vpn-gateway/point-to-site-entra-vpn-client-linux"
-    echo
-    echo "  3. Download VPN configuration from Azure Portal:"
-    echo "     - Navigate to your Virtual Network Gateway"
-    echo "     - Select 'Point-to-site configuration'"
-    echo "     - Click 'Download VPN client'"
-    echo
-    echo "  4. Import the configuration in Azure VPN Client and connect"
-    echo
-    echo "  5. Re-run this script after VPN connection is established"
-    echo
-    echo "For detailed instructions, see: ../001-iac/vpn/README.md"
-    echo
-    echo "Alternatively, redeploy infrastructure with:"
-    echo "  should_enable_private_aks_cluster = false"
-    echo "in your terraform.tfvars for a public AKS control plane."
-    echo
+    error "For private clusters, connect via VPN first. See: deploy/001-iac/vpn/README.md"
     fatal "Cluster connectivity check failed"
   fi
   info "Cluster connectivity verified"
@@ -215,6 +185,62 @@ create_nvcr_pull_secret() {
     --docker-username='$oauthtoken' \
     --docker-password="$api_key" \
     --dry-run=client -o yaml | kubectl apply -f -
+}
+
+# // ===================================================================
+# OSMO Preflight Validation
+# // ===================================================================
+
+is_prerelease_tag() {
+  local tag="${1:?image tag required}"
+  [[ "$tag" =~ (rc|beta|alpha|pre|dev) ]] || [[ "$tag" =~ ^v20[0-9]{2}\. ]]
+}
+
+validate_version_pair() {
+  local chart_version="${1:?chart version required}"
+  local image_version="${2:?image version required}"
+  local chart_version_set="${3:-false}"
+  local image_version_set="${4:-false}"
+  # shellcheck disable=SC2154
+  local prerelease_chart="${5:-$OSMO_PRERELEASE_CHART_VERSION}"
+  # shellcheck disable=SC2154
+  local prerelease_image="${6:-$OSMO_PRERELEASE_IMAGE_VERSION}"
+
+  [[ -n "$chart_version" ]] || fatal "Chart version cannot be empty"
+  [[ -n "$image_version" ]] || fatal "Image version cannot be empty"
+
+  if [[ "$chart_version_set" != "$image_version_set" ]]; then
+    fatal "Use --chart-version and --image-version together to keep a tested chart/image pair"
+  fi
+
+  if is_prerelease_tag "$image_version"; then
+    if [[ "$chart_version" != "$prerelease_chart" || "$image_version" != "$prerelease_image" ]]; then
+      fatal "Unsupported prerelease pair: chart=${chart_version}, image=${image_version}. Set OSMO_PRERELEASE_CHART_VERSION/OSMO_PRERELEASE_IMAGE_VERSION to a tested pair, then retry."
+    fi
+
+    # shellcheck disable=SC2154
+    if [[ "$OSMO_USE_PRERELEASE" != "true" && "$chart_version_set" != "true" ]]; then
+      fatal "Prerelease image requires explicit opt-in. Set OSMO_USE_PRERELEASE=true or provide both --chart-version and --image-version."
+    fi
+  fi
+}
+
+# // ===================================================================
+# OSMO Authentication
+# // ===================================================================
+
+osmo_login_and_setup() {
+  local service_url="${1:?service URL required}"
+  local username="${2:-guest}"
+  local roles="${3:-osmo-backend}"
+  info "Logging into OSMO at ${service_url}..."
+  osmo login "${service_url}/" --method dev --username "$username"
+  info "Ensuring dev user '$username' exists with $roles role..."
+  if ! osmo user get "$username" &>/dev/null; then
+    osmo user create "$username" --roles "$roles"
+  else
+    osmo user update "$username" --add-roles "$roles"
+  fi
 }
 
 # Apply SecretProviderClass for Azure Key Vault secrets sync

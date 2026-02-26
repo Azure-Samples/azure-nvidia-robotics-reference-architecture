@@ -100,87 +100,9 @@ done
 
 require_tools terraform osmo kubectl helm jq az envsubst
 
-is_prerelease_tag() {
-  local tag="${1:?image tag required}"
-  [[ "$tag" =~ (rc|beta|alpha) ]]
-}
-
-validate_version_pair() {
-  [[ -n "$chart_version" ]] || fatal "Chart version cannot be empty"
-  [[ -n "$image_version" ]] || fatal "Image version cannot be empty"
-
-  if [[ "$chart_version_set" != "$image_version_set" ]]; then
-    fatal "Use --chart-version and --image-version together to keep a tested chart/image pair"
-  fi
-
-  if is_prerelease_tag "$image_version"; then
-    if [[ "$chart_version" != "$OSMO_PRERELEASE_CHART_VERSION" || "$image_version" != "$OSMO_PRERELEASE_IMAGE_VERSION" ]]; then
-      fatal "Unsupported prerelease pair: chart=${chart_version}, image=${image_version}. Set OSMO_PRERELEASE_CHART_VERSION/OSMO_PRERELEASE_IMAGE_VERSION to a tested pair, then retry."
-    fi
-
-    if [[ "$OSMO_USE_PRERELEASE" != "true" && "$chart_version_set" != "true" ]]; then
-      fatal "Prerelease image requires explicit opt-in. Set OSMO_USE_PRERELEASE=true or provide both --chart-version and --image-version."
-    fi
-  fi
-}
-
-verify_chart_exists() {
-  local chart_ref="${1:?chart reference required}"
-  helm show chart "$chart_ref" --version "$chart_version" >/dev/null 2>&1 || \
-    fatal "Chart ${chart_ref}:${chart_version} not found. For prerelease fallback, set OSMO_PRERELEASE_* to the previous tested pair and retry."
-}
-
-verify_image_exists() {
-  local image_name="${1:?image name required}"
-  if [[ "$use_acr" == "true" ]]; then
-    az acr repository show-tags --name "$acr_name" --repository "osmo/${image_name}" --query "contains(@, '${image_version}')" -o tsv | grep -qi '^true$' || \
-      fatal "Image osmo/${image_name}:${image_version} not found in ACR ${acr_name}. Import the image or use a tested prerelease fallback pair."
-    return
-  fi
-
-  if command -v docker >/dev/null 2>&1; then
-    if ! docker manifest inspect "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1; then
-      if is_prerelease_tag "$image_version"; then
-        warn "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not verified. Prerelease images may require NGC authentication (docker login nvcr.io)."
-      else
-        fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
-      fi
-    fi
-    return
-  fi
-
-  if command -v crane >/dev/null 2>&1; then
-    if ! crane manifest "nvcr.io/nvidia/osmo/${image_name}:${image_version}" >/dev/null 2>&1; then
-      if is_prerelease_tag "$image_version"; then
-        warn "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not verified. Prerelease images may require NGC authentication."
-      else
-        fatal "Image nvcr.io/nvidia/osmo/${image_name}:${image_version} not found. Use a tested fallback pair."
-      fi
-    fi
-    return
-  fi
-
-  if is_prerelease_tag "$image_version"; then
-    warn "Cannot validate nvcr.io image tag without docker or crane. Prerelease images may require NGC authentication or --use-acr."
-  fi
-
-  warn "Skipping nvcr.io image preflight for ${image_name}:${image_version} because docker/crane is unavailable"
-}
-
 run_preflight_checks() {
   section "Preflight Version Checks"
-  validate_version_pair
-
-  if [[ "$use_acr" == "true" ]]; then
-    verify_chart_exists "oci://${acr_login_server}/helm/backend-operator"
-  else
-    verify_chart_exists "osmo/backend-operator"
-  fi
-
-  backend_images=(backend-worker backend-listener delayed-job-monitor client init-container)
-  for image_name in "${backend_images[@]}"; do
-    verify_image_exists "$image_name"
-  done
+  validate_version_pair "$chart_version" "$image_version" "$chart_version_set" "$image_version_set"
 }
 
 az account show &>/dev/null || fatal "Azure CLI not logged in; run 'az login'"
@@ -215,8 +137,8 @@ pool_ids=$(echo "$node_pools_json" | jq -r 'keys[]')
 
 # Auto-select default pool if not explicitly configured
 if [[ -z "${DEFAULT_POOL:-}" ]]; then
-  DEFAULT_POOL=$(echo "$pool_ids" | head -1)
-  info "Auto-selected default pool: $DEFAULT_POOL"
+  DEFAULT_POOL=$(echo "$node_pools_json" | jq -r 'keys | sort | first')
+  warn "DEFAULT_POOL not set — auto-selected '$DEFAULT_POOL' (first pool alphabetically). Set DEFAULT_POOL in .env.local to control this."
 fi
 
 # Compute endpoints
@@ -244,18 +166,7 @@ auth_mode="workload-identity"
 [[ "$use_access_keys" == "true" ]] && auth_mode="access-keys"
 dataset_template="$CONFIG_DIR/dataset-config-${auth_mode}.template.json"
 
-if [[ "$use_access_keys" == "true" ]]; then
-  workflow_template="$CONFIG_DIR/workflow-config-access-keys.template.json"
-  workflow_template_mode="access-keys"
-elif [[ "$OSMO_USE_PRERELEASE" == "true" ]] || is_prerelease_tag "$image_version"; then
-  workflow_template="$CONFIG_DIR/workflow-config-workload-identity-v6.1.template.json"
-  workflow_template_mode="workload-identity-v6.1-keyless"
-else
-  workflow_template="$CONFIG_DIR/workflow-config-workload-identity.template.json"
-  workflow_template_mode="workload-identity-legacy-compatible"
-fi
-
-info "Workflow template selected (${workflow_template_mode}): ${workflow_template}"
+workflow_template="$CONFIG_DIR/${WORKFLOW_TEMPLATE}"
 
 if [[ "$config_preview" == "true" ]]; then
   section "Configuration Preview"
@@ -268,6 +179,7 @@ if [[ "$config_preview" == "true" ]]; then
   print_kv "ACR" "$([[ $use_acr == true ]] && echo "$acr_login_server" || echo 'nvcr.io')"
   print_kv "Auth Mode" "$([[ $use_access_keys == true ]] && echo 'access-keys' || echo 'workload-identity')"
   print_kv "Workflow Template" "$workflow_template"
+  print_kv "Data Validation" "$([[ $use_access_keys == true ]] && echo 'enabled' || echo 'disabled (workload identity)')"
   print_kv "Token Expiry" "$expiry_date"
   print_kv "Pools" "$(echo "$pool_ids" | tr '\n' ' ')"
   print_kv "Default Pool" "default (shares with $DEFAULT_POOL)"
@@ -301,15 +213,7 @@ mkdir -p "$CONFIG_DIR/out"
 # OSMO Login
 #------------------------------------------------------------------------------
 section "OSMO Login"
-info "Logging into OSMO at ${service_url}..."
-osmo login "${service_url}/" --method dev --username guest
-
-info "Ensuring dev user 'guest' exists with osmo-backend role..."
-if ! osmo user get guest &>/dev/null; then
-  osmo user create guest --roles osmo-backend
-else
-  osmo user update guest --add-roles osmo-backend
-fi
+osmo_login_and_setup "$service_url"
 
 #------------------------------------------------------------------------------
 # Prepare Namespaces and Service Token
@@ -504,6 +408,13 @@ for pool_id in $pool_ids; do
     jq --arg pname "$platform_name" --argjson pentry "$platform_pool_entry" \
     '.platforms[$pname] = $pentry')
 
+  # Merge per-pool overrides if present
+  override_file="$CONFIG_DIR/overrides/${pool_id}.json"
+  if [[ -f "$override_file" ]]; then
+    info "Applying pool overrides from $override_file"
+    pool_config=$(echo "$pool_config" | jq -s '.[0] * .[1]' - "$override_file")
+  fi
+
   # Add to combined pools
   combined_pools=$(jq --arg id "$pool_id" --argjson pool "$pool_config" \
     '. + {($id): $pool}' <<< "$combined_pools")
@@ -534,6 +445,11 @@ jq -n --argjson pools "$combined_pools" '{"pools": $pools}' > "$CONFIG_DIR/out/c
 # Render other configs
 envsubst < "$scheduler_template" > "$CONFIG_DIR/out/scheduler-config.json"
 envsubst < "$workflow_template" > "$CONFIG_DIR/out/workflow-config.json"
+if [[ "$use_access_keys" == "false" ]]; then
+  jq '.credential_config.disable_data_validation = ["azure"]' \
+    "$CONFIG_DIR/out/workflow-config.json" > "$CONFIG_DIR/out/workflow-config.json.tmp"
+  mv "$CONFIG_DIR/out/workflow-config.json.tmp" "$CONFIG_DIR/out/workflow-config.json"
+fi
 
 # Apply OSMO configurations
 info "Applying pod template configuration..."
