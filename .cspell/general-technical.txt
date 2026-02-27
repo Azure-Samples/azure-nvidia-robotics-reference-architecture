@@ -1459,16 +1459,19 @@ mypy
 sandboxed
 
 # Azure NVIDIA Robotics Reference Architecture
+amlignore
 anymal
 autolog
 azureml
 cartpole
 chkpt
+coscheduling
 cudnn
 DDPG
 erewbuffer
 flatdict
 gpuinstancetype
+gpuspot
 infotensor
 IPPO
 irewbuffer

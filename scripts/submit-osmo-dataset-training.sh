@@ -29,8 +29,14 @@ WORKFLOW OPTIONS:
     -t, --task NAME               IsaacLab task (default: Isaac-Velocity-Rough-Anymal-C-v0)
     -n, --num-envs COUNT          Number of environments (default: 2048)
     -m, --max-iterations N        Maximum iterations (empty to unset)
-    -i, --image IMAGE             Container image (default: nvcr.io/nvidia/isaac-lab:2.2.0)
+    -i, --image IMAGE             Container image (default: nvcr.io/nvidia/isaac-lab:2.3.2)
     -b, --backend BACKEND         Training backend: skrl (default), rsl_rl
+
+RESOURCE OPTIONS:
+        --gpu COUNT               Number of GPUs (default: 1)
+        --cpu COUNT               CPU cores (default: 30)
+        --memory SIZE             Memory with unit (default: 400Gi)
+        --storage SIZE            Storage with unit (default: 200Gi)
 
 DATASET OPTIONS:
         --dataset-bucket NAME     OSMO bucket name (default: training)
@@ -50,6 +56,7 @@ AZURE CONTEXT:
 
 OTHER:
     -s, --run-smoke-test          Enable Azure connectivity smoke test
+        --use-local-osmo          Use local osmo-dev CLI instead of production osmo
     -h, --help                    Show this help message
 
 Values resolved: CLI > Environment variables > Terraform outputs
@@ -99,8 +106,13 @@ workflow="$REPO_ROOT/workflows/osmo/train-dataset.yaml"
 task="${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}"
 num_envs="${NUM_ENVS:-2048}"
 max_iterations="${MAX_ITERATIONS:-}"
-image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.2.0}"
+image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.3.2}"
 backend="${TRAINING_BACKEND:-skrl}"
+
+gpu="${OSMO_GPU:-1}"
+cpu="${OSMO_CPU:-30}"
+memory="${OSMO_MEMORY:-400Gi}"
+storage="${OSMO_STORAGE:-200Gi}"
 
 # Dataset configuration
 dataset_bucket="${OSMO_DATASET_BUCKET:-training}"
@@ -117,6 +129,7 @@ resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
 workspace_name="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
 
 run_smoke="${RUN_AZURE_SMOKE_TEST:-0}"
+use_local_osmo=false
 forward_args=()
 
 #------------------------------------------------------------------------------
@@ -132,6 +145,10 @@ while [[ $# -gt 0 ]]; do
     -m|--max-iterations)          max_iterations="$2"; shift 2 ;;
     -i|--image)                   image="$2"; shift 2 ;;
     -b|--backend)                 backend="$2"; shift 2 ;;
+    --gpu)                        gpu="$2"; shift 2 ;;
+    --cpu)                        cpu="$2"; shift 2 ;;
+    --memory)                     memory="$2"; shift 2 ;;
+    --storage)                    storage="$2"; shift 2 ;;
     --dataset-bucket)             dataset_bucket="$2"; shift 2 ;;
     --dataset-name)               dataset_name="$2"; shift 2 ;;
     --training-path)              training_path="$2"; shift 2 ;;
@@ -143,6 +160,7 @@ while [[ $# -gt 0 ]]; do
     --azure-resource-group)       resource_group="$2"; shift 2 ;;
     --azure-workspace-name)       workspace_name="$2"; shift 2 ;;
     -s|--run-smoke-test)          run_smoke="1"; shift ;;
+    --use-local-osmo)             use_local_osmo=true; shift ;;
     --)                           shift; forward_args=("$@"); break ;;
     *)                            forward_args+=("$1"); shift ;;
   esac
@@ -151,6 +169,8 @@ done
 #------------------------------------------------------------------------------
 # Validation
 #------------------------------------------------------------------------------
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools osmo rsync
 
@@ -210,6 +230,10 @@ submit_args=(
   "checkpoint_mode=$checkpoint_mode"
   "register_checkpoint=$register_checkpoint"
   "training_backend=$backend"
+  "gpu=$gpu"
+  "cpu=$cpu"
+  "memory=$memory"
+  "storage=$storage"
   "dataset_bucket=$dataset_bucket"
   "dataset_name=$dataset_name"
   "training_localpath=$rel_training_path"
