@@ -428,7 +428,7 @@ def main() -> int:
     # Launch simulation
     from isaaclab.app import AppLauncher
 
-    _app = AppLauncher(argparse.Namespace(headless=args.headless, enable_cameras=False))
+    AppLauncher(argparse.Namespace(headless=args.headless, enable_cameras=False))
 
     exit_code = 1
     try:
