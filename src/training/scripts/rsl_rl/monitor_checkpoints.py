@@ -3,6 +3,7 @@
 """Launch Isaac Sim Simulator first."""
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -80,7 +81,6 @@ simulation_app = app_launcher.app
 
 import glob
 import json
-import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -428,7 +428,5 @@ def main(
 
 
 if __name__ == "__main__":
-    # run the main function
     main()
-    # close sim app
-    simulation_app.close()
+    os._exit(0)
