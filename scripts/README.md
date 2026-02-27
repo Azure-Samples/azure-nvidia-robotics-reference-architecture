@@ -430,3 +430,8 @@ get_azureml_workspace  # Returns ML workspace name
 | [workflows/](../workflows/)               | YAML templates for training and validation jobs    |
 | [workflows/osmo/](../workflows/osmo/)     | OSMO workflow templates including dataset training |
 | [deploy/002-setup/](../deploy/002-setup/) | Cluster configuration and OSMO deployment          |
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

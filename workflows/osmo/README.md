@@ -294,3 +294,8 @@ Access the OSMO UI dashboard:
 
 * **VPN**: Open `http://10.0.5.7` in your browser
 * **Port-forward**: Run `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane` then open `http://localhost:3000`
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

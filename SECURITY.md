@@ -57,13 +57,13 @@ to your environment.
 
 ### What This Architecture Includes
 
-| Included Configuration      | Description                                    | Your Responsibility                                                 |
-|-----------------------------|------------------------------------------------|---------------------------------------------------------------------|
-| Private AKS cluster option  | Enabled by default via Terraform variable      | Evaluate whether private mode meets your network requirements       |
-| Managed identities          | User-assigned identity for AKS                 | Review identity permissions and scope for your workloads            |
-| Azure Key Vault integration | Key Vault CSI driver configured                | Manage secret lifecycle, rotation, and access policies              |
-| Kubernetes network policies | Azure CNI with network policy support enabled  | Define and maintain policies appropriate for your workloads         |
-| Workload identity           | Federated credential configuration for OSMO    | Verify audience restrictions and token scoping for your environment |
+| Included Configuration      | Description                                   | Your Responsibility                                                 |
+|-----------------------------|-----------------------------------------------|---------------------------------------------------------------------|
+| Private AKS cluster option  | Enabled by default via Terraform variable     | Evaluate whether private mode meets your network requirements       |
+| Managed identities          | User-assigned identity for AKS                | Review identity permissions and scope for your workloads            |
+| Azure Key Vault integration | Key Vault CSI driver configured               | Manage secret lifecycle, rotation, and access policies              |
+| Kubernetes network policies | Azure CNI with network policy support enabled | Define and maintain policies appropriate for your workloads         |
+| Workload identity           | Federated credential configuration for OSMO   | Verify audience restrictions and token scoping for your environment |
 
 ### What This Architecture Does Not Include
 
