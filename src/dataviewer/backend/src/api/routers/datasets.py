@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from ..models.datasources import DatasetInfo, EpisodeData, EpisodeMeta, TrajectoryPoint
 from ..services.dataset_service import DatasetService, get_dataset_service
+from ..validation import validate_path_containment, validated_camera_name, validated_dataset_id
 
 router = APIRouter()
 
@@ -51,7 +52,7 @@ async def list_datasets(
 
 @router.get("/{dataset_id}", response_model=DatasetInfo)
 async def get_dataset(
-    dataset_id: str,
+    dataset_id: str = Depends(validated_dataset_id),
     service: DatasetService = Depends(get_dataset_service),
 ) -> DatasetInfo:
     """
@@ -68,7 +69,7 @@ async def get_dataset(
 
 @router.get("/{dataset_id}/capabilities", response_model=DatasetCapabilities)
 async def get_dataset_capabilities(
-    dataset_id: str,
+    dataset_id: str = Depends(validated_dataset_id),
     service: DatasetService = Depends(get_dataset_service),
 ) -> DatasetCapabilities:
     """
@@ -114,7 +115,7 @@ async def get_dataset_capabilities(
 
 @router.get("/{dataset_id}/episodes", response_model=list[EpisodeMeta])
 async def list_episodes(
-    dataset_id: str,
+    dataset_id: str = Depends(validated_dataset_id),
     offset: int = Query(0, ge=0, description="Number of episodes to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum episodes to return"),
     has_annotations: bool | None = Query(None, description="Filter by annotation status"),
@@ -139,8 +140,8 @@ async def list_episodes(
 
 @router.get("/{dataset_id}/episodes/{episode_idx}", response_model=EpisodeData)
 async def get_episode(
-    dataset_id: str,
     episode_idx: int,
+    dataset_id: str = Depends(validated_dataset_id),
     service: DatasetService = Depends(get_dataset_service),
 ) -> EpisodeData:
     """
@@ -164,8 +165,8 @@ async def get_episode(
     response_model=list[TrajectoryPoint],
 )
 async def get_episode_trajectory(
-    dataset_id: str,
     episode_idx: int,
+    dataset_id: str = Depends(validated_dataset_id),
     service: DatasetService = Depends(get_dataset_service),
 ) -> list[TrajectoryPoint]:
     """
@@ -185,9 +186,9 @@ async def get_episode_trajectory(
 
 @router.get("/{dataset_id}/episodes/{episode_idx}/frames/{frame_idx}")
 async def get_episode_frame(
-    dataset_id: str,
     episode_idx: int,
     frame_idx: int,
+    dataset_id: str = Depends(validated_dataset_id),
     camera: str = Query("il-camera", description="Camera name"),
     service: DatasetService = Depends(get_dataset_service),
 ) -> Response:
@@ -215,8 +216,8 @@ async def get_episode_frame(
 
 @router.get("/{dataset_id}/episodes/{episode_idx}/cameras")
 async def get_episode_cameras(
-    dataset_id: str,
     episode_idx: int,
+    dataset_id: str = Depends(validated_dataset_id),
     service: DatasetService = Depends(get_dataset_service),
 ) -> list[str]:
     """
@@ -226,11 +227,11 @@ async def get_episode_cameras(
     return cameras
 
 
-@router.get("/{dataset_id}/episodes/{episode_idx}/video/{camera:path}")
+@router.get("/{dataset_id}/episodes/{episode_idx}/video/{camera}")
 async def get_episode_video(
-    dataset_id: str,
     episode_idx: int,
-    camera: str,
+    dataset_id: str = Depends(validated_dataset_id),
+    camera: str = Depends(validated_camera_name),
     service: DatasetService = Depends(get_dataset_service),
 ) -> FileResponse:
     """
@@ -242,6 +243,9 @@ async def get_episode_video(
     Note: camera parameter can include dots (e.g., 'observation.images.color')
     """
     video_path = service.get_video_file_path(dataset_id, episode_idx, camera)
+
+    if video_path is not None:
+        validate_path_containment(Path(video_path), Path(service.base_path))
 
     if video_path is None:
         raise HTTPException(
