@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..models.detection import DetectionRequest, EpisodeDetectionSummary
 from ..services.dataset_service import DatasetService, get_dataset_service
 from ..services.detection_service import DetectionService, get_detection_service
+from ..validation import validated_dataset_id
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -23,8 +24,8 @@ logger = logging.getLogger(__name__)
     response_model=EpisodeDetectionSummary,
 )
 async def run_detection(
-    dataset_id: str,
     episode_idx: int,
+    dataset_id: str = Depends(validated_dataset_id),
     request: DetectionRequest = DetectionRequest(),
     detection_service: DetectionService = Depends(get_detection_service),
     dataset_service: DatasetService = Depends(get_dataset_service),
@@ -94,8 +95,8 @@ async def run_detection(
     response_model=EpisodeDetectionSummary | None,
 )
 async def get_detections(
-    dataset_id: str,
     episode_idx: int,
+    dataset_id: str = Depends(validated_dataset_id),
     detection_service: DetectionService = Depends(get_detection_service),
 ) -> EpisodeDetectionSummary | None:
     """
@@ -108,8 +109,8 @@ async def get_detections(
 
 @router.delete("/{dataset_id}/episodes/{episode_idx}/detections")
 async def clear_detections(
-    dataset_id: str,
     episode_idx: int,
+    dataset_id: str = Depends(validated_dataset_id),
     detection_service: DetectionService = Depends(get_detection_service),
 ) -> dict[str, bool]:
     """

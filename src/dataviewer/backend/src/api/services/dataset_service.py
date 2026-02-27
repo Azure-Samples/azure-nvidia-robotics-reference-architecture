@@ -86,9 +86,10 @@ class DatasetService:
             return None
 
         if dataset_id not in self._lerobot_loaders:
-            from pathlib import Path
-
-            dataset_path = Path(self.base_path) / dataset_id
+            try:
+                dataset_path = self._get_dataset_path(dataset_id)
+            except ValueError:
+                return None
             if dataset_path.exists() and is_lerobot_dataset(dataset_path):
                 try:
                     self._lerobot_loaders[dataset_id] = LeRobotLoader(dataset_path)
@@ -112,9 +113,10 @@ class DatasetService:
             return None
 
         if dataset_id not in self._hdf5_loaders:
-            from pathlib import Path
-
-            dataset_path = Path(self.base_path) / dataset_id
+            try:
+                dataset_path = self._get_dataset_path(dataset_id)
+            except ValueError:
+                return None
             if dataset_path.exists():
                 # Check if there are HDF5 files
                 hdf5_files = list(dataset_path.glob("**/*.hdf5"))
@@ -136,9 +138,10 @@ class DatasetService:
         Returns:
             DatasetInfo if directory with supported data exists, None otherwise.
         """
-        from pathlib import Path
-
-        dataset_path = Path(self.base_path) / dataset_id
+        try:
+            dataset_path = self._get_dataset_path(dataset_id)
+        except ValueError:
+            return None
 
         # Validate directory exists
         if not dataset_path.exists() or not dataset_path.is_dir():
@@ -678,22 +681,18 @@ class DatasetService:
         """Check if a dataset is in LeRobot parquet format."""
         return self._get_lerobot_loader(dataset_id) is not None
 
-    def _get_dataset_path(self, dataset_id: str) -> str | None:
+    def _get_dataset_path(self, dataset_id: str) -> Path:
         """
-        Get the filesystem path for a dataset.
+        Build and validate the filesystem path for a dataset.
 
-        Args:
-            dataset_id: Dataset identifier (directory name).
-
-        Returns:
-            Absolute path to the dataset directory, or None if not found.
+        Raises:
+            ValueError: If dataset_id would escape the base data directory.
         """
-        from pathlib import Path
-
-        dataset_path = Path(self.base_path) / dataset_id
-        if dataset_path.exists() and dataset_path.is_dir():
-            return str(dataset_path.resolve())
-        return None
+        base = Path(self.base_path).resolve()
+        dataset_path = (base / dataset_id).resolve()
+        if not dataset_path.is_relative_to(base):
+            raise ValueError(f"Invalid dataset path: {dataset_id}")
+        return dataset_path
 
     async def get_frame_image(
         self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str

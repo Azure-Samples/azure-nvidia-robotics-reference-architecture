@@ -22,6 +22,7 @@ from ..services.hdf5_exporter import (
     HDF5ExportError,
     parse_edit_operations,
 )
+from ..validation import validate_path_containment, validated_dataset_id
 
 router = APIRouter()
 
@@ -108,8 +109,8 @@ class ExportResultResponse(BaseModel):
 
 @router.post("/{dataset_id}/export", response_model=ExportResultResponse)
 async def export_episodes(
-    dataset_id: str,
-    request: ExportRequest,
+    dataset_id: str = Depends(validated_dataset_id),
+    request: ExportRequest = ...,
     service: DatasetService = Depends(get_dataset_service),
 ) -> ExportResultResponse:
     """
@@ -130,8 +131,14 @@ async def export_episodes(
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
 
     # Get dataset path
-    dataset_path = service._get_dataset_path(dataset_id)
-    if not dataset_path:
+    try:
+        dataset_path = service._get_dataset_path(dataset_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dataset '{dataset_id}' does not have a valid path for export",
+        )
+    if not dataset_path.exists():
         raise HTTPException(
             status_code=400,
             detail=f"Dataset '{dataset_id}' does not have a local path for export",
@@ -139,6 +146,7 @@ async def export_episodes(
 
     # Validate output path
     output_path = Path(request.outputPath)
+    validate_path_containment(output_path, Path(service.base_path))
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
@@ -205,8 +213,8 @@ async def export_episodes(
 
 @router.post("/{dataset_id}/export/stream")
 async def export_episodes_stream(
-    dataset_id: str,
-    request: ExportRequest,
+    dataset_id: str = Depends(validated_dataset_id),
+    request: ExportRequest = ...,
     service: DatasetService = Depends(get_dataset_service),
 ) -> StreamingResponse:
     """
@@ -231,8 +239,14 @@ async def export_episodes_stream(
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
 
     # Get dataset path
-    dataset_path = service._get_dataset_path(dataset_id)
-    if not dataset_path:
+    try:
+        dataset_path = service._get_dataset_path(dataset_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dataset '{dataset_id}' does not have a valid path for export",
+        )
+    if not dataset_path.exists():
         raise HTTPException(
             status_code=400,
             detail=f"Dataset '{dataset_id}' does not have a local path for export",
@@ -240,6 +254,7 @@ async def export_episodes_stream(
 
     # Validate output path
     output_path = Path(request.outputPath)
+    validate_path_containment(output_path, Path(service.base_path))
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
@@ -370,7 +385,7 @@ async def export_episodes_stream(
 
 @router.get("/{dataset_id}/export/preview")
 async def preview_export(
-    dataset_id: str,
+    dataset_id: str = Depends(validated_dataset_id),
     episode_indices: str = Query(..., description="Comma-separated episode indices"),
     removed_frames: str | None = Query(None, description="Comma-separated frame indices to remove"),
     service: DatasetService = Depends(get_dataset_service),
