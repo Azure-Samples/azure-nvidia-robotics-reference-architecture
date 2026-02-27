@@ -1,6 +1,9 @@
 adal
 adls
 adms
+amlarc
+azmk
+azurevpnconfig
 adminconsent
 afds
 agic
