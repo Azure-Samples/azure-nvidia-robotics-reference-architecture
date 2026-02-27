@@ -22,8 +22,8 @@ Submit an Azure ML training job with argument parity to the OSMO workflow.
 
 AZUREML ASSET OPTIONS:
     --environment-name NAME       AzureML environment name (default: isaaclab-training-env)
-    --environment-version VER     Environment version (default: 2.2.0)
-    --image IMAGE                 Container image (default: nvcr.io/nvidia/isaac-lab:2.2.0)
+    --environment-version VER     Environment version (default: 2.3.2)
+    --image IMAGE                 Container image (default: nvcr.io/nvidia/isaac-lab:2.3.2)
     --assets-only                 Register environment without submitting job
 
 TRAINING OPTIONS:
@@ -128,8 +128,8 @@ run_smoke_test() {
 #------------------------------------------------------------------------------
 
 environment_name="isaaclab-training-env"
-environment_version="2.2.0"
-image="nvcr.io/nvidia/isaac-lab:2.2.0"
+environment_version="2.3.2"
+image="nvcr.io/nvidia/isaac-lab:2.3.2"
 assets_only=false
 
 job_file="$REPO_ROOT/workflows/azureml/train.yaml"

@@ -11,7 +11,7 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 ## 📜 Available Templates
 
 | Template                                 | Purpose                               | Submission Script                          |
-| ---------------------------------------- | ------------------------------------- | ------------------------------------------ |
+|------------------------------------------|---------------------------------------|--------------------------------------------|
 | [train.yaml](train.yaml)                 | Distributed training (base64 inline)  | `scripts/submit-osmo-training.sh`          |
 | [train-dataset.yaml](train-dataset.yaml) | Distributed training (dataset upload) | `scripts/submit-osmo-dataset-training.sh`  |
 | [lerobot-train.yaml](lerobot-train.yaml) | LeRobot behavioral cloning            | `scripts/submit-osmo-lerobot-training.sh`  |
@@ -20,7 +20,7 @@ NVIDIA OSMO workflow templates for distributed Isaac Lab training on Azure Kuber
 ## ⚖️ Workflow Comparison
 
 | Aspect      | train.yaml             | train-dataset.yaml    |
-| ----------- | ---------------------- | --------------------- |
+|-------------|------------------------|-----------------------|
 | Payload     | Base64-encoded archive | Dataset folder upload |
 | Size limit  | ~1MB                   | Unlimited             |
 | Versioning  | None                   | Automatic             |
@@ -43,7 +43,7 @@ Submits Isaac Lab distributed training through OSMO's workflow orchestration eng
 Parameters are passed as key=value pairs through the submission script:
 
 | Parameter               | Description           |
-| ----------------------- | --------------------- |
+|-------------------------|-----------------------|
 | `azure_subscription_id` | Azure subscription ID |
 | `azure_resource_group`  | Resource group name   |
 | `azure_workspace_name`  | ML workspace name     |
@@ -77,7 +77,7 @@ Submits Isaac Lab training using OSMO dataset folder injection instead of base64
 ### Dataset Parameters
 
 | Parameter            | Default         | Description                                     |
-| -------------------- | --------------- | ----------------------------------------------- |
+|----------------------|-----------------|-------------------------------------------------|
 | `dataset_bucket`     | `training`      | OSMO bucket for training code                   |
 | `dataset_name`       | `training-code` | Dataset name in bucket                          |
 | `training_localpath` | (required)      | Local path to src/training relative to workflow |
@@ -109,7 +109,7 @@ Submits LeRobot behavioral cloning training for ACT and Diffusion policy archite
 ### LeRobot Parameters
 
 | Parameter         | Default                                         | Description                                |
-| ----------------- | ----------------------------------------------- | ------------------------------------------ |
+|-------------------|-------------------------------------------------|--------------------------------------------|
 | `dataset_repo_id` | (required)                                      | HuggingFace dataset (e.g., `user/dataset`) |
 | `policy_type`     | `act`                                           | Policy architecture: `act`, `diffusion`    |
 | `job_name`        | `lerobot-act-training`                          | Unique job identifier                      |
@@ -167,7 +167,7 @@ Trains LeRobot policies using OSMO dataset mounts instead of HuggingFace Hub dow
 ### Dataset Training Parameters
 
 | Parameter           | Default            | Description                            |
-| ------------------- | ------------------ | -------------------------------------- |
+|---------------------|--------------------|----------------------------------------|
 | `dataset_bucket`    | `lerobot-datasets` | OSMO bucket for training data          |
 | `dataset_name`      | `training-data`    | Dataset name in bucket                 |
 | `dataset_localpath` | (required)         | Local path to dataset relative to YAML |
@@ -197,7 +197,7 @@ Evaluates trained LeRobot policies from HuggingFace Hub repositories. Downloads 
 ### Inference Parameters
 
 | Parameter         | Default    | Description                             |
-| ----------------- | ---------- | --------------------------------------- |
+|-------------------|------------|-----------------------------------------|
 | `policy_repo_id`  | (required) | HuggingFace policy repository           |
 | `policy_type`     | `act`      | Policy architecture: `act`, `diffusion` |
 | `eval_episodes`   | `10`       | Number of evaluation episodes           |
@@ -227,7 +227,7 @@ Evaluates trained LeRobot policies from HuggingFace Hub repositories. Downloads 
 ## ⚙️ Environment Variables
 
 | Variable                | Description                             |
-| ----------------------- | --------------------------------------- |
+|-------------------------|-----------------------------------------|
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID                   |
 | `AZURE_RESOURCE_GROUP`  | Resource group name                     |
 | `WORKFLOW_TEMPLATE`     | Path to workflow template               |
@@ -251,7 +251,7 @@ OSMO services are deployed to the `osmo-control-plane` namespace. Access method 
 When connected to VPN, OSMO is accessible via the internal load balancer:
 
 | Service      | URL                   |
-| ------------ | --------------------- |
+|--------------|-----------------------|
 | UI Dashboard | `http://10.0.5.7`     |
 | API Service  | `http://10.0.5.7/api` |
 
@@ -268,7 +268,7 @@ osmo info
 If `should_enable_private_aks_cluster = false` and not using VPN:
 
 | Service      | Port-Forward Command                                                  | Local URL               |
-| ------------ | --------------------------------------------------------------------- | ----------------------- |
+|--------------|-----------------------------------------------------------------------|-------------------------|
 | UI Dashboard | `kubectl port-forward svc/osmo-ui 3000:80 -n osmo-control-plane`      | `http://localhost:3000` |
 | API Service  | `kubectl port-forward svc/osmo-service 9000:80 -n osmo-control-plane` | `http://localhost:9000` |
 | Router       | `kubectl port-forward svc/osmo-router 8080:80 -n osmo-control-plane`  | `http://localhost:8080` |
