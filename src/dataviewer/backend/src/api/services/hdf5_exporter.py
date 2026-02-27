@@ -223,7 +223,7 @@ class HDF5Exporter:
                         if pos < len(valid_indices) - 1:
                             insertion_count += 1
                     except ValueError:
-                        pass
+                        continue
             output_frames = len(valid_indices) + insertion_count
 
             if progress_callback:

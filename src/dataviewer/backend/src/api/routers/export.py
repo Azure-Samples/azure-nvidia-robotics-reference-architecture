@@ -145,7 +145,7 @@ async def export_episodes(
 
     # Validate output path
     output_path = Path(request.outputPath).resolve()
-    if not str(output_path).startswith(str(_BASE_DATA_PATH)):
+    if not output_path.is_relative_to(_BASE_DATA_PATH):
         raise HTTPException(
             status_code=400,
             detail="Output path must be within the data directory",
@@ -252,7 +252,7 @@ async def export_episodes_stream(
 
     # Validate output path
     output_path = Path(request.outputPath).resolve()
-    if not str(output_path).startswith(str(_BASE_DATA_PATH)):
+    if not output_path.is_relative_to(_BASE_DATA_PATH):
         raise HTTPException(
             status_code=400,
             detail="Output path must be within the data directory",

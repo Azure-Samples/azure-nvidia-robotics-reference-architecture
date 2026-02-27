@@ -20,6 +20,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _sanitize(value: object) -> str:
+    """Sanitize a value for safe inclusion in log messages."""
+    return str(value).replace("\n", "\\n").replace("\r", "\\r")
+
+
 class DatasetCapabilities(BaseModel):
     """Capabilities available for a dataset."""
 
@@ -95,7 +100,7 @@ async def get_dataset_capabilities(
                 episodes = hdf5_loader.list_episodes()
                 episode_count = max(episode_count, len(episodes))
             except Exception:
-                pass
+                logger.debug("Failed to get HDF5 episode count for %s", _sanitize(dataset_id))
     elif is_lerobot:
         # Get episode count from LeRobot loader
         lerobot_loader = service._get_lerobot_loader(dataset_id)
@@ -104,7 +109,7 @@ async def get_dataset_capabilities(
                 episodes = lerobot_loader.list_episodes()
                 episode_count = max(episode_count, len(episodes))
             except Exception:
-                pass
+                logger.debug("Failed to get LeRobot episode count for %s", _sanitize(dataset_id))
 
     return DatasetCapabilities(
         hdf5_support=service.has_hdf5_support(),
@@ -210,7 +215,7 @@ async def get_episode_frame(
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Failed to load frame %d for camera '%s'", frame_idx, camera)
+        logger.exception("Failed to load frame %d for camera '%s'", int(frame_idx), _sanitize(camera))
         raise HTTPException(
             status_code=500,
             detail="Failed to load frame",

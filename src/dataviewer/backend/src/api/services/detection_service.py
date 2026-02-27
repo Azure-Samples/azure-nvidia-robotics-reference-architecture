@@ -26,6 +26,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _sanitize(value: object) -> str:
+    """Sanitize a value for safe inclusion in log messages."""
+    return str(value).replace("\n", "\\n").replace("\r", "\\r")
+
+
 # COCO class names for YOLO models
 ALLOWED_MODELS = {"yolo11n", "yolo11s", "yolo11m", "yolo11l", "yolo11x"}
 
@@ -130,7 +136,7 @@ class DetectionService:
             try:
                 from ultralytics import YOLO
 
-                logger.info("Loading YOLO model: %s", model_name)
+                logger.info("Loading YOLO model: %s", _sanitize(model_name))
                 self._model = YOLO(f"{model_name}.pt")
                 self._model_name = model_name
                 # Warmup with dummy inference
@@ -175,7 +181,7 @@ class DetectionService:
         image = Image.open(BytesIO(image_bytes))
         logger.debug(
             "Frame %d: image size=%s, mode=%s, bytes=%d",
-            frame_idx,
+            int(frame_idx),
             image.size,
             image.mode,
             len(image_bytes),
@@ -188,7 +194,7 @@ class DetectionService:
 
         logger.debug(
             "Frame %d: model returned %d result(s) in %.1fms",
-            frame_idx,
+            int(frame_idx),
             len(results) if results else 0,
             elapsed_ms,
         )
@@ -200,7 +206,7 @@ class DetectionService:
             boxes = result.boxes
             logger.debug(
                 "Frame %d: boxes=%s, num_boxes=%d",
-                frame_idx,
+                int(frame_idx),
                 boxes is not None,
                 len(boxes) if boxes is not None else 0,
             )
@@ -224,9 +230,9 @@ class DetectionService:
                         )
                     )
         else:
-            logger.debug("Frame %d: no results from model", frame_idx)
+            logger.debug("Frame %d: no results from model", int(frame_idx))
 
-        logger.debug("Frame %d: returning %d detections", frame_idx, len(detections))
+        logger.debug("Frame %d: returning %d detections", int(frame_idx), len(detections))
         return DetectionResult(
             frame=frame_idx,
             detections=detections,
@@ -244,8 +250,8 @@ class DetectionService:
         """Run detection on episode frames."""
         logger.debug(
             "Starting detection: dataset=%s, episode=%d, frames=%d",
-            dataset_id,
-            episode_idx,
+            _sanitize(dataset_id),
+            int(episode_idx),
             total_frames,
         )
 
@@ -263,7 +269,7 @@ class DetectionService:
                 if image_bytes is None:
                     skipped_frames += 1
                     if skipped_frames <= 3:
-                        logger.debug("Frame %d: image_bytes is None", frame_idx)
+                        logger.debug("Frame %d: image_bytes is None", int(frame_idx))
                     continue
 
                 if frame_idx == 0:
@@ -288,7 +294,7 @@ class DetectionService:
                     class_counts[det.class_name].append(det.confidence)
 
             except Exception as e:
-                logger.warning("Failed to process frame %d: %s", frame_idx, e)
+                logger.warning("Failed to process frame %d: %s", int(frame_idx), _sanitize(e))
                 continue
 
         total_dets = sum(len(r.detections) for r in results_by_frame)

@@ -17,6 +17,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _sanitize(value: object) -> str:
+    """Sanitize a value for safe inclusion in log messages."""
+    return str(value).replace("\n", "\\n").replace("\r", "\\r")
+
+
 @router.post(
     "/{dataset_id}/episodes/{episode_idx}/detect",
     response_model=EpisodeDetectionSummary,
@@ -35,20 +40,20 @@ async def run_detection(
     returns detection results with bounding boxes and class labels.
     Results are cached for subsequent retrieval.
     """
-    logger.info("POST /detect called: dataset=%s, episode=%d", dataset_id, episode_idx)
-    logger.info("Request: model=%s, confidence=%s", request.model, request.confidence)
+    logger.info("POST /detect called: dataset=%s, episode=%d", _sanitize(dataset_id), int(episode_idx))
+    logger.info("Request: model=%s, confidence=%s", _sanitize(request.model), _sanitize(request.confidence))
 
     # Validate episode exists
     episode = await dataset_service.get_episode(dataset_id, episode_idx)
     if episode is None:
-        logger.debug("Episode not found: dataset=%s, episode=%d", dataset_id, episode_idx)
+        logger.debug("Episode not found: dataset=%s, episode=%d", _sanitize(dataset_id), int(episode_idx))
         raise HTTPException(
             status_code=404,
             detail=f"Episode {episode_idx} not found in dataset '{dataset_id}'",
         )
 
     total_frames = episode.meta.length
-    logger.debug("Episode %d has %d frames", episode_idx, total_frames)
+    logger.debug("Episode %d has %d frames", int(episode_idx), total_frames)
 
     # Create frame image getter
     async def get_frame_image(frame_idx: int) -> bytes | None:

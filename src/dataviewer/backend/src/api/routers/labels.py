@@ -58,8 +58,11 @@ def _validate_dataset_id(dataset_id: str) -> None:
 
 def _labels_path(dataset_id: str) -> Path:
     _validate_dataset_id(dataset_id)
-    base = Path(_get_base_path())
-    return base / dataset_id / "meta" / "episode_labels.json"
+    base = Path(_get_base_path()).resolve()
+    result = (base / dataset_id / "meta" / "episode_labels.json").resolve()
+    if not result.is_relative_to(base):
+        raise HTTPException(status_code=400, detail="Invalid dataset ID")
+    return result
 
 
 async def _load_labels(dataset_id: str) -> DatasetLabelsFile:
