@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **Note:** This file is automatically maintained by [release-please](https://github.com/googleapis/release-please). Do not edit manually.
 
+## [0.5.0](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.4.0...v0.5.0) (2026-02-27)
+
+
+### ✨ Features
+
+* add dataviewer web application for dataset analysis and annotation ([#375](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/375)) ([c44d7bb](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/c44d7bbe7765e456e75c2ccba969eef1d116f912))
+* add YAML config schema with pydantic validation for ROS 2 recording ([#376](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/376)) ([1fa5243](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/commit/1fa52430274c04813f207306810b8e0df0fe9994))
+
 ## [0.4.0](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/compare/v0.3.0...v0.4.0) (2026-02-27)
 
 
