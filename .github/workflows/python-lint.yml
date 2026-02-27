@@ -31,7 +31,7 @@ jobs:
         id: ruff-check
         continue-on-error: true
         run: |
-          uv run ruff check src/ tests/ --output-format github 2>&1 | tee ruff-check-results.txt
+          uvx ruff check src/ tests/ --output-format github 2>&1 | tee ruff-check-results.txt
           EXIT_CODE=${PIPESTATUS[0]}
           if [ "$EXIT_CODE" -ne 0 ]; then
             echo "RUFF_CHECK_FAILED=true" >> "$GITHUB_ENV"
@@ -42,7 +42,7 @@ jobs:
         id: ruff-format
         continue-on-error: true
         run: |
-          uv run ruff format --check --diff src/ tests/ 2>&1 | tee ruff-format-results.txt
+          uvx ruff format --check --diff src/ tests/ 2>&1 | tee ruff-format-results.txt
           EXIT_CODE=${PIPESTATUS[0]}
           if [ "$EXIT_CODE" -ne 0 ]; then
             echo "RUFF_FORMAT_FAILED=true" >> "$GITHUB_ENV"
@@ -62,5 +62,5 @@ jobs:
       - name: Fail job if errors found
         if: (env.RUFF_CHECK_FAILED == 'true' || env.RUFF_FORMAT_FAILED == 'true') && !inputs.soft-fail
         run: |
-          echo "::error::Ruff violations detected. Run 'uv run ruff check --fix src/ tests/' and 'uv run ruff format src/ tests/' locally."
+          echo "::error::Ruff violations detected. Run 'uvx ruff check --fix src/ tests/' and 'uvx ruff format src/ tests/' locally."
           exit 1
