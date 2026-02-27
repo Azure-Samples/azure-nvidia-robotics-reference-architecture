@@ -30,7 +30,7 @@ class AzureBlobDataSource(BaseModel):
     account_name: str = Field(description="Azure storage account name")
     container_name: str = Field(description="Blob container name")
     sas_token: str | None = Field(
-        default=None, description="SAS token for authentication"
+        default=None, repr=False, description="SAS token for authentication"
     )
     managed_identity: bool = Field(
         default=False, description="Use managed identity for authentication"
@@ -46,7 +46,7 @@ class HuggingFaceDataSource(BaseModel):
         default=None, description="Git revision (branch, tag, or commit hash)"
     )
     token: str | None = Field(
-        default=None, description="Hugging Face API token for private repos"
+        default=None, repr=False, description="Hugging Face API token for private repos"
     )
 
 

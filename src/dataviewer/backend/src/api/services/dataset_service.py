@@ -8,6 +8,7 @@ and LeRobot parquet-format datasets.
 
 import logging
 import os
+import re
 
 from ..models.datasources import (
     DatasetInfo,
@@ -55,6 +56,14 @@ class DatasetService:
     Supports loading trajectory data from HDF5 files and LeRobot parquet datasets.
     """
 
+    _VALID_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+
+    @staticmethod
+    def _validate_dataset_id(dataset_id: str) -> None:
+        """Validate dataset_id against an allowlist pattern."""
+        if not DatasetService._VALID_ID_PATTERN.match(dataset_id):
+            raise ValueError(f"Invalid dataset ID: '{dataset_id}'")
+
     def __init__(self, base_path: str | None = None):
         """
         Initialize the dataset service.
@@ -84,6 +93,8 @@ class DatasetService:
         if not LEROBOT_AVAILABLE:
             return None
 
+        self._validate_dataset_id(dataset_id)
+
         if dataset_id not in self._lerobot_loaders:
             from pathlib import Path
 
@@ -109,6 +120,8 @@ class DatasetService:
         """
         if not HDF5_AVAILABLE:
             return None
+
+        self._validate_dataset_id(dataset_id)
 
         if dataset_id not in self._hdf5_loaders:
             from pathlib import Path
@@ -136,6 +149,8 @@ class DatasetService:
             DatasetInfo if directory with supported data exists, None otherwise.
         """
         from pathlib import Path
+
+        self._validate_dataset_id(dataset_id)
 
         dataset_path = Path(self.base_path) / dataset_id
 
@@ -683,9 +698,14 @@ class DatasetService:
         """
         from pathlib import Path
 
-        dataset_path = Path(self.base_path) / dataset_id
+        self._validate_dataset_id(dataset_id)
+
+        base_resolved = Path(self.base_path).resolve()
+        dataset_path = (base_resolved / dataset_id).resolve()
+        if not str(dataset_path).startswith(str(base_resolved)):
+            return None
         if dataset_path.exists() and dataset_path.is_dir():
-            return str(dataset_path.resolve())
+            return str(dataset_path)
         return None
 
     async def get_frame_image(

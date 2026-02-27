@@ -6,6 +6,7 @@ Annotations are stored separately using another storage adapter.
 """
 
 import json
+import logging
 from pathlib import Path
 
 from ..models.datasources import DatasetInfo, EpisodeData, EpisodeMeta, FeatureSchema, TaskInfo
@@ -27,6 +28,8 @@ class HuggingFaceHubAdapter:
     This adapter provides read-only access to dataset metadata, episode info,
     and video URLs. Annotations are stored separately.
     """
+
+    logger = logging.getLogger(__name__)
 
     def __init__(
         self,
@@ -79,8 +82,9 @@ class HuggingFaceHubAdapter:
             )
             return Path(local_path)
         except Exception as e:
+            self.logger.exception("Failed to download dataset file")
             raise StorageError(
-                f"Failed to download {filename} from {self.repo_id}: {e}", cause=e
+                "Failed to download dataset file", cause=e
             )
 
     async def get_dataset_info(self) -> DatasetInfo:

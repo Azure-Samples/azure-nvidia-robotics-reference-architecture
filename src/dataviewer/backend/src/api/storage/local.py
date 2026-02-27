@@ -6,7 +6,9 @@ following the LeRobot v3 format specification.
 """
 
 import json
+import logging
 import os
+import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +37,10 @@ class LocalStorageAdapter(StorageAdapter):
     with each episode having its own JSON file.
     """
 
+    _VALID_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+
+    logger = logging.getLogger(__name__)
+
     def __init__(self, base_path: str):
         """
         Initialize the local storage adapter.
@@ -46,6 +52,8 @@ class LocalStorageAdapter(StorageAdapter):
 
     def _get_annotations_dir(self, dataset_id: str) -> Path:
         """Get the annotations directory for a dataset."""
+        if not self._VALID_ID_PATTERN.match(dataset_id):
+            raise StorageError(f"Invalid dataset ID: '{dataset_id}'")
         return self.base_path / dataset_id / "annotations" / "episodes"
 
     def _get_annotation_path(self, dataset_id: str, episode_index: int) -> Path:
@@ -57,7 +65,8 @@ class LocalStorageAdapter(StorageAdapter):
         try:
             await aiofiles.os.makedirs(path, exist_ok=True)
         except OSError as e:
-            raise StorageError(f"Failed to create directory {path}: {e}", cause=e)
+            self.logger.exception("Failed to create annotations directory")
+            raise StorageError("Failed to create annotations directory", cause=e)
 
     async def get_annotation(
         self, dataset_id: str, episode_index: int
@@ -84,12 +93,14 @@ class LocalStorageAdapter(StorageAdapter):
                 return EpisodeAnnotationFile.model_validate(data)
 
         except json.JSONDecodeError as e:
+            self.logger.exception("Invalid JSON in annotation file")
             raise StorageError(
-                f"Invalid JSON in annotation file {file_path}: {e}", cause=e
+                "Invalid annotation file format", cause=e
             )
         except Exception as e:
+            self.logger.exception("Failed to read annotation file")
             raise StorageError(
-                f"Failed to read annotation file {file_path}: {e}", cause=e
+                "Failed to read annotation file", cause=e
             )
 
     async def save_annotation(

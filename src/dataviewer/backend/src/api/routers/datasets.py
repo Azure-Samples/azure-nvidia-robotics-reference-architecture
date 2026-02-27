@@ -6,6 +6,7 @@ and accessing episode information with HDF5 and LeRobot parquet support.
 """
 
 import io
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,6 +17,8 @@ from ..models.datasources import DatasetInfo, EpisodeData, EpisodeMeta, Trajecto
 from ..services.dataset_service import DatasetService, get_dataset_service
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 class DatasetCapabilities(BaseModel):
@@ -210,9 +213,10 @@ async def get_episode_frame(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to load frame %d for camera '%s'", frame_idx, camera)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to load frame: {str(e)}",
+            detail="Failed to load frame",
         )
 
 
@@ -256,7 +260,7 @@ async def get_episode_video(
     if not video_file.exists():
         raise HTTPException(
             status_code=404,
-            detail=f"Video file not found: {video_path}",
+            detail=f"Video not found for episode {episode_idx}, camera '{camera}'",
         )
 
     # Determine media type based on file extension

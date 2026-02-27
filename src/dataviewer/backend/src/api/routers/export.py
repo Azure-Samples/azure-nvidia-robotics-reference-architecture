@@ -7,6 +7,8 @@ frame editing, removal, and sub-task annotations applied.
 
 import asyncio
 import json
+import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,10 @@ from ..services.hdf5_exporter import (
 )
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
+
+_BASE_DATA_PATH = Path(os.environ.get("HMI_DATA_PATH", "./data")).resolve()
 
 
 class ImageTransformRequest(BaseModel):
@@ -144,13 +150,19 @@ async def export_episodes(
         )
 
     # Validate output path
-    output_path = Path(request.outputPath)
+    output_path = Path(request.outputPath).resolve()
+    if not str(output_path).startswith(str(_BASE_DATA_PATH)):
+        raise HTTPException(
+            status_code=400,
+            detail="Output path must be within the data directory",
+        )
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
+        logger.exception("Failed to create output path")
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid output path: {e}",
+            detail="Invalid output path",
         )
 
     try:
@@ -195,15 +207,15 @@ async def export_episodes(
             stats=result.stats,
         )
 
-    except ImportError as e:
+    except ImportError:
         raise HTTPException(
             status_code=501,
-            detail=f"Export not available: {e}",
+            detail="Export not available",
         )
-    except HDF5ExportError as e:
+    except HDF5ExportError:
         raise HTTPException(
             status_code=500,
-            detail=f"Export failed: {e}",
+            detail="Export failed",
         )
 
 
@@ -243,13 +255,19 @@ async def export_episodes_stream(
         )
 
     # Validate output path
-    output_path = Path(request.outputPath)
+    output_path = Path(request.outputPath).resolve()
+    if not str(output_path).startswith(str(_BASE_DATA_PATH)):
+        raise HTTPException(
+            status_code=400,
+            detail="Output path must be within the data directory",
+        )
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
+        logger.exception("Failed to create output path")
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid output path: {e}",
+            detail="Invalid output path",
         )
 
     async def event_generator():
@@ -352,11 +370,11 @@ async def export_episodes_stream(
             }
             yield f"event: complete\ndata: {json.dumps(complete_data)}\n\n"
 
-        except ImportError as e:
-            error_msg = f'Export not available: {e}'
+        except ImportError:
+            error_msg = 'Export not available'
             yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
-        except Exception as e:
-            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+        except Exception:
+            yield f"event: error\ndata: {json.dumps({'error': 'Export failed'})}\n\n"
 
     return StreamingResponse(
         event_generator(),

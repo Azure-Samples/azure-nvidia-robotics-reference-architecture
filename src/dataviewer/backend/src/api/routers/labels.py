@@ -7,6 +7,7 @@ and managing the set of available label options per dataset.
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 import aiofiles
@@ -52,7 +53,13 @@ def _get_base_path() -> str:
     return os.environ.get("HMI_DATA_PATH", "./data")
 
 
+def _validate_dataset_id(dataset_id: str) -> None:
+    if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", dataset_id):
+        raise HTTPException(status_code=400, detail="Invalid dataset ID")
+
+
 def _labels_path(dataset_id: str) -> Path:
+    _validate_dataset_id(dataset_id)
     base = Path(_get_base_path())
     return base / dataset_id / "meta" / "episode_labels.json"
 

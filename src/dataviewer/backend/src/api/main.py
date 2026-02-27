@@ -44,8 +44,8 @@ app.add_middleware(
         "http://localhost:5177",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
 )
 
 # Include routers - export must come before datasets to match longer paths first

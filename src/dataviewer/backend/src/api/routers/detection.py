@@ -6,7 +6,6 @@ and retrieving cached results.
 """
 
 import logging
-import sys
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -36,22 +35,20 @@ async def run_detection(
     returns detection results with bounding boxes and class labels.
     Results are cached for subsequent retrieval.
     """
-    print(f"\n{'='*60}", file=sys.stderr, flush=True)
-    print(f"[API] POST /detect called: dataset={dataset_id}, episode={episode_idx}", file=sys.stderr, flush=True)
-    print(f"[API] Request: model={request.model}, confidence={request.confidence}", file=sys.stderr, flush=True)
-    print(f"{'='*60}", file=sys.stderr, flush=True)
+    logger.info("POST /detect called: dataset=%s, episode=%d", dataset_id, episode_idx)
+    logger.info("Request: model=%s, confidence=%s", request.model, request.confidence)
     
     # Validate episode exists
     episode = await dataset_service.get_episode(dataset_id, episode_idx)
     if episode is None:
-        print(f"[API] ERROR: Episode not found", file=sys.stderr, flush=True)
+        logger.debug("Episode not found: dataset=%s, episode=%d", dataset_id, episode_idx)
         raise HTTPException(
             status_code=404,
             detail=f"Episode {episode_idx} not found in dataset '{dataset_id}'",
         )
 
     total_frames = episode.meta.length
-    print(f"[API] Episode has {total_frames} frames", file=sys.stderr, flush=True)
+    logger.debug("Episode %d has %d frames", episode_idx, total_frames)
 
     # Create frame image getter
     async def get_frame_image(frame_idx: int) -> bytes | None:
@@ -77,7 +74,7 @@ async def run_detection(
         logger.exception("Detection failed")
         raise HTTPException(
             status_code=500,
-            detail=f"Detection failed: {str(e)}",
+            detail="Detection failed",
         )
 
 

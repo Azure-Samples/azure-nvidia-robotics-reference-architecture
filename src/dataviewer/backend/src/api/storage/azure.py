@@ -5,6 +5,8 @@ Supports both SAS token and managed identity authentication.
 """
 
 import json
+import logging
+import re
 from datetime import datetime
 
 from ..models.annotations import EpisodeAnnotationFile
@@ -37,6 +39,10 @@ class AzureBlobStorageAdapter(StorageAdapter):
     Stores annotations in the container's annotations/episodes/ path,
     with each episode having its own JSON blob.
     """
+
+    _VALID_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+
+    logger = logging.getLogger(__name__)
 
     def __init__(
         self,
@@ -96,6 +102,8 @@ class AzureBlobStorageAdapter(StorageAdapter):
 
     def _get_blob_path(self, dataset_id: str, episode_index: int) -> str:
         """Get the blob path for an episode's annotations."""
+        if not self._VALID_ID_PATTERN.match(dataset_id):
+            raise StorageError(f"Invalid dataset ID: '{dataset_id}'")
         return f"{dataset_id}/annotations/episodes/episode_{episode_index:06d}.json"
 
     async def get_annotation(
@@ -126,12 +134,14 @@ class AzureBlobStorageAdapter(StorageAdapter):
         except ResourceNotFoundError:
             return None
         except json.JSONDecodeError as e:
+            self.logger.exception("Invalid JSON in annotation blob")
             raise StorageError(
-                f"Invalid JSON in blob {blob_path}: {e}", cause=e
+                "Invalid annotation file format", cause=e
             )
         except Exception as e:
+            self.logger.exception("Failed to read annotation blob")
             raise StorageError(
-                f"Failed to read blob {blob_path}: {e}", cause=e
+                "Failed to read annotation data", cause=e
             )
 
     async def save_annotation(
