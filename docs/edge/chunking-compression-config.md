@@ -14,8 +14,6 @@ keywords:
   - ros2 bag
 ---
 
-# Chunking and Compression Configuration
-
 Configure bag file chunking thresholds and per-topic compression for ROS 2 edge recording on NVIDIA Jetson devices. Correct settings prevent data loss from disk exhaustion and avoid CPU overload during recording sessions.
 
 ## Prerequisites
@@ -37,7 +35,7 @@ Orin Nano ships with a 60 GB eMMC/SSD. For sustained recording, install an M.2 N
 
 1. Install the M.2 NVMe drive into the Jetson carrier board's M.2 Key M slot (power off first).
 
-2. Identify the drive and create an ext4 partition:
+1. Identify the drive and create an ext4 partition:
 
 ```bash
 # Identify the NVMe device
@@ -48,7 +46,7 @@ sudo parted /dev/nvme0n1 --script mklabel gpt mkpart primary ext4 0% 100%
 sudo mkfs.ext4 -L recordings /dev/nvme0n1p1
 ```
 
-3. Mount the drive and configure auto-mount on boot:
+1. Mount the drive and configure auto-mount on boot:
 
 ```bash
 sudo mkdir -p /data/recordings
@@ -58,7 +56,7 @@ sudo mount /dev/nvme0n1p1 /data/recordings
 echo "/dev/nvme0n1p1 /data/recordings ext4 defaults,noatime 0 2" | sudo tee -a /etc/fstab
 ```
 
-4. Set ownership and verify write speed:
+1. Set ownership and verify write speed:
 
 ```bash
 sudo chown -R $USER:$USER /data/recordings
@@ -68,7 +66,7 @@ dd if=/dev/zero of=/data/recordings/test.bin bs=1M count=512 oflag=direct 2>&1 |
 rm /data/recordings/test.bin
 ```
 
-5. Confirm available space meets recording requirements (see [Storage Capacity Planning](#storage-capacity-planning)):
+1. Confirm available space meets recording requirements (see [Storage Capacity Planning](#storage-capacity-planning)):
 
 ```bash
 df -h /data/recordings
@@ -87,13 +85,13 @@ sudo apt update && sudo apt install -y \
   ros-humble-rosbag2-compression-zstd
 ```
 
-2. Create the configuration file on the Jetson device:
+1. Create the configuration file on the Jetson device:
 
 ```bash
 mkdir -p ~/ros2_ws/config
 ```
 
-3. Save the following YAML to `~/ros2_ws/config/recording_config.yaml`:
+1. Save the following YAML to `~/ros2_ws/config/recording_config.yaml`:
 
 ```yaml
 topics:
@@ -125,7 +123,7 @@ gap_detection:
 output_dir: /data/recordings
 ```
 
-4. Source the ROS 2 environment and verify topics are publishing before recording. The topic list depends on which drivers are running (camera, robot arm, IMU):
+1. Source the ROS 2 environment and verify topics are publishing before recording. The topic list depends on which drivers are running (camera, robot arm, IMU):
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -137,7 +135,7 @@ ros2 topic list
 ros2 topic hz /camera/color/image_raw
 ```
 
-5. Launch recording with bag chunking:
+1. Launch recording with bag chunking:
 
 ```bash
 ros2 bag record \
@@ -147,7 +145,7 @@ ros2 bag record \
   --config ~/ros2_ws/config/recording_config.yaml
 ```
 
-6. Verify the recorded bag after stopping the recording (Ctrl+C):
+1. Verify the recorded bag after stopping the recording (Ctrl+C):
 
 ```bash
 # List bag metadata and confirm all expected topics appear
@@ -160,30 +158,30 @@ ros2 bag info /data/recordings/<bag_directory>
 
 Each entry in the `topics` list controls recording frequency and compression for one ROS 2 topic. Field names match the schema defined in `config/recording_config.schema.json`.
 
-| Field          | Type     | Default  | Valid Values              | Description                                |
-| -------------- | -------- | -------- | ------------------------- | ------------------------------------------ |
-| `name`         | `string` | required | Any valid ROS 2 topic     | Topic name, must start with `/`            |
-| `frequency_hz` | `float`  | required | `(0, 1000]`               | Target recording frequency; downsamples if source publishes faster |
-| `compression`  | `string` | `none`   | `none`, `lz4`, `zstd`    | Compression algorithm applied to messages  |
+| Field          | Type     | Default  | Valid Values                     | Description                                                        |
+| -------------- | -------- | -------- | -------------------------------- | ------------------------------------------------------------------ |
+| `name`         | `string` | required | Any valid ROS 2 topic            | Topic name, must start with `/`                                    |
+| `frequency_hz` | `float`  | required | `(0, 1000]`                      | Target recording frequency; downsamples if source publishes faster |
+| `compression`  | `string` | `none`   | `none`, `lz4`, `zstd`            | Compression algorithm applied to messages                          |
 
 ### Compression Algorithm Comparison
 
-| Algorithm | Ratio (images) | Ratio (sensor) | Encode Speed (ARM) | CPU Cost | Use Case                        |
-| --------- | -------------- | -------------- | ------------------- | -------- | ------------------------------- |
-| `none`    | 1.0x           | 1.0x           | N/A                 | Zero     | Debugging, short captures       |
-| `lz4`     | 1.5 -- 2.0x    | 2.0 -- 3.0x   | ~500 MB/s           | Low      | High-frequency streams (≥100 Hz) [^3] |
-| `zstd`    | 2.5 -- 6.0x    | 3.0 -- 10.0x  | 50 -- 300 MB/s      | Medium   | Image topics, bandwidth-limited uploads [^2] [^6] |
+| Algorithm | Ratio (images) | Ratio (sensor) | Encode Speed (ARM) | CPU Cost | Use Case                                          |
+| --------- | -------------- | -------------- | ------------------ | -------- | ------------------------------------------------- |
+| `none`    | 1.0x           | 1.0x           | N/A                | Zero     | Debugging, short captures                         |
+| `lz4`     | 1.5 -- 2.0x    | 2.0 -- 3.0x    | ~500 MB/s          | Low      | High-frequency streams (≥100 Hz) [^3]             |
+| `zstd`    | 2.5 -- 6.0x    | 3.0 -- 10.0x   | 50 -- 300 MB/s     | Medium   | Image topics, bandwidth-limited uploads [^2] [^6] |
 
 ### Bag Chunking Parameters
 
 Bag-level chunking controls how recorded data splits into files and flushes to disk. These parameters are passed to `ros2 bag record`, not defined in the per-topic YAML schema.
 
-| Parameter          | Default      | Recommended          | Description                                    |
-| ------------------ | ------------ | -------------------- | ---------------------------------------------- |
-| `--max-bag-size`   | `0` (no split) | `1073741824` (1 GB) | Split bag file at this size in bytes           |
-| `--max-bag-duration`| `0` (no split)| `300` (5 min)       | Split bag file after this duration in seconds  |
-| `--max-cache-size` | `100 MB`     | `104857600` (100 MB) | In-memory write buffer before flushing to disk |
-| `--storage`        | `sqlite3`    | `mcap`               | Storage format; MCAP supports chunk-level compression [^5] |
+| Parameter            | Default        | Recommended          | Description                                                |
+| -------------------- | -------------- | -------------------- | ---------------------------------------------------------- |
+| `--max-bag-size`     | `0` (no split) | `1073741824` (1 GB)  | Split bag file at this size in bytes                       |
+| `--max-bag-duration` | `0` (no split) | `300` (5 min)        | Split bag file after this duration in seconds              |
+| `--max-cache-size`   | `100 MB`       | `104857600` (100 MB) | In-memory write buffer before flushing to disk             |
+| `--storage`          | `sqlite3`      | `mcap`               | Storage format; MCAP supports chunk-level compression [^5] |
 
 > [!TIP]
 > Set `--max-bag-size` to 1 GB on Jetson Orin Nano. Smaller bag files enable incremental uploads and reduce data loss if a recording session is interrupted.
@@ -199,10 +197,10 @@ Bag-level chunking controls how recorded data splits into files and flushes to d
 
 ### Gap Detection
 
-| Field          | Type     | Default   | Valid Range            | Description                                    |
-| -------------- | -------- | --------- | ---------------------- | ---------------------------------------------- |
-| `threshold_ms` | `float`  | `100.0`   | `> 0`                 | Flag gaps longer than this threshold           |
-| `severity`     | `string` | `warning` | `warning`, `error`, `critical` | Severity level for gap detection events |
+| Field          | Type     | Default   | Valid Range                       | Description                             |
+| -------------- | -------- | --------- | --------------------------------- | --------------------------------------- |
+| `threshold_ms` | `float`  | `100.0`   | `> 0`                             | Flag gaps longer than this threshold    |
+| `severity`     | `string` | `warning` | `warning`, `error`, `critical`    | Severity level for gap detection events |
 
 ## Storage Capacity Planning
 
@@ -212,12 +210,12 @@ Estimates based on observed data: ~1.3 GB raw per 20-second episode with full se
 
 Raw GB/hour per modality, computed from ROS 2 message sizes at the reference platform's publish rates:
 
-| Modality       | Message Size      | Frequency | Raw Rate   | Raw GB/hour |
-| -------------- | ----------------- | --------- | ---------- | ----------- |
-| RGB camera     | 480 × 848 × 3 B = 1.22 MB | 30 Hz | 36.6 MB/s | 129 |
-| Depth camera   | 480 × 848 × 2 B = 0.81 MB | 30 Hz | 24.4 MB/s | 81  |
-| Joint states   | ~5.6 KB (6-DOF `JointState`) | 100 Hz | 0.56 MB/s | 2   |
-| IMU            | ~30 KB (`Imu` + covariance matrices) | 200 Hz | 6.1 MB/s | 22 |
+| Modality     | Message Size                         | Frequency | Raw Rate  | Raw GB/hour |
+| ------------ | ------------------------------------ | --------- | --------- | ----------- |
+| RGB camera   | 480 × 848 × 3 B = 1.22 MB            | 30 Hz     | 36.6 MB/s | 129         |
+| Depth camera | 480 × 848 × 2 B = 0.81 MB            | 30 Hz     | 24.4 MB/s | 81          |
+| Joint states | ~5.6 KB (6-DOF `JointState`)         | 100 Hz    | 0.56 MB/s | 2           |
+| IMU          | ~30 KB (`Imu` + covariance matrices) | 200 Hz    | 6.1 MB/s  | 22          |
 
 Compressed estimates divide the raw rate by the effective compression ratio at each zstd level. Ratios are interpolated from Silesia corpus benchmarks [^2] and adjusted for ROS 2 message payloads:
 
@@ -231,11 +229,11 @@ Cross-check: 1.3 GB raw ÷ 20 seconds = 0.065 GB/s = 234 GB/hour, matching the f
 
 ### Estimated Storage Consumption (GB/hour)
 
-| Modality               | Raw   | zstd-1 | zstd-3 | zstd-6 |
-| ---------------------- | ----- | ------ | ------ | ------ |
-| Camera only (RGB-D)    | 210   | 84     | 52     | 35     |
-| Camera + joints        | 212   | 85     | 53     | 35     |
-| Camera + joints + IMU  | 234   | 94     | 59     | 39     |
+| Modality              | Raw | zstd-1 | zstd-3 | zstd-6 |
+| --------------------- | --- | ------ | ------ | ------ |
+| Camera only (RGB-D)   | 210 |     84 |     52 |     35 |
+| Camera + joints       | 212 |     85 |     53 |     35 |
+| Camera + joints + IMU | 234 |     94 |     59 |     39 |
 
 Camera data dominates storage consumption. Joint states and IMU contribute < 1% of total volume but are critical for policy training.
 
@@ -243,11 +241,11 @@ Camera data dominates storage consumption. Joint states and IMU contribute < 1% 
 
 Device storage capacities from NVIDIA Jetson module specifications [^4]. Orin Nano base SSD is 60 GB; AGX Orin typically ships with 500 GB+ NVMe [^1].
 
-| Device          | Usable Storage | zstd-1   | zstd-3   | zstd-6    |
-| --------------- | -------------- | -------- | -------- | --------- |
-| Orin Nano (SSD) | 50 GB          | 32 min   | 51 min   | 1 hr 17 min |
-| Orin Nano (M.2) | 200 GB         | 2 hr 8 min | 3 hr 23 min | 5 hr 8 min |
-| AGX Orin (NVMe) | 450 GB         | 4 hr 47 min| 7 hr 37 min | 11 hr 32 min |
+| Device          | Usable Storage | zstd-1      | zstd-3      | zstd-6       |
+| --------------- | -------------- | ----------- | ----------- | ------------ |
+| Orin Nano (SSD) | 50 GB          | 32 min      | 51 min      | 1 hr 17 min  |
+| Orin Nano (M.2) | 200 GB         | 2 hr 8 min  | 3 hr 23 min | 5 hr 8 min   |
+| AGX Orin (NVMe) | 450 GB         | 4 hr 47 min | 7 hr 37 min | 11 hr 32 min |
 
 Usable storage assumes 15% reserved for OS and applications. Durations use the full sensor suite: 1 RGB camera (480 × 848, 30 Hz) + 1 depth camera (480 × 848, 30 Hz) + 6-DOF joint states (100 Hz) + 1 IMU (200 Hz) — 234 GB/hour raw, compressed at respective zstd levels.
 
@@ -357,7 +355,6 @@ Post-processing or LeRobot conversion fails with codec errors (`zstd: error` in 
 
 ## Related Documentation
 
-- [Recording Configuration Schema](../../config/README.md) for full YAML schema reference and validation
 - [LeRobot Inference](../lerobot-inference.md) for policy deployment after training on recorded data
 - [Security Guide](../security-guide.md) for data encryption of recorded bags at rest
 
