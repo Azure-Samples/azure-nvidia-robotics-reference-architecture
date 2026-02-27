@@ -1,24 +1,4 @@
 {
-    "aks_a10": {
-        "spec": {
-            "tolerations": [
-                {
-                    "key": "kubernetes.azure.com/scalesetpriority",
-                    "value": "spot",
-                    "effect": "NoSchedule",
-                    "operator": "Equal"
-                },
-                {
-                    "key": "nvidia.com/gpu",
-                    "effect": "NoSchedule",
-                    "operator": "Exists"
-                }
-            ],
-            "nodeSelector": {
-                "node.kubernetes.io/instance-type": "${GPU_INSTANCE_TYPE}"
-            }
-        }
-    },
     "workload_identity": {
         "metadata": {
             "labels": {

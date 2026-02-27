@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   link-lang-check:
     name: Link Language Check
@@ -20,23 +24,21 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
 
       - name: Create logs directory
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path logs | Out-Null
 
       - name: Run Link Language Check
-        shell: pwsh
         run: scripts/linting/Invoke-LinkLanguageCheck.ps1
         continue-on-error: ${{ inputs.soft-fail }}
 
       - name: Upload link language check results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: link-lang-check-results
           path: logs/link-lang-check-results.json

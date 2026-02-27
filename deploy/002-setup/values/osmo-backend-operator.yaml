@@ -26,3 +26,8 @@ global:
           memory: "256Mi"
         limits:
           memory: "1Gi"
+
+# Disable backend-test-runner CronJob — image nvcr.io/nvidia/osmo/backend-test-runner
+# is not in ACR and NVCR requires authentication. Enable after importing image to ACR.
+backendTestRunner:
+  enabled: false

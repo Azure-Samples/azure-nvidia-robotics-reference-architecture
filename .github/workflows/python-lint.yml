@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   ruff:
     name: Ruff Lint and Format Check
@@ -20,7 +24,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
 
@@ -31,27 +35,27 @@ jobs:
         id: ruff-check
         continue-on-error: true
         run: |
-          uv run ruff check src/ tests/ --output-format github 2>&1 | tee ruff-check-results.txt
-          EXIT_CODE=${PIPESTATUS[0]}
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "RUFF_CHECK_FAILED=true" >> "$GITHUB_ENV"
-          fi
-          exit "$EXIT_CODE"
+          uvx ruff check src/ tests/ --output-format github 2>&1 | Tee-Object -FilePath ruff-check-results.txt
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            'RUFF_CHECK_FAILED=true' >> $env:GITHUB_ENV
+          }
+          exit $exitCode
 
       - name: Ruff format check
         id: ruff-format
         continue-on-error: true
         run: |
-          uv run ruff format --check --diff src/ tests/ 2>&1 | tee ruff-format-results.txt
-          EXIT_CODE=${PIPESTATUS[0]}
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "RUFF_FORMAT_FAILED=true" >> "$GITHUB_ENV"
-          fi
-          exit "$EXIT_CODE"
+          uvx ruff format --check --diff src/ tests/ 2>&1 | Tee-Object -FilePath ruff-format-results.txt
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            'RUFF_FORMAT_FAILED=true' >> $env:GITHUB_ENV
+          }
+          exit $exitCode
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: python-lint-results
           path: |
@@ -62,5 +66,5 @@ jobs:
       - name: Fail job if errors found
         if: (env.RUFF_CHECK_FAILED == 'true' || env.RUFF_FORMAT_FAILED == 'true') && !inputs.soft-fail
         run: |
-          echo "::error::Ruff violations detected. Run 'uv run ruff check --fix src/ tests/' and 'uv run ruff format src/ tests/' locally."
+          Write-Output "::error::Ruff violations detected. Run 'uvx ruff check --fix src/ tests/' and 'uvx ruff format src/ tests/' locally."
           exit 1
