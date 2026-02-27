@@ -319,6 +319,10 @@ Use [BATS-core](https://github.com/bats-core/bats-core) for shell script tests, 
 
 Documentation stays current through update triggers, ownership rules, and freshness reviews. See the [Documentation Maintenance](docs/contributing/documentation-maintenance.md) guide for the complete policy including review criteria, PR requirements, and release lifecycle.
 
+## Governance
+
+This project uses a corporate-sponsored maintainer model. See [GOVERNANCE.md](GOVERNANCE.md) for decision-making processes, roles, and how governance can change.
+
 ## Code of Conduct
 
 This project adopts the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). See [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) for details, or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions.

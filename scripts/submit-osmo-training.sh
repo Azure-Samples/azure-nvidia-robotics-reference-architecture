@@ -25,9 +25,15 @@ WORKFLOW OPTIONS:
     -t, --task NAME               IsaacLab task (default: Isaac-Velocity-Rough-Anymal-C-v0)
     -n, --num-envs COUNT          Number of environments (default: 2048)
     -m, --max-iterations N        Maximum iterations (empty to unset)
-    -i, --image IMAGE             Container image (default: nvcr.io/nvidia/isaac-lab:2.2.0)
+    -i, --image IMAGE             Container image (default: nvcr.io/nvidia/isaac-lab:2.3.2)
     -p, --payload-root DIR        Runtime extraction root (default: /workspace/isaac_payload)
     -b, --backend BACKEND         Training backend: skrl (default), rsl_rl
+
+RESOURCE OPTIONS:
+        --gpu COUNT               Number of GPUs (default: 1)
+        --cpu COUNT               CPU cores (default: 30)
+        --memory SIZE             Memory with unit (default: 400Gi)
+        --storage SIZE            Storage with unit (default: 200Gi)
 
 CHECKPOINT OPTIONS:
     -c, --checkpoint-uri URI      MLflow checkpoint artifact URI
@@ -43,6 +49,7 @@ AZURE CONTEXT:
 OTHER:
         --sleep-after-unpack VALUE  Sleep seconds post-unpack (for debugging)
     -s, --run-smoke-test          Enable Azure connectivity smoke test
+        --use-local-osmo          Use local osmo-dev CLI instead of production osmo
     -h, --help                    Show this help message
 
 Values resolved: CLI > Environment variables > Terraform outputs
@@ -81,9 +88,14 @@ workflow="$REPO_ROOT/workflows/osmo/train.yaml"
 task="${TASK:-Isaac-Velocity-Rough-Anymal-C-v0}"
 num_envs="${NUM_ENVS:-2048}"
 max_iterations="${MAX_ITERATIONS:-}"
-image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.2.0}"
+image="${IMAGE:-nvcr.io/nvidia/isaac-lab:2.3.2}"
 payload_root="${PAYLOAD_ROOT:-/workspace/isaac_payload}"
 backend="${TRAINING_BACKEND:-skrl}"
+
+gpu="${OSMO_GPU:-1}"
+cpu="${OSMO_CPU:-30}"
+memory="${OSMO_MEMORY:-400Gi}"
+storage="${OSMO_STORAGE:-200Gi}"
 
 checkpoint_uri="${CHECKPOINT_URI:-}"
 checkpoint_mode="${CHECKPOINT_MODE:-from-scratch}"
@@ -96,6 +108,7 @@ workspace_name="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
 
 sleep_after_unpack="${SLEEP_AFTER_UNPACK:-}"
 run_smoke="${RUN_AZURE_SMOKE_TEST:-0}"
+use_local_osmo=false
 forward_args=()
 
 #------------------------------------------------------------------------------
@@ -112,6 +125,10 @@ while [[ $# -gt 0 ]]; do
     -i|--image)                   image="$2"; shift 2 ;;
     -p|--payload-root)            payload_root="$2"; shift 2 ;;
     -b|--backend)                 backend="$2"; shift 2 ;;
+    --gpu)                        gpu="$2"; shift 2 ;;
+    --cpu)                        cpu="$2"; shift 2 ;;
+    --memory)                     memory="$2"; shift 2 ;;
+    --storage)                    storage="$2"; shift 2 ;;
     -c|--checkpoint-uri)          checkpoint_uri="$2"; shift 2 ;;
     -M|--checkpoint-mode)         checkpoint_mode="$2"; shift 2 ;;
     -r|--register-checkpoint)     register_checkpoint="$2"; shift 2 ;;
@@ -121,6 +138,7 @@ while [[ $# -gt 0 ]]; do
     --azure-workspace-name)       workspace_name="$2"; shift 2 ;;
     --sleep-after-unpack)         sleep_after_unpack="$2"; shift 2 ;;
     -s|--run-smoke-test)          run_smoke="1"; shift ;;
+    --use-local-osmo)             use_local_osmo=true; shift ;;
     --)                           shift; forward_args=("$@"); break ;;
     *)                            forward_args+=("$1"); shift ;;
   esac
@@ -129,6 +147,8 @@ done
 #------------------------------------------------------------------------------
 # Validation
 #------------------------------------------------------------------------------
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools osmo zip base64
 
@@ -195,6 +215,10 @@ submit_args=(
   "register_checkpoint=$register_checkpoint"
   "sleep_after_unpack=$sleep_after_unpack"
   "training_backend=$backend"
+  "gpu=$gpu"
+  "cpu=$cpu"
+  "memory=$memory"
+  "storage=$storage"
 )
 
 [[ -n "$subscription_id" ]] && submit_args+=("azure_subscription_id=$subscription_id")
