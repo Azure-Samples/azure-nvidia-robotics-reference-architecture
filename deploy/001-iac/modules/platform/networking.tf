@@ -68,6 +68,10 @@ resource "azurerm_public_ip" "nat_gateway" {
   allocation_method   = "Static"
   sku                 = "Standard"
   zones               = ["1"]
+
+  lifecycle {
+    ignore_changes = [ip_tags]
+  }
 }
 
 // NAT Gateway

@@ -23,6 +23,7 @@ OPTIONS:
     --purge-postgres        Drop all OSMO tables from PostgreSQL (destructive)
     --purge-redis           Flush OSMO keys from Redis (destructive)
     --db-name NAME          PostgreSQL database name (default: osmo)
+    --use-local-osmo        Use local osmo-dev CLI instead of production osmo
     --config-preview        Print configuration and exit
 
 EXAMPLES:
@@ -39,6 +40,7 @@ delete_mek=false
 purge_postgres=false
 purge_redis=false
 db_name="osmo"
+use_local_osmo=false
 config_preview=false
 
 while [[ $# -gt 0 ]]; do
@@ -51,10 +53,13 @@ while [[ $# -gt 0 ]]; do
     --purge-postgres)     purge_postgres=true; shift ;;
     --purge-redis)        purge_redis=true; shift ;;
     --db-name)            db_name="$2"; shift 2 ;;
+    --use-local-osmo)     use_local_osmo=true; shift ;;
     --config-preview)     config_preview=true; shift ;;
     *)                    fatal "Unknown option: $1" ;;
   esac
 done
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools az terraform kubectl helm jq
 

@@ -51,6 +51,13 @@ production-ready security posture.
 | Azure Key Vault | CSI driver configured         | [Key Vault CSI driver](https://learn.microsoft.com/azure/aks/csi-secrets-store-driver)        |
 | Terraform state | Local backend (not encrypted) | [Terraform Azure backend](https://developer.hashicorp.com/terraform/language/backend/azurerm) |
 
+### Container Security
+
+| Configuration        | Default                                           | Reference                                                                                                            |
+|----------------------|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| Microsoft Defender   | Configurable (`should_enable_microsoft_defender`) | [Defender for Containers](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-containers-introduction) |
+| Azure Policy for AKS | Enabled                                           | [Azure Policy for AKS](https://learn.microsoft.com/azure/aks/use-azure-policy)                                       |
+
 ### Kubernetes Security
 
 | Configuration | Default                    | Reference                                                               |
@@ -90,18 +97,18 @@ production-ready security posture.
 > compliance obligations, and threat model determine the complete set of controls
 > you need.
 
-| Category   | Consideration                                             | Reference                                                                                                                       |
-|------------|-----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| Network    | Evaluate private vs. public AKS API server                | [AKS private cluster](https://learn.microsoft.com/azure/aks/private-clusters)                                                   |
-| Network    | Define Kubernetes network policies for workload isolation | [AKS network policies](https://learn.microsoft.com/azure/aks/use-network-policies)                                              |
-| Identity   | Review managed identity permissions and scope             | [AKS managed identity](https://learn.microsoft.com/azure/aks/use-managed-identity)                                              |
-| Identity   | Verify workload identity audience restrictions            | [Workload identity](https://learn.microsoft.com/azure/aks/workload-identity-overview)                                           |
-| Secrets    | Configure Key Vault access policies and rotation          | [Key Vault rotation](https://learn.microsoft.com/azure/key-vault/keys/how-to-configure-key-rotation)                            |
-| Secrets    | Migrate Terraform state to a remote encrypted backend     | [Terraform Azure backend](https://developer.hashicorp.com/terraform/language/backend/azurerm)                                   |
-| Compute    | Enable Defender for Containers                            | [Defender for Containers](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-containers-introduction)            |
-| Compute    | Scan container images for vulnerabilities                 | [Container image scanning](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-container-registries-introduction) |
-| Monitoring | Enable diagnostic settings on AKS and Key Vault           | [AKS diagnostics](https://learn.microsoft.com/azure/aks/monitor-aks)                                                            |
-| Compliance | Review Azure compliance offerings for your industry       | [Azure compliance](https://learn.microsoft.com/azure/compliance/)                                                               |
+| Category   | Consideration                                                       | Reference                                                                                                                       |
+|------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| Network    | Evaluate private vs. public AKS API server                          | [AKS private cluster](https://learn.microsoft.com/azure/aks/private-clusters)                                                   |
+| Network    | Define Kubernetes network policies for workload isolation           | [AKS network policies](https://learn.microsoft.com/azure/aks/use-network-policies)                                              |
+| Identity   | Review managed identity permissions and scope                       | [AKS managed identity](https://learn.microsoft.com/azure/aks/use-managed-identity)                                              |
+| Identity   | Verify workload identity audience restrictions                      | [Workload identity](https://learn.microsoft.com/azure/aks/workload-identity-overview)                                           |
+| Secrets    | Configure Key Vault access policies and rotation                    | [Key Vault rotation](https://learn.microsoft.com/azure/key-vault/keys/how-to-configure-key-rotation)                            |
+| Secrets    | Migrate Terraform state to a remote encrypted backend               | [Terraform Azure backend](https://developer.hashicorp.com/terraform/language/backend/azurerm)                                   |
+| Compute    | Enable Defender for Containers (`should_enable_microsoft_defender`) | [Defender for Containers](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-containers-introduction)            |
+| Compute    | Scan container images for vulnerabilities                           | [Container image scanning](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-container-registries-introduction) |
+| Monitoring | Enable diagnostic settings on AKS and Key Vault                     | [AKS diagnostics](https://learn.microsoft.com/azure/aks/monitor-aks)                                                            |
+| Compliance | Review Azure compliance offerings for your industry                 | [Azure compliance](https://learn.microsoft.com/azure/compliance/)                                                               |
 
 ## Terraform State Security
 

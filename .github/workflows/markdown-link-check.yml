@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   markdown-link-check:
     name: Check Markdown Links
@@ -20,52 +24,39 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Get changed markdown files
         id: changed-files
-        shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- '*.md' | tr '\n' ' ')
-          else
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT HEAD~1 HEAD -- '*.md' | tr '\n' ' ')
-          fi
-          {
-            echo "files=$CHANGED_FILES"
-            if [ -z "$CHANGED_FILES" ]; then
-              echo "has_changes=false"
-            else
-              echo "has_changes=true"
-            fi
-          } >> "$GITHUB_OUTPUT"
-          if [ -n "$CHANGED_FILES" ]; then
-            echo "Changed markdown files: $CHANGED_FILES"
-          fi
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $changedFiles = (git diff --name-only --diff-filter=ACMRT '${{ github.event.pull_request.base.sha }}' '${{ github.sha }}' -- '*.md') -join ' '
+          } else {
+            $changedFiles = (git diff --name-only --diff-filter=ACMRT HEAD~1 HEAD -- '*.md') -join ' '
+          }
+          "files=$changedFiles" >> $env:GITHUB_OUTPUT
+          if ([string]::IsNullOrWhiteSpace($changedFiles)) {
+            'has_changes=false' >> $env:GITHUB_OUTPUT
+          } else {
+            'has_changes=true' >> $env:GITHUB_OUTPUT
+            Write-Output "Changed markdown files: $changedFiles"
+          }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4.1.0
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
+      - name: Setup Node.js and install dependencies
         if: steps.changed-files.outputs.has_changes == 'true'
-        run: npm ci
+        uses: ./.github/actions/setup-node-deps
 
       - name: Create logs directory
         if: steps.changed-files.outputs.has_changes == 'true'
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path logs | Out-Null
 
       - name: Run markdown link check
         id: link-check
         if: steps.changed-files.outputs.has_changes == 'true'
-        shell: pwsh
         run: |
           $changedFiles = "${{ steps.changed-files.outputs.files }}" -split '\s+' | Where-Object { $_ }
           & scripts/linting/Markdown-Link-Check.ps1 -Path $changedFiles
@@ -73,11 +64,11 @@ jobs:
 
       - name: Skip notification
         if: steps.changed-files.outputs.has_changes != 'true'
-        run: echo "No markdown files changed, skipping link check."
+        run: Write-Output 'No markdown files changed, skipping link check.'
 
       - name: Upload markdown link check results
         if: steps.changed-files.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: markdown-link-check-results
           path: logs/markdown-link-check-results.json
@@ -85,7 +76,6 @@ jobs:
 
       - name: Check results and fail if needed
         if: steps.changed-files.outputs.has_changes == 'true' && !inputs.soft-fail && steps.link-check.outcome == 'failure'
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           Write-CIAnnotation -Level Error -Message 'Markdown link check found broken links — see annotations and step summary above for details'
