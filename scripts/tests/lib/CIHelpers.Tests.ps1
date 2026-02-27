@@ -283,6 +283,33 @@ Describe 'Set-CIOutput' -Tag 'Unit' {
         }
     }
 
+    Context 'GitHub Actions - null environment variable fallback' {
+        BeforeEach {
+            Clear-MockCIEnvironment
+            $env:GITHUB_ACTIONS = 'true'
+            Mock Write-Warning { } -ModuleName CIHelpers
+            Mock Write-Verbose { } -ModuleName CIHelpers
+        }
+
+        AfterEach {
+            Clear-MockCIEnvironment
+        }
+
+        It 'Emits warning when GITHUB_OUTPUT is not set' {
+            Set-CIOutput -Name 'test' -Value 'value'
+            Should -Invoke -CommandName Write-Warning -ModuleName CIHelpers -ParameterFilter {
+                $Message -match 'GITHUB_OUTPUT is not set'
+            }
+        }
+
+        It 'Falls back to verbose logging' {
+            Set-CIOutput -Name 'test' -Value 'value'
+            Should -Invoke -CommandName Write-Verbose -ModuleName CIHelpers -ParameterFilter {
+                $Message -match 'CI output: test=value'
+            }
+        }
+    }
+
     Context 'Azure DevOps' {
         BeforeEach {
             Clear-MockCIEnvironment
@@ -354,6 +381,33 @@ Describe 'Set-CIEnv' -Tag 'Unit' {
             Set-CIEnv -Name 'MULTI' -Value "line1`nline2"
             $content = Get-Content $script:mockFiles.Env -Raw
             $content | Should -Match 'MULTI<<EOF_'
+        }
+    }
+
+    Context 'GitHub Actions - null environment variable fallback' {
+        BeforeEach {
+            Clear-MockCIEnvironment
+            $env:GITHUB_ACTIONS = 'true'
+            Mock Write-Warning { } -ModuleName CIHelpers
+            Mock Write-Verbose { } -ModuleName CIHelpers
+        }
+
+        AfterEach {
+            Clear-MockCIEnvironment
+        }
+
+        It 'Emits warning when GITHUB_ENV is not set' {
+            Set-CIEnv -Name 'MY_VAR' -Value 'value'
+            Should -Invoke -CommandName Write-Warning -ModuleName CIHelpers -ParameterFilter {
+                $Message -match 'GITHUB_ENV is not set'
+            }
+        }
+
+        It 'Falls back to verbose logging' {
+            Set-CIEnv -Name 'MY_VAR' -Value 'value'
+            Should -Invoke -CommandName Write-Verbose -ModuleName CIHelpers -ParameterFilter {
+                $Message -match 'CI env: MY_VAR=value'
+            }
         }
     }
 
@@ -448,6 +502,33 @@ Describe 'Write-CIStepSummary' -Tag 'Unit' {
         It 'Warns when path does not exist' {
             Write-CIStepSummary -Path 'TestDrive:/nonexistent.md' -WarningVariable w 3>$null
             $w | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'GitHub Actions - null environment variable fallback' {
+        BeforeEach {
+            Clear-MockCIEnvironment
+            $env:GITHUB_ACTIONS = 'true'
+            Mock Write-Warning { } -ModuleName CIHelpers
+            Mock Write-Verbose { } -ModuleName CIHelpers
+        }
+
+        AfterEach {
+            Clear-MockCIEnvironment
+        }
+
+        It 'Emits warning when GITHUB_STEP_SUMMARY is not set' {
+            Write-CIStepSummary -Content '## Results'
+            Should -Invoke -CommandName Write-Warning -ModuleName CIHelpers -ParameterFilter {
+                $Message -match 'GITHUB_STEP_SUMMARY is not set'
+            }
+        }
+
+        It 'Falls back to verbose logging' {
+            Write-CIStepSummary -Content '## Results'
+            Should -Invoke -CommandName Write-Verbose -ModuleName CIHelpers -ParameterFilter {
+                $Message -match 'Step summary: ## Results'
+            }
         }
     }
 
