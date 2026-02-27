@@ -31,7 +31,7 @@
         # Require explicit parameter types
         PSUseCompatibleSyntax = @{
             Enable = $true
-            TargetVersions = @('5.1', '7.0', '7.2')
+            TargetVersions = @('7.0', '7.2')
         }
 
         # Enforce proper comment-based help

@@ -4,10 +4,10 @@ workflow:
     exec_timeout: 23h
   resources:
     default:
-      gpu: 1
-      cpu: 8
-      memory: 48Gi
-      storage: 80Gi
+      gpu: {{ gpu }}
+      cpu: {{ cpu }}
+      memory: {{ memory }}
+      storage: {{ storage }}
   tasks:
     - name: isaac-training
       image: "{{ image }}"
@@ -15,6 +15,7 @@ workflow:
         - /bin/bash
         - /tmp/entry.sh
       environment:
+        NVIDIA_DRIVER_CAPABILITIES: "all"
         TASK: "{{ task }}"
         NUM_ENVS: "{{ num_envs }}"
         MAX_ITERATIONS: "{{ max_iterations }}"
@@ -76,7 +77,7 @@ workflow:
             bash "${TRAINING_ROOT}/scripts/train.sh" "${train_args[@]}"
 
 default-values:
-  image: nvcr.io/nvidia/isaac-lab:2.2.0
+  image: nvcr.io/nvidia/isaac-lab:2.3.2
   task: Isaac-Velocity-Rough-Anymal-C-v0
   num_envs: "2048"
   max_iterations: ""
@@ -95,4 +96,8 @@ default-values:
   checkpoint_mode: "from-scratch"
   register_checkpoint: ""
   training_backend: "skrl"
+  gpu: "1"
+  cpu: "30"
+  memory: 400Gi
+  storage: 200Gi
 

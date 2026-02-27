@@ -3,8 +3,10 @@
 set -o errexit -o nounset
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck disable=SC1091
 # shellcheck source=defaults.conf
 source "$SCRIPT_DIR/defaults.conf"
 
@@ -29,6 +31,8 @@ OPTIONS:
     --force-mek             Replace existing MEK (data loss warning)
     --mek-config-file PATH  Use existing MEK config file
     --skip-service-config   Skip service_base_url configuration
+    --skip-preflight        Skip preflight version checks
+    --use-local-osmo        Use local osmo-dev CLI instead of production osmo
     --config-preview        Print configuration and exit
 
 EXAMPLES:
@@ -41,6 +45,8 @@ EOF
 tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
 chart_version="$OSMO_CHART_VERSION"
 image_version="$OSMO_IMAGE_VERSION"
+[[ "$OSMO_USE_PRERELEASE" == "true" ]] && chart_version="$OSMO_PRERELEASE_CHART_VERSION"
+[[ "$OSMO_USE_PRERELEASE" == "true" ]] && image_version="$OSMO_PRERELEASE_IMAGE_VERSION"
 use_acr=false
 acr_name=""
 osmo_identity_client_id=""
@@ -49,14 +55,18 @@ skip_mek=false
 force_mek=false
 mek_config_file=""
 skip_service_config=false
+skip_preflight=false
+use_local_osmo=false
 config_preview=false
+chart_version_set=false
+image_version_set=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)             show_help; exit 0 ;;
     -t|--tf-dir)           tf_dir="$2"; shift 2 ;;
-    --chart-version)       chart_version="$2"; shift 2 ;;
-    --image-version)       image_version="$2"; shift 2 ;;
+    --chart-version)       chart_version="$2"; chart_version_set=true; shift 2 ;;
+    --image-version)       image_version="$2"; image_version_set=true; shift 2 ;;
     --use-acr)             use_acr=true; shift ;;
     --acr-name)            acr_name="$2"; use_acr=true; shift 2 ;;
     --osmo-identity-client-id) osmo_identity_client_id="$2"; shift 2 ;;
@@ -65,12 +75,21 @@ while [[ $# -gt 0 ]]; do
     --force-mek)           force_mek=true; shift ;;
     --mek-config-file)     mek_config_file="$2"; shift 2 ;;
     --skip-service-config) skip_service_config=true; shift ;;
+    --skip-preflight)      skip_preflight=true; shift ;;
+    --use-local-osmo)      use_local_osmo=true; shift ;;
     --config-preview)      config_preview=true; shift ;;
     *)                     fatal "Unknown option: $1" ;;
   esac
 done
 
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
+
 require_tools az terraform kubectl helm jq openssl envsubst
+
+run_preflight_checks() {
+  section "Preflight Version Checks"
+  validate_version_pair "$chart_version" "$image_version" "$chart_version_set" "$image_version_set"
+}
 
 #------------------------------------------------------------------------------
 # Gather Configuration
@@ -213,6 +232,18 @@ ingress_manifest="$SCRIPT_DIR/manifests/internal-lb-ingress.yaml"
 [[ -f "$ingress_manifest" ]] && kubectl apply -f "$ingress_manifest"
 
 #------------------------------------------------------------------------------
+# Configure NGC Authentication (pre-release images)
+#------------------------------------------------------------------------------
+
+nvcr_auth_active=false
+if [[ "$use_acr" == "false" ]] && is_prerelease_tag "$image_version"; then
+  [[ -z "$NGC_API_KEY" ]] && fatal "NGC_API_KEY required for pre-release images from nvcr.io. Export NGC_API_KEY or use --use-acr."
+  section "Configure NGC Authentication"
+  create_nvcr_pull_secret "$NS_OSMO_CONTROL_PLANE" "$NGC_API_KEY" "$NVCR_PULL_SECRET"
+  nvcr_auth_active=true
+fi
+
+#------------------------------------------------------------------------------
 # Configure Helm Repository
 #------------------------------------------------------------------------------
 
@@ -221,6 +252,12 @@ if [[ "$use_acr" == "false" ]]; then
   info "Adding OSMO Helm repository..."
   helm repo add osmo "$HELM_REPO_OSMO" 2>/dev/null || true
   helm repo update osmo
+fi
+
+if [[ "$skip_preflight" == "true" ]]; then
+  warn "Skipping preflight version checks (--skip-preflight)"
+else
+  run_preflight_checks
 fi
 
 #------------------------------------------------------------------------------
@@ -235,6 +272,7 @@ base_helm_args=(
   --set-string "global.osmoImageTag=$image_version"
 )
 [[ "$use_acr" == "true" ]] && base_helm_args+=(--set "global.osmoImageLocation=${acr_login_server}/osmo")
+[[ "$nvcr_auth_active" == "true" ]] && base_helm_args+=(--set "global.imagePullSecret=$NVCR_PULL_SECRET")
 
 # Deploy service
 info "Deploying osmo/service..."
@@ -243,7 +281,7 @@ helm_args=("${base_helm_args[@]}" -f "$service_values" --set "services.postgres.
 [[ -n "$osmo_identity_client_id" ]] && helm_args+=(-f "$service_identity_values" --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$osmo_identity_client_id")
 
 if [[ "$use_acr" == "true" ]]; then
-  helm upgrade -i service "oci://${acr_login_server}/helm/osmo" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i service "oci://${acr_login_server}/helm/service" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 else
   helm upgrade -i service osmo/service "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 fi
@@ -261,10 +299,10 @@ fi
 
 # Deploy web-ui
 info "Deploying osmo/web-ui..."
-helm_args=("${base_helm_args[@]}" -f "$ui_values")
+helm_args=("${base_helm_args[@]}" -f "$ui_values" --set "services.ui.apiHostname=osmo-service.${NS_OSMO_CONTROL_PLANE}.svc.cluster.local:80")
 
 if [[ "$use_acr" == "true" ]]; then
-  helm upgrade -i ui "oci://${acr_login_server}/helm/ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
+  helm upgrade -i ui "oci://${acr_login_server}/helm/web-ui" "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 else
   helm upgrade -i ui osmo/web-ui "${helm_args[@]}" --wait --timeout "$TIMEOUT_DEPLOY"
 fi
@@ -282,6 +320,7 @@ if [[ "$skip_service_config" == "false" ]]; then
     [[ -f "$service_config_template" ]] || fatal "Service config template not found: $service_config_template"
     export SERVICE_BASE_URL="$service_url"
     envsubst < "$service_config_template" > "$CONFIG_DIR/out/service-config.json"
+    osmo_login_and_setup "$service_url"
     info "Applying service configuration (service_base_url: $service_url)..."
     osmo config update SERVICE --file "$CONFIG_DIR/out/service-config.json" --description "Set service base URL for UI"
   else

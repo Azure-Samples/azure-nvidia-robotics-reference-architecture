@@ -4,15 +4,15 @@ Infrastructure deployment and cluster configuration for the robotics reference a
 
 ## 📖 Terminology Glossary
 
-| Term | Definition |
-| --- | --- |
-| Deploy | Provision Azure infrastructure or install cluster components using Terraform or deployment scripts. |
-| Setup | Post-deploy configuration and access steps for the cluster and workloads. |
-| Install | Install local client tools or CLIs (for example, Azure VPN Client). |
-| Cleanup | Remove cluster components while keeping Azure infrastructure intact. |
-| Uninstall | Run uninstall scripts that remove deployed cluster components. |
-| Destroy | Delete Azure infrastructure (Terraform destroy or resource group deletion). |
-| Teardown | Avoid in docs; use Destroy for infrastructure removal. |
+| Term      | Definition                                                                                          |
+|-----------|-----------------------------------------------------------------------------------------------------|
+| Deploy    | Provision Azure infrastructure or install cluster components using Terraform or deployment scripts. |
+| Setup     | Post-deploy configuration and access steps for the cluster and workloads.                           |
+| Install   | Install local client tools or CLIs (for example, Azure VPN Client).                                 |
+| Cleanup   | Remove cluster components while keeping Azure infrastructure intact.                                |
+| Uninstall | Run uninstall scripts that remove deployed cluster components.                                      |
+| Destroy   | Delete Azure infrastructure (Terraform destroy or resource group deletion).                         |
+| Teardown  | Avoid in docs; use Destroy for infrastructure removal.                                              |
 
 ## 📋 Deployment Order
 
@@ -154,3 +154,8 @@ This deletes all resources in the group immediately. Use when:
 - Terraform state is corrupted or unavailable
 
 See [001-iac/README.md](001-iac/README.md#destroy-infrastructure) for detailed options.
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

@@ -28,6 +28,12 @@ resource "azurerm_managed_redis" "main" {
   }
 
   public_network_access = var.should_enable_public_network_access ? "Enabled" : "Disabled"
+
+  timeouts {
+    create = "90m"
+    update = "90m"
+    delete = "90m"
+  }
 }
 
 // ============================================================
