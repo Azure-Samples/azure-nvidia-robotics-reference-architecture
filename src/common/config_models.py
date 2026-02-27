@@ -207,8 +207,8 @@ class RecordingConfig(BaseModel):
         topic_names = [topic.name for topic in self.topics]
         duplicates = [name for name in topic_names if topic_names.count(name) > 1]
         if duplicates:
-            unique_dups = sorted(set(duplicates))
-            raise ValueError(f"Duplicate topic names found: {unique_dups}")
+            unique_duplicates = sorted(set(duplicates))
+            raise ValueError(f"Duplicate topic names found: {unique_duplicates}")
         return self
 
     @field_validator("output_dir")
