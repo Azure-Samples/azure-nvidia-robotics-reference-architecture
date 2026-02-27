@@ -26,8 +26,8 @@ MODEL OPTIONS:
 
 AZUREML ASSET OPTIONS:
     --environment-name NAME       AzureML environment name (default: isaaclab-training-env)
-    --environment-version VER     Environment version (default: 2.2.0)
-    --image IMAGE                 Container image (default: nvcr.io/nvidia/isaac-lab:2.2.0)
+    --environment-version VER     Environment version (default: 2.3.2)
+    --image IMAGE                 Container image (default: nvcr.io/nvidia/isaac-lab:2.3.2)
 
 VALIDATION OPTIONS:
     --task TASK                   Override task ID (default: from model metadata)
@@ -90,8 +90,8 @@ EOF
 #------------------------------------------------------------------------------
 
 environment_name="isaaclab-training-env"
-environment_version="2.2.0"
-image="nvcr.io/nvidia/isaac-lab:2.2.0"
+environment_version="2.3.2"
+image="nvcr.io/nvidia/isaac-lab:2.3.2"
 
 model_name=""
 model_version="latest"

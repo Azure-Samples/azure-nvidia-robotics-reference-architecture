@@ -77,14 +77,15 @@
         "editor.tabSize": 2,
     },
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
         "editor.tabSize": 4,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        }
     },
-    "black-formatter.args": [
-        "--line-length",
-        "120"
-    ],
+
     "python.analysis.extraPaths": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/external/IsaacLab/source/isaaclab",
@@ -114,32 +115,10 @@
         "tag:yaml.org,2002:python/name:pymdownx.superfences.fence_code_format",
         "tag:yaml.org,2002:python/object/apply:pymdownx.slugs.slugify mapping"
     ],
-    "github.copilot.chat.agent.thinkingTool": true,
     "github.copilot.chat.codesearch.enabled": true,
     "github.copilot.chat.commitMessageGeneration.instructions": [
-        {
-            "file": "./.github/instructions/commit-message.instructions.md"
-        }
+      {
+          "file": "./.github/instructions/commit-message.instructions.md"
+      }
     ],
-    "chat.modeFilesLocations": {
-        ".github/chatmodes": true,
-        "/Users/vscode/repos/chatmodes": true,
-        "../hve-core/.github/chatmodes": true,
-        "../hve-core/copilot/beads/chatmodes": true,
-    },
-    "chat.instructionsFilesLocations": {
-        ".github/instructions": true,
-        "/Users/vscode/repos/instructions": true,
-        ".copilot-tracking/instructions": true,
-        ".copilot-tracking/plans": true,
-        "../hve-core/.github/instructions": true,
-        "../hve-core/copilot/beads/instructions": true,
-    },
-    "chat.promptFilesLocations": {
-        ".github/prompts": true,
-        "/Users/vscode/repos/prompts": true,
-        ".copilot-tracking/prompts": true,
-        "../hve-core/.github/prompts": true,
-        "../hve-core/copilot/beads/prompts": true,
-    },
 }

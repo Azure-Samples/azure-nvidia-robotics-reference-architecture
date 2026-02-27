@@ -90,6 +90,13 @@ jobs:
       contents: read
       id-token: write
 
+  # Python pytest test execution
+  pytest-tests:
+    name: Pytest Tests
+    uses: ./.github/workflows/pytest-tests.yml
+    permissions:
+      contents: read
+
   # Python linting using ruff
   python-lint:
     name: Python Lint
@@ -119,6 +126,7 @@ jobs:
       - markdown-link-check
       - dependency-pinning
       - pester-tests
+      - pytest-tests
       - python-lint
       - codeql-analysis
     name: Release Please
