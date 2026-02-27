@@ -81,7 +81,6 @@ simulation_app = app_launcher.app
 
 import glob
 import json
-import os
 import time
 from datetime import datetime
 from pathlib import Path

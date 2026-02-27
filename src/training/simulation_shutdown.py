@@ -67,7 +67,8 @@ def _start_shutdown_watchdog(timeout: int) -> None:
         try:
             os.kill(parent_pid, signal.SIGKILL)
         except ProcessLookupError:
-            pass
+            # Parent process already exited; nothing left to kill
+            _LOGGER.debug("Parent process %d already exited", parent_pid)
         os._exit(0)
     else:
         _LOGGER.info("Shutdown watchdog forked (pid=%d, %ds timeout)", child_pid, timeout)
