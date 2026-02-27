@@ -28,18 +28,18 @@ If you are new to the project, start with issues labeled `good first issue` or d
 
 Detailed documentation lives in [`docs/contributing/`](docs/contributing/):
 
-| Guide                                                                       | Description                                                    |
-|-----------------------------------------------------------------------------|----------------------------------------------------------------|
-| [Contributing Guide](docs/contributing/README.md)                           | Main hub — prerequisites, workflow, commit messages, style     |
-| [Prerequisites](docs/contributing/prerequisites.md)                         | Required tools, Azure access, NGC credentials, build commands  |
-| [Contribution Workflow](docs/contributing/contribution-workflow.md)         | Bug reports, feature requests, first contributions             |
-| [Pull Request Process](docs/contributing/pull-request-process.md)           | PR workflow, reviewers, approval criteria                      |
-| [Infrastructure Style](docs/contributing/infrastructure-style.md)           | Terraform conventions, shell scripts, copyright headers        |
-| [Deployment Validation](docs/contributing/deployment-validation.md)         | Validation levels, testing templates, cost optimization        |
-| [Cost Considerations](docs/contributing/cost-considerations.md)             | Component costs, budgeting, regional pricing                   |
-| [Security Review](docs/contributing/security-review.md)                     | Security checklist, credential handling, dependency updates    |
-| [Accessibility](docs/contributing/accessibility.md)                         | Accessibility scope, documentation and CLI output guidelines   |
-| [Documentation Maintenance](docs/contributing/documentation-maintenance.md) | Documentation update triggers, ownership, freshness policy     |
+| Guide                                                                       | Description                                                   |
+|-----------------------------------------------------------------------------|---------------------------------------------------------------|
+| [Contributing Guide](docs/contributing/README.md)                           | Main hub — prerequisites, workflow, commit messages, style    |
+| [Prerequisites](docs/contributing/prerequisites.md)                         | Required tools, Azure access, NGC credentials, build commands |
+| [Contribution Workflow](docs/contributing/contribution-workflow.md)         | Bug reports, feature requests, first contributions            |
+| [Pull Request Process](docs/contributing/pull-request-process.md)           | PR workflow, reviewers, approval criteria                     |
+| [Infrastructure Style](docs/contributing/infrastructure-style.md)           | Terraform conventions, shell scripts, copyright headers       |
+| [Deployment Validation](docs/contributing/deployment-validation.md)         | Validation levels, testing templates, cost optimization       |
+| [Cost Considerations](docs/contributing/cost-considerations.md)             | Component costs, budgeting, regional pricing                  |
+| [Security Review](docs/contributing/security-review.md)                     | Security checklist, credential handling, dependency updates   |
+| [Accessibility](docs/contributing/accessibility.md)                         | Accessibility scope, documentation and CLI output guidelines  |
+| [Documentation Maintenance](docs/contributing/documentation-maintenance.md) | Documentation update triggers, ownership, freshness policy    |
 
 ## I Have a Question
 
@@ -232,12 +232,12 @@ A regression test may be omitted when:
 
 #### What Counts as a Regression Test
 
-| Test Type                              | Counts as Regression Test                |
-|----------------------------------------|------------------------------------------|
-| Unit test verifying the fix            | Yes                                      |
-| Integration test covering the scenario | Yes                                      |
-| Manual test documented in PR           | Only if automated test is impractical    |
-| Informal local verification            | No                                       |
+| Test Type                              | Counts as Regression Test             |
+|----------------------------------------|---------------------------------------|
+| Unit test verifying the fix            | Yes                                   |
+| Integration test covering the scenario | Yes                                   |
+| Manual test documented in PR           | Only if automated test is impractical |
+| Informal local verification            | No                                    |
 
 #### Bug Fix PR Requirements
 
@@ -319,6 +319,16 @@ Use [BATS-core](https://github.com/bats-core/bats-core) for shell script tests, 
 
 Documentation stays current through update triggers, ownership rules, and freshness reviews. See the [Documentation Maintenance](docs/contributing/documentation-maintenance.md) guide for the complete policy including review criteria, PR requirements, and release lifecycle.
 
+## Governance
+
+This project uses a corporate-sponsored maintainer model. See [GOVERNANCE.md](GOVERNANCE.md) for decision-making processes, roles, and how governance can change.
+
+## Internationalization
+
+This project currently produces no user-facing applications or localizable content. All technical documentation is maintained in English.
+
+If user-facing components are added in the future, follow [W3C Internationalization](https://www.w3.org/International/) guidelines and [Unicode CLDR](https://cldr.unicode.org/) for locale data. Use [BCP 47](https://www.rfc-editor.org/info/bcp47) language tags for locale identifiers.
+
 ## Code of Conduct
 
 This project adopts the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). See [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) for details, or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions.
@@ -340,3 +350,8 @@ By contributing, you agree that your contributions will be licensed under the [M
 This contributing guide is adapted for reference architecture contributions and Azure + NVIDIA robotics infrastructure.
 
 Copyright (c) Microsoft Corporation. Licensed under the MIT License.
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

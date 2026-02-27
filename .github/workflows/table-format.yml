@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   table-format:
     name: Table Format Check
@@ -20,29 +24,24 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v4.1.0
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Setup Node.js and install dependencies
+        uses: ./.github/actions/setup-node-deps
 
       - name: Check table formatting
         id: table-format
         run: |
-          npm run format:tables > table-format-output.txt 2>&1 || echo "TABLE_FORMAT_FAILED=true" >> "$GITHUB_ENV"
-          cat table-format-output.txt
+          npm run format:tables 2>&1 | Tee-Object -FilePath table-format-output.txt
+          if ($LASTEXITCODE -ne 0) {
+            'TABLE_FORMAT_FAILED=true' >> $env:GITHUB_ENV
+          }
         continue-on-error: true
 
       - name: Create annotations
         if: env.TABLE_FORMAT_FAILED == 'true'
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           $changed = (git diff --name-only -- '*.md' 2>$null) | Where-Object { $_ }
@@ -57,7 +56,7 @@ jobs:
 
       - name: Upload table format results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: table-format-results
           path: table-format-output.txt
@@ -65,7 +64,6 @@ jobs:
 
       - name: Add job summary
         if: always()
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           if ($env:TABLE_FORMAT_FAILED -eq 'true') {
@@ -105,7 +103,6 @@ jobs:
 
       - name: Fail job if issues found
         if: env.TABLE_FORMAT_FAILED == 'true' && !inputs.soft-fail
-        shell: pwsh
         run: |
           Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
           Write-CIAnnotation -Level Error -Message "Table format check failed — run 'npm run format:tables' locally to fix. See step summary for details"
