@@ -1,22 +1,4 @@
 # Industry Standards & Protocols (not covered by public dicts)
-# Academic & Technical Terms
-# Security & Compliance
-# Cloud Platforms & Services (not covered by public dicts)
-# Programming Languages & Frameworks (not covered by public dicts)
-# Data & Analytics
-# Business & Enterprise
-# Networking & Infrastructure (not covered by public dicts)
-# Company Names & Brands
-# Product Names & Trademarks (not covered by public dicts)
-# File Formats & Extensions
-# Abbreviations & Acronyms
-# Technical Terms
-# Proper Nouns & Company Names
-# Development & DevOps
-# Video & Image Processing
-# Hardware & Platforms (not covered by public dicts)
-# Software & CAD Tools
-# Azure NVIDIA Robotics Reference Architecture
 abac
 abap
 abfs
@@ -37,6 +19,7 @@ allowlisting
 amazon
 amazonaws
 amet
+amlarc
 amlignore
 ammp
 amqp
@@ -106,7 +89,9 @@ autostart
 avanade
 avere
 avro
+azmk
 azureml
+azurevpnconfig
 baas
 Babelscape
 backend
@@ -400,6 +385,7 @@ dones
 donotreply
 dotenv
 dotnet
+downsamples
 downtime
 dpu
 drawtext
@@ -710,6 +696,7 @@ levelname
 libgl
 libglib
 libx
+libzstd
 lifecycle
 lifecycles
 lightbox
@@ -752,6 +739,7 @@ maxar
 maxdb
 Mbed
 mbps
+mcap
 mcaps
 mcem
 mcra
@@ -1171,12 +1159,14 @@ roadmaps
 roadrunner
 rollout
 rollouts
+rosbag
 routable
 rpa
 rpc
 rpcs
 rsa
 rslrl
+rtde
 rtmp
 rubrik
 runbooks
@@ -1229,6 +1219,7 @@ shards
 shellcheck
 showbacks
 siem
+sigalrm
 signalr
 signingkey
 signup
@@ -1245,6 +1236,7 @@ sles
 sloc
 slos
 slsa
+smartctl
 smes
 smita
 smpl
@@ -1335,6 +1327,7 @@ tebibytes
 techops
 techsmith
 tecton
+tegrastats
 Tekton
 telco
 telehealth
@@ -1572,3 +1565,4 @@ zipkin
 zonemap
 zref
 zscaler
+zstd
