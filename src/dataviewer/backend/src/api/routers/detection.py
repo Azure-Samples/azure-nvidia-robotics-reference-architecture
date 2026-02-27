@@ -40,13 +40,22 @@ async def run_detection(
     returns detection results with bounding boxes and class labels.
     Results are cached for subsequent retrieval.
     """
-    logger.info("POST /detect called: dataset=%s, episode=%d", _sanitize(dataset_id), int(episode_idx))
-    logger.info("Request: model=%s, confidence=%s", _sanitize(request.model), _sanitize(request.confidence))
+    logger.info(
+        "POST /detect called: dataset=%s, episode=%d",
+        _sanitize(dataset_id), int(episode_idx),
+    )
+    logger.info(
+        "Request: model=%s, confidence=%s",
+        _sanitize(request.model), _sanitize(request.confidence),
+    )
 
     # Validate episode exists
     episode = await dataset_service.get_episode(dataset_id, episode_idx)
     if episode is None:
-        logger.debug("Episode not found: dataset=%s, episode=%d", _sanitize(dataset_id), int(episode_idx))
+        logger.debug(
+            "Episode not found: dataset=%s, episode=%d",
+            _sanitize(dataset_id), int(episode_idx),
+        )
         raise HTTPException(
             status_code=404,
             detail=f"Episode {episode_idx} not found in dataset '{dataset_id}'",

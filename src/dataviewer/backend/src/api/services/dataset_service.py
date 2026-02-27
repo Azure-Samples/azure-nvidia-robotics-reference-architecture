@@ -831,7 +831,10 @@ class DatasetService:
 
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
-            logger.warning("No video for episode %d camera '%s'", int(episode_idx), _sanitize(camera))
+            logger.warning(
+                "No video for episode %d camera '%s'",
+                int(episode_idx), _sanitize(camera),
+            )
             return None
 
         cap = cv2.VideoCapture(str(video_path))
