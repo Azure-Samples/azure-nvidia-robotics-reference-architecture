@@ -560,6 +560,7 @@ lalogs
 ldap
 leaderboard
 lenovo
+lerobot
 lifecycle
 lifecycles
 lightbox
