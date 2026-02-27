@@ -194,16 +194,17 @@ class LeRobotLoader:
             return self._episode_index_cache[episode_index]
 
         info = self._load_info()
-
-        # Standard layout: one episode per chunk
         chunk_idx = episode_index
-        file_idx = 0
 
-        # Verify the parquet file exists
-        data_path = self._format_path(info.data_path, chunk_idx, file_idx)
-        full_path = self.base_path / data_path
+        # Try common file index conventions before expensive scan
+        for file_idx in (0, chunk_idx):
+            data_path = self._format_path(info.data_path, chunk_idx, file_idx)
+            full_path = self.base_path / data_path
+            if full_path.exists():
+                self._episode_index_cache[episode_index] = (chunk_idx, file_idx)
+                return chunk_idx, file_idx
 
-        if not full_path.exists():
+        if True:
             # Try searching all data files
             data_dir = self.base_path / "data"
             if data_dir.exists():
