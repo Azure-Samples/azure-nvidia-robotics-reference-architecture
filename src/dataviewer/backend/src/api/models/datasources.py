@@ -18,9 +18,7 @@ class LocalDataSource(BaseModel):
 
     type: Literal["local"] = "local"
     path: str = Field(description="Absolute or relative path to dataset directory")
-    watch_for_changes: bool = Field(
-        default=False, description="Whether to watch for file changes"
-    )
+    watch_for_changes: bool = Field(default=False, description="Whether to watch for file changes")
 
 
 class AzureBlobDataSource(BaseModel):
@@ -86,9 +84,7 @@ class DatasetInfo(BaseModel):
     features: dict[str, FeatureSchema] = Field(
         default_factory=dict, description="Feature schemas by name"
     )
-    tasks: list[TaskInfo] = Field(
-        default_factory=list, description="Available tasks"
-    )
+    tasks: list[TaskInfo] = Field(default_factory=list, description="Available tasks")
 
 
 # ============================================================================
@@ -102,9 +98,7 @@ class EpisodeMeta(BaseModel):
     index: int = Field(ge=0, description="Episode index within the dataset")
     length: int = Field(ge=0, description="Number of frames in the episode")
     task_index: int = Field(ge=0, description="Task index this episode belongs to")
-    has_annotations: bool = Field(
-        default=False, description="Whether this episode has annotations"
-    )
+    has_annotations: bool = Field(default=False, description="Whether this episode has annotations")
 
 
 class TrajectoryPoint(BaseModel):
@@ -114,12 +108,8 @@ class TrajectoryPoint(BaseModel):
     frame: int = Field(ge=0, description="Frame index")
     joint_positions: list[float] = Field(description="Joint positions array")
     joint_velocities: list[float] = Field(description="Joint velocities array")
-    end_effector_pose: list[float] = Field(
-        description="End-effector pose (position + orientation)"
-    )
-    gripper_state: float = Field(
-        ge=0, le=1, description="Gripper state (0=open, 1=closed)"
-    )
+    end_effector_pose: list[float] = Field(description="End-effector pose (position + orientation)")
+    gripper_state: float = Field(ge=0, le=1, description="Gripper state (0=open, 1=closed)")
 
 
 class FrameInsertion(BaseModel):
@@ -163,9 +153,7 @@ class CurriculumCriteria(BaseModel):
     task_completeness: list[str] | None = Field(
         default=None, description="Task completeness ratings to include"
     )
-    exclude_flags: list[str] | None = Field(
-        default=None, description="Trajectory flags to exclude"
-    )
+    exclude_flags: list[str] | None = Field(default=None, description="Trajectory flags to exclude")
     max_anomaly_count: int | None = Field(
         default=None, ge=0, description="Maximum anomalies allowed"
     )
@@ -195,12 +183,8 @@ class CurriculumDefinition(BaseModel):
     """Complete curriculum definition."""
 
     name: str = Field(description="Curriculum name")
-    strategy: str = Field(
-        default="balanced", description="Ordering strategy"
-    )
-    stages: list[CurriculumStage] = Field(
-        default_factory=list, description="Curriculum stages"
-    )
+    strategy: str = Field(default="balanced", description="Ordering strategy")
+    stages: list[CurriculumStage] = Field(default_factory=list, description="Curriculum stages")
 
 
 # ============================================================================

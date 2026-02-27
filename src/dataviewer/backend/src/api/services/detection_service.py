@@ -30,17 +30,85 @@ logger = logging.getLogger(__name__)
 ALLOWED_MODELS = {"yolo11n", "yolo11s", "yolo11m", "yolo11l", "yolo11x"}
 
 COCO_CLASSES = [
-    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck",
-    "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
-    "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra",
-    "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
-    "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove",
-    "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
-    "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
-    "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
-    "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
-    "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
-    "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "dining table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
     "toothbrush",
 ]
 
@@ -49,7 +117,7 @@ class DetectionService:
     """YOLO11 object detection service with caching."""
 
     def __init__(self) -> None:
-        self._model: "YOLO | None" = None
+        self._model: YOLO | None = None
         self._model_name: str = ""
         self._cache: dict[str, EpisodeDetectionSummary] = {}
 
@@ -80,9 +148,7 @@ class DetectionService:
         """Generate cache key for detection results."""
         return f"{dataset_id}:{episode_idx}"
 
-    def get_cached(
-        self, dataset_id: str, episode_idx: int
-    ) -> EpisodeDetectionSummary | None:
+    def get_cached(self, dataset_id: str, episode_idx: int) -> EpisodeDetectionSummary | None:
         """Get cached detection results if available."""
         key = self._cache_key(dataset_id, episode_idx)
         return self._cache.get(key)
@@ -107,24 +173,39 @@ class DetectionService:
 
         # Load image
         image = Image.open(BytesIO(image_bytes))
-        logger.debug("Frame %d: image size=%s, mode=%s, bytes=%d", frame_idx, image.size, image.mode, len(image_bytes))
+        logger.debug(
+            "Frame %d: image size=%s, mode=%s, bytes=%d",
+            frame_idx,
+            image.size,
+            image.mode,
+            len(image_bytes),
+        )
 
         # Run inference
         start_time = time.perf_counter()
         results = model(image, conf=confidence, verbose=False)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        logger.debug("Frame %d: model returned %d result(s) in %.1fms", frame_idx, len(results) if results else 0, elapsed_ms)
+        logger.debug(
+            "Frame %d: model returned %d result(s) in %.1fms",
+            frame_idx,
+            len(results) if results else 0,
+            elapsed_ms,
+        )
 
         # Parse results
         detections: list[Detection] = []
         if results and len(results) > 0:
             result = results[0]
             boxes = result.boxes
-            logger.debug("Frame %d: boxes=%s, num_boxes=%d", frame_idx, boxes is not None, len(boxes) if boxes is not None else 0)
+            logger.debug(
+                "Frame %d: boxes=%s, num_boxes=%d",
+                frame_idx,
+                boxes is not None,
+                len(boxes) if boxes is not None else 0,
+            )
 
             if boxes is not None and len(boxes) > 0:
-                
                 for i in range(len(boxes)):
                     class_id = int(boxes.cls[i].item())
                     class_name = (
@@ -161,12 +242,15 @@ class DetectionService:
         total_frames: int,
     ) -> EpisodeDetectionSummary:
         """Run detection on episode frames."""
-        logger.debug("Starting detection: dataset=%s, episode=%d, frames=%d", dataset_id, episode_idx, total_frames)
+        logger.debug(
+            "Starting detection: dataset=%s, episode=%d, frames=%d",
+            dataset_id,
+            episode_idx,
+            total_frames,
+        )
 
         # Determine frames to process
-        frames_to_process = (
-            request.frames if request.frames else list(range(total_frames))
-        )
+        frames_to_process = request.frames if request.frames else list(range(total_frames))
         logger.debug("Will process %d frames", len(frames_to_process))
 
         results_by_frame: list[DetectionResult] = []
@@ -191,7 +275,7 @@ class DetectionService:
                     confidence=request.confidence,
                     model_name=request.model,
                 )
-                
+
                 if frame_idx == 0:
                     logger.debug("Frame 0: found %d detections", len(result.detections))
 
@@ -208,7 +292,12 @@ class DetectionService:
                 continue
 
         total_dets = sum(len(r.detections) for r in results_by_frame)
-        logger.debug("Complete: processed=%d, skipped=%d, detections=%d", len(results_by_frame), skipped_frames, total_dets)
+        logger.debug(
+            "Complete: processed=%d, skipped=%d, detections=%d",
+            len(results_by_frame),
+            skipped_frames,
+            total_dets,
+        )
 
         # Build class summary
         class_summary = {

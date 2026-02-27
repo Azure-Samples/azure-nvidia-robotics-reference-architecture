@@ -5,7 +5,6 @@ Provides endpoints for trajectory analysis, anomaly detection,
 and episode clustering.
 """
 
-
 import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -32,9 +31,7 @@ class TrajectoryData(BaseModel):
         description="Joint positions array of shape (N, num_joints)"
     )
     timestamps: list[float] = Field(description="Timestamps for each position")
-    gripper_states: list[float] | None = Field(
-        default=None, description="Optional gripper states"
-    )
+    gripper_states: list[float] | None = Field(default=None, description="Optional gripper states")
 
 
 class TrajectoryMetricsResponse(BaseModel):
@@ -94,12 +91,8 @@ class AnomalyDetectionRequest(BaseModel):
 
     positions: list[list[float]] = Field(description="Joint positions")
     timestamps: list[float] = Field(description="Timestamps")
-    forces: list[list[float]] | None = Field(
-        default=None, description="Optional force/torque data"
-    )
-    gripper_states: list[float] | None = Field(
-        default=None, description="Optional gripper states"
-    )
+    forces: list[list[float]] | None = Field(default=None, description="Optional force/torque data")
+    gripper_states: list[float] | None = Field(default=None, description="Optional gripper states")
     gripper_commands: list[float] | None = Field(
         default=None, description="Optional gripper commands"
     )
@@ -110,17 +103,13 @@ class AnomalyDetectionResponse(BaseModel):
 
     anomalies: list[AnomalyResponse] = Field(description="List of detected anomalies")
     total_count: int = Field(description="Total number of anomalies")
-    severity_counts: dict[str, int] = Field(
-        description="Count of anomalies by severity"
-    )
+    severity_counts: dict[str, int] = Field(description="Count of anomalies by severity")
 
 
 class ClusterRequest(BaseModel):
     """Request for episode clustering."""
 
-    trajectories: list[list[list[float]]] = Field(
-        description="List of trajectory arrays"
-    )
+    trajectories: list[list[list[float]]] = Field(description="List of trajectory arrays")
     num_clusters: int | None = Field(
         default=None, ge=2, le=20, description="Optional fixed number of clusters"
     )
@@ -138,9 +127,7 @@ class ClusterResponse(BaseModel):
     """Clustering result response."""
 
     num_clusters: int = Field(description="Number of clusters found")
-    assignments: list[ClusterAssignmentResponse] = Field(
-        description="Cluster assignments"
-    )
+    assignments: list[ClusterAssignmentResponse] = Field(description="Cluster assignments")
     cluster_sizes: dict[str, int] = Field(description="Size of each cluster")
     silhouette_score: float = Field(description="Clustering quality score")
 
@@ -150,20 +137,14 @@ class SuggestAnnotationRequest(BaseModel):
 
     positions: list[list[float]] = Field(description="Joint positions")
     timestamps: list[float] = Field(description="Timestamps")
-    gripper_states: list[float] | None = Field(
-        default=None, description="Optional gripper states"
-    )
-    forces: list[list[float]] | None = Field(
-        default=None, description="Optional force data"
-    )
+    gripper_states: list[float] | None = Field(default=None, description="Optional gripper states")
+    forces: list[list[float]] | None = Field(default=None, description="Optional force data")
 
 
 class AnnotationSuggestion(BaseModel):
     """AI-suggested annotation."""
 
-    task_completion_rating: int = Field(
-        ge=1, le=5, description="Suggested task completion rating"
-    )
+    task_completion_rating: int = Field(ge=1, le=5, description="Suggested task completion rating")
     trajectory_quality_score: int = Field(
         ge=1, le=5, description="Suggested trajectory quality score"
     )
@@ -185,9 +166,7 @@ async def analyze_trajectory(data: TrajectoryData) -> TrajectoryMetricsResponse:
     from the provided trajectory data.
     """
     if len(data.positions) < 3:
-        raise HTTPException(
-            status_code=400, detail="Trajectory must have at least 3 positions"
-        )
+        raise HTTPException(status_code=400, detail="Trajectory must have at least 3 positions")
 
     if len(data.positions) != len(data.timestamps):
         raise HTTPException(
@@ -196,9 +175,7 @@ async def analyze_trajectory(data: TrajectoryData) -> TrajectoryMetricsResponse:
 
     positions = np.array(data.positions)
     timestamps = np.array(data.timestamps)
-    gripper_states = (
-        np.array(data.gripper_states) if data.gripper_states else None
-    )
+    gripper_states = np.array(data.gripper_states) if data.gripper_states else None
 
     analyzer = TrajectoryAnalyzer()
     metrics = analyzer.analyze(positions, timestamps, gripper_states)
@@ -215,19 +192,13 @@ async def detect_anomalies(request: AnomalyDetectionRequest) -> AnomalyDetection
     unexpected stops, oscillations, and other anomalies.
     """
     if len(request.positions) < 3:
-        raise HTTPException(
-            status_code=400, detail="Trajectory must have at least 3 positions"
-        )
+        raise HTTPException(status_code=400, detail="Trajectory must have at least 3 positions")
 
     positions = np.array(request.positions)
     timestamps = np.array(request.timestamps)
     forces = np.array(request.forces) if request.forces else None
-    gripper_states = (
-        np.array(request.gripper_states) if request.gripper_states else None
-    )
-    gripper_commands = (
-        np.array(request.gripper_commands) if request.gripper_commands else None
-    )
+    gripper_states = np.array(request.gripper_states) if request.gripper_states else None
+    gripper_commands = np.array(request.gripper_commands) if request.gripper_commands else None
 
     detector = AnomalyDetector()
     anomalies = detector.detect(
@@ -292,15 +263,11 @@ async def suggest_annotation(request: SuggestAnnotationRequest) -> AnnotationSug
     flags, and detected anomalies.
     """
     if len(request.positions) < 3:
-        raise HTTPException(
-            status_code=400, detail="Trajectory must have at least 3 positions"
-        )
+        raise HTTPException(status_code=400, detail="Trajectory must have at least 3 positions")
 
     positions = np.array(request.positions)
     timestamps = np.array(request.timestamps)
-    gripper_states = (
-        np.array(request.gripper_states) if request.gripper_states else None
-    )
+    gripper_states = np.array(request.gripper_states) if request.gripper_states else None
     forces = np.array(request.forces) if request.forces else None
 
     # Analyze trajectory quality
@@ -321,12 +288,8 @@ async def suggest_annotation(request: SuggestAnnotationRequest) -> AnnotationSug
 
     # Task completion is harder to infer - use trajectory quality as proxy
     # with adjustment for severe anomalies
-    severe_anomaly_count = sum(
-        1 for a in anomalies if a.severity == AnomalySeverity.HIGH
-    )
-    task_completion_rating = max(
-        1, trajectory_quality_score - severe_anomaly_count
-    )
+    severe_anomaly_count = sum(1 for a in anomalies if a.severity == AnomalySeverity.HIGH)
+    task_completion_rating = max(1, trajectory_quality_score - severe_anomaly_count)
 
     # Combine flags from metrics and anomalies
     suggested_flags = list(metrics.flags)

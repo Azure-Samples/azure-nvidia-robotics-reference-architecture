@@ -56,8 +56,8 @@ def get_hdf5_exporter():
 def get_image_transform():
     """Get the image transform service (requires Pillow for resize)."""
     from .image_transform import (
-        ImageTransform,
         CropRegion,
+        ImageTransform,
         ResizeDimensions,
         apply_transform,
         apply_transforms_batch,

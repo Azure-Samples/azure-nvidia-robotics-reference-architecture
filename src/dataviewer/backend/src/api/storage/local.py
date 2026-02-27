@@ -94,14 +94,10 @@ class LocalStorageAdapter(StorageAdapter):
 
         except json.JSONDecodeError as e:
             self.logger.exception("Invalid JSON in annotation file")
-            raise StorageError(
-                "Invalid annotation file format", cause=e
-            )
+            raise StorageError("Invalid annotation file format", cause=e)
         except Exception as e:
             self.logger.exception("Failed to read annotation file")
-            raise StorageError(
-                "Failed to read annotation file", cause=e
-            )
+            raise StorageError("Failed to read annotation file", cause=e)
 
     async def save_annotation(
         self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile
@@ -153,9 +149,7 @@ class LocalStorageAdapter(StorageAdapter):
         except StorageError:
             raise
         except Exception as e:
-            raise StorageError(
-                f"Failed to save annotation file {file_path}: {e}", cause=e
-            )
+            raise StorageError(f"Failed to save annotation file {file_path}: {e}", cause=e)
 
     async def list_annotated_episodes(self, dataset_id: str) -> list[int]:
         """
@@ -186,9 +180,7 @@ class LocalStorageAdapter(StorageAdapter):
             return sorted(episode_indices)
 
         except Exception as e:
-            raise StorageError(
-                f"Failed to list annotations for {dataset_id}: {e}", cause=e
-            )
+            raise StorageError(f"Failed to list annotations for {dataset_id}: {e}", cause=e)
 
     async def delete_annotation(self, dataset_id: str, episode_index: int) -> bool:
         """
@@ -211,6 +203,4 @@ class LocalStorageAdapter(StorageAdapter):
             return True
 
         except Exception as e:
-            raise StorageError(
-                f"Failed to delete annotation file {file_path}: {e}", cause=e
-            )
+            raise StorageError(f"Failed to delete annotation file {file_path}: {e}", cause=e)

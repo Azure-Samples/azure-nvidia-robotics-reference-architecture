@@ -18,14 +18,14 @@ env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_path)
 
 # Resolve HMI_DATA_PATH relative to the .env file location (backend/)
-import os
+import os  # noqa: E402
 
 _data_path = os.environ.get("HMI_DATA_PATH", "")
 if _data_path and not Path(_data_path).is_absolute():
     os.environ["HMI_DATA_PATH"] = str((env_path.parent / _data_path).resolve())
 
-from .routers import analysis, annotations, datasets, detection, export, labels
-from .routes import ai_analysis
+from .routers import analysis, annotations, datasets, detection, export, labels  # noqa: E402
+from .routes import ai_analysis  # noqa: E402
 
 app = FastAPI(
     title="LeRobot Annotation API",

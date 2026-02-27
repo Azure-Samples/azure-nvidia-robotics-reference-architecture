@@ -5,7 +5,6 @@ Provides endpoints for listing datasets, retrieving metadata,
 and accessing episode information with HDF5 and LeRobot parquet support.
 """
 
-import io
 import logging
 from pathlib import Path
 
@@ -201,9 +200,7 @@ async def get_episode_frame(
     Returns the image as JPEG for the specified frame and camera.
     """
     try:
-        image_bytes = await service.get_frame_image(
-            dataset_id, episode_idx, frame_idx, camera
-        )
+        image_bytes = await service.get_frame_image(dataset_id, episode_idx, frame_idx, camera)
         if image_bytes is None:
             raise HTTPException(
                 status_code=404,
@@ -212,7 +209,7 @@ async def get_episode_frame(
         return Response(content=image_bytes, media_type="image/jpeg")
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to load frame %d for camera '%s'", frame_idx, camera)
         raise HTTPException(
             status_code=500,

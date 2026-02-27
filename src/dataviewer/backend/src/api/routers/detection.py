@@ -37,7 +37,7 @@ async def run_detection(
     """
     logger.info("POST /detect called: dataset=%s, episode=%d", dataset_id, episode_idx)
     logger.info("Request: model=%s, confidence=%s", request.model, request.confidence)
-    
+
     # Validate episode exists
     episode = await dataset_service.get_episode(dataset_id, episode_idx)
     if episode is None:
@@ -70,7 +70,7 @@ async def run_detection(
             status_code=503,
             detail="YOLO dependencies not installed. Run: uv sync --extra yolo",
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Detection failed")
         raise HTTPException(
             status_code=500,

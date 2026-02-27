@@ -7,13 +7,13 @@ statistical methods and threshold-based detection.
 
 import uuid
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 from numpy.typing import NDArray
 
 
-class AnomalyType(str, Enum):
+class AnomalyType(StrEnum):
     """Types of detectable anomalies."""
 
     VELOCITY_SPIKE = "velocity_spike"
@@ -25,7 +25,7 @@ class AnomalyType(str, Enum):
     JOINT_LIMIT = "joint_limit"
 
 
-class AnomalySeverity(str, Enum):
+class AnomalySeverity(StrEnum):
     """Anomaly severity levels."""
 
     LOW = "low"
@@ -149,9 +149,7 @@ class AnomalyDetector:
 
         # Detect gripper failures if available
         if gripper_states is not None and gripper_commands is not None:
-            anomalies.extend(
-                self._detect_gripper_failures(gripper_states, gripper_commands)
-            )
+            anomalies.extend(self._detect_gripper_failures(gripper_states, gripper_commands))
 
         # Detect joint limit approaches if available
         if joint_limits is not None:
@@ -159,9 +157,7 @@ class AnomalyDetector:
 
         return anomalies
 
-    def _detect_velocity_spikes(
-        self, velocity: NDArray[np.float64]
-    ) -> list[DetectedAnomaly]:
+    def _detect_velocity_spikes(self, velocity: NDArray[np.float64]) -> list[DetectedAnomaly]:
         """
         Detect velocity spikes using z-score thresholding.
         """
@@ -206,9 +202,7 @@ class AnomalyDetector:
 
         return anomalies
 
-    def _detect_unexpected_stops(
-        self, velocity: NDArray[np.float64]
-    ) -> list[DetectedAnomaly]:
+    def _detect_unexpected_stops(self, velocity: NDArray[np.float64]) -> list[DetectedAnomaly]:
         """
         Detect unexpected stops (velocity near zero for extended period).
         """
@@ -251,9 +245,7 @@ class AnomalyDetector:
 
         return anomalies
 
-    def _detect_oscillations(
-        self, positions: NDArray[np.float64]
-    ) -> list[DetectedAnomaly]:
+    def _detect_oscillations(self, positions: NDArray[np.float64]) -> list[DetectedAnomaly]:
         """
         Detect oscillatory motion patterns.
         """
@@ -304,9 +296,7 @@ class AnomalyDetector:
 
         return anomalies
 
-    def _detect_force_spikes(
-        self, forces: NDArray[np.float64]
-    ) -> list[DetectedAnomaly]:
+    def _detect_force_spikes(self, forces: NDArray[np.float64]) -> list[DetectedAnomaly]:
         """
         Detect force/torque spikes using z-score thresholding.
         """

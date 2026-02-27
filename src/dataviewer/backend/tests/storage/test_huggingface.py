@@ -7,7 +7,6 @@ These tests use mocking to avoid requiring actual Hub access.
 import asyncio
 import json
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
@@ -26,6 +25,7 @@ class TestHuggingFaceHubAdapter(TestCase):
     def tearDown(self):
         """Clean up test fixtures."""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @patch("src.api.storage.huggingface.HF_AVAILABLE", True)

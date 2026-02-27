@@ -8,6 +8,7 @@ and LeRobot parquet-format datasets.
 
 import logging
 import os
+import pathlib
 import re
 
 from ..models.datasources import (
@@ -200,7 +201,7 @@ class DatasetService:
         return dataset_info
 
     def _discover_lerobot_dataset(
-        self, dataset_id: str, dataset_path: "Path"
+        self, dataset_id: str, dataset_path: "pathlib.Path"
     ) -> DatasetInfo | None:
         """
         Discover and create DatasetInfo from a LeRobot parquet dataset.
@@ -340,9 +341,7 @@ class DatasetService:
         dataset = self._datasets.get(dataset_id)
 
         # Get list of annotated episodes
-        annotated_indices = set(
-            await self._storage.list_annotated_episodes(dataset_id)
-        )
+        annotated_indices = set(await self._storage.list_annotated_episodes(dataset_id))
 
         episode_indices: list[int] = []
         episode_info_map: dict[int, dict] = {}
@@ -424,9 +423,7 @@ class DatasetService:
         # Apply pagination
         return episodes[offset : offset + limit]
 
-    async def get_episode(
-        self, dataset_id: str, episode_idx: int
-    ) -> EpisodeData | None:
+    async def get_episode(self, dataset_id: str, episode_idx: int) -> EpisodeData | None:
         """
         Get complete data for a specific episode.
 
@@ -442,9 +439,7 @@ class DatasetService:
         dataset = self._datasets.get(dataset_id)
 
         # Get annotation status
-        annotated_indices = set(
-            await self._storage.list_annotated_episodes(dataset_id)
-        )
+        annotated_indices = set(await self._storage.list_annotated_episodes(dataset_id))
 
         trajectory_data: list[TrajectoryPoint] = []
         video_urls: dict[str, str] = {}
@@ -460,7 +455,9 @@ class DatasetService:
                 ep_task_index = lr_data.task_index
 
                 # Convert LeRobot data to TrajectoryPoint list
-                num_joints = lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
+                num_joints = (
+                    lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
+                )
 
                 for i in range(lr_data.length):
                     joint_pos = lr_data.joint_positions[i].tolist()
@@ -470,7 +467,11 @@ class DatasetService:
                         else [0.0] * num_joints
                     )
                     # Use action as surrogate for end-effector if not available
-                    ee_pose = lr_data.actions[i][:6].tolist() if lr_data.actions is not None else [0.0] * 6
+                    ee_pose = (
+                        lr_data.actions[i][:6].tolist()
+                        if lr_data.actions is not None
+                        else [0.0] * 6
+                    )
                     gripper = 0.0  # LeRobot UR10e doesn't have gripper in this dataset
 
                     trajectory_data.append(
@@ -485,7 +486,7 @@ class DatasetService:
                     )
 
                 # Generate video URLs for cameras
-                for camera in lr_data.video_paths.keys():
+                for camera in lr_data.video_paths:
                     video_urls[camera] = (
                         f"/api/datasets/{dataset_id}/episodes/{episode_idx}/video/{camera}"
                     )
@@ -502,7 +503,12 @@ class DatasetService:
                 )
 
             except Exception as e:
-                logger.warning("LeRobot load_episode failed for %s/%d: %s", dataset_id, episode_idx, e)
+                logger.warning(
+                    "LeRobot load_episode failed for %s/%d: %s",
+                    dataset_id,
+                    episode_idx,
+                    e,
+                )
                 # Fall through to try HDF5
 
         # Try to load from HDF5
@@ -562,9 +568,7 @@ class DatasetService:
                 pass
 
         # Validate episode index if we have dataset info
-        if dataset is not None and (
-            episode_idx < 0 or episode_idx >= dataset.total_episodes
-        ):
+        if dataset is not None and (episode_idx < 0 or episode_idx >= dataset.total_episodes):
             return None
 
         return EpisodeData(
@@ -599,7 +603,9 @@ class DatasetService:
             try:
                 lr_data = lerobot_loader.load_episode(episode_idx)
                 trajectory_data: list[TrajectoryPoint] = []
-                num_joints = lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
+                num_joints = (
+                    lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
+                )
 
                 for i in range(lr_data.length):
                     joint_pos = lr_data.joint_positions[i].tolist()
@@ -608,7 +614,11 @@ class DatasetService:
                         if lr_data.joint_velocities is not None
                         else [0.0] * num_joints
                     )
-                    ee_pose = lr_data.actions[i][:6].tolist() if lr_data.actions is not None else [0.0] * 6
+                    ee_pose = (
+                        lr_data.actions[i][:6].tolist()
+                        if lr_data.actions is not None
+                        else [0.0] * 6
+                    )
                     gripper = 0.0
 
                     trajectory_data.append(
@@ -625,7 +635,12 @@ class DatasetService:
                 return trajectory_data
 
             except Exception as e:
-                logger.warning("LeRobot trajectory load failed for %s/%d: %s", dataset_id, episode_idx, e)
+                logger.warning(
+                    "LeRobot trajectory load failed for %s/%d: %s",
+                    dataset_id,
+                    episode_idx,
+                    e,
+                )
 
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
@@ -729,9 +744,7 @@ class DatasetService:
         # Try LeRobot loader first (mp4 frame extraction)
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is not None:
-            return self._extract_frame_from_video(
-                lerobot_loader, episode_idx, frame_idx, camera
-            )
+            return self._extract_frame_from_video(lerobot_loader, episode_idx, frame_idx, camera)
 
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
@@ -761,6 +774,7 @@ class DatasetService:
                 return None
 
             import io
+
             from PIL import Image
 
             frame = hdf5_data.images[camera][frame_idx]
@@ -770,7 +784,13 @@ class DatasetService:
             return buffer.getvalue()
 
         except Exception as e:
-            logger.exception("Error loading frame %d from %s/%d: %s", frame_idx, dataset_id, episode_idx, e)
+            logger.exception(
+                "Error loading frame %d from %s/%d: %s",
+                frame_idx,
+                dataset_id,
+                episode_idx,
+                e,
+            )
             return None
 
     def _extract_frame_from_video(
@@ -806,9 +826,7 @@ class DatasetService:
         finally:
             cap.release()
 
-    async def get_episode_cameras(
-        self, dataset_id: str, episode_idx: int
-    ) -> list[str]:
+    async def get_episode_cameras(self, dataset_id: str, episode_idx: int) -> list[str]:
         """
         Get list of available cameras for an episode.
 
@@ -838,9 +856,7 @@ class DatasetService:
         except Exception:
             return []
 
-    def get_video_file_path(
-        self, dataset_id: str, episode_idx: int, camera: str
-    ) -> str | None:
+    def get_video_file_path(self, dataset_id: str, episode_idx: int, camera: str) -> str | None:
         """
         Get the filesystem path to a video file.
 

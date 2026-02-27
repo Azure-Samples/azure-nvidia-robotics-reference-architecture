@@ -5,8 +5,6 @@ Tests the full HTTP round-trip through FastAPI routes, verifying response
 schemas, status codes, pagination, and data integrity.
 """
 
-import pytest
-
 
 class TestHealthEndpoint:
     """Verify the health check still works with the real environment."""
@@ -189,14 +187,10 @@ class TestGetVideo:
         cameras = cam_resp.json()
         assert len(cameras) > 0
         camera = cameras[0]
-        resp = client.get(
-            f"/api/datasets/{dataset_id}/episodes/0/video/{camera}"
-        )
+        resp = client.get(f"/api/datasets/{dataset_id}/episodes/0/video/{camera}")
         assert resp.status_code == 200
         assert "video" in resp.headers.get("content-type", "")
 
     def test_video_nonexistent_camera(self, client, dataset_id):
-        resp = client.get(
-            f"/api/datasets/{dataset_id}/episodes/0/video/fake_camera"
-        )
+        resp = client.get(f"/api/datasets/{dataset_id}/episodes/0/video/fake_camera")
         assert resp.status_code == 404

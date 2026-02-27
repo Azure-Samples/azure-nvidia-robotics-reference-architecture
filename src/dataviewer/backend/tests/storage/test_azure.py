@@ -13,12 +13,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.api.models.annotations import (
-    EpisodeAnnotationFile,
     AnnotationMetadata,
+    EpisodeAnnotationFile,
     TaskCompletenessAnnotation,
     TaskCompletenessRating,
 )
-from src.api.storage.base import StorageError
 
 
 def create_test_annotation(episode_index: int) -> EpisodeAnnotationFile:
@@ -59,10 +58,10 @@ class TestAzureBlobStorageAdapter(TestCase):
     @patch("src.api.storage.azure.BlobServiceClient")
     def test_get_annotation_not_found(self, mock_blob_service):
         """Test getting a non-existent annotation returns None."""
-        from src.api.storage.azure import AzureBlobStorageAdapter
-
         # Import the exception we need to mock
         from azure.core.exceptions import ResourceNotFoundError
+
+        from src.api.storage.azure import AzureBlobStorageAdapter
 
         # Set up mock to raise ResourceNotFoundError
         mock_client = MagicMock()
@@ -214,8 +213,9 @@ class TestAzureBlobStorageAdapter(TestCase):
     @patch("src.api.storage.azure.BlobServiceClient")
     def test_delete_annotation_not_found(self, mock_blob_service):
         """Test deleting a non-existent annotation returns False."""
-        from src.api.storage.azure import AzureBlobStorageAdapter
         from azure.core.exceptions import ResourceNotFoundError
+
+        from src.api.storage.azure import AzureBlobStorageAdapter
 
         # Set up mock
         mock_client = MagicMock()

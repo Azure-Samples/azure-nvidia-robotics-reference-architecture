@@ -6,7 +6,6 @@ video path resolution, and camera discovery.
 """
 
 import os
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -80,9 +79,7 @@ class TestDatasetInfo:
 
     def test_features_contains_video(self, loader):
         info = loader.get_dataset_info()
-        video_features = [
-            k for k, v in info.features.items() if v.get("dtype") == "video"
-        ]
+        video_features = [k for k, v in info.features.items() if v.get("dtype") == "video"]
         assert len(video_features) > 0
 
     def test_data_and_video_path_templates(self, loader):

@@ -96,9 +96,7 @@ class HDF5Loader:
             ImportError: If h5py is not installed.
         """
         if not HDF5_AVAILABLE:
-            raise ImportError(
-                "HDF5 support requires h5py package. Install with: pip install h5py"
-            )
+            raise ImportError("HDF5 support requires h5py package. Install with: pip install h5py")
 
         self.base_path = Path(base_path)
         self._episode_cache: dict[int, Path] = {}
@@ -143,9 +141,7 @@ class HDF5Loader:
                 self._episode_cache[episode_index] = file_path
                 return file_path
 
-        raise HDF5LoaderError(
-            f"No HDF5 file found for episode {episode_index} in {self.base_path}"
-        )
+        raise HDF5LoaderError(f"No HDF5 file found for episode {episode_index} in {self.base_path}")
 
     def list_episodes(self) -> list[int]:
         """
@@ -173,7 +169,7 @@ class HDF5Loader:
                 for prefix in ["episode_", "ep_"]:
                     if filename.startswith(prefix):
                         try:
-                            index_str = filename[len(prefix):]
+                            index_str = filename[len(prefix) :]
                             episode_indices.add(int(index_str))
                         except ValueError:
                             continue
@@ -204,9 +200,7 @@ class HDF5Loader:
 
         try:
             with h5py.File(file_path, "r") as f:
-                return self._parse_hdf5_file(
-                    f, episode_index, load_images, image_cameras
-                )
+                return self._parse_hdf5_file(f, episode_index, load_images, image_cameras)
         except HDF5LoaderError:
             raise
         except Exception as e:
@@ -228,9 +222,7 @@ class HDF5Loader:
             f, ["data/qpos", "qpos", "observations/qpos", "observation/state"]
         )
         if joint_positions is None:
-            raise HDF5LoaderError(
-                f"No joint position data found in episode {episode_index}"
-            )
+            raise HDF5LoaderError(f"No joint position data found in episode {episode_index}")
 
         length = len(joint_positions)
 
@@ -242,9 +234,7 @@ class HDF5Loader:
             timestamps = np.arange(length) / fps
 
         # Load optional arrays
-        joint_velocities = self._load_array(
-            f, ["data/qvel", "qvel", "observations/qvel"]
-        )
+        joint_velocities = self._load_array(f, ["data/qvel", "qvel", "observations/qvel"])
         end_effector_pose = self._load_array(
             f, ["data/ee_pose", "ee_pose", "observations/ee_pose", "data/cartesian_pos"]
         )
@@ -278,9 +268,7 @@ class HDF5Loader:
             metadata=metadata,
         )
 
-    def _load_array(
-        self, f: "h5py.File", paths: list[str]
-    ) -> NDArray[np.float64] | None:
+    def _load_array(self, f: "h5py.File", paths: list[str]) -> NDArray[np.float64] | None:
         """Try to load an array from multiple possible paths."""
         for path in paths:
             if path in f:
@@ -379,7 +367,13 @@ class HDF5Loader:
 
                 # Get available cameras
                 cameras = []
-                for group_path in ["observations/images", "observation/images", "images", "data/images"]:
+                camera_paths = [
+                    "observations/images",
+                    "observation/images",
+                    "images",
+                    "data/images",
+                ]
+                for group_path in camera_paths:
                     if group_path in f and isinstance(f[group_path], h5py.Group):
                         cameras = list(f[group_path].keys())
                         break
@@ -397,9 +391,7 @@ class HDF5Loader:
                 }
 
         except Exception as e:
-            raise HDF5LoaderError(
-                f"Failed to get info for episode {episode_index}: {e}", cause=e
-            )
+            raise HDF5LoaderError(f"Failed to get info for episode {episode_index}: {e}", cause=e)
 
 
 def get_hdf5_loader(base_path: str | Path) -> HDF5Loader:

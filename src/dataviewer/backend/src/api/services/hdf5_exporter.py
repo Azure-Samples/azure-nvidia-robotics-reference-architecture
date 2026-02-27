@@ -18,6 +18,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ..models.datasources import FrameInsertion
+from .frame_interpolation import interpolate_frame_data, interpolate_image
 from .hdf5_loader import HDF5Loader, HDF5LoaderError
 from .image_transform import (
     CropRegion,
@@ -26,8 +28,6 @@ from .image_transform import (
     ResizeDimensions,
     apply_camera_transforms,
 )
-from .frame_interpolation import interpolate_frame_data, interpolate_image
-from ..models.datasources import FrameInsertion
 
 # h5py is an optional dependency
 try:
@@ -161,9 +161,7 @@ class HDF5Exporter:
             ImportError: If h5py is not installed.
         """
         if not HDF5_AVAILABLE:
-            raise ImportError(
-                "HDF5 export requires h5py package. Install with: pip install h5py"
-            )
+            raise ImportError("HDF5 export requires h5py package. Install with: pip install h5py")
 
         self.src_path = Path(src_path)
         self.dst_path = Path(dst_path)
@@ -198,14 +196,16 @@ class HDF5Exporter:
 
             # Load source episode with images
             if progress_callback:
-                progress_callback(ExportProgress(
-                    current_episode=episode_index,
-                    total_episodes=1,
-                    current_frame=0,
-                    total_frames=0,
-                    percentage=0,
-                    status="Loading source episode...",
-                ))
+                progress_callback(
+                    ExportProgress(
+                        current_episode=episode_index,
+                        total_episodes=1,
+                        current_frame=0,
+                        total_frames=0,
+                        percentage=0,
+                        status="Loading source episode...",
+                    )
+                )
 
             episode = self.loader.load_episode(episode_index, load_images=True)
 
@@ -227,14 +227,16 @@ class HDF5Exporter:
             output_frames = len(valid_indices) + insertion_count
 
             if progress_callback:
-                progress_callback(ExportProgress(
-                    current_episode=episode_index,
-                    total_episodes=1,
-                    current_frame=0,
-                    total_frames=output_frames,
-                    percentage=10,
-                    status=f"Exporting {output_frames} frames (removed {total_frames - output_frames})...",  # noqa: E501
-                ))
+                progress_callback(
+                    ExportProgress(
+                        current_episode=episode_index,
+                        total_episodes=1,
+                        current_frame=0,
+                        total_frames=output_frames,
+                        percentage=10,
+                        status=f"Exporting {output_frames} frames (removed {total_frames - output_frames})...",  # noqa: E501
+                    )
+                )
 
             # Output file path
             output_path = self.dst_path / f"episode_{episode_index:06d}.hdf5"
@@ -280,14 +282,16 @@ class HDF5Exporter:
                 output_files.append(str(subtasks_path))
 
             if progress_callback:
-                progress_callback(ExportProgress(
-                    current_episode=episode_index,
-                    total_episodes=1,
-                    current_frame=output_frames,
-                    total_frames=output_frames,
-                    percentage=100,
-                    status="Export complete",
-                ))
+                progress_callback(
+                    ExportProgress(
+                        current_episode=episode_index,
+                        total_episodes=1,
+                        current_frame=output_frames,
+                        total_frames=output_frames,
+                        percentage=100,
+                        status="Export complete",
+                    )
+                )
 
             duration_ms = (datetime.now() - start_time).total_seconds() * 1000
 
@@ -348,14 +352,17 @@ class HDF5Exporter:
                         # Adjust percentage for multi-episode export
                         base_pct = (idx / len(episode_indices)) * 100
                         episode_pct = p.percentage / len(episode_indices)
-                        progress_callback(ExportProgress(
-                            current_episode=ep_idx,
-                            total_episodes=len(episode_indices),
-                            current_frame=p.current_frame,
-                            total_frames=p.total_frames,
-                            percentage=base_pct + episode_pct,
-                            status=p.status,
-                        ))
+                        progress_callback(
+                            ExportProgress(
+                                current_episode=ep_idx,
+                                total_episodes=len(episode_indices),
+                                current_frame=p.current_frame,
+                                total_frames=p.total_frames,
+                                percentage=base_pct + episode_pct,
+                                status=p.status,
+                            )
+                        )
+
                 return episode_progress
 
             progress_fn = make_episode_progress(i, episode_index)
@@ -543,14 +550,11 @@ class HDF5Exporter:
     ) -> None:
         """Export images with transforms, frame filtering, and insertions."""
         # Filter frames first
-        filtered_images = {
-            camera: frames[valid_indices]
-            for camera, frames in images.items()
-        }
+        filtered_images = {camera: frames[valid_indices] for camera, frames in images.items()}
 
         # Apply insertions before transforms
         if inserted_frames:
-            for camera, original_frames in images.items():
+            for camera, _original_frames in images.items():
                 filtered = filtered_images[camera]
                 img_insertions: list[tuple[int, NDArray]] = []
                 for insertion in inserted_frames:
@@ -578,14 +582,16 @@ class HDF5Exporter:
                 if progress_callback:
                     frame_count[0] += 1
                     pct = 10 + (frame_count[0] / (total_frames * len(filtered_images))) * 80
-                    progress_callback(ExportProgress(
-                        current_episode=episode_index,
-                        total_episodes=1,
-                        current_frame=current,
-                        total_frames=total,
-                        percentage=pct,
-                        status=f"Transforming {camera}...",
-                    ))
+                    progress_callback(
+                        ExportProgress(
+                            current_episode=episode_index,
+                            total_episodes=1,
+                            current_frame=current,
+                            total_frames=total,
+                            percentage=pct,
+                            status=f"Transforming {camera}...",
+                        )
+                    )
 
             filtered_images = apply_camera_transforms(
                 filtered_images,
@@ -659,11 +665,15 @@ class HDF5Exporter:
                         "y": edits.global_transform.crop.y,
                         "width": edits.global_transform.crop.width,
                         "height": edits.global_transform.crop.height,
-                    } if edits.global_transform.crop else None,
+                    }
+                    if edits.global_transform.crop
+                    else None,
                     "resize": {
                         "width": edits.global_transform.resize.width,
                         "height": edits.global_transform.resize.height,
-                    } if edits.global_transform.resize else None,
+                    }
+                    if edits.global_transform.resize
+                    else None,
                 }
 
             if edits.removed_frames:
@@ -705,14 +715,16 @@ class HDF5Exporter:
             if new_start is None or new_end is None:
                 continue
 
-            adjusted_subtasks.append({
-                "id": st.id,
-                "label": st.label,
-                "frame_range": [new_start, new_end],
-                "color": st.color,
-                "source": st.source,
-                "description": st.description,
-            })
+            adjusted_subtasks.append(
+                {
+                    "id": st.id,
+                    "label": st.label,
+                    "frame_range": [new_start, new_end],
+                    "color": st.color,
+                    "source": st.source,
+                    "description": st.description,
+                }
+            )
 
         path.write_text(json.dumps(adjusted_subtasks, indent=2))
 

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import aiofiles
 import aiofiles.os
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -31,9 +31,7 @@ class DatasetLabelsFile(BaseModel):
     """All episode labels and available options for a dataset."""
 
     dataset_id: str
-    available_labels: list[str] = Field(
-        default_factory=lambda: ["SUCCESS", "FAILURE", "PARTIAL"]
-    )
+    available_labels: list[str] = Field(default_factory=lambda: ["SUCCESS", "FAILURE", "PARTIAL"])
     episodes: dict[str, list[str]] = Field(default_factory=dict)
 
 
@@ -132,7 +130,7 @@ async def set_episode_labels(
         if normalized and normalized not in labels_file.available_labels:
             labels_file.available_labels.append(normalized)
 
-    labels_file.episodes[key] = [l.strip().upper() for l in body.labels if l.strip()]
+    labels_file.episodes[key] = [lbl.strip().upper() for lbl in body.labels if lbl.strip()]
     await _save_labels(dataset_id, labels_file)
 
     return EpisodeLabels(

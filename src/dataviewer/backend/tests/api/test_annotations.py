@@ -21,7 +21,6 @@ from src.api.models.annotations import (
     TrajectoryQualityMetrics,
 )
 from src.api.models.datasources import DatasetInfo, FeatureSchema
-from src.api.services.annotation_service import get_annotation_service
 from src.api.services.dataset_service import get_dataset_service
 
 
@@ -173,9 +172,7 @@ class TestAnnotationEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_delete_annotations_all(
-        self, client, registered_dataset, sample_annotation
-    ):
+    async def test_delete_annotations_all(self, client, registered_dataset, sample_annotation):
         """Test deleting all annotations for an episode."""
         # Save annotation
         client.put(
@@ -266,9 +263,7 @@ class TestAutoAnalysisEndpoint:
     @pytest.mark.asyncio
     async def test_trigger_auto_analysis(self, client, registered_dataset):
         """Test triggering auto-analysis."""
-        response = client.post(
-            "/api/datasets/test-dataset/episodes/5/annotations/auto"
-        )
+        response = client.post("/api/datasets/test-dataset/episodes/5/annotations/auto")
         assert response.status_code == 200
 
         data = response.json()
