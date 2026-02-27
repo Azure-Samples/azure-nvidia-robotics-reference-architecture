@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   link-lang-check:
     name: Link Language Check
@@ -25,12 +29,10 @@ jobs:
           persist-credentials: false
 
       - name: Create logs directory
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path logs | Out-Null
 
       - name: Run Link Language Check
-        shell: pwsh
         run: scripts/linting/Invoke-LinkLanguageCheck.ps1
         continue-on-error: ${{ inputs.soft-fail }}
 

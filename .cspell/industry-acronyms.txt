@@ -69,3 +69,5 @@ QLAPI
 qlapi
 Cnet
 cnet
+URDF
+MJCF

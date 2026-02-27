@@ -60,3 +60,5 @@ azurelinux
 servicebus
 eastu
 AADSSH
+rtxprogpu
+RTXPRO
