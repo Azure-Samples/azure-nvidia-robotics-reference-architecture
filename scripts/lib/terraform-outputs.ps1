@@ -7,7 +7,7 @@
 #Requires -Version 7.0
 
 $Script:TfOutput = $null
-$Script:DefaultTerraformDir = Join-Path $PSScriptRoot '..\..\deploy\001-iac'
+$Script:DefaultTerraformDir = Join-Path $PSScriptRoot '..' '..' 'deploy' '001-iac'
 
 <#
 .SYNOPSIS
