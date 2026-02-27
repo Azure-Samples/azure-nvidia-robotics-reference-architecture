@@ -42,11 +42,13 @@ async def run_detection(
     """
     logger.info(
         "POST /detect called: dataset=%s, episode=%d",
-        _sanitize(dataset_id), int(episode_idx),
+        _sanitize(dataset_id),
+        int(episode_idx),
     )
     logger.info(
         "Request: model=%s, confidence=%s",
-        _sanitize(request.model), _sanitize(request.confidence),
+        _sanitize(request.model),
+        _sanitize(request.confidence),
     )
 
     # Validate episode exists
@@ -54,7 +56,8 @@ async def run_detection(
     if episode is None:
         logger.debug(
             "Episode not found: dataset=%s, episode=%d",
-            _sanitize(dataset_id), int(episode_idx),
+            _sanitize(dataset_id),
+            int(episode_idx),
         )
         raise HTTPException(
             status_code=404,

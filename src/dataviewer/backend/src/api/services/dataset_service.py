@@ -833,7 +833,8 @@ class DatasetService:
         if video_path is None:
             logger.warning(
                 "No video for episode %d camera '%s'",
-                int(episode_idx), _sanitize(camera),
+                int(episode_idx),
+                _sanitize(camera),
             )
             return None
 

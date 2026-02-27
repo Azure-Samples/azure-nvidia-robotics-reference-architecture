@@ -217,7 +217,8 @@ async def get_episode_frame(
     except Exception:
         logger.exception(
             "Failed to load frame %d for camera '%s'",
-            int(frame_idx), _sanitize(camera),
+            int(frame_idx),
+            _sanitize(camera),
         )
         raise HTTPException(
             status_code=500,
