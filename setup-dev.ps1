@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
 
@@ -99,11 +100,15 @@ $UvVersion = '0.7.12'
 
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Info "Installing uv package manager v$UvVersion..."
-    if ($IsWindows) {
-        Invoke-RestMethod "https://astral.sh/uv/$UvVersion/install.ps1" | Invoke-Expression
+    $uvInstaller = Join-Path ([System.IO.Path]::GetTempPath()) 'uv-install.ps1'
+    try {
+        Invoke-WebRequest -Uri "https://astral.sh/uv/$UvVersion/install.ps1" -OutFile $uvInstaller -UseBasicParsing
+        & $uvInstaller
     }
-    else {
-        & bash -c "curl -LsSf https://astral.sh/uv/$UvVersion/install.sh | sh"
+    finally {
+        Remove-Item $uvInstaller -Force -ErrorAction SilentlyContinue
+    }
+    if (-not $IsWindows) {
         $env:PATH = "$HOME/.local/bin:$HOME/.cargo/bin:$env:PATH"
     }
     if ($LASTEXITCODE -ne 0) {
