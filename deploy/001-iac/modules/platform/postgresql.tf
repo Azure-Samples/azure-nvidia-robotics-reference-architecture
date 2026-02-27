@@ -2,45 +2,11 @@
  * # PostgreSQL Resources (Optional OSMO Service)
  *
  * This file creates the optional PostgreSQL Flexible Server for OSMO including:
- * - Delegated subnet for VNet integration (NOT private endpoint)
  * - PostgreSQL Flexible Server with TimescaleDB extension
+ * - Private endpoint for secure connectivity (supports cross-region deployment)
  * - Database definitions per configuration
  * - Password stored securely in Key Vault
- *
- * Note: PostgreSQL uses VNet integration via delegated subnet, not private endpoints.
  */
-
-// ============================================================
-// PostgreSQL Delegated Subnet
-// ============================================================
-
-resource "azurerm_subnet" "postgresql" {
-  count = var.should_deploy_postgresql ? 1 : 0
-
-  name                            = "snet-psql-${local.resource_name_suffix}"
-  resource_group_name             = var.resource_group.name
-  virtual_network_name            = azurerm_virtual_network.main.name
-  address_prefixes                = var.postgresql_config.subnet_prefixes
-  service_endpoints               = ["Microsoft.Storage"]
-  default_outbound_access_enabled = !var.should_enable_nat_gateway
-
-  delegation {
-    name = "postgresql-delegation"
-
-    service_delegation {
-      name = "Microsoft.DBforPostgreSQL/flexibleServers"
-      actions = [
-        "Microsoft.Network/virtualNetworks/subnets/join/action",
-      ]
-    }
-  }
-}
-
-// ============================================================
-// PostgreSQL Private DNS Zone Link
-// ============================================================
-
-// Note: DNS zone is created in private-dns-zones.tf
 
 // ============================================================
 // PostgreSQL Admin Password
@@ -76,13 +42,11 @@ resource "azurerm_postgresql_flexible_server" "main" {
   count = var.should_deploy_postgresql ? 1 : 0
 
   name                          = "psql-${local.resource_name_suffix}"
-  location                      = var.resource_group.location
+  location                      = var.postgresql_config.location
   resource_group_name           = var.resource_group.name
   version                       = var.postgresql_config.version
   sku_name                      = var.postgresql_config.sku_name
   storage_mb                    = var.postgresql_config.storage_mb
-  delegated_subnet_id           = azurerm_subnet.postgresql[0].id
-  private_dns_zone_id           = azurerm_private_dns_zone.postgresql[0].id
   administrator_login           = "psqladmin"
   administrator_password        = random_password.postgresql[0].result
   zone                          = var.postgresql_config.zone
@@ -98,13 +62,34 @@ resource "azurerm_postgresql_flexible_server" "main" {
     }
   }
 
-  // When the zone is set to null Azure will pick an available zone which then could cause
-  // terraform to try and change the zone, this results in an error on multiple deployments
   lifecycle {
     ignore_changes = [zone]
   }
+}
 
-  depends_on = [azurerm_private_dns_zone_virtual_network_link.postgresql]
+// ============================================================
+// PostgreSQL Private Endpoint
+// ============================================================
+
+resource "azurerm_private_endpoint" "postgresql" {
+  count = var.should_deploy_postgresql && local.pe_enabled ? 1 : 0
+
+  name                = "pe-psql-${local.resource_name_suffix}"
+  location            = var.resource_group.location
+  resource_group_name = var.resource_group.name
+  subnet_id           = azurerm_subnet.private_endpoints[0].id
+
+  private_service_connection {
+    name                           = "psc-psql-${local.resource_name_suffix}"
+    private_connection_resource_id = azurerm_postgresql_flexible_server.main[0].id
+    subresource_names              = ["postgresqlServer"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "pdz-psql-${local.resource_name_suffix}"
+    private_dns_zone_ids = [azurerm_private_dns_zone.postgresql[0].id]
+  }
 }
 
 // ============================================================
@@ -117,6 +102,8 @@ resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.main[0].id
   value     = "HSTORE,UUID-OSSP,PG_STAT_STATEMENTS"
+
+  depends_on = [azurerm_private_endpoint.postgresql]
 }
 
 // ============================================================
@@ -130,4 +117,6 @@ resource "azurerm_postgresql_flexible_server_database" "databases" {
   server_id = azurerm_postgresql_flexible_server.main[0].id
   collation = each.value.collation
   charset   = each.value.charset
+
+  depends_on = [azurerm_postgresql_flexible_server_configuration.extensions]
 }

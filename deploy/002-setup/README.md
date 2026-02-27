@@ -183,6 +183,17 @@ See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_
 | `03-deploy-osmo-control-plane.sh` | OSMO service, router, web-ui          |
 | `04-deploy-osmo-backend.sh`       | Backend operator, workflow storage    |
 
+### RTX PRO 6000 GRID Driver
+
+RTX PRO 6000 BSE nodes use SR-IOV vGPU passthrough and require the Microsoft GRID driver instead of the NVIDIA datacenter driver. The deploy script detects nodes labeled `nvidia.com/gpu.deploy.driver=false` (set via Terraform `node_labels`) and applies a DaemonSet that installs the GRID driver on each matching node.
+
+| Component              | Path                                                         |
+|------------------------|--------------------------------------------------------------|
+| DaemonSet manifest     | `manifests/gpu-grid-driver-installer.yaml`                   |
+| Node label (Terraform) | `node_labels = { "nvidia.com/gpu.deploy.driver" = "false" }` |
+
+The DaemonSet uses an init container that runs `nsenter` into the host namespace to download and compile the Microsoft GRID driver (`580.105.08-grid-azure`). After installation, the GPU Operator's toolkit, device-plugin, and validator detect the pre-installed driver. New nodes added by the cluster autoscaler receive the driver automatically.
+
 ## 🚩 Script Flags
 
 | Flag                | Scripts                                                        | Description                                       |
@@ -190,7 +201,88 @@ See [OSMO Keycloak configuration](https://nvidia.github.io/OSMO/main/deployment_
 | `--use-access-keys` | `04-deploy-osmo-backend.sh`                                    | Storage account keys instead of workload identity |
 | `--use-acr`         | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Pull from Terraform-deployed ACR                  |
 | `--acr-name NAME`   | `03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh` | Specify alternate ACR                             |
+| `--use-local-osmo`  | All scripts that invoke `osmo`                                 | Use local `osmo-dev` CLI instead of production    |
 | `--config-preview`  | All                                                            | Print config and exit                             |
+
+## 🔧 Using a Local OSMO CLI (osmo-dev)
+
+For development and testing with a locally-built OSMO CLI, use `osmo-dev.sh` directly or pass `--use-local-osmo` to any deployment script. The `osmo-dev.sh` script at `optional/osmo-dev.sh` builds and runs the OSMO CLI from source via Bazel.
+
+### Prerequisites
+
+| Requirement                  | Purpose                              |
+|------------------------------|--------------------------------------|
+| OSMO repository clone        | CLI source code from GitHub          |
+| Bazel                        | Builds and runs the CLI from source  |
+| `OSMO_SOURCE_DIR` configured | Points to the cloned OSMO repository |
+
+### Local OSMO Setup
+
+1. Clone the OSMO repository:
+
+```bash
+git clone https://github.com/NVIDIA/OSMO.git ~/osmo
+```
+
+1. Create `.env.local` at the repository root and set `OSMO_SOURCE_DIR`:
+
+```bash
+cp .env.local.example .env.local
+```
+
+```bash
+# .env.local
+OSMO_SOURCE_DIR=~/osmo
+```
+
+Use an absolute path or `~` for home directory. Relative paths are not supported.
+
+1. Install Bazel (if not already installed):
+
+```bash
+brew install bazel
+```
+
+### Using osmo-dev.sh Directly
+
+Run `optional/osmo-dev.sh` as a standalone CLI for local development. It accepts the same arguments as the production `osmo` command.
+
+```bash
+# Login to the OSMO service on your cluster
+./optional/osmo-dev.sh login http://10.0.5.7 --method=dev --username=testuser
+
+# Verify connection
+./optional/osmo-dev.sh info
+
+# List workflows
+./optional/osmo-dev.sh workflow list
+
+# Check CLI version
+./optional/osmo-dev.sh version
+```
+
+> [!IMPORTANT]
+> The `osmo-dev.sh` CLI and the installed `osmo` binary share the same configuration directory. Running `osmo login` or `osmo-dev.sh login` sets the login state for both. When switching between `osmo` and `osmo-dev.sh`, verify which server you are connected to with `osmo info` or `osmo-dev.sh info`.
+
+### Using --use-local-osmo with Deployment Scripts
+
+Pass `--use-local-osmo` to any deployment or workflow script to transparently replace the `osmo` command with `osmo-dev.sh`.
+
+```bash
+# Deploy OSMO backend using local CLI
+./04-deploy-osmo-backend.sh --use-acr --use-local-osmo
+
+# Submit workflow using local CLI
+cd ../../scripts
+./submit-osmo-training.sh --use-local-osmo -- --dry-run
+
+# Uninstall using local CLI
+cd ../deploy/002-setup/cleanup
+./uninstall-osmo-backend.sh --use-local-osmo
+```
+
+> [!NOTE]
+> The `.env.local` file is gitignored. Each developer maintains their own copy. The `.env.local.example` file at the repository root documents available variables.
 
 ## ⚙️ Configuration
 
@@ -340,11 +432,12 @@ kubectl describe sa osmo-service -n osmo-control-plane
 
 ## 🧩 Optional Scripts
 
-| Script                                    | Purpose                      |
-|-------------------------------------------|------------------------------|
-| `optional/deploy-volcano-scheduler.sh`    | Volcano (alternative to KAI) |
-| `optional/uninstall-volcano-scheduler.sh` | Uninstall Volcano scheduler  |
-| `optional/add-user-to-platform.sh`        | Add user to OSMO platform    |
+| Script                                    | Purpose                            |
+|-------------------------------------------|------------------------------------|
+| `optional/osmo-dev.sh`                    | Run OSMO CLI from source via Bazel |
+| `optional/deploy-volcano-scheduler.sh`    | Volcano (alternative to KAI)       |
+| `optional/uninstall-volcano-scheduler.sh` | Uninstall Volcano scheduler        |
+| `optional/add-user-to-platform.sh`        | Add user to OSMO platform          |
 
 ## 🗑️ Cleanup
 

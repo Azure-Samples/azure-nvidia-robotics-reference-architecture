@@ -49,3 +49,15 @@ output "gpu_node_pool_subnets" {
     }
   }
 }
+
+output "node_pools" {
+  description = "GPU node pool configurations for OSMO pool and pod template generation"
+  value = {
+    for key, pool in var.node_pools : key => {
+      vm_size     = pool.vm_size
+      node_taints = pool.node_taints
+      priority    = pool.priority
+      node_labels = pool.node_labels
+    }
+  }
+}

@@ -22,6 +22,7 @@ OPTIONS:
     --skip-k8s-cleanup      Skip cleaning up K8s resources
     --delete-container      Delete the storage container (destructive)
     --container-name NAME   Blob container name (default: osmo)
+    --use-local-osmo        Use local osmo-dev CLI instead of production osmo
     --config-preview        Print configuration and exit
 
 EXAMPLES:
@@ -38,6 +39,7 @@ skip_osmo_config=false
 skip_k8s_cleanup=false
 delete_container=false
 container_name="osmo"
+use_local_osmo=false
 config_preview=false
 
 while [[ $# -gt 0 ]]; do
@@ -49,10 +51,13 @@ while [[ $# -gt 0 ]]; do
     --skip-k8s-cleanup)   skip_k8s_cleanup=true; shift ;;
     --delete-container)   delete_container=true; shift ;;
     --container-name)     container_name="$2"; shift 2 ;;
+    --use-local-osmo)     use_local_osmo=true; shift ;;
     --config-preview)     config_preview=true; shift ;;
     *)                    fatal "Unknown option: $1" ;;
   esac
 done
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools az terraform kubectl helm jq
 
