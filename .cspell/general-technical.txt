@@ -352,6 +352,7 @@ defaultazurecredential
 deidentification
 deis
 delimited
+deployers
 denormalized
 deserialize
 deserialized
@@ -1191,8 +1192,10 @@ antimalware
 auditable
 auditability
 auditifnotexists
+CSPRNG
 gdpr
 hipaa
+keylength
 oidc
 OSSF
 passwordless
@@ -1327,10 +1330,12 @@ Upselling
 
 # Development & DevOps
 agile
+CFLAGS
 cicd
 devops
 scrum
 kanban
+LDFLAGS
 sprint
 backlog
 pipeline
@@ -1517,6 +1522,7 @@ podgroups
 podmonitors
 portforward
 prebundle
+psqladmin
 pyav
 pyglet
 qjqy

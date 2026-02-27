@@ -18,12 +18,12 @@ Deploy the full Azure NVIDIA Robotics stack and submit a training job in ~1.5-2 
 
 ## Prerequisites
 
-| Requirement | Details |
-| --- | --- |
-| Azure subscription | Contributor + User Access Administrator roles |
-| GPU quota | `Standard_NC24ads_A100_v4` in target region |
-| NVIDIA NGC account | Sign up at <https://ngc.nvidia.com/> for API key |
-| Development environment | Devcontainer (recommended) or local tools |
+| Requirement             | Details                                          |
+|-------------------------|--------------------------------------------------|
+| Azure subscription      | Contributor + User Access Administrator roles    |
+| GPU quota               | `Standard_NC24ads_A100_v4` in target region      |
+| NVIDIA NGC account      | Sign up at <https://ngc.nvidia.com/> for API key |
+| Development environment | Devcontainer (recommended) or local tools        |
 
 See [Prerequisites](../contributing/prerequisites.md) for installation commands and version requirements.
 
@@ -176,9 +176,9 @@ See [Cost Considerations](../contributing/cost-considerations.md) for detailed p
 
 ## Next Steps
 
-| Resource | Description |
-| --- | --- |
-| [LeRobot Inference](../lerobot-inference.md) | Run inference with trained LeRobot models |
-| [MLflow Integration](../mlflow-integration.md) | Track experiments with MLflow |
-| [Deployment Guide](../../deploy/README.md) | Full deployment reference and options |
-| [Contributing Guide](../contributing/README.md) | Development workflow and code standards |
+| Resource                                        | Description                               |
+|-------------------------------------------------|-------------------------------------------|
+| [LeRobot Inference](../lerobot-inference.md)    | Run inference with trained LeRobot models |
+| [MLflow Integration](../mlflow-integration.md)  | Track experiments with MLflow             |
+| [Deployment Guide](../../deploy/README.md)      | Full deployment reference and options     |
+| [Contributing Guide](../contributing/README.md) | Development workflow and code standards   |
