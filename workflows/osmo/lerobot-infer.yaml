@@ -167,15 +167,17 @@ workflow:
             ]
 
             # ----------------------------------------------------------------
-            # Plotting helpers
+            # Plotting (inline copy of src/inference/plotting.py functions)
             # ----------------------------------------------------------------
 
-            def plot_action_deltas(predicted, ground_truth, episode, fps):
-                """Per-joint action deltas overlay."""
+            def _setup_matplotlib():
                 import matplotlib
                 matplotlib.use("Agg")
                 import matplotlib.pyplot as plt
+                return plt
 
+            def plot_action_deltas(predicted, ground_truth, episode, fps):
+                plt = _setup_matplotlib()
                 n_steps, n_joints = predicted.shape
                 t = np.arange(n_steps) / fps
                 fig, axes = plt.subplots(n_joints, 1, figsize=(14, 2.5 * n_joints), sharex=True)
@@ -192,13 +194,8 @@ workflow:
                 fig.tight_layout()
                 return fig
 
-
             def plot_cumulative_positions(predicted, ground_truth, episode, fps):
-                """Reconstructed absolute joint positions from cumulative deltas."""
-                import matplotlib
-                matplotlib.use("Agg")
-                import matplotlib.pyplot as plt
-
+                plt = _setup_matplotlib()
                 pred_pos = np.cumsum(predicted, axis=0)
                 gt_pos = np.cumsum(ground_truth, axis=0)
                 n_steps, n_joints = predicted.shape
@@ -217,13 +214,8 @@ workflow:
                 fig.tight_layout()
                 return fig
 
-
             def plot_error_heatmap(predicted, ground_truth, episode, fps):
-                """Absolute error heatmap across joints and time."""
-                import matplotlib
-                matplotlib.use("Agg")
-                import matplotlib.pyplot as plt
-
+                plt = _setup_matplotlib()
                 error = np.abs(predicted - ground_truth)
                 n_steps = error.shape[0]
                 t = np.arange(n_steps) / fps
@@ -240,21 +232,14 @@ workflow:
                 fig.tight_layout()
                 return fig
 
-
             def plot_summary_panel(predicted, ground_truth, inference_times, episode, fps):
-                """2x2 summary: all joints overlay, error boxplots, latency, per-joint MAE."""
-                import matplotlib
-                matplotlib.use("Agg")
-                import matplotlib.pyplot as plt
-
+                plt = _setup_matplotlib()
                 error = np.abs(predicted - ground_truth)
                 n_steps, n_joints = predicted.shape
                 t = np.arange(n_steps) / fps
                 colors = plt.cm.tab10(np.linspace(0, 1, n_joints))
-
                 fig, axes = plt.subplots(2, 2, figsize=(14, 8))
                 fig.suptitle(f"Episode {episode} — Inference Summary", fontsize=14, fontweight="bold")
-
                 ax = axes[0, 0]
                 for j in range(n_joints):
                     ax.plot(t, ground_truth[:, j], color=colors[j], alpha=0.6, linewidth=1.0)
@@ -263,14 +248,12 @@ workflow:
                 ax.set_ylabel("Action delta (rad)", fontsize=9)
                 ax.set_title("All Joints (solid=GT, dashed=pred)", fontsize=10)
                 ax.grid(True, alpha=0.3)
-
                 ax = axes[0, 1]
                 ax.boxplot([error[:, j] for j in range(n_joints)], tick_labels=JOINT_NAMES, patch_artist=True)
                 ax.set_ylabel("Absolute Error (rad)", fontsize=9)
                 ax.set_title("Error Distribution per Joint", fontsize=10)
                 ax.tick_params(axis="x", rotation=30, labelsize=8)
                 ax.grid(True, alpha=0.3, axis="y")
-
                 ax = axes[1, 0]
                 inf_ms = inference_times * 1000
                 ax.plot(inf_ms, color="#4CAF50", alpha=0.7, linewidth=0.8)
@@ -281,7 +264,6 @@ workflow:
                 ax.legend(fontsize=8)
                 ax.grid(True, alpha=0.3)
                 ax.set_ylim(0, min(np.percentile(inf_ms, 99) * 2, inf_ms.max() * 1.1))
-
                 ax = axes[1, 1]
                 per_joint_mae = np.mean(error, axis=0)
                 bars = ax.bar(JOINT_NAMES, per_joint_mae, color=colors[:n_joints], alpha=0.7)
@@ -291,7 +273,55 @@ workflow:
                 ax.grid(True, alpha=0.3, axis="y")
                 for bar, val in zip(bars, per_joint_mae):
                     ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{val:.4f}", ha="center", va="bottom", fontsize=7)
+                fig.tight_layout()
+                return fig
 
+            def plot_aggregate_summary(episode_metrics):
+                plt = _setup_matplotlib()
+                episodes = [m["episode"] for m in episode_metrics]
+                ep_labels = [str(e) for e in episodes]
+                maes = [m["mae"] for m in episode_metrics]
+                mses = [m["mse"] for m in episode_metrics]
+                throughputs = [m["throughput_hz"] for m in episode_metrics]
+                per_joint = np.array([m["per_joint_mae"] for m in episode_metrics])
+                n_joints = per_joint.shape[1]
+                colors = plt.cm.tab10(np.linspace(0, 1, n_joints))
+                fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+                fig.suptitle(f"Aggregate Inference Summary ({len(episodes)} episodes)", fontsize=14, fontweight="bold")
+                ax = axes[0, 0]
+                bars = ax.bar(ep_labels, maes, color="#2196F3", alpha=0.7)
+                ax.axhline(y=np.mean(maes), color="#F44336", linestyle="--", alpha=0.7, label=f"Mean: {np.mean(maes):.6f}")
+                ax.set_xlabel("Episode", fontsize=9)
+                ax.set_ylabel("MAE (rad)", fontsize=9)
+                ax.set_title("Per-Episode MAE", fontsize=10)
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3, axis="y")
+                ax = axes[0, 1]
+                mean_per_joint = np.mean(per_joint, axis=0)
+                ax.bar(JOINT_NAMES, mean_per_joint, color=colors[:n_joints], alpha=0.7)
+                for j in range(n_joints):
+                    ax.scatter([JOINT_NAMES[j]] * len(episodes), per_joint[:, j], color=colors[j], s=15, alpha=0.5, zorder=3)
+                ax.set_ylabel("MAE (rad)", fontsize=9)
+                ax.set_title("Per-Joint MAE (mean + per-episode scatter)", fontsize=10)
+                ax.tick_params(axis="x", rotation=30, labelsize=8)
+                ax.grid(True, alpha=0.3, axis="y")
+                ax = axes[1, 0]
+                bar_colors = ["#4CAF50" if t >= 30 else "#FF5722" for t in throughputs]
+                ax.bar(ep_labels, throughputs, color=bar_colors, alpha=0.7)
+                ax.axhline(y=30, color="#F44336", linestyle="--", alpha=0.7, label="Realtime (30 Hz)")
+                ax.set_xlabel("Episode", fontsize=9)
+                ax.set_ylabel("Throughput (Hz)", fontsize=9)
+                ax.set_title("Per-Episode Throughput", fontsize=10)
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3, axis="y")
+                ax = axes[1, 1]
+                bars = ax.bar(ep_labels, mses, color="#9C27B0", alpha=0.7)
+                ax.axhline(y=np.mean(mses), color="#F44336", linestyle="--", alpha=0.7, label=f"Mean: {np.mean(mses):.7f}")
+                ax.set_xlabel("Episode", fontsize=9)
+                ax.set_ylabel("MSE (rad²)", fontsize=9)
+                ax.set_title("Per-Episode MSE", fontsize=10)
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3, axis="y")
                 fig.tight_layout()
                 return fig
 
@@ -533,6 +563,16 @@ workflow:
                         "aggregate_throughput_hz": agg_throughput,
                     })
                     mlflow.log_artifact(str(results_path))
+
+                    if len(all_episode_metrics) >= 2:
+                        import matplotlib
+                        matplotlib.use("Agg")
+                        import matplotlib.pyplot as plt
+                        fig = plot_aggregate_summary(all_episode_metrics)
+                        mlflow.log_figure(fig, "plots/aggregate_summary.png")
+                        plt.close(fig)
+                        print("[INFO] Logged aggregate summary plot to MLflow")
+
                     mlflow.end_run()
                     print("[INFO] MLflow run completed with plots and metrics")
 
