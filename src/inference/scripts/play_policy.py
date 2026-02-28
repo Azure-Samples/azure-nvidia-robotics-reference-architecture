@@ -20,6 +20,7 @@ sys.path.insert(0, str(_SRC_DIR))
 from isaaclab.app import AppLauncher
 
 from common import cli_args  # isort: skip
+from training.simulation_shutdown import prepare_for_shutdown
 
 parser = argparse.ArgumentParser(description="Run inference using an exported ONNX or TorchScript policy.")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during inference.")
@@ -438,6 +439,7 @@ def main(
             json.dump(metrics, f, indent=2)
         print(f"\n[INFO] Metrics saved to: {metrics_path}")
 
+    prepare_for_shutdown()
     env.close()
 
 

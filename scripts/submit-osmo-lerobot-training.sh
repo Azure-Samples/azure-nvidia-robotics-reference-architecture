@@ -73,6 +73,7 @@ AZURE CONTEXT:
         --azure-workspace-name NAME   Azure ML workspace
 
 OTHER:
+        --use-local-osmo          Use local osmo-dev CLI instead of production osmo
     -h, --help                    Show this help message
 
 Values resolved: CLI > Environment variables > Terraform outputs
@@ -148,6 +149,7 @@ ARCHIVE_PATH="$TMP_DIR/osmo-lerobot-training.zip"
 B64_PATH="$TMP_DIR/osmo-lerobot-training.b64"
 payload_root="${PAYLOAD_ROOT:-/workspace/lerobot_payload}"
 
+use_local_osmo=false
 forward_args=()
 
 #------------------------------------------------------------------------------
@@ -183,6 +185,7 @@ while [[ $# -gt 0 ]]; do
     --azure-subscription-id)      subscription_id="$2"; shift 2 ;;
     --azure-resource-group)       resource_group="$2"; shift 2 ;;
     --azure-workspace-name)       workspace_name="$2"; shift 2 ;;
+    --use-local-osmo)             use_local_osmo=true; shift ;;
     --)                           shift; forward_args=("$@"); break ;;
     *)                            forward_args+=("$1"); shift ;;
   esac
@@ -191,6 +194,8 @@ done
 #------------------------------------------------------------------------------
 # Validation
 #------------------------------------------------------------------------------
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools osmo zip base64
 

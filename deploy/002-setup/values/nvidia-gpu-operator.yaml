@@ -1,13 +1,15 @@
 # NVIDIA GPU Operator Helm values for Azure AKS
-# Configured for AKS with gpu_driver = "Install" (Azure-managed driver/toolkit)
+# Mixed GPU node pool configuration. See docs/gpu-configuration.md for architecture details.
 
-# Operator settings - use containerd runtime with AKS-compatible handler name
+# Operator settings
 operator:
-  defaultRuntime: containerd
-  runtimeClass: nvidia-container-runtime
+  runtimeClass: nvidia
 
-# Common tolerations for spot GPU nodes
-# Applied to all GPU Operator components that need to run on GPU nodes
+# CDI disabled; this cluster uses runtimeClass-based GPU injection.
+cdi:
+  enabled: false
+
+# Tolerations for GPU and spot nodes
 daemonsets:
   tolerations:
     - key: nvidia.com/gpu
@@ -18,16 +20,33 @@ daemonsets:
       value: spot
       effect: NoSchedule
 
-# Driver is managed by AKS GPU node pools (gpu_driver = "Install" in Terraform)
+# Driver for H100 nodes; RTX PRO 6000 uses GRID DaemonSet (see docs/gpu-configuration.md).
+# Proprietary kernel modules required for Azure vGPU.
 driver:
-  enabled: false
+  enabled: true
+  kernelModuleType: proprietary
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
-# Toolkit is managed by AKS - do NOT enable as it will crash containerd
+# Container toolkit
 toolkit:
-  enabled: false
+  enabled: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: kubernetes.azure.com/scalesetpriority
+      operator: Equal
+      value: spot
+      effect: NoSchedule
 
-# Device plugin - required to advertise GPU resources to kubelet
-# AKS gpu_driver="Install" does NOT include the device plugin
+# Device plugin
 devicePlugin:
   enabled: true
   tolerations:
@@ -39,7 +58,7 @@ devicePlugin:
       value: spot
       effect: NoSchedule
 
-# Enable DCGM exporter for GPU metrics
+# DCGM exporter for GPU metrics
 dcgmExporter:
   enabled: true
   serviceMonitor:
@@ -53,9 +72,13 @@ dcgmExporter:
       value: spot
       effect: NoSchedule
 
-# Disable MIG (not used)
+# MIG strategy: single required for RTX PRO 6000 vGPU (see docs/gpu-configuration.md).
 mig:
   strategy: single
+
+# MIG manager disabled; vGPU host manages MIG instances.
+migManager:
+  enabled: false
 
 # GPU Feature Discovery
 gfd:
@@ -69,7 +92,7 @@ gfd:
       value: spot
       effect: NoSchedule
 
-# Node Feature Discovery - required to detect GPU nodes
+# Node Feature Discovery
 node-feature-discovery:
   worker:
     tolerations:
@@ -89,11 +112,11 @@ node-feature-discovery:
         value: spot
         effect: NoSchedule
 
-# Node labeller for GPU detection
+# Node status exporter
 nodeStatusExporter:
   enabled: true
 
-# Validator ensures everything is working
+# Validator
 validator:
   enabled: true
   tolerations:
