@@ -1,8 +1,8 @@
 ---
 title: LeRobot ACT Policy Inference
-description: Run a trained ACT policy locally or on a UR10E robot via ROS2
+description: Run a trained ACT policy locally, on OSMO with MLflow plots, or on a UR10E robot via ROS2
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-12
+ms.date: 2026-02-27
 ms.topic: how-to
 keywords:
   - lerobot
@@ -17,7 +17,7 @@ Run a trained ACT (Action Chunking with Transformers) policy locally against dat
 ## 📋 Prerequisites
 
 | Tool              | Version | Install                    |
-|-------------------|---------|----------------------------|
+| ----------------- | ------- | -------------------------- |
 | Python            | 3.10+   | System or `pyenv`          |
 | `uv` or `pip`     | Latest  | `pip install uv`           |
 | Azure CLI         | 2.50+   | `uv pip install azure-cli` |
@@ -100,7 +100,7 @@ Inference Results
 ### Inference Script Parameters
 
 | Parameter       | Default                       | Description                             |
-|-----------------|-------------------------------|-----------------------------------------|
+| --------------- | ----------------------------- | --------------------------------------- |
 | `--policy-repo` | `alizaidi/hve-robo-act-train` | HuggingFace repo ID or local path       |
 | `--dataset-dir` | (required)                    | LeRobot v3 dataset root directory       |
 | `--episode`     | `0`                           | Episode index for test observations     |
@@ -112,7 +112,7 @@ Inference Results
 ### Model Details
 
 | Property          | Value                                   |
-|-------------------|-----------------------------------------|
+| ----------------- | --------------------------------------- |
 | Policy type       | ACT (Action Chunking with Transformers) |
 | Parameters        | 51.6M                                   |
 | State dim         | 6 (UR10E joint positions in radians)    |
@@ -120,6 +120,48 @@ Inference Results
 | Image input       | 480 x 848 RGB                           |
 | Control frequency | 30 Hz                                   |
 | Backbone          | ResNet-18                               |
+
+## 📊 OSMO Evaluation with MLflow Plots
+
+Run batch evaluation across multiple episodes on OSMO with trajectory plots logged directly to AzureML Studio via MLflow.
+
+### Submit with MLflow Enabled
+
+```bash
+scripts/submit-osmo-lerobot-inference.sh \
+  --policy-repo-id alizaidi/hve-robo-act-train \
+  --dataset-repo-id alizaidi/hve-robo-cell \
+  --eval-episodes 10 \
+  --mlflow-enable \
+  --experiment-name lerobot-act-eval
+```
+
+### Viewing Plots in AzureML Studio
+
+Navigate to **AzureML Studio > Jobs > (run name) > Images**. The left panel shows a folder tree organized by episode, and plots render inline with tab navigation across all images.
+
+Each episode produces four plots plus one aggregate summary across all episodes:
+
+| Plot                       | Description                                                       |
+| -------------------------- | ----------------------------------------------------------------- |
+| `action_deltas.png`        | Per-joint predicted vs ground truth action overlays               |
+| `cumulative_positions.png` | Reconstructed absolute joint positions                            |
+| `error_heatmap.png`        | Time x joint absolute error heatmap                               |
+| `summary_panel.png`        | 2x2 panel: all joints, error boxplots, latency, MAE bars          |
+| `aggregate_summary.png`    | Cross-episode comparison of MAE, MSE, throughput, per-joint error |
+
+Numeric metrics are on the **Metrics** tab: per-episode values (`ep0_mse`, `ep0_mae`, `ep0_throughput_hz`) and aggregate summaries (`aggregate_mse`, `aggregate_mae`).
+
+### OSMO Inference Script Parameters
+
+| Parameter           | Default      | Description                                 |
+| ------------------- | ------------ | ------------------------------------------- |
+| `--policy-repo-id`  | (required)   | HuggingFace policy repository               |
+| `--dataset-repo-id` | (none)       | HuggingFace dataset for replay evaluation   |
+| `--eval-episodes`   | `10`         | Number of episodes to evaluate              |
+| `--mlflow-enable`   | `false`      | Log plots and metrics to AzureML via MLflow |
+| `--experiment-name` | auto-derived | MLflow experiment name                      |
+| `--register-model`  | (none)       | Register model to AzureML after evaluation  |
 
 ## 🤖 ROS2 Deployment
 
@@ -130,7 +172,7 @@ For real robot control, use the ROS2 inference node in `src/inference/scripts/ac
 `src/inference/robot_types.py` defines the interface between the robot and the policy:
 
 | Type                               | Maps to                    | Shape                 |
-|------------------------------------|----------------------------|-----------------------|
+| ---------------------------------- | -------------------------- | --------------------- |
 | `RobotObservation.joint_positions` | `observation.state`        | `(6,)` radians        |
 | `RobotObservation.color_image`     | `observation.images.color` | `(480, 848, 3)` uint8 |
 | `JointPositionCommand.positions`   | `action`                   | `(6,)` radians        |
@@ -162,7 +204,7 @@ ros2 run lerobot_inference act_inference_node \
 ### ROS2 Node Parameters
 
 | Parameter            | Default                       | Description                            |
-|----------------------|-------------------------------|----------------------------------------|
+| -------------------- | ----------------------------- | -------------------------------------- |
 | `policy_repo`        | `alizaidi/hve-robo-act-train` | Model source                           |
 | `device`             | `cuda`                        | Inference device                       |
 | `control_hz`         | `30.0`                        | Control loop frequency                 |
@@ -174,7 +216,7 @@ ros2 run lerobot_inference act_inference_node \
 ### ROS2 Topics
 
 | Topic                     | Type                              | Direction |
-|---------------------------|-----------------------------------|-----------|
+| ------------------------- | --------------------------------- | --------- |
 | `/joint_states`           | `sensor_msgs/JointState`          | Subscribe |
 | `/camera/color/image_raw` | `sensor_msgs/Image`               | Subscribe |
 | `/lerobot/joint_commands` | `trajectory_msgs/JointTrajectory` | Publish   |
