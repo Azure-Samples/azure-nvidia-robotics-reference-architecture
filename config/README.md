@@ -25,19 +25,19 @@ Topics define which ROS 2 messages to record during episodes with frequency down
 
 ### Field Reference
 
-| Name            | Type   | Default  | Valid Range           | Description                          |
-|-----------------|--------|----------|-----------------------|--------------------------------------|
-| `name`          | string | required | ROS 2 topic path      | Topic name starting with `/`         |
-| `frequency_hz`  | float  | required | (0, 1000]             | Target recording frequency in Hz     |
-| `compression`   | string | `none`   | `none`, `lz4`, `zstd` | Compression algorithm                |
+| Name           | Type   | Default  | Valid Range           | Description                      |
+|----------------|--------|----------|-----------------------|----------------------------------|
+| `name`         | string | required | ROS 2 topic path      | Topic name starting with `/`     |
+| `frequency_hz` | float  | required | (0, 1000]             | Target recording frequency in Hz |
+| `compression`  | string | `none`   | `none`, `lz4`, `zstd` | Compression algorithm            |
 
 ### Compression Algorithms
 
-| Algorithm | Ratio | CPU Overhead | Use Case                                     |
-|-----------|-------|--------------|----------------------------------------------|
-| `none`    | 1x    | 0%           | Uncompressed recording, maximum write speed  |
-| `lz4`     | 2-3x  | <10%         | High-frequency topics (joint states, IMU)    |
-| `zstd`    | 3-5x  | 20-30%       | Images and low-frequency data                |
+| Algorithm | Ratio | CPU Overhead | Use Case                                    |
+|-----------|-------|--------------|---------------------------------------------|
+| `none`    | 1x    | 0%           | Uncompressed recording, maximum write speed |
+| `lz4`     | 2-3x  | <10%         | High-frequency topics (joint states, IMU)   |
+| `zstd`    | 3-5x  | 20-30%       | Images and low-frequency data               |
 
 ### Example
 
@@ -77,11 +77,11 @@ trigger:
 
 Episodes start when robot reaches target pose within tolerance.
 
-| Name            | Type           | Default  | Valid Range  | Description                                          |
-|-----------------|----------------|----------|--------------|------------------------------------------------------|
-| `type`          | string         | required | `position`   | Trigger discriminator                                |
-| `joint_indices` | array[integer] | required | min length 1 | Joint indices to monitor                             |
-| `tolerances`    | array[float]   | required | min length 1 | Position tolerance per joint (radians or meters)     |
+| Name            | Type           | Default  | Valid Range  | Description                                      |
+|-----------------|----------------|----------|--------------|--------------------------------------------------|
+| `type`          | string         | required | `position`   | Trigger discriminator                            |
+| `joint_indices` | array[integer] | required | min length 1 | Joint indices to monitor                         |
+| `tolerances`    | array[float]   | required | min length 1 | Position tolerance per joint (radians or meters) |
 
 Array lengths must match. Validation fails if `tolerances` count differs from `joint_indices` count.
 
@@ -130,10 +130,10 @@ disk_thresholds:
 
 Gap detection identifies missing messages during recording for quality assurance.
 
-| Name           | Type   | Default   | Valid Range                    | Description                                 |
-|----------------|--------|-----------|--------------------------------|---------------------------------------------|
-| `threshold_ms` | float  | 100.0     | >0                             | Gap detection threshold in milliseconds     |
-| `severity`     | string | `warning` | `warning`, `error`, `critical` | Severity level for gap events               |
+| Name           | Type   | Default   | Valid Range                    | Description                             |
+|----------------|--------|-----------|--------------------------------|-----------------------------------------|
+| `threshold_ms` | float  | 100.0     | >0                             | Gap detection threshold in milliseconds |
+| `severity`     | string | `warning` | `warning`, `error`, `critical` | Severity level for gap events           |
 
 The system tracks last message timestamp per topic and flags gaps exceeding `threshold_ms`. Gap events are logged with configured severity and stored in episode metadata for post-processing analysis.
 
@@ -159,13 +159,13 @@ Configuration files are validated using Pydantic models at service startup. Vali
 
 ### Validation Rules
 
-| Rule               | Error Message Pattern                                               |
-|--------------------|---------------------------------------------------------------------|
-| Topic name format  | `Topic name must start with /: <name>`                              |
-| Topic uniqueness   | `Duplicate topic names found: [<names>]`                            |
-| Frequency range    | `frequency_hz out of range: <value>`                                |
-| Threshold ordering | `Warning threshold (<n>%) must be less than critical (<m>%)`        |
-| Array length match | `Tolerance count (<n>) must match joint index count (<m>)`          |
+| Rule               | Error Message Pattern                                        |
+|--------------------|--------------------------------------------------------------|
+| Topic name format  | `Topic name must start with /: <name>`                       |
+| Topic uniqueness   | `Duplicate topic names found: [<names>]`                     |
+| Frequency range    | `frequency_hz out of range: <value>`                         |
+| Threshold ordering | `Warning threshold (<n>%) must be less than critical (<m>%)` |
+| Array length match | `Tolerance count (<n>) must match joint index count (<m>)`   |
 
 ### JSON Schema Integration
 
