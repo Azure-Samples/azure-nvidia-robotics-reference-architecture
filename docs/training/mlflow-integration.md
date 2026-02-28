@@ -239,6 +239,53 @@ Training slows down due to excessive MLflow API calls.
 
 Log messages like `"Failed to extract or log metrics at step X"` indicate transient data structure changes or incompatible metric types. Occasional warnings are harmless. For persistent warnings, check the exception details and modify `_extract_from_value()` in `skrl_mlflow_agent.py` for specific metric types.
 
+**Possible Causes:**
+
+1. Transient data structure changes
+   * Some algorithms modify `tracking_data` structure during training
+   * Usually harmless if only occasional warnings appear
+
+2. Incompatible metric types
+   * The integration attempts to convert all metrics to float
+   * Some complex objects cannot be converted and are skipped
+
+**Solutions:**
+
+1. Check warning details in logs
+   * Warnings include the exception message for debugging
+   * Determine if the failed metric is critical
+
+2. Add custom extraction logic
+   * Modify `_extract_from_value()` in `skrl_mlflow_agent.py` for specific metric types
+   * Contribute improvements back to the integration module
+
+### Empty Metrics Dictionary
+
+**Symptom:** Integration runs but extracts zero metrics.
+
+**Possible Causes:**
+
+1. Agent `tracking_data` is empty
+   * Agent may not have started tracking yet
+   * Training updates occur after rollouts, not after every environment step
+   * Check agent initialization and training state
+
+2. All metrics filtered out
+   * If using `metric_filter` with no matching metric names
+   * Verify filter set contains correct metric names
+
+3. Metric extraction depth exceeded
+   * Nested metrics beyond `max_depth=2` are not extracted
+   * Increase `max_depth` in `_extract_from_tracking_data()` if needed
+
+## Related Documentation
+
+* [Training Guide](README.md)
+* [Inference Guide](../inference/README.md)
+* [Workflow Templates](../../workflows/README.md)
+
+---
+
 <!-- markdownlint-disable MD036 -->
 *🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
 then carefully refined by our team of discerning human reviewers.*
