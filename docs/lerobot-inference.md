@@ -1,8 +1,8 @@
 ---
 title: LeRobot ACT Policy Inference
-description: Run a trained ACT policy locally or on a UR10E robot via ROS2
+description: Run a trained ACT policy locally, on OSMO with MLflow plots, or on a UR10E robot via ROS2
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-12
+ms.date: 2026-02-27
 ms.topic: how-to
 keywords:
   - lerobot
@@ -120,6 +120,45 @@ Inference Results
 | Image input       | 480 x 848 RGB                           |
 | Control frequency | 30 Hz                                   |
 | Backbone          | ResNet-18                               |
+
+## 📊 OSMO Evaluation with MLflow Plots
+
+Run batch evaluation across multiple episodes on OSMO with trajectory plots logged directly to AzureML Studio via MLflow.
+
+### Submit with MLflow Enabled
+
+```bash
+scripts/submit-osmo-lerobot-inference.sh \
+  --policy-repo-id alizaidi/hve-robo-act-train \
+  --dataset-repo-id alizaidi/hve-robo-cell \
+  --eval-episodes 10 \
+  --mlflow-enable \
+  --experiment-name lerobot-act-eval
+```
+
+### Viewing Plots in AzureML Studio
+
+Navigate to **AzureML Studio > Experiments > (experiment name) > (run) > Artifacts > plots/**. Each episode produces four plots:
+
+| Plot                   | Description                                        |
+|------------------------|----------------------------------------------------|
+| `action_deltas.png`    | Per-joint predicted vs ground truth action overlays |
+| `cumulative_positions.png` | Reconstructed absolute joint positions         |
+| `error_heatmap.png`    | Time x joint absolute error heatmap                |
+| `summary_panel.png`    | 2x2 panel: all joints, error boxplots, latency, MAE bars |
+
+MLflow also logs numeric metrics per episode (`ep0_mse`, `ep0_mae`, `ep0_throughput_hz`) and aggregate summaries (`aggregate_mse`, `aggregate_mae`).
+
+### OSMO Inference Script Parameters
+
+| Parameter             | Default                     | Description                                  |
+|-----------------------|-----------------------------|----------------------------------------------|
+| `--policy-repo-id`    | (required)                  | HuggingFace policy repository                |
+| `--dataset-repo-id`   | (none)                      | HuggingFace dataset for replay evaluation    |
+| `--eval-episodes`     | `10`                        | Number of episodes to evaluate               |
+| `--mlflow-enable`     | `false`                     | Log plots and metrics to AzureML via MLflow  |
+| `--experiment-name`   | auto-derived                | MLflow experiment name                       |
+| `--register-model`    | (none)                      | Register model to AzureML after evaluation   |
 
 ## 🤖 ROS2 Deployment
 

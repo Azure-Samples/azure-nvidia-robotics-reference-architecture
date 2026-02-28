@@ -45,6 +45,10 @@ EVALUATION OPTIONS:
         --eval-batch-size N       Evaluation batch size (default: 10)
         --record-video            Record evaluation videos
 
+MLFLOW TRACKING:
+        --mlflow-enable           Enable MLflow logging with trajectory plots to AzureML
+        --experiment-name NAME    MLflow experiment name (default: auto-derived)
+
 MODEL REGISTRATION:
     -r, --register-model NAME     Model name for Azure ML registration
 
@@ -78,6 +82,8 @@ lerobot_version="${LEROBOT_VERSION:-}"
 eval_episodes="${EVAL_EPISODES:-10}"
 eval_batch_size="${EVAL_BATCH_SIZE:-10}"
 record_video="${RECORD_VIDEO:-false}"
+mlflow_enable="${MLFLOW_ENABLE:-false}"
+experiment_name="${EXPERIMENT_NAME:-}"
 register_model="${REGISTER_MODEL:-}"
 use_local_osmo=false
 
@@ -105,6 +111,8 @@ while [[ $# -gt 0 ]]; do
     --eval-episodes)              eval_episodes="$2"; shift 2 ;;
     --eval-batch-size)            eval_batch_size="$2"; shift 2 ;;
     --record-video)               record_video="true"; shift ;;
+    --mlflow-enable)              mlflow_enable="true"; shift ;;
+    --experiment-name)            experiment_name="$2"; shift 2 ;;
     -r|--register-model)          register_model="$2"; shift 2 ;;
     --azure-subscription-id)      subscription_id="$2"; shift 2 ;;
     --azure-resource-group)       resource_group="$2"; shift 2 ;;
@@ -131,10 +139,10 @@ case "$policy_type" in
   *) fatal "Unsupported policy type: $policy_type (use: act, diffusion)" ;;
 esac
 
-if [[ -n "$register_model" ]]; then
-  [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for model registration"
-  [[ -z "$resource_group" ]] && fatal "Azure resource group required for model registration"
-  [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for model registration"
+if [[ -n "$register_model" || "$mlflow_enable" == "true" ]]; then
+  [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for model registration / MLflow"
+  [[ -z "$resource_group" ]] && fatal "Azure resource group required for model registration / MLflow"
+  [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for model registration / MLflow"
 fi
 
 #------------------------------------------------------------------------------
@@ -155,6 +163,8 @@ submit_args=(
 
 [[ -n "$dataset_repo_id" ]]  && submit_args+=("dataset_repo_id=$dataset_repo_id")
 [[ -n "$lerobot_version" ]]  && submit_args+=("lerobot_version=$lerobot_version")
+[[ "$mlflow_enable" == "true" ]] && submit_args+=("mlflow_enable=true")
+[[ -n "$experiment_name" ]]  && submit_args+=("experiment_name=$experiment_name")
 [[ -n "$register_model" ]]   && submit_args+=("register_model=$register_model")
 
 [[ -n "$subscription_id" ]] && submit_args+=("azure_subscription_id=$subscription_id")
@@ -174,6 +184,8 @@ info "  Job Name: $job_name"
 info "  Eval Episodes: $eval_episodes"
 info "  Image: $image"
 [[ -n "$dataset_repo_id" ]] && info "  Dataset: $dataset_repo_id"
+[[ "$mlflow_enable" == "true" ]] && info "  MLflow: enabled (plots logged to AzureML)"
+[[ -n "$experiment_name" ]] && info "  Experiment: $experiment_name"
 [[ -n "$register_model" ]] && info "  Register model: $register_model"
 
 osmo "${submit_args[@]}" || fatal "Failed to submit workflow"
