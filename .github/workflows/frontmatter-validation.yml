@@ -27,6 +27,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   frontmatter-validation:
     name: Validate Markdown Frontmatter
@@ -35,23 +39,20 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Create logs directory
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path logs | Out-Null
 
       - name: Install PowerShell-Yaml
-        shell: pwsh
         run: |
           Install-Module -Name PowerShell-Yaml -Force -Scope CurrentUser
 
       - name: Run Frontmatter Validation
-        shell: pwsh
         run: |
           $args = @()
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
@@ -71,7 +72,7 @@ jobs:
 
       - name: Upload frontmatter validation results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: frontmatter-validation-results
           path: logs/frontmatter-validation-results.json
@@ -79,7 +80,6 @@ jobs:
 
       - name: Check results and fail if needed
         if: ${{ !inputs.soft-fail }}
-        shell: pwsh
         run: |
           if ($env:FRONTMATTER_VALIDATION_FAILED -eq 'true') {
             Write-Host "Frontmatter validation failed. Failing the job."

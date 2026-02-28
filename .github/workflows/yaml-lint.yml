@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   yaml-lint:
     name: actionlint
@@ -25,28 +29,31 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Create logs directory
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path logs | Out-Null
 
       - name: Install actionlint
         run: |
-          ACTIONLINT_VERSION="1.7.10"
-          ACTIONLINT_SHA256="f4c76b71db5755a713e6055cbb0857ed07e103e028bda117817660ebadb4386f"
-          curl -sSfL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" -o /tmp/actionlint.tar.gz
-          echo "${ACTIONLINT_SHA256} /tmp/actionlint.tar.gz" | sha256sum -c --quiet -
-          sudo tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint
-          rm /tmp/actionlint.tar.gz
+          $version = '1.7.10'
+          $expectedHash = 'f4c76b71db5755a713e6055cbb0857ed07e103e028bda117817660ebadb4386f'
+          $url = "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
+          $tmpFile = '/tmp/actionlint.tar.gz'
+          Invoke-WebRequest -Uri $url -OutFile $tmpFile
+          $actualHash = (Get-FileHash -Path $tmpFile -Algorithm SHA256).Hash.ToLower()
+          if ($actualHash -ne $expectedHash) {
+            throw "Hash mismatch: expected $expectedHash, got $actualHash"
+          }
+          sudo tar -xzf $tmpFile -C /usr/local/bin actionlint
+          Remove-Item $tmpFile
           actionlint --version
 
       - name: Run YAML Lint
-        shell: pwsh
         continue-on-error: ${{ inputs.soft-fail }}
         run: |
           $lintArgs = @{}
@@ -57,7 +64,7 @@ jobs:
 
       - name: Upload YAML lint results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: yaml-lint-results
           path: logs/

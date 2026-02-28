@@ -1,23 +1,16 @@
 ---
 title: MLflow Integration for SKRL Training
-description: MLflow metric logging integration with SKRL agent training during Isaac Lab training runs
+description: Metric logging integration for SKRL agent training during Isaac Lab runs using monkey-patching
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-24
+ms.date: 2026-02-23
 ms.topic: reference
 keywords:
-  - MLflow
-  - SKRL
-  - Isaac Lab
-  - training
+  - mlflow
+  - skrl
   - metrics
   - experiment tracking
+  - isaac lab
 ---
-
-## MLflow Integration for SKRL Training
-
-MLflow metric logging integration with SKRL agent training during Isaac Lab training runs.
-
-## Overview
 
 The training pipeline uses monkey-patching to wrap the agent's `_update` method, intercepting training updates to extract and log metrics to MLflow. This approach provides comprehensive experiment tracking without modifying the underlying SKRL agent implementation or training code.
 
@@ -212,82 +205,39 @@ The training script handles MLflow setup and monkey-patching automatically. To c
 
 ### No Metrics Logged to MLflow
 
-**Symptom:** Training runs complete but no metrics appear in MLflow.
+Training runs complete but no metrics appear in MLflow.
 
-**Possible Causes:**
-
-1. MLflow not configured or authenticated
-   * Verify `mlflow.set_tracking_uri()` is called with correct Azure ML workspace URI
-   * Check Azure authentication is valid
-   * Confirm MLflow experiment exists
-
-2. Monkey-patching not applied correctly
-   * Ensure `create_mlflow_logging_wrapper` is called after Runner instantiation
-   * Verify `runner.agent._update` is replaced with the wrapper function before `runner.run()`
-   * Confirm `mlflow_module` parameter is the actual mlflow module, not None
-
-3. Training completed before metrics logged
-   * If training runs are very short, metrics may not be captured
-   * Training updates occur after rollouts complete, not after every environment step
+1. **MLflow not configured** - Verify `mlflow.set_tracking_uri()` is called with the correct Azure ML workspace URI and authentication is valid.
+2. **Monkey-patching not applied** - Ensure `create_mlflow_logging_wrapper` is called after Runner instantiation and `runner.agent._update` is replaced before `runner.run()`.
+3. **Short training runs** - Training updates occur after rollouts complete. Very short runs may finish before metrics are captured.
+4. **Empty tracking data** - Agent `tracking_data` may not populate until after the first rollout. If using `metric_filter`, verify the filter set contains matching metric names.
 
 ### Missing Specific Metrics
 
-**Symptom:** Some expected metrics are not logged while others are.
+Some expected metrics are not logged while others are.
 
-**Possible Causes:**
-
-1. Metric not available in agent
-   * Different SKRL algorithms expose different metrics
-   * Check `agent.tracking_data` to see what the agent actually tracks
-   * Some metrics only appear after certain training phases
-
-2. Metric filtered out
-   * If using `metric_filter`, ensure desired metric names are included
-   * Check spelling and casing of metric names in filter set
-
-3. Metric extraction failed
-   * Check logs for warnings about failed metric extraction
-   * Some metrics may have incompatible types or structures
+1. **Algorithm differences** - Different SKRL algorithms expose different metrics. Check `agent.tracking_data` for available entries.
+2. **Metric filtered** - If using `metric_filter`, ensure metric names match exactly (case-sensitive).
+3. **Extraction failure** - Check logs for metric extraction warnings. Some metrics may have incompatible types.
 
 ### AttributeError on Agent
 
-**Symptom:** `AttributeError: Agent must have 'tracking_data' attribute`
+`AttributeError: Agent must have 'tracking_data' attribute`
 
-**Possible Causes:**
-
-1. Incompatible agent type
-   * Ensure the agent is a SKRL agent with `tracking_data` attribute
-   * Verify SKRL version is compatible
-
-2. Agent not fully initialized
-   * Apply monkey-patch after Runner instantiation
-   * Ensure the agent has been configured with all required parameters
-
-3. Monkey-patching timing issue
-   * Verify `runner.agent` exists before calling `create_mlflow_logging_wrapper`
-   * Check that `runner.agent._update` method exists before replacement
+1. **Incompatible agent** - Ensure the agent is a SKRL agent with `tracking_data`. Verify SKRL version compatibility.
+2. **Timing** - Apply monkey-patch after Runner instantiation. Verify `runner.agent` and `runner.agent._update` exist before replacement.
 
 ### High MLflow API Load
 
-**Symptom:** Training slows down due to excessive MLflow API calls.
+Training slows down due to excessive MLflow API calls.
 
-**Solutions:**
-
-1. Increase logging interval
-   * Use `--mlflow_log_interval 100` or higher to reduce API calls
-   * Balance between metric granularity and performance
-
-2. Use `metric_filter`
-   * Log only essential metrics to reduce payload size
-   * Remove high-cardinality or nested metrics
-
-3. Batch metric logging
-   * The integration already batches metrics per training update
-   * Ensure MLflow is using asynchronous logging if available
+1. Increase logging interval with `--mlflow_log_interval 100` or higher.
+2. Use `metric_filter` to log only essential metrics.
+3. The integration already batches metrics per training update. Enable asynchronous MLflow logging if available.
 
 ### Metric Extraction Warnings
 
-**Symptom:** Log messages like `"Failed to extract or log metrics at step X"`
+Log messages like `"Failed to extract or log metrics at step X"` indicate transient data structure changes or incompatible metric types. Occasional warnings are harmless. For persistent warnings, check the exception details and modify `_extract_from_value()` in `skrl_mlflow_agent.py` for specific metric types.
 
 **Possible Causes:**
 
@@ -337,5 +287,6 @@ The training script handles MLflow setup and monkey-patching automatically. To c
 ---
 
 <!-- markdownlint-disable MD036 -->
-*🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.*
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
 <!-- markdownlint-enable MD036 -->

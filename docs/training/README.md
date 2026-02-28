@@ -1,72 +1,61 @@
 ---
 title: Training Guide
-description: Train robotics policies with Isaac Lab and LeRobot using Azure ML and NVIDIA OSMO
+description: Training workflows, experiment tracking, and ML pipeline documentation for the Azure NVIDIA Robotics Reference Architecture
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-24
+ms.date: 2026-02-23
 ms.topic: overview
 keywords:
   - training
-  - robotics
-  - Isaac Lab
-  - LeRobot
-  - OSMO
-  - Azure ML
-  - SKRL
-  - MLflow
+  - azureml
+  - osmo
+  - mlflow
+  - lerobot
+  - isaac lab
 ---
 
-Train reinforcement learning policies for robotics tasks using Isaac Lab with SKRL agents or LeRobot ACT policies. Submit training jobs through Azure ML compute or NVIDIA OSMO workflow orchestration.
+Training documentation for reinforcement learning with Isaac Lab and behavioral cloning with LeRobot. Both frameworks run on Azure ML and NVIDIA OSMO platforms.
 
 ## 📖 Training Guides
 
-| Guide                                              | Description                                           |
-|----------------------------------------------------|-------------------------------------------------------|
-| [MLflow Integration](mlflow-integration.md)        | Automatic metric logging from SKRL agents to Azure ML |
-| [Inference Guide](../inference/README.md)          | Deploy trained policies in simulation or on hardware  |
+| Guide                                              | Description                                                          |
+|----------------------------------------------------|----------------------------------------------------------------------|
+| [Isaac Lab Training](isaac-lab-training.md)        | RL training with SKRL and RSL-RL backends on Azure ML and OSMO       |
+| [LeRobot Training](lerobot-training.md)            | Behavioral cloning with ACT and Diffusion policies                   |
+| [Experiment Tracking](experiment-tracking.md)      | MLflow and WANDB setup, model registration, checkpoint flows         |
+| [MLflow Integration](mlflow-integration.md)        | SKRL metric logging internals, metric filtering, and troubleshooting |
 
-## ⚙️ Training Pipelines
+## ⚖️ Platform Comparison
 
-| Pipeline         | Framework | Orchestration | Submission Script                            |
-|------------------|-----------|---------------|----------------------------------------------|
-| Isaac Lab + SKRL | SKRL      | Azure ML      | `scripts/submit-azureml-training.sh`         |
-| Isaac Lab + SKRL | SKRL      | OSMO          | `scripts/submit-osmo-training.sh`            |
-| LeRobot ACT      | LeRobot   | Azure ML      | `scripts/submit-azureml-lerobot-training.sh` |
-| LeRobot ACT      | LeRobot   | OSMO          | `scripts/submit-osmo-lerobot-training.sh`    |
+| Aspect              | Azure ML                                 | OSMO                                     |
+|---------------------|------------------------------------------|------------------------------------------|
+| Submission          | `az ml job create`                       | `osmo workflow submit`                   |
+| Orchestration       | Azure ML compute targets                 | OSMO workflow engine + KAI Scheduler     |
+| Experiment tracking | MLflow (managed)                         | MLflow + WANDB (credential injection)    |
+| Dataset injection   | Azure ML datastores                      | OSMO buckets (base64 or dataset upload)  |
+| Model registration  | `az ml model create`                     | Via MLflow or post-training script       |
+| Monitoring          | Azure ML Studio                          | OSMO UI Dashboard                        |
 
 ## 🚀 Quick Start
 
-Isaac Lab SKRL training via Azure ML:
+Isaac Lab RL training on Azure ML:
 
 ```bash
-./scripts/submit-azureml-training.sh \
-  --task Isaac-Cartpole-v0 \
-  --num-envs 512
+./scripts/submit-azureml-training.sh --task Isaac-Velocity-Rough-Anymal-C-v0
 ```
 
-OSMO training submission:
+LeRobot behavioral cloning on OSMO:
 
 ```bash
-./scripts/submit-osmo-training.sh \
-  --task Isaac-Cartpole-v0 \
-  --num-envs 512
-```
-
-LeRobot ACT training via OSMO:
-
-```bash
-./scripts/submit-osmo-lerobot-training.sh \
-  --dataset-repo-id <repo-id> \
-  --training-steps 100000
+./scripts/submit-osmo-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
 ```
 
 ## 📚 Related Documentation
 
-- [MLflow Integration](mlflow-integration.md)
-- [Inference Guide](../inference/README.md)
-- [Workflow Templates](../../workflows/README.md)
-- [Automation Scripts](../../scripts/README.md)
-
----
+- [Deployment Guide](../../deploy/README.md) for infrastructure setup
+- [LeRobot Inference](../inference/lerobot-inference.md) for running trained policies
+- [AzureML Workflows](../../workflows/azureml/README.md) for job template reference
+- [OSMO Workflows](../../workflows/osmo/README.md) for workflow template reference
+- [Scripts Reference](../../scripts/README.md) for CLI usage
 
 <!-- markdownlint-disable MD036 -->
 *🤖 Crafted with precision by ✨Copilot following brilliant human instruction,

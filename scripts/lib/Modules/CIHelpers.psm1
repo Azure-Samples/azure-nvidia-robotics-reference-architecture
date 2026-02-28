@@ -149,6 +149,38 @@ function Test-CIEnvironment {
 
 <#
 .SYNOPSIS
+Validates the PowerShell runtime version meets a minimum requirement.
+
+.DESCRIPTION
+Compares the current PowerShell version against a minimum version. Emits a CI warning
+annotation when the version is below the threshold.
+
+.PARAMETER MinimumVersion
+The minimum required PowerShell version. Defaults to 7.0.
+
+.OUTPUTS
+System.Boolean
+#>
+function Test-PowerShellVersion {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory = $false)]
+        [version]$MinimumVersion = '7.0'
+    )
+
+    $currentVersion = $PSVersionTable.PSVersion
+
+    if ($currentVersion -lt $MinimumVersion) {
+        Write-CIAnnotation -Message "PowerShell $currentVersion is below minimum $MinimumVersion" -Level 'Warning'
+        return $false
+    }
+
+    return $true
+}
+
+<#
+.SYNOPSIS
 Sets a CI output variable on the current platform.
 
 .DESCRIPTION
@@ -187,6 +219,11 @@ function Set-CIOutput {
 
     switch ($platform) {
         'github' {
+            if ([string]::IsNullOrEmpty($env:GITHUB_OUTPUT)) {
+                Write-Warning 'GITHUB_OUTPUT is not set; falling back to verbose logging'
+                Write-Verbose "CI output: $Name=$Value"
+                return
+            }
             $escapedName = ConvertTo-GitHubActionsEscaped -Value $Name -ForProperty
             $escapedValue = ConvertTo-GitHubActionsEscaped -Value $Value
             "$escapedName=$escapedValue" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
@@ -242,6 +279,11 @@ function Set-CIEnv {
 
     switch ($platform) {
         'github' {
+            if ([string]::IsNullOrEmpty($env:GITHUB_ENV)) {
+                Write-Warning 'GITHUB_ENV is not set; falling back to verbose logging'
+                Write-Verbose "CI env: $Name=$Value"
+                return
+            }
             $delimiter = "EOF_$([guid]::NewGuid().ToString('N'))"
             "$Name<<$delimiter", $Value, $delimiter | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
         }
@@ -297,6 +339,11 @@ function Write-CIStepSummary {
 
     switch ($platform) {
         'github' {
+            if ([string]::IsNullOrEmpty($env:GITHUB_STEP_SUMMARY)) {
+                Write-Warning 'GITHUB_STEP_SUMMARY is not set; falling back to verbose logging'
+                Write-Verbose "Step summary: $Content"
+                return
+            }
             $Content | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
         }
         'azdo' {
@@ -583,6 +630,7 @@ Export-ModuleMember -Function @(
     'ConvertTo-AzureDevOpsEscaped',
     'Get-CIPlatform',
     'Test-CIEnvironment',
+    'Test-PowerShellVersion',
     'Set-CIOutput',
     'Set-CIEnv',
     'Write-CIStepSummary',
