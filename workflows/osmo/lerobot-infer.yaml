@@ -37,6 +37,11 @@ workflow:
         MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES: "{{ mlflow_token_refresh_retries }}"
         MLFLOW_HTTP_REQUEST_TIMEOUT: "{{ mlflow_http_request_timeout }}"
         REGISTER_MODEL: "{{ register_model }}"
+        AML_MODEL_NAME: "{{ aml_model_name }}"
+        AML_MODEL_VERSION: "{{ aml_model_version }}"
+        BLOB_STORAGE_ACCOUNT: "{{ blob_storage_account }}"
+        BLOB_STORAGE_CONTAINER: "{{ blob_storage_container }}"
+        BLOB_PREFIX: "{{ blob_prefix }}"
       files:
         - path: /tmp/entry.sh
           contents: |
@@ -46,9 +51,11 @@ workflow:
             echo "=== LeRobot Inference Workflow ==="
             echo "Policy: ${POLICY_REPO_ID}"
             echo "Policy Type: ${POLICY_TYPE}"
-            echo "Dataset: ${DATASET_REPO_ID}"
+            echo "Dataset: ${DATASET_REPO_ID:-${DATASET_ROOT:-none}}"
             echo "Eval Episodes: ${EVAL_EPISODES}"
             echo "Output Dir: ${OUTPUT_DIR}"
+            echo "AML Model: ${AML_MODEL_NAME:-none}:${AML_MODEL_VERSION:-none}"
+            echo "Local Dataset: ${LOCAL_DATASET:-false}"
 
             # Install system dependencies
             echo "Installing system dependencies..."
@@ -80,6 +87,141 @@ workflow:
             if [[ "${MLFLOW_ENABLE:-false}" == "true" ]]; then
               echo "Installing MLflow and plotting dependencies..."
               uv pip install azureml-mlflow "mlflow>=2.8.0,<3.0.0" matplotlib --system
+            fi
+
+            # Download model from AzureML registry if specified
+            if [[ -n "${AML_MODEL_NAME:-}" && -n "${AML_MODEL_VERSION:-}" ]]; then
+              echo "Downloading model from AzureML registry: ${AML_MODEL_NAME}:${AML_MODEL_VERSION}..."
+
+              python3 << 'MODEL_DOWNLOAD_SCRIPT'
+            import os
+            import sys
+            from pathlib import Path
+
+            try:
+                from azure.ai.ml import MLClient
+                from azure.identity import DefaultAzureCredential
+
+                credential = DefaultAzureCredential(
+                    managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"),
+                    authority=os.environ.get("AZURE_AUTHORITY_HOST"),
+                )
+
+                client = MLClient(
+                    credential=credential,
+                    subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
+                    resource_group_name=os.environ["AZURE_RESOURCE_GROUP"],
+                    workspace_name=os.environ["AZUREML_WORKSPACE_NAME"],
+                )
+
+                model_name = os.environ["AML_MODEL_NAME"]
+                model_version = os.environ["AML_MODEL_VERSION"]
+                download_dir = Path("/tmp/aml-model")
+                download_dir.mkdir(parents=True, exist_ok=True)
+
+                print(f"[INFO] Downloading {model_name}:{model_version}...")
+                client.models.download(
+                    name=model_name,
+                    version=model_version,
+                    download_path=str(download_dir),
+                )
+
+                # Resolve actual model path (may be nested under model name)
+                model_path = download_dir / model_name
+                if not model_path.exists():
+                    model_path = download_dir
+
+                # Find directory with model weights
+                for candidate in [model_path] + list(model_path.iterdir()) if model_path.is_dir() else [model_path]:
+                    if candidate.is_dir() and (
+                        list(candidate.glob("*.safetensors")) or list(candidate.glob("*.bin"))
+                    ):
+                        model_path = candidate
+                        break
+
+                # Write resolved path for shell consumption
+                with open("/tmp/aml_model_path.env", "w") as f:
+                    f.write(f"AML_MODEL_PATH={model_path}\n")
+
+                print(f"[INFO] Model downloaded to: {model_path}")
+                for f in sorted(model_path.iterdir()):
+                    print(f"  {f.name} ({f.stat().st_size / 1024 / 1024:.1f} MB)")
+
+            except Exception as e:
+                print(f"[ERROR] Failed to download model: {e}")
+                import traceback
+                traceback.print_exc()
+                sys.exit(1)
+            MODEL_DOWNLOAD_SCRIPT
+
+              if [[ -f /tmp/aml_model_path.env ]]; then
+                export $(cat /tmp/aml_model_path.env | xargs)
+                export POLICY_REPO_ID="${AML_MODEL_PATH}"
+                echo "Using AzureML model at: ${POLICY_REPO_ID}"
+              else
+                echo "Error: Model download did not produce path file"
+                exit 1
+              fi
+            fi
+
+            # Download dataset from Azure Blob Storage if configured
+            if [[ -n "${BLOB_STORAGE_ACCOUNT:-}" && -n "${BLOB_PREFIX:-}" ]]; then
+              echo "Installing Azure storage dependencies..."
+              uv pip install azure-storage-blob azure-identity --system
+
+              echo "Downloading dataset from Azure Blob: ${BLOB_STORAGE_ACCOUNT}/${BLOB_STORAGE_CONTAINER}/${BLOB_PREFIX}..."
+
+              python3 << 'BLOB_DOWNLOAD_SCRIPT'
+            import os
+            import sys
+            from pathlib import Path
+
+            try:
+                from azure.identity import DefaultAzureCredential
+                from azure.storage.blob import ContainerClient
+
+                account = os.environ["BLOB_STORAGE_ACCOUNT"]
+                container = os.environ.get("BLOB_STORAGE_CONTAINER", "datasets")
+                prefix = os.environ["BLOB_PREFIX"]
+                local_root = Path("/workspace/data") / prefix.replace("/", "_")
+                local_root.mkdir(parents=True, exist_ok=True)
+
+                credential = DefaultAzureCredential(
+                    managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"),
+                    authority=os.environ.get("AZURE_AUTHORITY_HOST"),
+                )
+
+                url = f"https://{account}.blob.core.windows.net/{container}"
+                client = ContainerClient.from_container_url(url, credential=credential)
+
+                blobs = list(client.list_blobs(name_starts_with=prefix))
+                print(f"[INFO] Found {len(blobs)} blobs under {prefix}")
+
+                for blob in blobs:
+                    rel = blob.name[len(prefix):].lstrip("/")
+                    if not rel:
+                        continue
+                    local_path = local_root / rel
+                    local_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(local_path, "wb") as f:
+                        f.write(client.download_blob(blob.name).readall())
+
+                with open("/tmp/dataset_path.env", "w") as f:
+                    f.write(f"DATASET_DIR={local_root}\n")
+
+                print(f"[INFO] Dataset downloaded to: {local_root}")
+
+            except Exception as e:
+                print(f"[ERROR] Failed to download dataset: {e}")
+                import traceback
+                traceback.print_exc()
+                sys.exit(1)
+            BLOB_DOWNLOAD_SCRIPT
+
+              if [[ -f /tmp/dataset_path.env ]]; then
+                export $(cat /tmp/dataset_path.env | xargs)
+                echo "Dataset ready at: ${DATASET_DIR}"
+              fi
             fi
 
             # Authenticate with HuggingFace Hub
@@ -380,13 +522,18 @@ workflow:
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 print(f"[INFO] Using device: {device}")
 
-                # Download dataset
-                if dataset_repo_id:
+                # Resolve dataset source
+                dataset_dir_env = os.environ.get("DATASET_DIR", "")
+
+                if dataset_dir_env and os.path.isdir(dataset_dir_env):
+                    dataset_dir = dataset_dir_env
+                    print(f"[INFO] Using blob-downloaded dataset: {dataset_dir}")
+                elif dataset_repo_id:
                     from huggingface_hub import snapshot_download
                     dataset_dir = snapshot_download(repo_id=dataset_repo_id, repo_type="dataset")
-                    print(f"[INFO] Dataset downloaded to: {dataset_dir}")
+                    print(f"[INFO] Dataset downloaded from HuggingFace: {dataset_dir}")
                 else:
-                    print("[ERROR] --dataset-repo-id is required for evaluation")
+                    print("[ERROR] Dataset source required: set DATASET_REPO_ID or blob storage params")
                     sys.exit(1)
 
                 # Load dataset info
@@ -675,3 +822,8 @@ default-values:
   mlflow_token_refresh_retries: "5"
   mlflow_http_request_timeout: "600"
   register_model: ""
+  aml_model_name: ""
+  aml_model_version: ""
+  blob_storage_account: ""
+  blob_storage_container: datasets
+  blob_prefix: ""

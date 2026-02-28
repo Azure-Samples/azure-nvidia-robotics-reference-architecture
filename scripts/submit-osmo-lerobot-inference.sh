@@ -28,15 +28,20 @@ show_help() {
 Usage: submit-osmo-lerobot-inference.sh [OPTIONS] [-- osmo-submit-flags]
 
 Submit a LeRobot inference/evaluation workflow to OSMO.
-Evaluates trained policies from HuggingFace Hub repositories.
+Evaluates trained policies from HuggingFace Hub or Azure ML model registry.
 
-REQUIRED:
+POLICY SOURCE (one required):
         --policy-repo-id ID       HuggingFace policy repository (e.g., user/trained-policy)
+        --from-aml-model          Load policy from AzureML model registry instead of HuggingFace
+        --model-name NAME         AzureML model registry name (e.g., hve-robo-act-model)
+        --model-version VERSION   AzureML model version (e.g., 4)
 
-EVALUATION OPTIONS:
-    -w, --workflow PATH           Workflow template (default: workflows/osmo/lerobot-infer.yaml)
-    -p, --policy-type TYPE        Policy architecture: act, diffusion (default: act)
-    -d, --dataset-repo-id ID     Dataset for environment replay evaluation
+DATASET SOURCE (one required):
+    -d, --dataset-repo-id ID     HuggingFace dataset for replay evaluation
+        --from-blob-dataset       Download dataset from Azure Blob Storage
+        --storage-account NAME    Azure storage account (default: from Terraform)
+        --storage-container NAME  Blob container name (default: datasets)
+        --blob-prefix PREFIX      Blob path prefix (e.g., hve-robo/hve-robo-cell)
     -j, --job-name NAME           Job identifier (default: lerobot-eval)
     -o, --output-dir DIR          Container output directory (default: /workspace/outputs/eval)
     -i, --image IMAGE             Container image (default: pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime)
@@ -87,6 +92,14 @@ experiment_name="${EXPERIMENT_NAME:-}"
 register_model="${REGISTER_MODEL:-}"
 use_local_osmo=false
 
+from_aml_model=false
+model_name="${AML_MODEL_NAME:-}"
+model_version="${AML_MODEL_VERSION:-}"
+from_blob_dataset=false
+storage_account="${BLOB_STORAGE_ACCOUNT:-${AZURE_STORAGE_ACCOUNT_NAME:-}}"
+storage_container="${BLOB_STORAGE_CONTAINER:-datasets}"
+blob_prefix="${BLOB_PREFIX:-}"
+
 subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
 resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
 workspace_name="${AZUREML_WORKSPACE_NAME:-$(get_azureml_workspace)}"
@@ -113,6 +126,13 @@ while [[ $# -gt 0 ]]; do
     --record-video)               record_video="true"; shift ;;
     --mlflow-enable)              mlflow_enable="true"; shift ;;
     --experiment-name)            experiment_name="$2"; shift 2 ;;
+    --from-aml-model)             from_aml_model=true; shift ;;
+    --model-name)                 model_name="$2"; shift 2 ;;
+    --model-version)              model_version="$2"; shift 2 ;;
+    --from-blob-dataset)          from_blob_dataset=true; shift ;;
+    --storage-account)            storage_account="$2"; shift 2 ;;
+    --storage-container)          storage_container="$2"; shift 2 ;;
+    --blob-prefix)                blob_prefix="$2"; shift 2 ;;
     -r|--register-model)          register_model="$2"; shift 2 ;;
     --azure-subscription-id)      subscription_id="$2"; shift 2 ;;
     --azure-resource-group)       resource_group="$2"; shift 2 ;;
@@ -131,7 +151,25 @@ done
 
 require_tools osmo
 
-[[ -z "$policy_repo_id" ]] && fatal "--policy-repo-id is required"
+# Policy source validation
+if [[ "$from_aml_model" == "true" ]]; then
+  [[ -z "$model_name" ]]    && fatal "--model-name is required with --from-aml-model"
+  [[ -z "$model_version" ]] && fatal "--model-version is required with --from-aml-model"
+  # Use model_name as policy_repo_id placeholder for the workflow
+  policy_repo_id="${model_name}:${model_version}"
+else
+  [[ -z "$policy_repo_id" ]] && fatal "--policy-repo-id is required (or use --from-aml-model)"
+fi
+
+# Dataset source validation
+if [[ "$from_blob_dataset" == "true" ]]; then
+  [[ -z "$blob_prefix" ]] && fatal "--blob-prefix is required with --from-blob-dataset"
+  [[ -z "$storage_account" ]] && storage_account="$(get_storage_account)"
+  [[ -z "$storage_account" ]] && fatal "--storage-account is required with --from-blob-dataset"
+else
+  [[ -z "$dataset_repo_id" ]] && fatal "--dataset-repo-id is required (or use --from-blob-dataset)"
+fi
+
 [[ -f "$workflow" ]] || fatal "Workflow template not found: $workflow"
 
 case "$policy_type" in
@@ -139,10 +177,10 @@ case "$policy_type" in
   *) fatal "Unsupported policy type: $policy_type (use: act, diffusion)" ;;
 esac
 
-if [[ -n "$register_model" || "$mlflow_enable" == "true" ]]; then
-  [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for model registration / MLflow"
-  [[ -z "$resource_group" ]] && fatal "Azure resource group required for model registration / MLflow"
-  [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for model registration / MLflow"
+if [[ -n "$register_model" || "$mlflow_enable" == "true" || "$from_aml_model" == "true" ]]; then
+  [[ -z "$subscription_id" ]] && fatal "Azure subscription ID required for model registry / MLflow"
+  [[ -z "$resource_group" ]] && fatal "Azure resource group required for model registry / MLflow"
+  [[ -z "$workspace_name" ]] && fatal "Azure ML workspace name required for model registry / MLflow"
 fi
 
 #------------------------------------------------------------------------------
@@ -167,6 +205,16 @@ submit_args=(
 [[ -n "$experiment_name" ]]  && submit_args+=("experiment_name=$experiment_name")
 [[ -n "$register_model" ]]   && submit_args+=("register_model=$register_model")
 
+# AzureML model registry source
+if [[ "$from_aml_model" == "true" ]]; then
+  submit_args+=("aml_model_name=$model_name" "aml_model_version=$model_version")
+fi
+
+# Azure Blob dataset source
+if [[ "$from_blob_dataset" == "true" ]]; then
+  submit_args+=("blob_storage_account=$storage_account" "blob_storage_container=$storage_container" "blob_prefix=$blob_prefix")
+fi
+
 [[ -n "$subscription_id" ]] && submit_args+=("azure_subscription_id=$subscription_id")
 [[ -n "$resource_group" ]]  && submit_args+=("azure_resource_group=$resource_group")
 [[ -n "$workspace_name" ]]  && submit_args+=("azure_workspace_name=$workspace_name")
@@ -184,6 +232,8 @@ info "  Job Name: $job_name"
 info "  Eval Episodes: $eval_episodes"
 info "  Image: $image"
 [[ -n "$dataset_repo_id" ]] && info "  Dataset: $dataset_repo_id"
+[[ "$from_blob_dataset" == "true" ]] && info "  Dataset: Azure Blob ($storage_account/$storage_container/$blob_prefix)"
+[[ "$from_aml_model" == "true" ]] && info "  Model source: AzureML registry (${model_name}:${model_version})"
 [[ "$mlflow_enable" == "true" ]] && info "  MLflow: enabled (plots logged to AzureML)"
 [[ -n "$experiment_name" ]] && info "  Experiment: $experiment_name"
 [[ -n "$register_model" ]] && info "  Register model: $register_model"
