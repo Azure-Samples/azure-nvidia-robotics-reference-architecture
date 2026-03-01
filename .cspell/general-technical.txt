@@ -37,6 +37,7 @@ allowlisting
 amazon
 amazonaws
 amet
+amlarc
 amlignore
 ammp
 amqp
@@ -106,7 +107,9 @@ autostart
 avanade
 avere
 avro
+azmk
 azureml
+azurevpnconfig
 baas
 Babelscape
 backend
@@ -402,6 +405,7 @@ dones
 donotreply
 dotenv
 dotnet
+downsamples
 downtime
 dpu
 drawtext
@@ -712,6 +716,7 @@ levelname
 libgl
 libglib
 libx
+libzstd
 lifecycle
 lifecycles
 lightbox
@@ -754,6 +759,7 @@ maxar
 maxdb
 Mbed
 mbps
+mcap
 mcaps
 mcem
 mcra
@@ -1174,12 +1180,14 @@ roadmaps
 roadrunner
 rollout
 rollouts
+rosbag
 routable
 rpa
 rpc
 rpcs
 rsa
 rslrl
+rtde
 rtmp
 rubrik
 runbooks
@@ -1232,6 +1240,7 @@ shards
 shellcheck
 showbacks
 siem
+sigalrm
 signalr
 signingkey
 signup
@@ -1248,6 +1257,7 @@ sles
 sloc
 slos
 slsa
+smartctl
 smes
 smita
 smpl
@@ -1339,6 +1349,7 @@ tebibytes
 techops
 techsmith
 tecton
+tegrastats
 Tekton
 telco
 telehealth
