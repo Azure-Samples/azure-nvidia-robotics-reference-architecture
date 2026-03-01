@@ -51,8 +51,11 @@ def _get_base_path() -> str:
 
 
 def _labels_path(dataset_id: str) -> Path:
-    base = Path(_get_base_path())
-    return base / dataset_id / "meta" / "episode_labels.json"
+    base = Path(_get_base_path()).resolve()
+    target = (base / dataset_id / "meta" / "episode_labels.json").resolve()
+    if not target.is_relative_to(base):
+        raise HTTPException(status_code=400, detail="Invalid dataset ID")
+    return target
 
 
 async def _load_labels(dataset_id: str) -> DatasetLabelsFile:

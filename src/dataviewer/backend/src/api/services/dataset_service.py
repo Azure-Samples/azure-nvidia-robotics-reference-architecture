@@ -83,6 +83,7 @@ class DatasetService:
         Returns:
             LeRobotLoader if available and dataset is LeRobot format, None otherwise.
         """
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
         if not LEROBOT_AVAILABLE:
             return None
 
@@ -197,6 +198,7 @@ class DatasetService:
         Returns:
             DatasetInfo if valid LeRobot dataset, None otherwise.
         """
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is None:
             return None
@@ -322,6 +324,7 @@ class DatasetService:
         Returns:
             List of EpisodeMeta matching the filters.
         """
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
         dataset = self._datasets.get(dataset_id)
 
         # Get list of annotated episodes
@@ -420,6 +423,7 @@ class DatasetService:
         Returns:
             EpisodeData if found, None otherwise.
         """
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
         dataset = self._datasets.get(dataset_id)
 
         # Get annotation status
@@ -479,7 +483,12 @@ class DatasetService:
                 )
 
             except Exception as e:
-                logger.warning("LeRobot load_episode failed for %r/%d: %s", dataset_id, episode_idx, e)
+                logger.warning(
+                    "LeRobot load_episode failed for %r/%s: %s",
+                    dataset_id,
+                    str(episode_idx).replace("\n", "").replace("\r", ""),
+                    e,
+                )
                 # Fall through to try HDF5
 
         # Try to load from HDF5
@@ -560,6 +569,7 @@ class DatasetService:
         Returns:
             List of TrajectoryPoint, empty if not found.
         """
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
         # Try LeRobot loader first
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is not None:
@@ -593,9 +603,9 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot trajectory load failed for %r/%d: %s",
+                    "LeRobot trajectory load failed for %r/%s: %s",
                     dataset_id,
-                    episode_idx,
+                    str(episode_idx).replace("\n", "").replace("\r", ""),
                     e,
                 )
 
@@ -685,6 +695,8 @@ class DatasetService:
         Returns:
             JPEG image bytes, or None if not found.
         """
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        camera = camera.replace("\n", "").replace("\r", "")
         # Try LeRobot loader first (mp4 frame extraction)
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is not None:
@@ -727,10 +739,10 @@ class DatasetService:
 
         except Exception as e:
             logger.exception(
-                "Error loading frame %d from %r/%d: %s",
-                frame_idx,
+                "Error loading frame %s from %r/%s: %s",
+                str(frame_idx).replace("\n", "").replace("\r", ""),
                 dataset_id,
-                episode_idx,
+                str(episode_idx).replace("\n", "").replace("\r", ""),
                 e,
             )
             return None
@@ -743,6 +755,7 @@ class DatasetService:
         camera: str,
     ) -> bytes | None:
         """Extract a single JPEG frame from a LeRobot mp4 video using OpenCV."""
+        camera = camera.replace("\n", "").replace("\r", "")
         import io
 
         import cv2
@@ -750,7 +763,11 @@ class DatasetService:
 
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
-            logger.warning("No video for episode %d camera %r", episode_idx, camera)
+            logger.warning(
+                "No video for episode %s camera %r",
+                str(episode_idx).replace("\n", "").replace("\r", ""),
+                camera,
+            )
             return None
 
         cap = cv2.VideoCapture(str(video_path))
