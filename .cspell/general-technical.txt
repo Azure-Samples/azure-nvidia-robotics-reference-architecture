@@ -320,6 +320,7 @@ dataset
 datasetanalysistool
 datasets
 datasize
+dataviewer
 dataverse
 datefmt
 davinci

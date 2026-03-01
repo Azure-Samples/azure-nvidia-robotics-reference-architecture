@@ -17,9 +17,9 @@ TEST_DATASET_ID = os.environ.get("TEST_DATASET_ID", "sample_lerobot")
 def test_dataset_path():
     """Absolute path to the directory containing the test LeRobot dataset."""
     assert os.path.isdir(TEST_DATASET_PATH), f"Dataset base path not found: {TEST_DATASET_PATH}"
-    assert os.path.isdir(
-        os.path.join(TEST_DATASET_PATH, TEST_DATASET_ID)
-    ), f"LeRobot dataset not found at {TEST_DATASET_PATH}/{TEST_DATASET_ID}"
+    assert os.path.isdir(os.path.join(TEST_DATASET_PATH, TEST_DATASET_ID)), (
+        f"LeRobot dataset not found at {TEST_DATASET_PATH}/{TEST_DATASET_ID}"
+    )
     return TEST_DATASET_PATH
 
 

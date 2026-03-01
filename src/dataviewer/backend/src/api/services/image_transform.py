@@ -138,7 +138,7 @@ def apply_resize(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for resize operations. " "Install with: pip install Pillow"
+            "PIL (Pillow) is required for resize operations. Install with: pip install Pillow"
         )
 
     if size.width <= 0 or size.height <= 0:
@@ -180,7 +180,7 @@ def apply_brightness(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. " "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
@@ -212,7 +212,7 @@ def apply_contrast(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. " "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
@@ -244,7 +244,7 @@ def apply_saturation(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. " "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
@@ -307,7 +307,7 @@ def apply_hue_rotation(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. " "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     if frame.ndim != 3 or frame.shape[2] != 3:
@@ -353,7 +353,7 @@ def apply_color_filter(
 
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. " "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
