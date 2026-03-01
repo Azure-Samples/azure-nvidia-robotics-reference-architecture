@@ -83,30 +83,6 @@ workflow:
             echo "Installing UV package manager..."
             pip install --quiet uv
 
-            # Install LeRobot and Azure ML dependencies
-            LEROBOT_PKG="lerobot"
-            if [[ -n "${LEROBOT_VERSION:-}" && "${LEROBOT_VERSION}" != "latest" ]]; then
-              LEROBOT_PKG="lerobot==${LEROBOT_VERSION}"
-            fi
-
-            PIP_PACKAGES=(
-              "${LEROBOT_PKG}" huggingface-hub
-              azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0"
-              psutil pynvml
-            )
-
-            # Add blob storage dependencies when using Azure data source
-            if [[ -n "${STORAGE_ACCOUNT:-}" ]]; then
-              PIP_PACKAGES+=(azure-storage-blob pyarrow)
-            fi
-
-            echo "Installing LeRobot ${LEROBOT_VERSION:-latest} and dependencies..."
-            if command -v uv &>/dev/null; then
-              uv pip install "${PIP_PACKAGES[@]}" --system
-            else
-              pip install --quiet --no-cache-dir "${PIP_PACKAGES[@]}"
-            fi
-
             # Unpack training scripts from base64-encoded payload
             ARCHIVE_PATH="/tmp/lerobot_payload.zip"
             PAYLOAD_ROOT="${PAYLOAD_ROOT:-/workspace/lerobot_payload}"
@@ -119,6 +95,16 @@ workflow:
             unzip -oq "${ARCHIVE_PATH}" -d "${PAYLOAD_ROOT}"
             export PYTHONPATH="${PAYLOAD_ROOT}/src:${PYTHONPATH:-}"
             echo "Training scripts unpacked to ${PAYLOAD_ROOT}/src"
+
+            # Install runtime dependencies from workflow manifest
+            LEROBOT_MANIFEST="${PAYLOAD_ROOT}/src/training/lerobot/pyproject.toml"
+            LEROBOT_REQUIREMENTS="/tmp/lerobot-runtime-requirements.txt"
+            if [[ ! -f "${LEROBOT_MANIFEST}" ]]; then
+              echo "ERROR: LeRobot workflow manifest not found at ${LEROBOT_MANIFEST}" >&2
+              exit 1
+            fi
+            uv pip compile "${LEROBOT_MANIFEST}" -o "${LEROBOT_REQUIREMENTS}"
+            uv pip install --system --requirement "${LEROBOT_REQUIREMENTS}"
 
             # Build training command arguments
             TRAIN_ARGS=()
@@ -134,7 +120,6 @@ workflow:
                 "--dataset.root=${FULL_DATASET_PATH}"
                 "--dataset.use_imagenet_stats=false"
                 "--dataset.video_backend=pyav"
-                "--tolerance_s=0.04"
               )
             fi
 

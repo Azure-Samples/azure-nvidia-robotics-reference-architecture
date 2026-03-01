@@ -33,6 +33,8 @@ workflow:
         AZUREML_WORKSPACE_NAME: "{{ azure_workspace_name }}"
         AZURE_AUTHORITY_HOST: "{{ azure_authority_host }}"
         REGISTER_MODEL: "{{ register_model }}"
+        ENCODED_ARCHIVE: "{{ encoded_archive }}"
+        PAYLOAD_ROOT: "{{ payload_root }}"
       files:
         - path: /tmp/entry.sh
           contents: |
@@ -62,15 +64,26 @@ workflow:
             echo "Installing UV package manager..."
             pip install --quiet uv
 
-            # Install LeRobot and dependencies
-            echo "Installing LeRobot ${LEROBOT_VERSION:-latest}..."
-            if [[ -n "${LEROBOT_VERSION:-}" && "${LEROBOT_VERSION}" != "latest" ]]; then
-              uv pip install "lerobot==${LEROBOT_VERSION}" huggingface-hub \
-                azure-identity azure-ai-ml --system
-            else
-              uv pip install lerobot huggingface-hub \
-                azure-identity azure-ai-ml --system
+            # Unpack runtime payload and install dependencies from workflow manifest
+            ARCHIVE_PATH="/tmp/lerobot_payload.zip"
+            PAYLOAD_ROOT="${PAYLOAD_ROOT:-/workspace/lerobot_payload}"
+            mkdir -p "${PAYLOAD_ROOT}"
+            if [[ -z "${ENCODED_ARCHIVE:-}" ]]; then
+              echo "ERROR: ENCODED_ARCHIVE is not set or empty; runtime payload is required." >&2
+              exit 1
             fi
+            printf '%s' "${ENCODED_ARCHIVE}" | base64 -d > "${ARCHIVE_PATH}"
+            unzip -oq "${ARCHIVE_PATH}" -d "${PAYLOAD_ROOT}"
+            export PYTHONPATH="${PAYLOAD_ROOT}/src:${PYTHONPATH:-}"
+
+            LEROBOT_MANIFEST="${PAYLOAD_ROOT}/src/training/lerobot/pyproject.toml"
+            LEROBOT_REQUIREMENTS="/tmp/lerobot-runtime-requirements.txt"
+            if [[ ! -f "${LEROBOT_MANIFEST}" ]]; then
+              echo "ERROR: LeRobot workflow manifest not found at ${LEROBOT_MANIFEST}" >&2
+              exit 1
+            fi
+            uv pip compile "${LEROBOT_MANIFEST}" -o "${LEROBOT_REQUIREMENTS}"
+            uv pip install --system --requirement "${LEROBOT_REQUIREMENTS}"
 
             # Authenticate with HuggingFace Hub
             echo "Authenticating with HuggingFace Hub..."
@@ -249,3 +262,5 @@ default-values:
   azure_workspace_name: ""
   azure_authority_host: https://login.microsoftonline.com
   register_model: ""
+  encoded_archive: ""
+  payload_root: /workspace/lerobot_payload
