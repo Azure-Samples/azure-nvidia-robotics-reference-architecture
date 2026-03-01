@@ -55,8 +55,7 @@ def _get_base_path() -> str:
 def _labels_path(dataset_id: str) -> Path:
     base = Path(_get_base_path())
     path = base / dataset_id / "meta" / "episode_labels.json"
-    validate_path_containment(path, base)
-    return path
+    return validate_path_containment(path, base)
 
 
 async def _load_labels(dataset_id: str) -> DatasetLabelsFile:

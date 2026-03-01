@@ -36,11 +36,17 @@ def validated_camera_name(
 
 
 def validate_path_containment(path: Path, base_path: Path) -> Path:
-    """Verify a path resolves within the expected base directory."""
+    """Verify a path resolves within the expected base directory.
+
+    Returns a reconstructed path built from the validated base and relative
+    components, breaking the taint chain for static analysis tools.
+    """
     resolved = path.resolve()
-    if not resolved.is_relative_to(base_path.resolve()):
+    base_resolved = base_path.resolve()
+    if not resolved.is_relative_to(base_resolved):
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: resolved path escapes base directory",
         )
-    return resolved
+    relative = resolved.relative_to(base_resolved)
+    return base_resolved / relative

@@ -244,16 +244,13 @@ async def get_episode_video(
     """
     video_path = service.get_video_file_path(dataset_id, episode_idx, camera)
 
-    if video_path is not None:
-        validate_path_containment(Path(video_path), Path(service.base_path))
-
     if video_path is None:
         raise HTTPException(
             status_code=404,
             detail=f"Video not found for episode {episode_idx}, camera '{camera}'",
         )
 
-    video_file = Path(video_path)
+    video_file = validate_path_containment(Path(video_path), Path(service.base_path))
     if not video_file.exists():
         raise HTTPException(
             status_code=404,
@@ -271,7 +268,7 @@ async def get_episode_video(
     media_type = media_types.get(suffix, "video/mp4")
 
     return FileResponse(
-        path=video_path,
+        path=str(video_file),
         media_type=media_type,
         filename=f"{dataset_id}_ep{episode_idx}_{camera.replace('.', '_')}{suffix}",
     )

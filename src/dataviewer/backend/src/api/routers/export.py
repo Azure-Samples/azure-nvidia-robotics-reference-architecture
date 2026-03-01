@@ -139,8 +139,7 @@ async def export_episodes(
         )
 
     # Validate output path
-    output_path = Path(request.outputPath)
-    validate_path_containment(output_path, Path(service.base_path))
+    output_path = validate_path_containment(Path(request.outputPath), Path(service.base_path))
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
@@ -241,8 +240,7 @@ async def export_episodes_stream(
         )
 
     # Validate output path
-    output_path = Path(request.outputPath)
-    validate_path_containment(output_path, Path(service.base_path))
+    output_path = validate_path_containment(Path(request.outputPath), Path(service.base_path))
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:

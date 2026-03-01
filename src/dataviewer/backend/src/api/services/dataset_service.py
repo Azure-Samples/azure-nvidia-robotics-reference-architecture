@@ -683,7 +683,8 @@ class DatasetService:
         dataset_path = (base / dataset_id).resolve()
         if not dataset_path.is_relative_to(base):
             raise ValueError(f"Invalid dataset path: {dataset_id}")
-        return dataset_path
+        relative = dataset_path.relative_to(base)
+        return base / relative
 
     async def get_frame_image(self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str) -> bytes | None:
         """
