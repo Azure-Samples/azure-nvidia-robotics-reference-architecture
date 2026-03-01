@@ -54,13 +54,11 @@ def _labels_path(dataset_id: str) -> Path:
     safe_id = os.path.basename(dataset_id)
     if not safe_id or safe_id != dataset_id:
         raise HTTPException(status_code=400, detail="Invalid dataset ID")
-    base = Path(_get_base_path()).resolve()
-    target = (base / safe_id / "meta" / "episode_labels.json").resolve()
-    try:
-        target.relative_to(base)
-    except ValueError:
+    base_dir = os.path.realpath(_get_base_path())
+    target = os.path.realpath(os.path.join(base_dir, safe_id, "meta", "episode_labels.json"))
+    if not target.startswith(base_dir + os.sep):
         raise HTTPException(status_code=400, detail="Invalid dataset ID")
-    return target
+    return Path(target)
 
 
 async def _load_labels(dataset_id: str) -> DatasetLabelsFile:

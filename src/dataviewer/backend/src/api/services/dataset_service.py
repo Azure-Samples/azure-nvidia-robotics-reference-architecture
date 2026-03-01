@@ -80,7 +80,7 @@ class DatasetService:
         Returns:
             LeRobotLoader if available and dataset is LeRobot format, None otherwise.
         """
-        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         if not LEROBOT_AVAILABLE:
             return None
 
@@ -94,8 +94,8 @@ class DatasetService:
                 except Exception as e:
                     logger.warning(
                         "Failed to create LeRobot loader for %s: %s",
-                        dataset_id.replace("\n", "").replace("\r", ""),
-                        str(e).replace("\n", "").replace("\r", ""),
+                        dataset_id.replace("\r\n", "").replace("\n", ""),
+                        str(e).replace("\r\n", "").replace("\n", ""),
                     )
                     return None
 
@@ -199,7 +199,7 @@ class DatasetService:
         Returns:
             DatasetInfo if valid LeRobot dataset, None otherwise.
         """
-        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is None:
             return None
@@ -230,8 +230,8 @@ class DatasetService:
         except Exception as e:
             logger.warning(
                 "Failed to discover LeRobot dataset %s: %s",
-                dataset_id.replace("\n", "").replace("\r", ""),
-                str(e).replace("\n", "").replace("\r", ""),
+                dataset_id.replace("\r\n", "").replace("\n", ""),
+                str(e).replace("\r\n", "").replace("\n", ""),
             )
             return None
 
@@ -329,7 +329,7 @@ class DatasetService:
         Returns:
             List of EpisodeMeta matching the filters.
         """
-        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         dataset = self._datasets.get(dataset_id)
 
         # Get list of annotated episodes
@@ -352,8 +352,8 @@ class DatasetService:
             except Exception as e:
                 logger.warning(
                     "LeRobot list_episodes failed for %s: %s",
-                    dataset_id.replace("\n", "").replace("\r", ""),
-                    str(e).replace("\n", "").replace("\r", ""),
+                    dataset_id.replace("\r\n", "").replace("\n", ""),
+                    str(e).replace("\r\n", "").replace("\n", ""),
                 )
                 episode_indices = []
 
@@ -432,7 +432,7 @@ class DatasetService:
         Returns:
             EpisodeData if found, None otherwise.
         """
-        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         dataset = self._datasets.get(dataset_id)
 
         # Get annotation status
@@ -492,7 +492,11 @@ class DatasetService:
                 )
 
             except Exception as e:
-                logger.warning("LeRobot load_episode failed for episode %d: %s", episode_idx, type(e).__name__)
+                logger.warning(
+                    "LeRobot load_episode failed for episode %s: %s",
+                    str(episode_idx).replace("\r\n", "").replace("\n", ""),
+                    type(e).__name__.replace("\r\n", "").replace("\n", ""),
+                )
                 # Fall through to try HDF5
 
         # Try to load from HDF5
@@ -573,7 +577,7 @@ class DatasetService:
         Returns:
             List of TrajectoryPoint, empty if not found.
         """
-        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         # Try LeRobot loader first
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is not None:
@@ -606,7 +610,11 @@ class DatasetService:
                 return trajectory_data
 
             except Exception as e:
-                logger.warning("LeRobot trajectory load failed for episode %d: %s", episode_idx, type(e).__name__)
+                logger.warning(
+                    "LeRobot trajectory load failed for episode %s: %s",
+                    str(episode_idx).replace("\r\n", "").replace("\n", ""),
+                    type(e).__name__.replace("\r\n", "").replace("\n", ""),
+                )
 
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
@@ -694,8 +702,8 @@ class DatasetService:
         Returns:
             JPEG image bytes, or None if not found.
         """
-        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
-        camera = camera.replace("\n", "").replace("\r", "")
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
+        camera = camera.replace("\r\n", "").replace("\n", "")
         # Try LeRobot loader first (mp4 frame extraction)
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is not None:
@@ -704,7 +712,7 @@ class DatasetService:
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
         if hdf5_loader is None:
-            logger.warning("No loader found for dataset %s", dataset_id.replace("\n", "").replace("\r", ""))
+            logger.warning("No loader found for dataset %s", dataset_id.replace("\r\n", "").replace("\n", ""))
             return None
 
         try:
@@ -713,7 +721,7 @@ class DatasetService:
             if camera not in hdf5_data.images:
                 logger.warning(
                     "Camera %s not found in episode. Available cameras: %s",
-                    camera.replace("\n", "").replace("\r", ""),
+                    camera.replace("\r\n", "").replace("\n", ""),
                     list(hdf5_data.images.keys()),
                 )
                 return None
@@ -737,7 +745,12 @@ class DatasetService:
             return buffer.getvalue()
 
         except Exception as e:
-            logger.warning("Error loading frame %d from episode %d: %s", frame_idx, episode_idx, type(e).__name__)
+            logger.warning(
+                "Error loading frame %s from episode %s: %s",
+                str(frame_idx).replace("\r\n", "").replace("\n", ""),
+                str(episode_idx).replace("\r\n", "").replace("\n", ""),
+                type(e).__name__.replace("\r\n", "").replace("\n", ""),
+            )
             return None
 
     def _extract_frame_from_video(
@@ -748,7 +761,7 @@ class DatasetService:
         camera: str,
     ) -> bytes | None:
         """Extract a single JPEG frame from a LeRobot mp4 video using OpenCV."""
-        camera = camera.replace("\n", "").replace("\r", "")
+        camera = camera.replace("\r\n", "").replace("\n", "")
         import io
 
         import cv2
@@ -756,7 +769,10 @@ class DatasetService:
 
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
-            logger.warning("No video for episode %d", episode_idx)
+            logger.warning(
+                "No video for episode %s",
+                str(episode_idx).replace("\r\n", "").replace("\n", ""),
+            )
             return None
 
         cap = cv2.VideoCapture(str(video_path))
@@ -764,7 +780,10 @@ class DatasetService:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             ret, frame = cap.read()
             if not ret or frame is None:
-                logger.warning("Failed to read frame %d", frame_idx)
+                logger.warning(
+                    "Failed to read frame %s",
+                    str(frame_idx).replace("\r\n", "").replace("\n", ""),
+                )
                 return None
 
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -823,7 +842,7 @@ class DatasetService:
                 if video_path is not None:
                     return str(video_path)
             except Exception as e:
-                logger.warning("Failed to get video path: %s", str(e).replace("\n", "").replace("\r", ""))
+                logger.warning("Failed to get video path: %s", str(e).replace("\r\n", "").replace("\n", ""))
 
         return None
 

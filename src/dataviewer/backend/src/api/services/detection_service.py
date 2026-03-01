@@ -125,7 +125,7 @@ class DetectionService:
             try:
                 from ultralytics import YOLO
 
-                logger.info("Loading YOLO model: %s", model_name.replace("\n", "").replace("\r", ""))
+                logger.info("Loading YOLO model: %s", model_name.replace("\r\n", "").replace("\n", ""))
                 self._model = YOLO(f"{model_name}.pt")
                 self._model_name = model_name
                 # Warmup with dummy inference
@@ -305,7 +305,11 @@ class DetectionService:
 
             except Exception as e:
                 print(f"[DETECT] Frame {frame_idx}: ERROR {e}", file=sys.stderr, flush=True)
-                logger.warning("Failed to process frame %d: %s", frame_idx, type(e).__name__)
+                logger.warning(
+                    "Failed to process frame %s: %s",
+                    str(frame_idx).replace("\r\n", "").replace("\n", ""),
+                    type(e).__name__.replace("\r\n", "").replace("\n", ""),
+                )
                 continue
 
         total_dets = sum(len(r.detections) for r in results_by_frame)
