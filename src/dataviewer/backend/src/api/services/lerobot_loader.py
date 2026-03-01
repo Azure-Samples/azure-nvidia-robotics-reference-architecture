@@ -450,7 +450,7 @@ def is_lerobot_dataset(path: str | Path) -> bool:
     Returns:
         True if the path contains a LeRobot dataset structure.
     """
-    path = Path(path).resolve()
+    path = Path(path)
     info_path = path / "meta" / "info.json"
     data_dir = path / "data"
     return info_path.exists() and data_dir.exists()

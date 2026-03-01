@@ -195,6 +195,48 @@ class TestHuggingFaceHubAdapter(TestCase):
         url = adapter.get_video_url(5500, "cam")
         assert "chunk-005" in url
 
+    @patch("src.api.storage.huggingface.HF_AVAILABLE", True)
+    def test_isinstance_storage_adapter(self):
+        """Verify HuggingFaceHubAdapter inherits from StorageAdapter."""
+        from src.api.storage.base import StorageAdapter
+        from src.api.storage.huggingface import HuggingFaceHubAdapter
+
+        adapter = HuggingFaceHubAdapter(repo_id="test/dataset")
+        assert isinstance(adapter, StorageAdapter)
+
+    @patch("src.api.storage.huggingface.HF_AVAILABLE", True)
+    def test_write_methods_raise_not_implemented(self):
+        """Verify all write methods raise NotImplementedError."""
+        from src.api.storage.huggingface import HuggingFaceHubAdapter
+
+        adapter = HuggingFaceHubAdapter(repo_id="test/dataset")
+        with self.assertRaises(NotImplementedError):
+            asyncio.run(adapter.save_annotation("ds", 0, None))
+        with self.assertRaises(NotImplementedError):
+            asyncio.run(adapter.get_annotation("ds", 0))
+        with self.assertRaises(NotImplementedError):
+            asyncio.run(adapter.list_annotated_episodes("ds"))
+        with self.assertRaises(NotImplementedError):
+            asyncio.run(adapter.delete_annotation("ds", 0))
+
+    @patch("src.api.storage.huggingface.HF_AVAILABLE", True)
+    @patch("src.api.storage.huggingface.hf_hub_download")
+    @patch("src.api.storage.huggingface.HfFileSystem")
+    def test_download_file_uses_async_to_thread(self, mock_fs_class, mock_download):
+        """Verify _download_file wraps hf_hub_download with asyncio.to_thread."""
+        from src.api.storage.huggingface import HuggingFaceHubAdapter
+
+        mock_download.return_value = str(Path(self.temp_dir) / "dummy.json")
+        adapter = HuggingFaceHubAdapter(
+            repo_id=self.repo_id,
+            cache_dir=self.temp_dir,
+        )
+        with patch(
+            "src.api.storage.huggingface.asyncio.to_thread", wraps=asyncio.to_thread
+        ) as mock_to_thread:
+            asyncio.run(adapter._download_file("meta/info.json"))
+            assert mock_to_thread.call_count >= 1
+
 
 class TestHuggingFaceHubAdapterImportError(TestCase):
     """Tests for HuggingFaceHubAdapter when huggingface_hub is not installed."""

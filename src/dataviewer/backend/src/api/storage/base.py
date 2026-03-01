@@ -73,6 +73,9 @@ class StorageAdapter(ABC):
         """
         pass
 
+    async def close(self) -> None:  # noqa: B027
+        """Release any held resources. Default implementation is a no-op."""
+
     async def get_annotations_batch(
         self, dataset_id: str, episode_indices: list[int]
     ) -> dict[int, EpisodeAnnotationFile | None]:

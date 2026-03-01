@@ -5,8 +5,6 @@ Tests trajectory analysis, anomaly detection, and annotation suggestion
 endpoints with trajectory data extracted from the real dataset.
 """
 
-import os
-
 import numpy as np
 import pytest
 
@@ -16,8 +14,10 @@ from src.api.services.trajectory_analysis import TrajectoryAnalyzer
 
 
 @pytest.fixture(scope="module")
-def loader(dataset_base_path, dataset_id):
-    return LeRobotLoader(os.path.join(dataset_base_path, dataset_id))
+def loader(test_dataset_path, test_dataset_id):
+    import os
+
+    return LeRobotLoader(os.path.join(test_dataset_path, test_dataset_id))
 
 
 @pytest.fixture(scope="module")

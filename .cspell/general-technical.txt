@@ -1,22 +1,22 @@
-# Industry Standards & Protocols (not covered by public dicts)
-# Academic & Technical Terms
-# Security & Compliance
-# Cloud Platforms & Services (not covered by public dicts)
-# Programming Languages & Frameworks (not covered by public dicts)
-# Data & Analytics
-# Business & Enterprise
-# Networking & Infrastructure (not covered by public dicts)
-# Company Names & Brands
-# Product Names & Trademarks (not covered by public dicts)
-# File Formats & Extensions
 # Abbreviations & Acronyms
-# Technical Terms
-# Proper Nouns & Company Names
-# Development & DevOps
-# Video & Image Processing
-# Hardware & Platforms (not covered by public dicts)
-# Software & CAD Tools
+# Academic & Technical Terms
 # Azure NVIDIA Robotics Reference Architecture
+# Business & Enterprise
+# Cloud Platforms & Services (not covered by public dicts)
+# Company Names & Brands
+# Data & Analytics
+# Development & DevOps
+# File Formats & Extensions
+# Hardware & Platforms (not covered by public dicts)
+# Industry Standards & Protocols (not covered by public dicts)
+# Networking & Infrastructure (not covered by public dicts)
+# Product Names & Trademarks (not covered by public dicts)
+# Programming Languages & Frameworks (not covered by public dicts)
+# Proper Nouns & Company Names
+# Security & Compliance
+# Software & CAD Tools
+# Technical Terms
+# Video & Image Processing
 abac
 abap
 abfs
@@ -345,6 +345,7 @@ datalake
 dataops
 datapoints
 dataset
+datasetanalysistool
 datasets
 datasize
 dataverse
@@ -366,6 +367,7 @@ deis
 delenv
 delimited
 dell
+denoising
 denormalized
 deployers
 deserialize
@@ -985,6 +987,7 @@ platform
 platformops
 platforms
 playfab
+playhead
 playment
 playsinline
 Plotly
@@ -1318,6 +1321,7 @@ supervisely
 suricata
 swid
 syft
+synchronisation
 syslog
 syslogs
 sysplex
@@ -1356,6 +1360,7 @@ testcase
 testcases
 testcontainer
 testdata
+testpaths
 testsrc
 testuser
 tflint
@@ -1381,6 +1386,7 @@ TOCTOU
 todatetime
 todynamic
 togaf
+toggleable
 tolerations
 tolong
 tomtom
@@ -1572,3 +1578,4 @@ zipkin
 zonemap
 zref
 zscaler
+zstd

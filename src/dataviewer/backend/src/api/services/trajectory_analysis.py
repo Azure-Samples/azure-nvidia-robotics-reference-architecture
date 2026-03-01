@@ -225,7 +225,7 @@ class TrajectoryAnalyzer:
         hesitation_count = 0
         consecutive = 0
 
-        for stopped in is_stopped.tolist():
+        for stopped in is_stopped:
             if stopped:
                 consecutive += 1
             else:
