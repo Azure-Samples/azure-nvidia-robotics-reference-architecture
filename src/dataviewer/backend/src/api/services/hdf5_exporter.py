@@ -218,12 +218,10 @@ class HDF5Exporter:
             insertion_count = 0
             if inserted_frames:
                 for ins in inserted_frames:
-                    try:
+                    if ins.after_frame_index in valid_indices:
                         pos = valid_indices.index(ins.after_frame_index)
                         if pos < len(valid_indices) - 1:
                             insertion_count += 1
-                    except ValueError:
-                        pass
             output_frames = len(valid_indices) + insertion_count
 
             if progress_callback:

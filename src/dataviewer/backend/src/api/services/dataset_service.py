@@ -24,19 +24,17 @@ logger = logging.getLogger(__name__)
 
 # HDF5 support is optional
 try:
-    from .hdf5_loader import HDF5Loader, HDF5LoaderError
+    from .hdf5_loader import HDF5Loader
 
     HDF5_AVAILABLE = True
 except ImportError:
     HDF5_AVAILABLE = False
     HDF5Loader = None
-    HDF5LoaderError = Exception
 
 # LeRobot parquet support is optional
 try:
     from .lerobot_loader import (
         LeRobotLoader,
-        LeRobotLoaderError,
         is_lerobot_dataset,
     )
 
@@ -44,7 +42,6 @@ try:
 except ImportError:
     LEROBOT_AVAILABLE = False
     LeRobotLoader = None
-    LeRobotLoaderError = Exception
     is_lerobot_dataset = lambda x: False  # noqa: E731
 
 
@@ -96,8 +93,8 @@ class DatasetService:
                     self._lerobot_loaders[dataset_id] = LeRobotLoader(dataset_path)
                 except Exception as e:
                     logger.warning(
-                        "Failed to create LeRobot loader for %r: %s",
-                        dataset_id,
+                        "Failed to create LeRobot loader for %s: %s",
+                        dataset_id.replace("\n", "").replace("\r", ""),
                         str(e).replace("\n", "").replace("\r", ""),
                     )
                     return None
@@ -232,8 +229,8 @@ class DatasetService:
 
         except Exception as e:
             logger.warning(
-                "Failed to discover LeRobot dataset %r: %s",
-                dataset_id,
+                "Failed to discover LeRobot dataset %s: %s",
+                dataset_id.replace("\n", "").replace("\r", ""),
                 str(e).replace("\n", "").replace("\r", ""),
             )
             return None
@@ -354,8 +351,8 @@ class DatasetService:
                         episode_info_map[idx] = {"length": 0, "task_index": 0}
             except Exception as e:
                 logger.warning(
-                    "LeRobot list_episodes failed for %r: %s",
-                    dataset_id,
+                    "LeRobot list_episodes failed for %s: %s",
+                    dataset_id.replace("\n", "").replace("\r", ""),
                     str(e).replace("\n", "").replace("\r", ""),
                 )
                 episode_indices = []
@@ -398,14 +395,14 @@ class DatasetService:
                     ep_length = ep_info.get("length", 0)
                     ep_task_index = ep_info.get("task_index", 0)
                 except Exception:
-                    pass
+                    pass  # Best-effort; episode info unavailable
             elif self._get_hdf5_loader(dataset_id) is not None:
                 try:
                     ep_info = self._get_hdf5_loader(dataset_id).get_episode_info(idx)
                     ep_length = ep_info.get("length", 0)
                     ep_task_index = ep_info.get("task_index", 0)
                 except Exception:
-                    pass
+                    pass  # Best-effort; episode info unavailable
 
             if task_index is not None and ep_task_index != task_index:
                 continue
@@ -496,8 +493,8 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot load_episode failed for %r/%d: %s",
-                    dataset_id,
+                    "LeRobot load_episode failed for %s/%d: %s",
+                    dataset_id.replace("\n", "").replace("\r", ""),
                     episode_idx,
                     str(e).replace("\n", "").replace("\r", ""),
                 )
@@ -615,8 +612,8 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot trajectory load failed for %r/%d: %s",
-                    dataset_id,
+                    "LeRobot trajectory load failed for %s/%d: %s",
+                    dataset_id.replace("\n", "").replace("\r", ""),
                     episode_idx,
                     str(e).replace("\n", "").replace("\r", ""),
                 )
@@ -717,7 +714,7 @@ class DatasetService:
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
         if hdf5_loader is None:
-            logger.warning("No loader found for dataset %r", dataset_id)
+            logger.warning("No loader found for dataset %s", dataset_id.replace("\n", "").replace("\r", ""))
             return None
 
         try:
@@ -725,8 +722,8 @@ class DatasetService:
 
             if camera not in hdf5_data.images:
                 logger.warning(
-                    "Camera %r not found in episode. Available cameras: %s",
-                    camera,
+                    "Camera %s not found in episode. Available cameras: %s",
+                    camera.replace("\n", "").replace("\r", ""),
                     list(hdf5_data.images.keys()),
                 )
                 return None
@@ -751,9 +748,9 @@ class DatasetService:
 
         except Exception as e:
             logger.warning(
-                "Error loading frame %d from %r/%d: %s",
+                "Error loading frame %d from %s/%d: %s",
                 frame_idx,
-                dataset_id,
+                dataset_id.replace("\n", "").replace("\r", ""),
                 episode_idx,
                 str(e).replace("\n", "").replace("\r", ""),
             )
@@ -776,9 +773,9 @@ class DatasetService:
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
             logger.warning(
-                "No video for episode %d camera %r",
+                "No video for episode %d camera %s",
                 episode_idx,
-                camera,
+                camera.replace("\n", "").replace("\r", ""),
             )
             return None
 
@@ -818,7 +815,7 @@ class DatasetService:
             try:
                 return lerobot_loader.get_cameras()
             except Exception:
-                pass
+                pass  # Best-effort; loader may not support camera listing
 
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)

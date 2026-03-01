@@ -22,8 +22,8 @@ try:
 
     AZURE_AVAILABLE = True
 except ImportError:
-    HttpResponseError = None
-    ResourceNotFoundError = None
+    HttpResponseError = Exception
+    ResourceNotFoundError = Exception
     RetryPolicy = None
     DefaultAzureCredential = None
     ContentSettings = None
