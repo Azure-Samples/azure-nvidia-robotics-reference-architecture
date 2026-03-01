@@ -21,6 +21,12 @@ from ..storage import LocalStorageAdapter
 
 logger = logging.getLogger(__name__)
 
+
+def _sanitize_log(value: object) -> str:
+    """Strip control characters from a value to prevent log injection."""
+    return str(value).replace("\n", "\\n").replace("\r", "\\r")
+
+
 # HDF5 support is optional
 try:
     from .hdf5_loader import HDF5Loader, HDF5LoaderError
@@ -93,7 +99,7 @@ class DatasetService:
                 try:
                     self._lerobot_loaders[dataset_id] = LeRobotLoader(dataset_path)
                 except Exception as e:
-                    logger.warning("Failed to create LeRobot loader for %s: %s", dataset_id, e)
+                    logger.warning("Failed to create LeRobot loader for %s: %s", _sanitize_log(dataset_id), e)
                     return None
 
         return self._lerobot_loaders.get(dataset_id)
@@ -224,7 +230,7 @@ class DatasetService:
             return dataset_info
 
         except Exception as e:
-            logger.warning("Failed to discover LeRobot dataset %s: %s", dataset_id, e)
+            logger.warning("Failed to discover LeRobot dataset %s: %s", _sanitize_log(dataset_id), e)
             return None
 
     async def list_datasets(self) -> list[DatasetInfo]:
@@ -341,7 +347,7 @@ class DatasetService:
                     except Exception:
                         episode_info_map[idx] = {"length": 0, "task_index": 0}
             except Exception as e:
-                logger.warning("LeRobot list_episodes failed for %s: %s", dataset_id, e)
+                logger.warning("LeRobot list_episodes failed for %s: %s", _sanitize_log(dataset_id), e)
                 episode_indices = []
 
         # Fall back to HDF5 loader
@@ -478,7 +484,7 @@ class DatasetService:
                 )
 
             except Exception as e:
-                logger.warning("LeRobot load_episode failed for %s/%d: %s", dataset_id, episode_idx, e)
+                logger.warning("LeRobot load_episode failed for %s/%d: %s", _sanitize_log(dataset_id), episode_idx, e)
                 # Fall through to try HDF5
 
         # Try to load from HDF5
@@ -591,7 +597,12 @@ class DatasetService:
                 return trajectory_data
 
             except Exception as e:
-                logger.warning("LeRobot trajectory load failed for %s/%d: %s", dataset_id, episode_idx, e)
+                logger.warning(
+                    "LeRobot trajectory load failed for %s/%d: %s",
+                    _sanitize_log(dataset_id),
+                    episode_idx,
+                    e,
+                )
 
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
@@ -687,7 +698,7 @@ class DatasetService:
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
         if hdf5_loader is None:
-            logger.warning("No loader found for dataset %s", dataset_id)
+            logger.warning("No loader found for dataset %s", _sanitize_log(dataset_id))
             return None
 
         try:
@@ -696,7 +707,7 @@ class DatasetService:
             if camera not in hdf5_data.images:
                 logger.warning(
                     "Camera %s not found in episode. Available cameras: %s",
-                    camera,
+                    _sanitize_log(camera),
                     list(hdf5_data.images.keys()),
                 )
                 return None
@@ -720,7 +731,13 @@ class DatasetService:
             return buffer.getvalue()
 
         except Exception as e:
-            logger.exception("Error loading frame %d from %s/%d: %s", frame_idx, dataset_id, episode_idx, e)
+            logger.exception(
+                "Error loading frame %d from %s/%d: %s",
+                frame_idx,
+                _sanitize_log(dataset_id),
+                episode_idx,
+                e,
+            )
             return None
 
     def _extract_frame_from_video(
@@ -738,7 +755,7 @@ class DatasetService:
 
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
-            logger.warning("No video for episode %d camera '%s'", episode_idx, camera)
+            logger.warning("No video for episode %d camera '%s'", episode_idx, _sanitize_log(camera))
             return None
 
         cap = cv2.VideoCapture(str(video_path))
