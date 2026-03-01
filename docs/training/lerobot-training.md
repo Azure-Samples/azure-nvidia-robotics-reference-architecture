@@ -1,86 +1,112 @@
 ---
-title: LeRobot Training Guide
-description: Train behavioral cloning policies using LeRobot ACT and Diffusion architectures on Azure ML and OSMO
+title: LeRobot Training
+description: Behavioral cloning training with ACT and Diffusion policies on Azure ML and OSMO platforms
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-24
+ms.date: 2026-02-23
 ms.topic: how-to
 keywords:
   - lerobot
   - behavioral cloning
-  - act policy
-  - diffusion policy
+  - act
+  - diffusion
+  - azureml
+  - osmo
+  - training
 ---
 
-Train behavioral cloning policies for robotics manipulation tasks using LeRobot ACT and Diffusion architectures. Submit training jobs through Azure ML compute or NVIDIA OSMO workflow orchestration.
+LeRobot behavioral cloning training for ACT and Diffusion policy architectures. Training runs on Azure ML and OSMO platforms using HuggingFace Hub datasets with WANDB and MLflow experiment tracking.
 
 ## 📋 Prerequisites
 
-| Component           | Requirement                                                                                                            |
-|---------------------|------------------------------------------------------------------------------------------------------------------------|
-| AKS cluster         | GPU-capable nodes provisioned via Terraform                                                                            |
-| Azure ML (optional) | K8s extension deployed, compute target attached (`02-deploy-azureml-extension.sh`)                                     |
-| OSMO (optional)     | Control plane and backend deployed, CLI authenticated (`03-deploy-osmo-control-plane.sh`, `04-deploy-osmo-backend.sh`) |
-| Storage             | Checkpoint storage configured                                                                                          |
-| HuggingFace         | Account with dataset access                                                                                            |
-
-## ⚙️ Supported Policies
-
-| Policy    | Architecture                      | Use Case                                        |
-|-----------|-----------------------------------|-------------------------------------------------|
-| ACT       | Action Chunking with Transformers | Fine manipulation tasks with sequential actions |
-| Diffusion | Diffusion Policy                  | Complex manipulation via denoising diffusion    |
-
-## 🔧 Training Parameters
-
-| Parameter         | Default                                         | Platform | Description                                           |
-|-------------------|-------------------------------------------------|----------|-------------------------------------------------------|
-| `dataset_repo_id` | (required)                                      | Both     | HuggingFace dataset repository (e.g., `user/dataset`) |
-| `policy_type`     | `act`                                           | Both     | Policy architecture: `act`, `diffusion`               |
-| `job_name`        | `lerobot-act-training`                          | Both     | Unique job identifier                                 |
-| `image`           | `pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime` | Both     | Container image                                       |
-| `training_steps`  | (LeRobot default)                               | OSMO     | Total training iterations                             |
-| `batch_size`      | (LeRobot default)                               | OSMO     | Training batch size                                   |
-| `save_freq`       | `5000`                                          | Both     | Checkpoint save frequency                             |
-| `wandb_enable`    | `true`                                          | Both     | Enable WANDB logging                                  |
-| `mlflow_enable`   | `false`                                         | OSMO     | Enable Azure ML MLflow logging                        |
+| Component        | Requirement                                                                  |
+|------------------|------------------------------------------------------------------------------|
+| Infrastructure   | AKS cluster deployed via [Infrastructure Guide](../../deploy/README.md)      |
+| Azure ML or OSMO | At least one platform configured (see Platform Selection section)            |
+| HuggingFace token| Required for private datasets (`hf_token` credential)                        |
+| WANDB API key    | Required when `--wandb-enable` is set (default on OSMO)                      |
 
 ## 🚀 Quick Start
 
-Azure ML submission:
+### Azure ML
 
 ```bash
 ./scripts/submit-azureml-lerobot-training.sh \
-  --dataset-repo-id lerobot/aloha_sim_insertion_human \
-  --policy-type act
+  -d lerobot/aloha_sim_insertion_human
 ```
 
-OSMO submission:
+### OSMO
 
 ```bash
-# ACT training with WANDB logging
 ./scripts/submit-osmo-lerobot-training.sh \
   -d lerobot/aloha_sim_insertion_human
-
-# Diffusion policy with MLflow logging
-./scripts/submit-osmo-lerobot-training.sh \
-  -d user/custom-dataset \
-  -p diffusion \
-  --mlflow-enable \
-  -r my-diffusion-model
 ```
 
-Fine-tune from an existing policy:
+### End-to-End Pipeline (OSMO)
+
+Train, evaluate, and register in one command:
+
+```bash
+./scripts/run-lerobot-pipeline.sh \
+  -d lerobot/aloha_sim_insertion_human \
+  --policy-repo-id user/my-act-policy \
+  -r my-act-model
+```
+
+## 🧠 Policy Architectures
+
+| Architecture | Type                                  | Strengths                                 |
+|--------------|---------------------------------------|-------------------------------------------|
+| ACT          | Action Chunking with Transformers     | Multi-step prediction, temporal coherence |
+| Diffusion    | Denoising Diffusion Policy            | Multi-modal action distributions          |
+
+Select the architecture with `--policy-type`:
+
+```bash
+# ACT policy (default)
+./scripts/submit-osmo-lerobot-training.sh -d user/dataset -p act
+
+# Diffusion policy
+./scripts/submit-osmo-lerobot-training.sh -d user/dataset -p diffusion
+```
+
+## ⚖️ Platform Selection
+
+| Aspect              | Azure ML                              | OSMO                                    |
+|---------------------|---------------------------------------|-----------------------------------------|
+| Submission          | `az ml job create`                    | `osmo workflow submit`                  |
+| Experiment tracking | MLflow (managed)                      | WANDB (default) + MLflow (optional)     |
+| Credential handling | Azure ML environment variables        | `osmo credential set` injection         |
+| Dataset delivery    | HuggingFace Hub download              | Hub download or OSMO bucket mount       |
+| Pipeline support    | Manual multi-step                     | `run-lerobot-pipeline.sh` orchestration |
+
+## ⚙️ Training Configuration
+
+| Parameter           | Default                                         | Description                          |
+|---------------------|-------------------------------------------------|--------------------------------------|
+| `--dataset-repo-id` | (required)                                      | HuggingFace dataset repository       |
+| `--policy-type`     | `act`                                           | Policy: `act` or `diffusion`         |
+| `--job-name`        | `lerobot-act-training`                          | Job identifier                       |
+| `--image`           | `pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime` | Container image                      |
+| `--training-steps`  | (LeRobot default)                               | Total training iterations            |
+| `--batch-size`      | (LeRobot default)                               | Training batch size                  |
+| `--save-freq`       | `5000`                                          | Checkpoint save frequency            |
+| `--policy-repo-id`  | (none)                                          | Pre-trained policy for fine-tuning   |
+
+### Fine-Tuning from Existing Policy
 
 ```bash
 ./scripts/submit-osmo-lerobot-training.sh \
-  -d user/dataset \
+  -d user/my-dataset \
   --policy-repo-id user/pretrained-act \
-  --training-steps 50000
+  --training-steps 50000 \
+  --batch-size 16
 ```
 
-## 🔑 Credential Configuration
+## 🔑 Credential Setup
 
-OSMO workflows use credential injection for authentication:
+### OSMO Credentials
+
+OSMO injects credentials at workflow runtime:
 
 ```bash
 # HuggingFace token (required for private datasets)
@@ -90,37 +116,56 @@ osmo credential set hf_token --generic --value "hf_..."
 osmo credential set wandb_api_key --generic --value "..."
 ```
 
-Azure ML jobs inherit credentials from the AzureML extension service principal.
+### Azure ML Credentials
 
-## 📊 Experiment Tracking
+Azure ML uses workspace-managed identity. Set environment variables for custom configurations:
 
-| Backend         | Enable Flag          | Platform | Details                                      |
-|-----------------|----------------------|----------|----------------------------------------------|
-| WANDB           | `wandb_enable=true`  | Both     | Requires `wandb_api_key` credential          |
-| Azure ML MLflow | `mlflow_enable=true` | OSMO     | Logs to Azure ML workspace                   |
-| Azure ML MLflow | Automatic            | Azure ML | Enabled by default through AzureML extension |
+| Variable                  | Description               |
+|---------------------------|---------------------------|
+| `AZURE_SUBSCRIPTION_ID`   | Azure subscription ID     |
+| `AZURE_RESOURCE_GROUP`    | Resource group name       |
+| `AZUREML_WORKSPACE_NAME`  | Azure ML workspace name   |
+| `AZUREML_COMPUTE`         | Compute target name       |
 
-See [MLflow Integration](mlflow-integration.md) for SKRL metric logging configuration and available metrics.
+## 📊 Experiment Logging
 
-## 💾 Checkpoint Management
+### WANDB (Default on OSMO)
 
-Checkpoints save at intervals defined by `save_freq` (default: every 5000 steps). OSMO workflows register checkpoints to Azure ML model registry when `--register_model` is specified.
+WANDB logging is enabled by default on OSMO workflows. Requires `wandb_api_key` credential.
 
 ```bash
-# Register trained model to Azure ML
-./scripts/submit-osmo-lerobot-inference.sh \
-  --policy-repo-id user/trained-act-policy \
-  -r my-registered-model
+# Disable WANDB
+./scripts/submit-osmo-lerobot-training.sh \
+  -d user/dataset \
+  --wandb-disable
 ```
 
-## 📦 Dataset Sources
+### MLflow (Azure ML Managed)
 
-| Source              | Platform | Description                                          |
-|---------------------|----------|------------------------------------------------------|
-| HuggingFace Hub     | Both     | Download at runtime via `dataset_repo_id`            |
-| OSMO Dataset Bucket | OSMO     | Mount from Azure Blob Storage, versioned across runs |
+Azure ML training uses MLflow automatically. Enable MLflow on OSMO with:
 
-OSMO dataset mount training:
+```bash
+./scripts/submit-osmo-lerobot-training.sh \
+  -d user/dataset \
+  --mlflow-enable
+```
+
+See [Experiment Tracking](experiment-tracking.md) for platform comparison and configuration details.
+
+## 💾 Dataset Workflows
+
+### HuggingFace Hub (Default)
+
+LeRobot downloads datasets from HuggingFace Hub at runtime. Specify datasets with `--dataset-repo-id`:
+
+```bash
+./scripts/submit-osmo-lerobot-training.sh \
+  -d lerobot/aloha_sim_insertion_human
+```
+
+### OSMO Dataset Mount
+
+Mount datasets from OSMO buckets backed by Azure Blob Storage:
 
 ```bash
 ./scripts/submit-osmo-lerobot-training.sh \
@@ -130,28 +175,45 @@ OSMO dataset mount training:
   --dataset-name my-lerobot-data
 ```
 
-> [!NOTE]
-> OSMO dataset mounts fall back to HuggingFace Hub download if no dataset mount is available.
+Falls back to HuggingFace Hub download when no dataset mount is available.
 
 ## 🔄 End-to-End Pipeline
 
-`scripts/run-lerobot-pipeline.sh` orchestrates the full training-to-inference workflow: dataset preparation, training submission, checkpoint extraction, and model evaluation.
+The `run-lerobot-pipeline.sh` script orchestrates the full lifecycle on OSMO:
+
+| Stage | Action                                |
+|-------|---------------------------------------|
+| 1     | Submit training workflow              |
+| 2     | Poll workflow status until completion |
+| 3     | Submit inference/evaluation workflow  |
 
 ```bash
+# Full pipeline
 ./scripts/run-lerobot-pipeline.sh \
-  --dataset-repo-id lerobot/aloha_sim_insertion_human \
-  --policy-type act
+  -d lerobot/aloha_sim_insertion_human \
+  --policy-repo-id user/my-policy \
+  -r my-model
+
+# Training only with polling (skip inference)
+./scripts/run-lerobot-pipeline.sh \
+  -d user/dataset \
+  --skip-inference
+
+# Async mode (submit and exit)
+./scripts/run-lerobot-pipeline.sh \
+  -d user/dataset \
+  --skip-wait
 ```
 
-## 📚 Related Documentation
+## 🔗 Related Documentation
 
-- [Azure ML Training](azureml-training.md)
-- [OSMO Training](osmo-training.md)
-- [MLflow Integration](mlflow-integration.md)
-- [Inference Guide](../inference/README.md)
-
----
+- [LeRobot Inference](../lerobot-inference.md) for evaluating trained policies
+- [Experiment Tracking](experiment-tracking.md) for MLflow and WANDB configuration
+- [AzureML Workflows](../../workflows/azureml/README.md) for job template reference
+- [OSMO Workflows](../../workflows/osmo/README.md) for workflow template reference
+- [Scripts Reference](../../scripts/README.md) for full CLI parameter tables
 
 <!-- markdownlint-disable MD036 -->
-*🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.*
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
 <!-- markdownlint-enable MD036 -->

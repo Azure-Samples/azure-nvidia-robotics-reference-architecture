@@ -49,6 +49,11 @@ output "gpu_node_pool_subnets" {
   value       = module.sil.gpu_node_pool_subnets
 }
 
+output "node_pools" {
+  description = "GPU node pool configurations for OSMO pool and pod template generation"
+  value       = module.sil.node_pools
+}
+
 // ============================================================
 // ML Workspace Outputs
 // ============================================================
