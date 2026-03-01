@@ -305,7 +305,7 @@ class DetectionService:
 
             except Exception as e:
                 print(f"[DETECT] Frame {frame_idx}: ERROR {e}", file=sys.stderr, flush=True)
-                logger.warning("Failed to process frame %d: %s", frame_idx, str(e).replace("\n", "").replace("\r", ""))
+                logger.warning("Failed to process frame %d: %s", frame_idx, type(e).__name__)
                 continue
 
         total_dets = sum(len(r.detections) for r in results_by_frame)

@@ -51,8 +51,11 @@ def _get_base_path() -> str:
 
 
 def _labels_path(dataset_id: str) -> Path:
+    safe_id = os.path.basename(dataset_id)
+    if not safe_id or safe_id != dataset_id:
+        raise HTTPException(status_code=400, detail="Invalid dataset ID")
     base = Path(_get_base_path()).resolve()
-    target = (base / dataset_id / "meta" / "episode_labels.json").resolve()
+    target = (base / safe_id / "meta" / "episode_labels.json").resolve()
     try:
         target.relative_to(base)
     except ValueError:

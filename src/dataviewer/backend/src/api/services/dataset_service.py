@@ -492,12 +492,7 @@ class DatasetService:
                 )
 
             except Exception as e:
-                logger.warning(
-                    "LeRobot load_episode failed for %s/%d: %s",
-                    dataset_id.replace("\n", "").replace("\r", ""),
-                    episode_idx,
-                    str(e).replace("\n", "").replace("\r", ""),
-                )
+                logger.warning("LeRobot load_episode failed for episode %d: %s", episode_idx, type(e).__name__)
                 # Fall through to try HDF5
 
         # Try to load from HDF5
@@ -611,12 +606,7 @@ class DatasetService:
                 return trajectory_data
 
             except Exception as e:
-                logger.warning(
-                    "LeRobot trajectory load failed for %s/%d: %s",
-                    dataset_id.replace("\n", "").replace("\r", ""),
-                    episode_idx,
-                    str(e).replace("\n", "").replace("\r", ""),
-                )
+                logger.warning("LeRobot trajectory load failed for episode %d: %s", episode_idx, type(e).__name__)
 
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
@@ -747,13 +737,7 @@ class DatasetService:
             return buffer.getvalue()
 
         except Exception as e:
-            logger.warning(
-                "Error loading frame %d from %s/%d: %s",
-                frame_idx,
-                dataset_id.replace("\n", "").replace("\r", ""),
-                episode_idx,
-                str(e).replace("\n", "").replace("\r", ""),
-            )
+            logger.warning("Error loading frame %d from episode %d: %s", frame_idx, episode_idx, type(e).__name__)
             return None
 
     def _extract_frame_from_video(
@@ -772,11 +756,7 @@ class DatasetService:
 
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
-            logger.warning(
-                "No video for episode %d camera %s",
-                episode_idx,
-                camera.replace("\n", "").replace("\r", ""),
-            )
+            logger.warning("No video for episode %d", episode_idx)
             return None
 
         cap = cv2.VideoCapture(str(video_path))
@@ -784,11 +764,7 @@ class DatasetService:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             ret, frame = cap.read()
             if not ret or frame is None:
-                logger.warning(
-                    "Failed to read frame %d from %s",
-                    frame_idx,
-                    str(video_path).replace("\n", "").replace("\r", ""),
-                )
+                logger.warning("Failed to read frame %d", frame_idx)
                 return None
 
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
