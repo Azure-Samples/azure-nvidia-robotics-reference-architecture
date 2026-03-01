@@ -6,6 +6,4 @@ ms.date: 2025-01-15
 ms.topic: troubleshooting
 ---
 
-# Azure ML Validation Job Debugging
-
 This is a valid documentation file with all recommended frontmatter fields.

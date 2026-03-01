@@ -223,7 +223,7 @@ class HDF5Exporter:
                         if pos < len(valid_indices) - 1:
                             insertion_count += 1
                     except ValueError:
-                        continue
+                        pass
             output_frames = len(valid_indices) + insertion_count
 
             if progress_callback:
@@ -627,7 +627,7 @@ class HDF5Exporter:
         """Export metadata attributes."""
         # Copy original metadata
         for key, value in episode.metadata.items():
-            if isinstance(value, (list, dict)):
+            if isinstance(value, list | dict):
                 dst.attrs[key] = json.dumps(value)
             else:
                 dst.attrs[key] = value

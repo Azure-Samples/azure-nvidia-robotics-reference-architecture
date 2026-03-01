@@ -27,9 +27,7 @@ class AzureBlobDataSource(BaseModel):
     type: Literal["azure-blob"] = "azure-blob"
     account_name: str = Field(description="Azure storage account name")
     container_name: str = Field(description="Blob container name")
-    sas_token: str | None = Field(
-        default=None, repr=False, description="SAS token for authentication"
-    )
+    sas_token: str | None = Field(default=None, description="SAS token for authentication")
     managed_identity: bool = Field(
         default=False, description="Use managed identity for authentication"
     )
@@ -43,9 +41,7 @@ class HuggingFaceDataSource(BaseModel):
     revision: str | None = Field(
         default=None, description="Git revision (branch, tag, or commit hash)"
     )
-    token: str | None = Field(
-        default=None, repr=False, description="Hugging Face API token for private repos"
-    )
+    token: str | None = Field(default=None, description="Hugging Face API token for private repos")
 
 
 # Discriminated union for data sources
