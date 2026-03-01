@@ -1,25 +1,12 @@
 {
-    "name": "${BACKEND_NAME}",
+    "name": "${POOL_NAME}",
     "backend": "${BACKEND_NAME}",
-    "default_platform": "a10_platform",
-    "platforms": {
-        "a10_platform": {
-            "description": "A10 GPU platform with spot instance support",
-            "host_network_allowed": false,
-            "privileged_allowed": true,
-            "default_variables": {},
-            "resource_validations": [],
-            "override_pod_template": [
-                "aks_a10",
-                "workload_identity"
-            ],
-            "allowed_mounts": []
-        }
-    },
+    "default_platform": "${DEFAULT_PLATFORM}",
+    "platforms": {},
     "resources": {
         "gpu": null
     },
-    "description": "${BACKEND_DESCRIPTION}",
+    "description": "${POOL_DESCRIPTION}",
     "enable_maintenance": false,
     "common_pod_template": [
         "default_user",

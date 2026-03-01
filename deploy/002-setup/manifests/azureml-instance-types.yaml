@@ -29,3 +29,19 @@ spec:
       cpu: "8"
       memory: "32Gi"
       nvidia.com/gpu: 1
+---
+apiVersion: amlarc.azureml.com/v1alpha1
+kind: InstanceType
+metadata:
+  name: gpu
+spec:
+  nodeSelector:
+    accelerator: nvidia
+  resources:
+    requests:
+      cpu: "4"
+      memory: "16Gi"
+    limits:
+      cpu: "8"
+      memory: "32Gi"
+      nvidia.com/gpu: 1

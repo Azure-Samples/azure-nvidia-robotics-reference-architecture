@@ -1,53 +1,39 @@
-# Automation
+---
+title: Cluster Automation
+description: Azure Automation Account for scheduled cluster operations and runbooks
+author: Microsoft Robotics-AI Team
+ms.date: 2026-02-23
+ms.topic: reference
+keywords:
+  - automation
+  - scheduled
+  - start-stop
+---
 
-Azure Automation account for scheduled infrastructure operations.
+Azure Automation Account for scheduled cluster operations. Manages start/stop schedules and maintenance runbooks for the AKS cluster.
 
-## 🎯 Purpose
+> [!NOTE]
+> Complete automation configuration including schedule setup and runbook details is in the [Cluster Automation](../../../docs/deploy/automation.md) guide.
 
-Runs scheduled PowerShell runbooks to manage infrastructure resources, such as starting PostgreSQL and AKS at the beginning of business hours to reduce costs.
-
-## 📋 Prerequisites
-
-- Platform infrastructure deployed (`cd .. && terraform apply`)
-- Core variables matching parent deployment
-
-## 🚀 Usage
+## 🚀 Quick Start
 
 ```bash
 cd deploy/001-iac/automation
-
-# Configure schedule and resources
-# Edit terraform.tfvars with your schedule
-
+cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply
 ```
 
-## ⚙️ Configuration
+## 📖 Documentation
 
-Example `terraform.tfvars`:
+| Guide                                                    | Description                                             |
+|----------------------------------------------------------|---------------------------------------------------------|
+| [Cluster Automation](../../../docs/deploy/automation.md) | Schedule configuration, runbooks, and managed resources |
 
-```hcl
-environment     = "dev"
-location        = "westus3"
-resource_prefix = "rob"
-instance        = "001"
+## ➡️ Next Step
 
-should_start_postgresql = true
+Proceed to [Cluster Setup](../../002-setup/).
 
-schedule_config = {
-  start_time = "13:00"
-  week_days  = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-  timezone   = "UTC"
-}
-```
-
-## 📦 Resources Created
-
-- Azure Automation Account with system-assigned managed identity
-- PowerShell 7.2 runbook for starting resources
-- Weekly schedule with configurable days and start time
-- Role assignments for AKS and PostgreSQL management
-
-## 🔗 Related
-
-- [Parent README](../README.md) - Main infrastructure documentation
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

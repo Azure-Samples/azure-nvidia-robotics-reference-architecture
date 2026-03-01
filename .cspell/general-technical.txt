@@ -1,4 +1,22 @@
+# Abbreviations & Acronyms
+# Academic & Technical Terms
+# Azure NVIDIA Robotics Reference Architecture
+# Business & Enterprise
+# Cloud Platforms & Services (not covered by public dicts)
+# Company Names & Brands
+# Data & Analytics
+# Development & DevOps
+# File Formats & Extensions
+# Hardware & Platforms (not covered by public dicts)
 # Industry Standards & Protocols (not covered by public dicts)
+# Networking & Infrastructure (not covered by public dicts)
+# Product Names & Trademarks (not covered by public dicts)
+# Programming Languages & Frameworks (not covered by public dicts)
+# Proper Nouns & Company Names
+# Security & Compliance
+# Software & CAD Tools
+# Technical Terms
+# Video & Image Processing
 abac
 abap
 abfs
@@ -19,6 +37,7 @@ allowlisting
 amazon
 amazonaws
 amet
+amlignore
 ammp
 amqp
 amsr
@@ -47,6 +66,7 @@ arachni
 aravis
 architected
 architecting
+argjson
 ariba
 arrowdown
 arrowleft
@@ -127,6 +147,7 @@ bssid
 btocompute
 buildpack
 bulletsprint
+Burstable
 byol
 byos
 caching
@@ -135,6 +156,7 @@ cannery
 canonicalize
 cantemo
 capex
+capsys
 captcha
 cartpole
 cassandra
@@ -143,6 +165,7 @@ cds
 cengage
 centrify
 ceo
+CFLAGS
 cfo
 chainalytics
 changefeed
@@ -199,6 +222,7 @@ cloudyn
 clu
 clustered
 clusterer
+clusterpolicies
 cmdb
 cmdlet
 cmdlets
@@ -258,6 +282,7 @@ corosync
 correlated
 correlations
 cortana
+coscheduling
 couchbase
 coupa
 cpps
@@ -266,6 +291,7 @@ cpuprofile
 cpus
 cqrs
 crc
+crds
 creds
 cref
 Creo
@@ -282,6 +308,7 @@ cse's
 csp
 cspell
 cspm
+CSPRNG
 csps
 csr
 csv
@@ -308,6 +335,7 @@ Cybercrime
 cybersecurity
 cyclomatic
 cyclonedds
+daemonset
 Dapr
 datacenter
 datacenters
@@ -324,6 +352,7 @@ dataverse
 datefmt
 davinci
 dbcc
+dbname
 dcgm
 DDPG
 debuggability
@@ -335,9 +364,12 @@ defaultazurecredential
 defaultinstancetype
 deidentification
 deis
+delenv
 delimited
 dell
+denoising
 denormalized
+deployers
 deserialize
 deserialized
 dets
@@ -366,6 +398,7 @@ documentdb
 docx
 dogfood
 domino
+dones
 donotreply
 dotenv
 dotnet
@@ -394,6 +427,8 @@ endusers
 enhancements
 entitlement
 entitlements
+envsubst
+epch
 epicor
 eps
 erewbuffer
@@ -462,6 +497,7 @@ georeplicated
 georeplication
 geoserver
 geospatial
+getpid
 gettype
 gigabytes
 git
@@ -476,8 +512,11 @@ google
 googlecloud
 gpu
 gpuinstancetype
+gpupool
+gpuspot
 grafana
 graphql
+grdn
 greenfield
 grooming
 gruntwork
@@ -537,8 +576,10 @@ iisreset
 imagenet
 imap
 imds
+imgmsg
 incentivize
 incentivized
+incluster
 indexeddb
 inetpub
 inexhaustive
@@ -557,6 +598,8 @@ inmon
 innersource
 innodb
 inprivate
+instancetype
+instancetypes
 intel
 intellicode
 intellij
@@ -613,6 +656,7 @@ jira
 journalctl
 jpgs
 json
+jtzh
 jumpstart
 junitxml
 jupyter
@@ -631,6 +675,7 @@ kepware
 keras
 kerberos
 keyid
+keylength
 kics
 kinect
 kingsway
@@ -658,11 +703,14 @@ lan
 lanczos
 lavfi
 ldap
+LDFLAGS
 leaderboard
 lenbuffer
 lenovo
 lerobot
 levelname
+libgl
+libglib
 libx
 lifecycle
 lifecycles
@@ -679,8 +727,10 @@ liveops
 Llamacpp
 llap
 llms
+lnkmpfy
 loadbalancer
 localizationpriority
+localpath
 lockdown
 lockdowns
 lockfiles
@@ -735,6 +785,7 @@ midtones
 migratable
 minecraft
 minification
+MININTERVAL
 minio
 minmax
 misallocate
@@ -749,6 +800,7 @@ mlops
 moby
 modbus
 Modelica
+modeset
 modopts
 modreq
 modreqs
@@ -781,6 +833,7 @@ myregistry
 mysql
 namespace
 namespaces
+nanosec
 nant
 ncdc
 nei
@@ -805,6 +858,7 @@ noncompliant
 nosql
 notnull
 notpetya
+nsenter
 nsgs
 nslookup
 ntfs
@@ -815,6 +869,7 @@ nvarchar
 nvas
 nvcr
 nvidia
+nvidiadrivers
 nvme
 nvml
 nygard
@@ -831,8 +886,10 @@ okera
 okrs
 olap
 olas
+oldsha
 oltp
 omnichannel
+Omniverse
 onapsis
 onboarded
 onboards
@@ -840,6 +897,7 @@ oneline
 onmicrosoft
 onnx
 onnxruntime
+onnxscript
 onpremises
 onpremisesstorage
 openapi
@@ -860,6 +918,7 @@ operationalizes
 operationalizing
 opex
 opinsights
+opset
 Opsgenie
 optimised
 optimising
@@ -871,6 +930,7 @@ organisation
 organisations
 organised
 osmoauth
+osmorobo
 OSSF
 otel
 otlp
@@ -904,10 +964,14 @@ pdbs
 pdfs
 pebibyte
 peerings
+peermem
+pentry
 performant
+persistenced
 personalizer
 petya
 pgadmin
+PGPASSWORD
 pgsql
 phpinfo
 phpmyadmin
@@ -930,15 +994,19 @@ Plotly
 pluggable
 pluralsight
 pmks
+pname
 pngs
 pnrp
 pocs
 pod
+podgroups
 podmonitor
+podmonitors
 pointnext
 polybase
 popen
 popout
+portforward
 Portworx
 posix
 posterized
@@ -950,6 +1018,7 @@ ppac
 pptx
 prd
 preapproved
+prebundle
 precommitment
 precommitments
 preconfigured
@@ -986,6 +1055,7 @@ pseries
 pseudonymization
 pseudonymize
 psql
+psqladmin
 PSScriptAnalyzer
 pstn
 psversiontable
@@ -994,6 +1064,7 @@ pulsant
 pulumi
 purescale
 pwsh
+pyav
 pyglet
 pylance
 pyodbc
@@ -1005,6 +1076,7 @@ PYTHONPATH
 pyyaml
 Qdrant
 qgis
+qjqy
 qldrw
 qlik
 qpos
@@ -1028,6 +1100,7 @@ randn
 rasterio
 ratecard
 rbsc
+rclpy
 rcnn
 rdbms
 rdma
@@ -1069,6 +1142,7 @@ reimplementing
 reintegrate
 reintegrating
 relabelling
+relayserver
 Remotable
 renumbered
 reoccur
@@ -1090,9 +1164,11 @@ rewbuffer
 rfcs
 rgba
 rhn
+rhysd
 risc
 rlhf
 rmem
+rmmod
 roadmap
 roadmaps
 roadrunner
@@ -1121,6 +1197,7 @@ sandboxed
 Sankey
 sap
 Sarbanes
+savez
 scalability
 scalesetpriority
 scenario
@@ -1137,6 +1214,7 @@ sdks
 sdlc
 searchable
 seccomp
+secretproviderclass
 sectigo
 seealso
 Seldon
@@ -1172,6 +1250,7 @@ slos
 slsa
 smes
 smita
+smpl
 SMPTE
 smptebars
 smtp
@@ -1203,6 +1282,7 @@ ssds
 ssdt
 ssis
 ssl
+sslmode
 ssma
 ssrs
 sssc
@@ -1216,6 +1296,7 @@ stig
 stonith
 stopwords
 storsimple
+stosmorbt
 strategizing
 striim
 strpos
@@ -1265,6 +1346,7 @@ telemetry
 templating
 templatize
 templatized
+tensordict
 teradata
 teragen
 terasort
@@ -1280,6 +1362,7 @@ testcontainer
 testdata
 testpaths
 testsrc
+testuser
 tflint
 tflite
 tfvars
@@ -1339,6 +1422,7 @@ typosquatting
 udfs
 udp
 udrs
+ueks
 umap
 unbootable
 uncompromised
@@ -1359,6 +1443,7 @@ uniqueidentifier
 unisys
 unjudged
 unmanaged
+unnormalization
 unoptimized
 Unproxied
 unpublish
@@ -1368,6 +1453,7 @@ unsnooze
 untrusted
 upbound
 upds
+updt
 upjet
 upns
 upsell
@@ -1492,3 +1578,4 @@ zipkin
 zonemap
 zref
 zscaler
+zstd
