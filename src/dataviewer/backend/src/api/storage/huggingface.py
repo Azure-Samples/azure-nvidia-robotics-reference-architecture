@@ -279,8 +279,7 @@ class HuggingFaceHubAdapter(StorageAdapter):
         video_path = f"videos/{chunk_name}/{feature_name}/episode_{episode_index:06d}.mp4"
 
         return (
-            f"https://huggingface.co/datasets/{self.repo_id}/resolve/"
-            f"{self.revision}/{video_path}"
+            f"https://huggingface.co/datasets/{self.repo_id}/resolve/{self.revision}/{video_path}"
         )
 
     async def get_annotation(
