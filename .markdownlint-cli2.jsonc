@@ -4,6 +4,7 @@
     ".copilot-tracking/**",
     "venv/**",
     ".venv/**",
+    "**/.venv/**",
     "external/**",
     "scripts/tests/Fixtures/**"
   ],
@@ -76,6 +77,7 @@
     },
     "MD055": { "style": "consistent" },
     "MD056": true,
-    "MD058": true
+    "MD058": true,
+    "MD060": { "style": "leading_and_trailing" }
   }
 }

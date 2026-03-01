@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from training.scripts.skrl_mlflow_agent import create_mlflow_logging_wrapper
+from training.simulation_shutdown import prepare_for_shutdown
+from training.stream import install_ansi_stripping
 from training.utils import AzureMLContext, set_env_defaults
 
 _LOGGER = logging.getLogger("isaaclab.skrl")
@@ -330,7 +332,7 @@ def _namespace_snapshot(namespace: argparse.Namespace) -> tuple[dict[str, object
 
     payload: dict[str, object] = {}
     for key, value in vars(namespace).items():
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, str | int | float | bool) or value is None:
             payload[key] = value
         else:
             payload[key] = str(value)
@@ -393,7 +395,7 @@ def _configure_environment(
 
     if isinstance(env_cfg, manager_cfg_type):
         _set_num_envs_for_manager_cfg(env_cfg, cli_args.num_envs)
-    elif isinstance(env_cfg, (direct_cfg_type, direct_mar_cfg_type)):
+    elif isinstance(env_cfg, direct_cfg_type | direct_mar_cfg_type):
         _set_num_envs_for_direct_cfg(env_cfg, cli_args.num_envs)
 
     if cli_args.distributed:
@@ -418,6 +420,7 @@ def _configure_agent_training(
         trainer_cfg["timesteps"] = cli_args.max_iterations * rollouts
 
     trainer_cfg["close_environment_at_exit"] = False
+    trainer_cfg["disable_progressbar"] = False
     agent_dict["seed"] = random_seed
     return rollouts
 
@@ -830,14 +833,11 @@ def _load_training_modules(
 
 
 def _close_simulation(simulation_app: Any | None) -> None:
-    """Close simulation app and suppress expected shutdown issues."""
+    """Exit the process; Kit's shutdown hangs on vGPU nodes.
 
-    if simulation_app is None:
-        return
-    try:
-        simulation_app.close()
-    except Exception as exc:
-        _LOGGER.info("Simulation app close raised exception (expected during shutdown): %s", exc)
+    See docs/gpu-configuration.md § "Isaac Sim 4.x Shutdown Fix".
+    """
+    os._exit(0)
 
 
 def _build_run_descriptor(
@@ -970,6 +970,7 @@ def _run_hydra_training(
                 modules=modules,
             )
         finally:
+            prepare_for_shutdown()
             env.close()
 
     _launch()
@@ -1045,6 +1046,7 @@ def run_training(
     cli_args, unparsed_args = _prepare_cli_arguments(parser, args, hydra_args)
 
     app_launcher, simulation_app = _initialize_simulation(AppLauncher, cli_args, unparsed_args)
+    install_ansi_stripping()
     try:
         modules = _load_training_modules(cli_args, context)
         _run_hydra_training(

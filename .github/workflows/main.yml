@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   # Spell checking using cspell
   spell-check:
@@ -90,6 +94,13 @@ jobs:
       contents: read
       id-token: write
 
+  # Python pytest test execution
+  pytest-tests:
+    name: Pytest Tests
+    uses: ./.github/workflows/pytest-tests.yml
+    permissions:
+      contents: read
+
   # Python linting using ruff
   python-lint:
     name: Python Lint
@@ -119,6 +130,7 @@ jobs:
       - markdown-link-check
       - dependency-pinning
       - pester-tests
+      - pytest-tests
       - python-lint
       - codeql-analysis
     name: Release Please
@@ -156,6 +168,35 @@ jobs:
           # created in the next step, ensuring subsequent runs find it.
           skip-github-pull-request: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main)') }}
 
+      - name: Checkout release PR branch
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4.2.2
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+
+      - name: Setup uv
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b  # v7.3.0
+
+      - name: Regenerate uv.lock
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          uv lock
+          if git diff --quiet -- uv.lock; then
+            echo "uv.lock is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add uv.lock
+          git commit -m "chore: regenerate uv.lock"
+          git push
+
       # Workaround: release-please with "draft": true uses lazy tag
       # creation. The git tag is not materialized until the release is
       # published. Without the tag, release-please cannot find the draft
@@ -171,16 +212,17 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          TAG="${{ steps.release.outputs.tag_name }}"
-          REPO="${{ github.repository }}"
-          if ! gh api "/repos/$REPO/git/refs/tags/$TAG" --silent 2>/dev/null; then
-            gh api "/repos/$REPO/git/refs" \
-              -f "ref=refs/tags/$TAG" \
+          $tag = '${{ steps.release.outputs.tag_name }}'
+          $repo = '${{ github.repository }}'
+          $null = gh api "/repos/$repo/git/refs/tags/$tag" --silent 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            gh api "/repos/$repo/git/refs" `
+              -f "ref=refs/tags/$tag" `
               -f "sha=${{ github.sha }}"
-            echo "Created git tag $TAG -> ${{ github.sha }}"
-          else
-            echo "Git tag $TAG already exists"
-          fi
+            Write-Output "Created git tag $tag -> ${{ github.sha }}"
+          } else {
+            Write-Output "Git tag $tag already exists"
+          }
 
   # Promote draft release to published
   publish-release:
@@ -206,46 +248,48 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: gh release edit "$TAG_NAME" --draft=false --repo "$GITHUB_REPOSITORY"
+        run: gh release edit $env:TAG_NAME --draft=false --repo $env:GITHUB_REPOSITORY
 
       - name: Close released milestone
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          if ! result=$(gh api --paginate "repos/$GITHUB_REPOSITORY/milestones?per_page=100&state=all" \
-            --jq ".[] | select(.title == \"$TAG_NAME\") | \"\(.number) \(.state)\""); then
-            echo "::warning::API call failed while querying milestones for $TAG_NAME"
-            exit 0
-          fi
-
-          if [ -z "$result" ]; then
-            echo "::warning::No milestone found matching $TAG_NAME"
-            exit 0
-          fi
-
-          ms_number=$(echo "$result" | awk '{print $1}')
-          ms_state=$(echo "$result" | awk '{print $2}')
-
-          if [ "$ms_state" = "closed" ]; then
-            echo "Milestone $TAG_NAME (#$ms_number) already closed"
-            exit 0
-          fi
-
-          if ! open_issues=$(gh api "repos/$GITHUB_REPOSITORY/milestones/$ms_number" \
-            --jq '.open_issues'); then
-            echo "::warning::API call failed while querying milestone details for $TAG_NAME (#$ms_number)"
-            exit 0
-          fi
-
-          if [ "${open_issues:-0}" -gt 0 ]; then
-            echo "::warning::Milestone $TAG_NAME has $open_issues open issue(s) — triage after closure"
-          fi
-
-          gh api "repos/$GITHUB_REPOSITORY/milestones/$ms_number" \
-            --method PATCH -f state=closed || {
-            echo "::warning::Failed to close milestone $TAG_NAME (#$ms_number)"
+          $milestones = gh api --paginate "repos/$env:GITHUB_REPOSITORY/milestones?per_page=100&state=all" --jq '.[]' 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output '::warning::API call failed while querying milestones for ${{ needs.release-please.outputs.tag_name }}'
             exit 0
           }
 
-          echo "Closed milestone $TAG_NAME (#$ms_number)"
+          $match = @($milestones | ConvertFrom-Json) | Where-Object { $_.title -eq $env:TAG_NAME }
+          if (-not $match) {
+            Write-Output "::warning::No milestone found matching $env:TAG_NAME"
+            exit 0
+          }
+
+          $msNumber = $match.number
+          $msState = $match.state
+
+          if ($msState -eq 'closed') {
+            Write-Output "Milestone $env:TAG_NAME (#$msNumber) already closed"
+            exit 0
+          }
+
+          $detail = gh api "repos/$env:GITHUB_REPOSITORY/milestones/$msNumber" 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::warning::API call failed while querying milestone details for $env:TAG_NAME (#$msNumber)"
+            exit 0
+          }
+          $openIssues = ($detail | ConvertFrom-Json).open_issues
+
+          if ($openIssues -gt 0) {
+            Write-Output "::warning::Milestone $env:TAG_NAME has $openIssues open issue(s) — triage after closure"
+          }
+
+          $null = gh api "repos/$env:GITHUB_REPOSITORY/milestones/$msNumber" --method PATCH -f state=closed 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::warning::Failed to close milestone $env:TAG_NAME (#$msNumber)"
+            exit 0
+          }
+
+          Write-Output "Closed milestone $env:TAG_NAME (#$msNumber)"

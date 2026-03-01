@@ -27,6 +27,8 @@ sys.path.insert(0, str(_TRAINING_DIR))
 from isaaclab.app import AppLauncher
 
 from common import cli_args
+from training.simulation_shutdown import prepare_for_shutdown
+from training.stream import install_ansi_stripping
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
@@ -280,7 +282,7 @@ def _start_mlflow_run(
             mlflow.set_tags(tags)
         if params:
             serializable_params = {
-                k: v for k, v in params.items() if isinstance(v, (int, float, str, bool)) or v is None
+                k: v for k, v in params.items() if isinstance(v, int | float | str | bool) or v is None
             }
             mlflow.log_params(serializable_params)
         print(f"[INFO] MLflow run started: experiment='{experiment_name}', run='{run_name}'")
@@ -712,6 +714,8 @@ def main(
     if is_primary_process and mlflow_module and mlflow_run_active:
         _log_config_artifacts(mlflow_module, log_dir)
 
+    install_ansi_stripping()
+
     if is_primary_process and azure_context is not None:
         runner.log = _create_enhanced_log(runner.log, mlflow_module, mlflow_run_active, runner)
 
@@ -799,9 +803,10 @@ def main(
             mlflow_module.end_run()
 
     # close the simulator
+    prepare_for_shutdown()
     env.close()
 
 
 if __name__ == "__main__":
     main()
-    simulation_app.close()
+    os._exit(0)

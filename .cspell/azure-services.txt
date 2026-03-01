@@ -1,6 +1,9 @@
 adal
 adls
 adms
+amlarc
+azmk
+azurevpnconfig
 adminconsent
 afds
 agic
@@ -57,3 +60,5 @@ azurelinux
 servicebus
 eastu
 AADSSH
+rtxprogpu
+RTXPRO

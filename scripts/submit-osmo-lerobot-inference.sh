@@ -54,6 +54,7 @@ AZURE CONTEXT:
         --azure-workspace-name NAME   Azure ML workspace
 
 OTHER:
+        --use-local-osmo          Use local osmo-dev CLI instead of production osmo
     -h, --help                    Show this help message
 
 Values resolved: CLI > Environment variables > Terraform outputs
@@ -78,6 +79,7 @@ eval_episodes="${EVAL_EPISODES:-10}"
 eval_batch_size="${EVAL_BATCH_SIZE:-10}"
 record_video="${RECORD_VIDEO:-false}"
 register_model="${REGISTER_MODEL:-}"
+use_local_osmo=false
 
 subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
 resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
@@ -107,6 +109,7 @@ while [[ $# -gt 0 ]]; do
     --azure-subscription-id)      subscription_id="$2"; shift 2 ;;
     --azure-resource-group)       resource_group="$2"; shift 2 ;;
     --azure-workspace-name)       workspace_name="$2"; shift 2 ;;
+    --use-local-osmo)             use_local_osmo=true; shift ;;
     --)                           shift; forward_args=("$@"); break ;;
     *)                            forward_args+=("$1"); shift ;;
   esac
@@ -115,6 +118,8 @@ done
 #------------------------------------------------------------------------------
 # Validation
 #------------------------------------------------------------------------------
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools osmo
 require_tools osmo zip base64

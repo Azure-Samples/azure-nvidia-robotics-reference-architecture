@@ -18,6 +18,7 @@ workflow:
         huggingface:
           HF_TOKEN: hf_token
       environment:
+        NVIDIA_DRIVER_CAPABILITIES: "all"
         POLICY_REPO_ID: "{{ policy_repo_id }}"
         POLICY_TYPE: "{{ policy_type }}"
         DATASET_REPO_ID: "{{ dataset_repo_id }}"

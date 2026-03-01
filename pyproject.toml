@@ -1,6 +1,6 @@
 [project]
 name = "azure-nvidia-robotics-reference-architecture"
-version = "0.3.0"
+version = "0.4.0"
 description = "Azure NVIDIA Robotics Reference Architecture for Isaac Lab training"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,7 +24,14 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
 markers = []
 
 [tool.ruff]

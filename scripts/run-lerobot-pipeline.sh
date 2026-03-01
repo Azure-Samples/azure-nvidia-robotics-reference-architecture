@@ -70,6 +70,7 @@ AZURE CONTEXT:
         --azure-workspace-name NAME   Azure ML workspace
 
 GENERAL:
+        --use-local-osmo          Use local osmo-dev CLI instead of production osmo
     -h, --help                    Show this help message
 
 EXAMPLES:
@@ -128,6 +129,7 @@ skip_register=false
 poll_interval="${POLL_INTERVAL:-60}"
 timeout_mins="${TIMEOUT_MINS:-720}"
 skip_wait=false
+use_local_osmo=false
 
 subscription_id="${AZURE_SUBSCRIPTION_ID:-$(get_subscription_id)}"
 resource_group="${AZURE_RESOURCE_GROUP:-$(get_resource_group)}"
@@ -162,6 +164,7 @@ while [[ $# -gt 0 ]]; do
     --poll-interval)              poll_interval="$2"; shift 2 ;;
     --timeout)                    timeout_mins="$2"; shift 2 ;;
     --skip-wait)                  skip_wait=true; shift ;;
+    --use-local-osmo)             use_local_osmo=true; shift ;;
     --azure-subscription-id)      subscription_id="$2"; shift 2 ;;
     --azure-resource-group)       resource_group="$2"; shift 2 ;;
     --azure-workspace-name)       workspace_name="$2"; shift 2 ;;
@@ -173,6 +176,8 @@ done
 #------------------------------------------------------------------------------
 # Validation
 #------------------------------------------------------------------------------
+
+[[ "$use_local_osmo" == "true" ]] && activate_local_osmo
 
 require_tools osmo jq
 
@@ -238,6 +243,7 @@ if [[ -n "$workspace_name" ]]; then
   train_args+=(--azure-workspace-name "$workspace_name")
 fi
 
+[[ "$use_local_osmo" == "true" ]] && train_args+=(--use-local-osmo)
 [[ ${#forward_args[@]} -gt 0 ]] && train_args+=(-- "${forward_args[@]}")
 
 bash "${train_args[@]}" || fatal "Training submission failed"
@@ -335,6 +341,8 @@ else
   if [[ -n "$workspace_name" ]]; then
     eval_args+=(--azure-workspace-name "$workspace_name")
   fi
+
+  [[ "$use_local_osmo" == "true" ]] && eval_args+=(--use-local-osmo)
 
   bash "${eval_args[@]}" || fatal "Inference submission failed"
 
