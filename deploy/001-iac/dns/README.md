@@ -1,45 +1,42 @@
-# Private DNS for OSMO UI
+---
+title: Private DNS for OSMO UI
+description: Private DNS zone for OSMO UI hostname resolution on the internal load balancer
+author: Microsoft Robotics-AI Team
+ms.date: 2026-02-23
+ms.topic: how-to
+keywords:
+  - dns
+  - private-dns
+  - osmo
+---
 
-Internal DNS resolution for the OSMO UI service running on an internal LoadBalancer.
+Private DNS zone for OSMO UI hostname resolution. Maps the OSMO UI hostname to the internal LoadBalancer IP for access through VPN.
 
-## 📋 Prerequisites
+> [!NOTE]
+> Complete DNS configuration and resolution flow details are in the [Private DNS Configuration](../../../docs/deploy/dns.md) guide.
 
-- Platform infrastructure deployed (`cd .. && terraform apply`)
-- VPN Gateway deployed ([vpn/README.md](../vpn/README.md))
-- OSMO UI service running with internal LoadBalancer IP
-
-## 🚀 Usage
-
-Get the OSMO UI LoadBalancer IP from your cluster:
+## 🚀 Quick Start
 
 ```bash
-kubectl get svc -n osmo-control-plane osmo-ui -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-```
+# Get the OSMO UI LoadBalancer IP
+kubectl get svc -n osmo osmo-ui -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 
-Deploy the DNS zone:
-
-```bash
+# Deploy DNS zone with the LoadBalancer IP
 cd deploy/001-iac/dns
-terraform init
-terraform apply -var="osmo_loadbalancer_ip=10.0.x.x"
+terraform init && terraform apply -var="osmo_loadbalancer_ip=<IP_FROM_ABOVE>"
 ```
 
-## ⚙️ Configuration
+## 📖 Documentation
 
-| Variable                     | Description              | Default      |
-|------------------------------|--------------------------|--------------|
-| `osmo_loadbalancer_ip`       | Internal LoadBalancer IP | (required)   |
-| `osmo_private_dns_zone_name` | DNS zone name            | `osmo.local` |
-| `osmo_hostname`              | Hostname within zone     | `dev`        |
+| Guide                                                    | Description                                     |
+|----------------------------------------------------------|-------------------------------------------------|
+| [Private DNS Configuration](../../../docs/deploy/dns.md) | DNS zone setup, resolution flow, and validation |
 
-## 💡 How It Works
+## ➡️ Next Step
 
-1. DNS zone (e.g., `osmo.local`) is linked to the VNet
-2. A record (`dev.osmo.local`) points to the LoadBalancer IP
-3. VPN clients use the Private DNS Resolver to resolve internal names
-4. Access OSMO UI at `http://dev.osmo.local` when connected via VPN
+Proceed to [Cluster Setup](../../002-setup/).
 
-## 🔗 Related
-
-- [Parent README](../README.md) - Main infrastructure documentation
-- [vpn/README.md](../vpn/README.md) - VPN Gateway setup (required for DNS resolution)
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->
