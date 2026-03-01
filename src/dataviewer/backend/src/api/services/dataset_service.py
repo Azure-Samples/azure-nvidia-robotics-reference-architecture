@@ -95,7 +95,11 @@ class DatasetService:
                 try:
                     self._lerobot_loaders[dataset_id] = LeRobotLoader(dataset_path)
                 except Exception as e:
-                    logger.warning("Failed to create LeRobot loader for %r: %s", dataset_id, e)
+                    logger.warning(
+                        "Failed to create LeRobot loader for %r: %s",
+                        dataset_id,
+                        str(e).replace("\n", "").replace("\r", ""),
+                    )
                     return None
 
         return self._lerobot_loaders.get(dataset_id)
@@ -227,7 +231,11 @@ class DatasetService:
             return dataset_info
 
         except Exception as e:
-            logger.warning("Failed to discover LeRobot dataset %r: %s", dataset_id, e)
+            logger.warning(
+                "Failed to discover LeRobot dataset %r: %s",
+                dataset_id,
+                str(e).replace("\n", "").replace("\r", ""),
+            )
             return None
 
     async def list_datasets(self) -> list[DatasetInfo]:
@@ -345,7 +353,11 @@ class DatasetService:
                     except Exception:
                         episode_info_map[idx] = {"length": 0, "task_index": 0}
             except Exception as e:
-                logger.warning("LeRobot list_episodes failed for %r: %s", dataset_id, e)
+                logger.warning(
+                    "LeRobot list_episodes failed for %r: %s",
+                    dataset_id,
+                    str(e).replace("\n", "").replace("\r", ""),
+                )
                 episode_indices = []
 
         # Fall back to HDF5 loader
@@ -484,10 +496,10 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot load_episode failed for %r/%s: %s",
+                    "LeRobot load_episode failed for %r/%d: %s",
                     dataset_id,
-                    str(episode_idx).replace("\n", "").replace("\r", ""),
-                    e,
+                    episode_idx,
+                    str(e).replace("\n", "").replace("\r", ""),
                 )
                 # Fall through to try HDF5
 
@@ -603,10 +615,10 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot trajectory load failed for %r/%s: %s",
+                    "LeRobot trajectory load failed for %r/%d: %s",
                     dataset_id,
-                    str(episode_idx).replace("\n", "").replace("\r", ""),
-                    e,
+                    episode_idx,
+                    str(e).replace("\n", "").replace("\r", ""),
                 )
 
         # Fall back to HDF5 loader
@@ -738,12 +750,12 @@ class DatasetService:
             return buffer.getvalue()
 
         except Exception as e:
-            logger.exception(
-                "Error loading frame %s from %r/%s: %s",
-                str(frame_idx).replace("\n", "").replace("\r", ""),
+            logger.warning(
+                "Error loading frame %d from %r/%d: %s",
+                frame_idx,
                 dataset_id,
-                str(episode_idx).replace("\n", "").replace("\r", ""),
-                e,
+                episode_idx,
+                str(e).replace("\n", "").replace("\r", ""),
             )
             return None
 
@@ -764,8 +776,8 @@ class DatasetService:
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
             logger.warning(
-                "No video for episode %s camera %r",
-                str(episode_idx).replace("\n", "").replace("\r", ""),
+                "No video for episode %d camera %r",
+                episode_idx,
                 camera,
             )
             return None
@@ -775,7 +787,11 @@ class DatasetService:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             ret, frame = cap.read()
             if not ret or frame is None:
-                logger.warning("Failed to read frame %d from %s", frame_idx, video_path)
+                logger.warning(
+                    "Failed to read frame %d from %s",
+                    frame_idx,
+                    str(video_path).replace("\n", "").replace("\r", ""),
+                )
                 return None
 
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -834,7 +850,7 @@ class DatasetService:
                 if video_path is not None:
                     return str(video_path)
             except Exception as e:
-                logger.warning("Failed to get video path: %s", e)
+                logger.warning("Failed to get video path: %s", str(e).replace("\n", "").replace("\r", ""))
 
         return None
 
