@@ -79,23 +79,17 @@ class EpisodeEditRequest(BaseModel):
     cameraTransforms: dict[str, ImageTransformRequest] | None = Field(
         None, description="Per-camera transform overrides"
     )
-    removedFrames: list[int] | None = Field(
-        None, description="Frame indices to exclude"
-    )
+    removedFrames: list[int] | None = Field(None, description="Frame indices to exclude")
     insertedFrames: list[FrameInsertionRequest] | None = Field(
         None, description="Interpolated frame insertions"
     )
-    subtasks: list[SubtaskRequest] | None = Field(
-        None, description="Sub-task segments"
-    )
+    subtasks: list[SubtaskRequest] | None = Field(None, description="Sub-task segments")
 
 
 class ExportRequest(BaseModel):
     """Export request model."""
 
-    episodeIndices: list[int] = Field(
-        ..., description="Episode indices to export", min_length=1
-    )
+    episodeIndices: list[int] = Field(..., description="Episode indices to export", min_length=1)
     outputPath: str = Field(..., description="Output directory path")
     applyEdits: bool = Field(True, description="Whether to apply edit operations")
     edits: dict[int, EpisodeEditRequest] | None = Field(
@@ -163,25 +157,27 @@ async def export_episodes(
             for episode_idx, edit_req in request.edits.items():
                 # Convert string key to int (JSON keys are always strings)
                 idx = int(episode_idx) if isinstance(episode_idx, str) else episode_idx
-                edits_map[idx] = parse_edit_operations({
-                    "datasetId": dataset_id,
-                    "episodeIndex": edit_req.episodeIndex,
-                    "globalTransform": edit_req.globalTransform.model_dump()
-                    if edit_req.globalTransform
-                    else None,
-                    "cameraTransforms": {
-                        k: v.model_dump() for k, v in edit_req.cameraTransforms.items()
+                edits_map[idx] = parse_edit_operations(
+                    {
+                        "datasetId": dataset_id,
+                        "episodeIndex": edit_req.episodeIndex,
+                        "globalTransform": edit_req.globalTransform.model_dump()
+                        if edit_req.globalTransform
+                        else None,
+                        "cameraTransforms": {
+                            k: v.model_dump() for k, v in edit_req.cameraTransforms.items()
+                        }
+                        if edit_req.cameraTransforms
+                        else None,
+                        "removedFrames": edit_req.removedFrames,
+                        "insertedFrames": [i.model_dump() for i in edit_req.insertedFrames]
+                        if edit_req.insertedFrames
+                        else None,
+                        "subtasks": [s.model_dump() for s in edit_req.subtasks]
+                        if edit_req.subtasks
+                        else None,
                     }
-                    if edit_req.cameraTransforms
-                    else None,
-                    "removedFrames": edit_req.removedFrames,
-                    "insertedFrames": [i.model_dump() for i in edit_req.insertedFrames]
-                    if edit_req.insertedFrames
-                    else None,
-                    "subtasks": [s.model_dump() for s in edit_req.subtasks]
-                    if edit_req.subtasks
-                    else None,
-                })
+                )
 
         result = exporter.export_episodes(
             episode_indices=request.episodeIndices,
@@ -263,25 +259,27 @@ async def export_episodes_stream(
                 for episode_idx, edit_req in request.edits.items():
                     # Convert string key to int (JSON keys are always strings)
                     idx = int(episode_idx) if isinstance(episode_idx, str) else episode_idx
-                    edits_map[idx] = parse_edit_operations({
-                        "datasetId": dataset_id,
-                        "episodeIndex": edit_req.episodeIndex,
-                        "globalTransform": edit_req.globalTransform.model_dump()
-                        if edit_req.globalTransform
-                        else None,
-                        "cameraTransforms": {
-                            k: v.model_dump() for k, v in edit_req.cameraTransforms.items()
+                    edits_map[idx] = parse_edit_operations(
+                        {
+                            "datasetId": dataset_id,
+                            "episodeIndex": edit_req.episodeIndex,
+                            "globalTransform": edit_req.globalTransform.model_dump()
+                            if edit_req.globalTransform
+                            else None,
+                            "cameraTransforms": {
+                                k: v.model_dump() for k, v in edit_req.cameraTransforms.items()
+                            }
+                            if edit_req.cameraTransforms
+                            else None,
+                            "removedFrames": edit_req.removedFrames,
+                            "insertedFrames": [i.model_dump() for i in edit_req.insertedFrames]
+                            if edit_req.insertedFrames
+                            else None,
+                            "subtasks": [s.model_dump() for s in edit_req.subtasks]
+                            if edit_req.subtasks
+                            else None,
                         }
-                        if edit_req.cameraTransforms
-                        else None,
-                        "removedFrames": edit_req.removedFrames,
-                        "insertedFrames": [i.model_dump() for i in edit_req.insertedFrames]
-                        if edit_req.insertedFrames
-                        else None,
-                        "subtasks": [s.model_dump() for s in edit_req.subtasks]
-                        if edit_req.subtasks
-                        else None,
-                    })
+                    )
 
             # Queue for progress updates
             progress_queue: asyncio.Queue[ExportProgress | None] = asyncio.Queue()
@@ -289,6 +287,7 @@ async def export_episodes_stream(
             def progress_callback(progress: ExportProgress):
                 # Non-blocking put
                 import contextlib
+
                 with contextlib.suppress(asyncio.QueueFull):
                     progress_queue.put_nowait(progress)
 
@@ -312,12 +311,12 @@ async def export_episodes_stream(
                     )
                     if progress:
                         progress_data = {
-                            'currentEpisode': progress.current_episode,
-                            'totalEpisodes': progress.total_episodes,
-                            'currentFrame': progress.current_frame,
-                            'totalFrames': progress.total_frames,
-                            'percentage': progress.percentage,
-                            'status': progress.status,
+                            "currentEpisode": progress.current_episode,
+                            "totalEpisodes": progress.total_episodes,
+                            "currentFrame": progress.current_frame,
+                            "totalFrames": progress.total_frames,
+                            "percentage": progress.percentage,
+                            "status": progress.status,
                         }
                         yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
                 except TimeoutError:
@@ -332,12 +331,12 @@ async def export_episodes_stream(
                     progress = progress_queue.get_nowait()
                     if progress:
                         progress_data = {
-                            'currentEpisode': progress.current_episode,
-                            'totalEpisodes': progress.total_episodes,
-                            'currentFrame': progress.current_frame,
-                            'totalFrames': progress.total_frames,
-                            'percentage': progress.percentage,
-                            'status': progress.status,
+                            "currentEpisode": progress.current_episode,
+                            "totalEpisodes": progress.total_episodes,
+                            "currentFrame": progress.current_frame,
+                            "totalFrames": progress.total_frames,
+                            "percentage": progress.percentage,
+                            "status": progress.status,
                         }
                         yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
                 except asyncio.QueueEmpty:
@@ -345,15 +344,15 @@ async def export_episodes_stream(
 
             # Send completion event
             complete_data = {
-                'success': result.success,
-                'outputFiles': result.output_files,
-                'error': result.error,
-                'stats': result.stats,
+                "success": result.success,
+                "outputFiles": result.output_files,
+                "error": result.error,
+                "stats": result.stats,
             }
             yield f"event: complete\ndata: {json.dumps(complete_data)}\n\n"
 
         except ImportError as e:
-            error_msg = f'Export not available: {e}'
+            error_msg = f"Export not available: {e}"
             yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
         except Exception as e:
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"

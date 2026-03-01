@@ -15,7 +15,7 @@ A full-stack application for analyzing and annotating robotic training data from
 
 ## Installation
 
-### Backend
+### Backend Setup
 
 ```bash
 cd backend
@@ -28,7 +28,7 @@ source .venv/bin/activate
 uv pip install -e ".[dev,analysis,export]"
 ```
 
-### Frontend
+### Frontend Setup
 
 ```bash
 cd frontend
@@ -56,6 +56,7 @@ HMI_DATA_PATH=/path/to/your/datasets
 This launches both backend and frontend in the correct order, with health checking and graceful shutdown.
 
 **Options:**
+
 ```bash
 ./start.sh --backend   # Start backend only
 ./start.sh --frontend  # Start frontend only
@@ -63,6 +64,7 @@ This launches both backend and frontend in the correct order, with health checki
 ```
 
 **Environment variables:**
+
 - `BACKEND_PORT` - Backend port (default: 8000)
 - `FRONTEND_PORT` - Frontend port (default: 5173)
 
@@ -83,11 +85,11 @@ cd frontend
 npm run dev
 ```
 
-The application will be available at **http://localhost:5173**
+The application will be available at `http://localhost:5173`.
 
 ## Development
 
-### Backend
+### Backend Development
 
 ```bash
 # Run tests
@@ -98,7 +100,7 @@ pytest
 ruff check src/
 ```
 
-### Frontend
+### Frontend Development
 
 ```bash
 cd frontend
@@ -109,6 +111,7 @@ npm run build
 ## API Documentation
 
 Once the backend is running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- Health check: http://localhost:8000/health
+
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- Health check: `http://localhost:8000/health`

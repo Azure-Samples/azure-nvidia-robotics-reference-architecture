@@ -124,8 +124,7 @@ class LeRobotLoader:
         """
         if not PARQUET_AVAILABLE:
             raise ImportError(
-                "LeRobot support requires pyarrow package. "
-                "Install with: pip install pyarrow"
+                "LeRobot support requires pyarrow package. Install with: pip install pyarrow"
             )
 
         self.base_path = Path(base_path)
@@ -218,9 +217,7 @@ class LeRobotLoader:
                                     episodes_in_file = df["episode_index"].unique()
                                     if episode_index in episodes_in_file:
                                         chunk_num = int(chunk_dir.name.split("-")[1])
-                                        file_num = int(
-                                            parquet_file.stem.split("-")[1]
-                                        )
+                                        file_num = int(parquet_file.stem.split("-")[1])
                                         self._episode_index_cache[episode_index] = (
                                             chunk_num,
                                             file_num,
@@ -229,9 +226,7 @@ class LeRobotLoader:
                             except Exception:
                                 continue
 
-            raise LeRobotLoaderError(
-                f"No data file found for episode {episode_index}"
-            )
+            raise LeRobotLoaderError(f"No data file found for episode {episode_index}")
 
         self._episode_index_cache[episode_index] = (chunk_idx, file_idx)
         return chunk_idx, file_idx
@@ -240,9 +235,7 @@ class LeRobotLoader:
         self, template: str, chunk_index: int, file_index: int, video_key: str = ""
     ) -> str:
         """Format a path template with indices."""
-        return template.format(
-            chunk_index=chunk_index, file_index=file_index, video_key=video_key
-        )
+        return template.format(chunk_index=chunk_index, file_index=file_index, video_key=video_key)
 
     def list_episodes(self) -> list[int]:
         """
@@ -283,9 +276,7 @@ class LeRobotLoader:
                 df = df[df["episode_index"] == episode_index]
 
             if df.empty:
-                raise LeRobotLoaderError(
-                    f"Episode {episode_index} not found in {full_path}"
-                )
+                raise LeRobotLoaderError(f"Episode {episode_index} not found in {full_path}")
 
             # Sort by frame_index
             if "frame_index" in df.columns:
@@ -302,9 +293,7 @@ class LeRobotLoader:
 
             # Extract frame indices
             frame_indices = (
-                df["frame_index"].values
-                if "frame_index" in df.columns
-                else np.arange(length)
+                df["frame_index"].values if "frame_index" in df.columns else np.arange(length)
             )
 
             # Extract observation state (joint positions)
@@ -332,9 +321,7 @@ class LeRobotLoader:
                 actions = np.zeros_like(joint_positions)
 
             # Get task index
-            task_index = (
-                int(df["task_index"].iloc[0]) if "task_index" in df.columns else 0
-            )
+            task_index = int(df["task_index"].iloc[0]) if "task_index" in df.columns else 0
 
             # Find video paths
             video_paths: dict[str, Path] = {}
@@ -368,9 +355,7 @@ class LeRobotLoader:
         except LeRobotLoaderError:
             raise
         except Exception as e:
-            raise LeRobotLoaderError(
-                f"Failed to load episode {episode_index}: {e}", cause=e
-            )
+            raise LeRobotLoaderError(f"Failed to load episode {episode_index}: {e}", cause=e)
 
     def get_episode_info(self, episode_index: int) -> dict[str, Any]:
         """
@@ -397,9 +382,7 @@ class LeRobotLoader:
                 df = df[df["episode_index"] == episode_index]
 
             length = len(df)
-            task_index = (
-                int(df["task_index"].iloc[0]) if "task_index" in df.columns else 0
-            )
+            task_index = int(df["task_index"].iloc[0]) if "task_index" in df.columns else 0
 
             # Find cameras from video features
             cameras: list[str] = []
@@ -421,9 +404,7 @@ class LeRobotLoader:
                 f"Failed to get info for episode {episode_index}: {e}", cause=e
             )
 
-    def get_video_path(
-        self, episode_index: int, camera_key: str
-    ) -> Path | None:
+    def get_video_path(self, episode_index: int, camera_key: str) -> Path | None:
         """
         Get the video file path for an episode and camera.
 
@@ -437,9 +418,7 @@ class LeRobotLoader:
         info = self._load_info()
         chunk_idx, file_idx = self._find_episode_location(episode_index)
 
-        video_rel_path = self._format_path(
-            info.video_path, chunk_idx, file_idx, camera_key
-        )
+        video_rel_path = self._format_path(info.video_path, chunk_idx, file_idx, camera_key)
         video_full_path = self.base_path / video_rel_path
 
         if video_full_path.exists():

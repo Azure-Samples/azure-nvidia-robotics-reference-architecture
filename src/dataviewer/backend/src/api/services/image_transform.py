@@ -109,17 +109,13 @@ def apply_crop(
     if crop.x < 0 or crop.y < 0:
         raise ImageTransformError(f"Crop offset cannot be negative: ({crop.x}, {crop.y})")
     if crop.x + crop.width > w:
-        raise ImageTransformError(
-            f"Crop width exceeds image bounds: {crop.x} + {crop.width} > {w}"
-        )
+        raise ImageTransformError(f"Crop width exceeds image bounds: {crop.x} + {crop.width} > {w}")
     if crop.y + crop.height > h:
         raise ImageTransformError(
             f"Crop height exceeds image bounds: {crop.y} + {crop.height} > {h}"
         )
     if crop.width <= 0 or crop.height <= 0:
-        raise ImageTransformError(
-            f"Crop dimensions must be positive: {crop.width}x{crop.height}"
-        )
+        raise ImageTransformError(f"Crop dimensions must be positive: {crop.width}x{crop.height}")
 
     # Apply crop using NumPy slicing
     return frame[crop.y : crop.y + crop.height, crop.x : crop.x + crop.width]
@@ -144,14 +140,11 @@ def apply_resize(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for resize operations. "
-            "Install with: pip install Pillow"
+            "PIL (Pillow) is required for resize operations. Install with: pip install Pillow"
         )
 
     if size.width <= 0 or size.height <= 0:
-        raise ImageTransformError(
-            f"Resize dimensions must be positive: {size.width}x{size.height}"
-        )
+        raise ImageTransformError(f"Resize dimensions must be positive: {size.width}x{size.height}")
 
     try:
         # Convert to PIL Image
@@ -189,8 +182,7 @@ def apply_brightness(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. "
-            "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
@@ -222,8 +214,7 @@ def apply_contrast(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. "
-            "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
@@ -255,8 +246,7 @@ def apply_saturation(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. "
-            "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
@@ -319,14 +309,11 @@ def apply_hue_rotation(
     """
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. "
-            "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     if frame.ndim != 3 or frame.shape[2] != 3:
-        raise ImageTransformError(
-            f"Hue rotation requires RGB image, got shape: {frame.shape}"
-        )
+        raise ImageTransformError(f"Hue rotation requires RGB image, got shape: {frame.shape}")
 
     try:
         pil_image = Image.fromarray(frame)
@@ -368,8 +355,7 @@ def apply_color_filter(
 
     if not PIL_AVAILABLE:
         raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. "
-            "Install with: pip install Pillow"
+            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
         )
 
     try:
@@ -380,11 +366,13 @@ def apply_color_filter(
 
         elif filter_name == "sepia":
             # Sepia transformation matrix
-            sepia_matrix = np.array([
-                [0.393, 0.769, 0.189],
-                [0.349, 0.686, 0.168],
-                [0.272, 0.534, 0.131],
-            ])
+            sepia_matrix = np.array(
+                [
+                    [0.393, 0.769, 0.189],
+                    [0.349, 0.686, 0.168],
+                    [0.272, 0.534, 0.131],
+                ]
+            )
             sepia_frame = frame.astype(np.float32)
             # Apply sepia transformation
             result = np.dot(sepia_frame[..., :3], sepia_matrix.T)
@@ -551,6 +539,7 @@ def apply_camera_transforms(
         def camera_progress(current: int, total: int) -> None:
             if progress_callback:
                 progress_callback(cam, current, total)
+
         return camera_progress
 
     for camera, frames in images.items():

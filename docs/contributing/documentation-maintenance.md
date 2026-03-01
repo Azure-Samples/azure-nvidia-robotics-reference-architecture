@@ -2,7 +2,7 @@
 title: Documentation Maintenance Policy
 description: Update triggers, ownership, review criteria, freshness policy, and release lifecycle for project documentation
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-11
+ms.date: 2026-02-25
 ms.topic: reference
 keywords:
   - documentation
@@ -20,12 +20,12 @@ Documentation accuracy directly affects deployment success and contributor confi
 
 Documentation updates are required when changes affect what users read, follow, or depend on.
 
-| Trigger Category                           | Examples                                                           |
-|--------------------------------------------|--------------------------------------------------------------------|
-| API, CLI, or configuration schema changes  | New Terraform variable, changed Helm value, updated script flag    |
-| Deployment steps or prerequisites          | New Azure provider registration, changed kubectl version, new tool |
-| Feature additions, deprecations, removals  | New training workflow, deprecated OSMO backend, removed script     |
-| User-reported gaps                         | Confusing instructions, missing steps, outdated screenshots        |
+| Trigger Category                          | Examples                                                           |
+|-------------------------------------------|--------------------------------------------------------------------|
+| API, CLI, or configuration schema changes | New Terraform variable, changed Helm value, updated script flag    |
+| Deployment steps or prerequisites         | New Azure provider registration, changed kubectl version, new tool |
+| Feature additions, deprecations, removals | New training workflow, deprecated OSMO backend, removed script     |
+| User-reported gaps                        | Confusing instructions, missing steps, outdated screenshots        |
 
 When a code PR introduces any of these changes, the author must update affected documentation in the same PR or file a documentation issue referencing the PR.
 
@@ -33,15 +33,15 @@ When a code PR introduces any of these changes, the author must update affected 
 
 Documentation ownership maps areas to responsible teams. The `.github/CODEOWNERS` file configures automatic review requests for code owners.
 
-| Area                                           | Owner                                                       |
-|------------------------------------------------|-------------------------------------------------------------|
-| `/docs/**/*.md`                                | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
-| `/deploy/**/README.md`                         | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
-| `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md` | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
-| Root `README.md`                               | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`)  |
+| Area                                           | Owner                                                      |
+|------------------------------------------------|------------------------------------------------------------|
+| `/docs/**/*.md`                                | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`) |
+| `/deploy/**/README.md`                         | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`) |
+| `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md` | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`) |
+| Root `README.md`                               | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`) |
 
 > [!TIP]
-> Full role definitions and governance structure are planned for v0.6.0 (issues #98 and #99). Current CODEOWNERS configuration uses the `@Azure-Samples/edge-ai-core-dev` team as code owners for all documentation paths.
+> Full role definitions and governance structure are tracked in [#98](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/98) and [#99](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/99). Current CODEOWNERS configuration uses the `@Azure-Samples/edge-ai-core-dev` team as code owners for all documentation paths.
 
 ## Review Process
 
@@ -136,3 +136,8 @@ Breaking changes require explicit communication and migration support:
 * [Pull Request Process](pull-request-process.md) - PR workflow, reviewer assignment, approval criteria
 * [Contributing Guide](README.md) - Prerequisites, workflow, commit messages
 * [Documentation Issue Template](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new?template=05-documentation.yml) - Report stale or inaccurate content
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

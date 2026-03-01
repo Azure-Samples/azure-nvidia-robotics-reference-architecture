@@ -19,10 +19,12 @@ __all__ = [
 def get_azure_adapter():
     """Get the Azure Blob Storage adapter (requires azure-storage-blob)."""
     from .azure import AzureBlobStorageAdapter
+
     return AzureBlobStorageAdapter
 
 
 def get_huggingface_adapter():
     """Get the Hugging Face Hub adapter (requires huggingface_hub)."""
     from .huggingface import HuggingFaceHubAdapter
+
     return HuggingFaceHubAdapter

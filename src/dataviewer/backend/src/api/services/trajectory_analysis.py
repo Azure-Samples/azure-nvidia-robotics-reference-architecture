@@ -114,9 +114,7 @@ class TrajectoryAnalyzer:
         correction_count = self._count_corrections(velocity)
 
         # Determine flags
-        flags = self._determine_flags(
-            smoothness, jitter, hesitation_count, correction_count
-        )
+        flags = self._determine_flags(smoothness, jitter, hesitation_count, correction_count)
 
         # Compute overall score
         overall_score = self._compute_overall_score(
@@ -192,14 +190,14 @@ class TrajectoryAnalyzer:
 
             # FFT of velocity
             n = len(vel_magnitude)
-            freq_spectrum = np.abs(scipy_fft.fft(vel_magnitude))[:n // 2]
+            freq_spectrum = np.abs(scipy_fft.fft(vel_magnitude))[: n // 2]
 
             # Estimate sample rate
             avg_dt = np.mean(np.diff(timestamps[: len(velocity) + 1]))
             if avg_dt <= 0:
                 avg_dt = 1.0 / 30.0  # Default 30 FPS
 
-            frequencies = scipy_fft.fftfreq(n, avg_dt)[:n // 2]
+            frequencies = scipy_fft.fftfreq(n, avg_dt)[: n // 2]
 
             # High frequency power (above threshold)
             high_freq_mask = np.abs(frequencies) > self.jitter_frequency_threshold

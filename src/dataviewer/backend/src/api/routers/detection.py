@@ -36,15 +36,23 @@ async def run_detection(
     returns detection results with bounding boxes and class labels.
     Results are cached for subsequent retrieval.
     """
-    print(f"\n{'='*60}", file=sys.stderr, flush=True)
-    print(f"[API] POST /detect called: dataset={dataset_id}, episode={episode_idx}", file=sys.stderr, flush=True)
-    print(f"[API] Request: model={request.model}, confidence={request.confidence}", file=sys.stderr, flush=True)
-    print(f"{'='*60}", file=sys.stderr, flush=True)
-    
+    print(f"\n{'=' * 60}", file=sys.stderr, flush=True)
+    print(
+        f"[API] POST /detect called: dataset={dataset_id}, episode={episode_idx}",
+        file=sys.stderr,
+        flush=True,
+    )
+    print(
+        f"[API] Request: model={request.model}, confidence={request.confidence}",
+        file=sys.stderr,
+        flush=True,
+    )
+    print(f"{'=' * 60}", file=sys.stderr, flush=True)
+
     # Validate episode exists
     episode = await dataset_service.get_episode(dataset_id, episode_idx)
     if episode is None:
-        print(f"[API] ERROR: Episode not found", file=sys.stderr, flush=True)
+        print("[API] ERROR: Episode not found", file=sys.stderr, flush=True)
         raise HTTPException(
             status_code=404,
             detail=f"Episode {episode_idx} not found in dataset '{dataset_id}'",

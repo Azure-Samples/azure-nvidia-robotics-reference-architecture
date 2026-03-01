@@ -14,7 +14,7 @@ OSMO handles workflow orchestration and job scheduling while Azure provides elas
   - Automatic metric logging from SKRL agents to Azure ML
   - Comprehensive tracking of episode statistics, losses, optimization metrics, and timing data
   - Configurable logging intervals and metric filtering
-  - See [MLflow Integration Guide](docs/mlflow-integration.md) for details
+  - See [MLflow Integration Guide](docs/training/mlflow-integration.md) for details
 - **Scalable Compute** - Auto-scaling GPU nodes based on workload demands
 - **Cost Optimization** - Pay-per-use compute with automatic scaling
 - **Enterprise Security** - Entra ID integration
@@ -181,7 +181,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 Review security guidance before deploying this reference architecture:
 
 - [SECURITY.md](SECURITY.md) - vulnerability reporting and security considerations for deployers
-- [Security Guide](docs/security-guide.md) - detailed security configuration inventory, deployment responsibilities, and checklist
+- [Security Documentation](docs/security/README.md) - threat model, security guide, and deployment responsibilities
 
 ## 🤝 Support
 

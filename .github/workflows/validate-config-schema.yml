@@ -1,0 +1,56 @@
+name: Validate Config Schema
+
+on:
+  pull_request:
+    paths:
+      - 'src/common/config_models.py'
+      - 'config/recording_config.schema.json'
+      - 'config/generate_config_schema.py'
+  push:
+    branches: [main]
+    paths:
+      - 'src/common/config_models.py'
+      - 'config/recording_config.schema.json'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-schema:
+    name: Validate Config Schema Synchronization
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pydantic
+
+      - name: Regenerate schema
+        run: PYTHONPATH=. python config/generate_config_schema.py
+
+      - name: Check for schema drift
+        run: |
+          if ! git diff --exit-code config/recording_config.schema.json; then
+            echo ""
+            echo "❌ Error: Schema is out of sync with pydantic models"
+            echo ""
+            echo "The JSON Schema file does not match the current pydantic models."
+            echo "If the models have changed intentionally, regenerate the schema by running the following command locally:"
+            echo ""
+            echo "  pip install pydantic && PYTHONPATH=. python config/generate_config_schema.py"
+            echo ""
+            echo "Then commit the updated schema file."
+            echo ""
+            exit 1
+          fi
+          echo "✅ Config schema is up-to-date with pydantic models"

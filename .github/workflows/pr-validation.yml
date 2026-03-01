@@ -108,6 +108,12 @@ jobs:
     permissions:
       contents: read
 
+  # Python pytest test execution
+  pytest-tests:
+    name: Pytest Tests
+    uses: ./.github/workflows/pytest-tests.yml
+    permissions:
+      contents: read
   # Python linting using ruff
   python-lint:
     name: Python Lint

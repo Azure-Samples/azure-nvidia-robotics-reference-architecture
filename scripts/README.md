@@ -11,7 +11,7 @@ Submission scripts for training and validation workflows on Azure ML and OSMO pl
 ## 📜 Submission Scripts
 
 | Script                               | Purpose                                             | Platform |
-| ------------------------------------ | --------------------------------------------------- | -------- |
+|--------------------------------------|-----------------------------------------------------|----------|
 | `submit-azureml-training.sh`         | Package code and submit Azure ML training job       | Azure ML |
 | `submit-azureml-validation.sh`       | Submit model validation job                         | Azure ML |
 | `submit-azureml-lerobot-training.sh` | Submit LeRobot training to Azure ML                 | Azure ML |
@@ -78,8 +78,8 @@ Values resolve in order: **CLI arguments → environment variables → Terraform
 | Option                         | Default                            | Description                                     | Source                                  |
 |--------------------------------|------------------------------------|-------------------------------------------------|-----------------------------------------|
 | `--environment-name`           | `isaaclab-training-env`            | AzureML environment name                        | CLI                                     |
-| `--environment-version`        | `2.2.0`                            | AzureML environment version                     | CLI                                     |
-| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                                 | CLI                                     |
+| `--environment-version`        | `2.3.2`                            | AzureML environment version                     | CLI                                     |
+| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.3.2`   | Container image                                 | CLI                                     |
 | `--assets-only`                | `false`                            | Register environment without submitting a job   | CLI                                     |
 | `--job-file` / `-w`            | `workflows/azureml/train.yaml`     | Job YAML template                               | CLI                                     |
 | `--task` / `-t`                | `Isaac-Velocity-Rough-Anymal-C-v0` | IsaacLab task                                   | `TASK`                                  |
@@ -122,8 +122,8 @@ Example:
 | `--model-name`          | derived from task                  | Azure ML model name                              | CLI                           |
 | `--model-version`       | `latest`                           | Azure ML model version                           | CLI                           |
 | `--environment-name`    | `isaaclab-training-env`            | AzureML environment name                         | CLI                           |
-| `--environment-version` | `2.2.0`                            | AzureML environment version                      | CLI                           |
-| `--image`               | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                                  | CLI                           |
+| `--environment-version` | `2.3.2`                            | AzureML environment version                      | CLI                           |
+| `--image`               | `nvcr.io/nvidia/isaac-lab:2.3.2`   | Container image                                  | CLI                           |
 | `--task`                | `Isaac-Velocity-Rough-Anymal-C-v0` | Override task ID                                 | `TASK`                        |
 | `--framework`           | unset                              | Override framework                               | CLI                           |
 | `--eval-episodes`       | `100`                              | Evaluation episodes                              | CLI                           |
@@ -158,7 +158,7 @@ Example:
 | `--task` / `-t`                | `Isaac-Velocity-Rough-Anymal-C-v0` | IsaacLab task                                    | `TASK`                        |
 | `--num-envs` / `-n`            | `2048`                             | Number of parallel environments                  | `NUM_ENVS`                    |
 | `--max-iterations` / `-m`      | unset                              | Max iterations (empty to unset)                  | `MAX_ITERATIONS`              |
-| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                                  | `IMAGE`                       |
+| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.3.2`   | Container image                                  | `IMAGE`                       |
 | `--payload-root` / `-p`        | `/workspace/isaac_payload`         | Runtime extraction root                          | `PAYLOAD_ROOT`                |
 | `--backend` / `-b`             | `skrl`                             | Training backend: `skrl` (default), `rsl_rl`     | `TRAINING_BACKEND`            |
 | `--checkpoint-uri` / `-c`      | unset                              | MLflow checkpoint artifact URI                   | `CHECKPOINT_URI`              |
@@ -189,7 +189,7 @@ Example:
 | `--task` / `-t`                | `Isaac-Velocity-Rough-Anymal-C-v0`  | IsaacLab task                                    | `TASK`                        |
 | `--num-envs` / `-n`            | `2048`                              | Number of parallel environments                  | `NUM_ENVS`                    |
 | `--max-iterations` / `-m`      | unset                               | Max iterations (empty to unset)                  | `MAX_ITERATIONS`              |
-| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.2.0`    | Container image                                  | `IMAGE`                       |
+| `--image` / `-i`               | `nvcr.io/nvidia/isaac-lab:2.3.2`    | Container image                                  | `IMAGE`                       |
 | `--backend` / `-b`             | `skrl`                              | Training backend: `skrl` (default), `rsl_rl`     | `TRAINING_BACKEND`            |
 | `--dataset-bucket`             | `training`                          | OSMO bucket name                                 | `OSMO_DATASET_BUCKET`         |
 | `--dataset-name`               | `training-code`                     | Dataset name (auto-versioned)                    | `OSMO_DATASET_NAME`           |
@@ -238,7 +238,7 @@ The `submit-osmo-dataset-training.sh` script uploads `src/training/` as a versio
 ### Dataset Parameters
 
 | Parameter          | Default         | Description                   |
-| ------------------ | --------------- | ----------------------------- |
+|--------------------|-----------------|-------------------------------|
 | `--dataset-bucket` | `training`      | OSMO bucket for training code |
 | `--dataset-name`   | `training-code` | Dataset name (auto-versioned) |
 | `--training-path`  | `src/training`  | Local folder to upload        |
@@ -247,7 +247,7 @@ The script stages files to exclude `__pycache__` and build artifacts via `.amlig
 
 ## 🤖 LeRobot Behavioral Cloning
 
-The `submit-osmo-lerobot-training.sh` script submits LeRobot training workflows supporting ACT and Diffusion policy architectures. Uses HuggingFace Hub datasets and installs LeRobot dynamically at runtime.
+The `submit-osmo-lerobot-training.sh` script submits LeRobot training workflows supporting ACT and Diffusion policy architectures. Uses HuggingFace Hub datasets and installs runtime dependencies from `src/training/lerobot/pyproject.toml`.
 
 ### LeRobot Submission Examples
 
@@ -273,7 +273,7 @@ The `submit-osmo-lerobot-training.sh` script submits LeRobot training workflows 
 ### LeRobot Parameters
 
 | Parameter           | Default                | Description                        |
-| ------------------- | ---------------------- | ---------------------------------- |
+|---------------------|------------------------|------------------------------------|
 | `--dataset-repo-id` | (required)             | HuggingFace dataset repository ID  |
 | `--policy-type`     | `act`                  | Policy: `act`, `diffusion`         |
 | `--job-name`        | `lerobot-act-training` | Job identifier                     |
@@ -308,7 +308,7 @@ The `submit-osmo-lerobot-inference.sh` script evaluates trained LeRobot policies
 ### Inference Parameters
 
 | Parameter           | Default    | Description                          |
-| ------------------- | ---------- | ------------------------------------ |
+|---------------------|------------|--------------------------------------|
 | `--policy-repo-id`  | (required) | HuggingFace policy repository        |
 | `--policy-type`     | `act`      | Policy: `act`, `diffusion`           |
 | `--eval-episodes`   | `10`       | Number of evaluation episodes        |
@@ -317,7 +317,7 @@ The `submit-osmo-lerobot-inference.sh` script evaluates trained LeRobot policies
 
 ## 🏢 AzureML LeRobot Training
 
-The `submit-azureml-lerobot-training.sh` script submits LeRobot training directly to Azure ML instead of OSMO. Registers an environment, builds an inline training command, and submits via `az ml job create`.
+The `submit-azureml-lerobot-training.sh` script submits LeRobot training directly to Azure ML instead of OSMO. It registers an environment, compiles runtime dependencies from `src/training/lerobot/pyproject.toml`, and submits via `az ml job create`.
 
 ### AzureML LeRobot Examples
 
@@ -345,7 +345,7 @@ The `run-lerobot-pipeline.sh` script orchestrates the full LeRobot lifecycle: tr
 ### Pipeline Stages
 
 | Stage | Action                                | Script Used                        |
-| ----- | ------------------------------------- | ---------------------------------- |
+|-------|---------------------------------------|------------------------------------|
 | 1     | Submit training workflow              | `submit-osmo-lerobot-training.sh`  |
 | 2     | Poll workflow status until completion | `osmo workflow status`             |
 | 3     | Submit inference/evaluation workflow  | `submit-osmo-lerobot-inference.sh` |
@@ -382,7 +382,7 @@ The `run-lerobot-pipeline.sh` script orchestrates the full LeRobot lifecycle: tr
 ### Pipeline Parameters
 
 | Parameter           | Default     | Description                      |
-| ------------------- | ----------- | -------------------------------- |
+|---------------------|-------------|----------------------------------|
 | `--dataset-repo-id` | (required)  | HuggingFace dataset repository   |
 | `--policy-repo-id`  | (required*) | HuggingFace policy target repo   |
 | `--policy-type`     | `act`       | Policy: `act`, `diffusion`       |
@@ -397,7 +397,7 @@ The `run-lerobot-pipeline.sh` script orchestrates the full LeRobot lifecycle: tr
 Scripts resolve values in order: CLI arguments → environment variables → Terraform outputs.
 
 | Variable                 | Description                      |
-| ------------------------ | -------------------------------- |
+|--------------------------|----------------------------------|
 | `AZURE_SUBSCRIPTION_ID`  | Azure subscription               |
 | `AZURE_RESOURCE_GROUP`   | Resource group name              |
 | `AZUREML_WORKSPACE_NAME` | ML workspace name                |
@@ -411,7 +411,7 @@ Scripts resolve values in order: CLI arguments → environment variables → Ter
 ## 📚 Library
 
 | File                       | Purpose                                        |
-| -------------------------- | ---------------------------------------------- |
+|----------------------------|------------------------------------------------|
 | `lib/terraform-outputs.sh` | Shared functions for reading Terraform outputs |
 
 Source the library to use helper functions:
@@ -426,7 +426,12 @@ get_azureml_workspace  # Returns ML workspace name
 ## 🔗 Related Documentation
 
 | Resource                                  | Description                                        |
-| ----------------------------------------- | -------------------------------------------------- |
+|-------------------------------------------|----------------------------------------------------|
 | [workflows/](../workflows/)               | YAML templates for training and validation jobs    |
 | [workflows/osmo/](../workflows/osmo/)     | OSMO workflow templates including dataset training |
 | [deploy/002-setup/](../deploy/002-setup/) | Cluster configuration and OSMO deployment          |
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->

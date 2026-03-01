@@ -57,13 +57,13 @@ to your environment.
 
 ### What This Architecture Includes
 
-| Included Configuration      | Description                                    | Your Responsibility                                                 |
-|-----------------------------|------------------------------------------------|---------------------------------------------------------------------|
-| Private AKS cluster option  | Enabled by default via Terraform variable      | Evaluate whether private mode meets your network requirements       |
-| Managed identities          | User-assigned identity for AKS                 | Review identity permissions and scope for your workloads            |
-| Azure Key Vault integration | Key Vault CSI driver configured                | Manage secret lifecycle, rotation, and access policies              |
-| Kubernetes network policies | Azure CNI with network policy support enabled  | Define and maintain policies appropriate for your workloads         |
-| Workload identity           | Federated credential configuration for OSMO    | Verify audience restrictions and token scoping for your environment |
+| Included Configuration      | Description                                   | Your Responsibility                                                 |
+|-----------------------------|-----------------------------------------------|---------------------------------------------------------------------|
+| Private AKS cluster option  | Enabled by default via Terraform variable     | Evaluate whether private mode meets your network requirements       |
+| Managed identities          | User-assigned identity for AKS                | Review identity permissions and scope for your workloads            |
+| Azure Key Vault integration | Key Vault CSI driver configured               | Manage secret lifecycle, rotation, and access policies              |
+| Kubernetes network policies | Azure CNI with network policy support enabled | Define and maintain policies appropriate for your workloads         |
+| Workload identity           | Federated credential configuration for OSMO   | Verify audience restrictions and token scoping for your environment |
 
 ### What This Architecture Does Not Include
 
@@ -91,10 +91,13 @@ You are responsible for all security decisions in your deployment:
 
 Refer to official [Azure security documentation](https://learn.microsoft.com/azure/security/) for authoritative, current guidance.
 
+## Security Documentation
+
+For comprehensive security documentation including threat models and deployment security guidance, see [Security Documentation](docs/security/README.md).
+
 ## Additional Resources
 
 <!-- cspell:words deployers -->
 
-- [Security Guide for Deployers](docs/security-guide.md) - detailed security configuration inventory and deployment checklist
 - [Azure security documentation](https://learn.microsoft.com/azure/security/) - authoritative security guidance for Azure services
 - [AKS baseline architecture](https://learn.microsoft.com/azure/architecture/reference-architectures/containers/aks/baseline-aks) - production-ready AKS security patterns

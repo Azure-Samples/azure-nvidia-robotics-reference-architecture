@@ -5,8 +5,6 @@ Tests trajectory analysis, anomaly detection, and annotation suggestion
 endpoints with trajectory data extracted from the real dataset.
 """
 
-import os
-
 import numpy as np
 import pytest
 
@@ -16,8 +14,10 @@ from src.api.services.trajectory_analysis import TrajectoryAnalyzer
 
 
 @pytest.fixture(scope="module")
-def loader(dataset_base_path, dataset_id):
-    return LeRobotLoader(os.path.join(dataset_base_path, dataset_id))
+def loader(test_dataset_path, test_dataset_id):
+    import os
+
+    return LeRobotLoader(os.path.join(test_dataset_path, test_dataset_id))
 
 
 @pytest.fixture(scope="module")
@@ -30,9 +30,7 @@ class TestTrajectoryAnalyzer:
 
     def test_analyze_returns_metrics(self, episode_data):
         analyzer = TrajectoryAnalyzer()
-        metrics = analyzer.analyze(
-            episode_data.joint_positions, episode_data.timestamps
-        )
+        metrics = analyzer.analyze(episode_data.joint_positions, episode_data.timestamps)
         assert 0 <= metrics.smoothness <= 1
         assert 0 <= metrics.efficiency <= 1
         assert 0 <= metrics.jitter <= 1
@@ -43,9 +41,7 @@ class TestTrajectoryAnalyzer:
 
     def test_smoothness_nonzero(self, episode_data):
         analyzer = TrajectoryAnalyzer()
-        metrics = analyzer.analyze(
-            episode_data.joint_positions, episode_data.timestamps
-        )
+        metrics = analyzer.analyze(episode_data.joint_positions, episode_data.timestamps)
         assert metrics.smoothness > 0
 
     def test_short_trajectory(self):
@@ -71,16 +67,12 @@ class TestAnomalyDetector:
 
     def test_detect_returns_list(self, episode_data):
         detector = AnomalyDetector()
-        anomalies = detector.detect(
-            episode_data.joint_positions, episode_data.timestamps
-        )
+        anomalies = detector.detect(episode_data.joint_positions, episode_data.timestamps)
         assert isinstance(anomalies, list)
 
     def test_anomaly_fields(self, episode_data):
         detector = AnomalyDetector()
-        anomalies = detector.detect(
-            episode_data.joint_positions, episode_data.timestamps
-        )
+        anomalies = detector.detect(episode_data.joint_positions, episode_data.timestamps)
         for a in anomalies:
             assert a.frame_range[0] <= a.frame_range[1]
             assert 0 <= a.confidence <= 1

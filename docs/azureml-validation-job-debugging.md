@@ -1,7 +1,7 @@
 # AzureML Validation Job Debugging Summary
 
 **Date**: December 3, 2025
-**Branch**: `feat/azurml-job-support`
+**Branch**: `feat/azureml-job-support`
 **Status**: 🔄 In Progress - Blocked on Storage Authentication
 
 ## Objective

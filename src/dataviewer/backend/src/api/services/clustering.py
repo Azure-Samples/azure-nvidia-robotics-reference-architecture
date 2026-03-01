@@ -90,9 +90,7 @@ class EpisodeClusterer:
             return ClusteringResult(
                 num_clusters=1,
                 assignments=[
-                    ClusterAssignment(
-                        episode_index=i, cluster_id=0, similarity_score=1.0
-                    )
+                    ClusterAssignment(episode_index=i, cluster_id=0, similarity_score=1.0)
                     for i in range(len(trajectories))
                 ],
                 cluster_sizes={0: len(trajectories)},
@@ -114,9 +112,7 @@ class EpisodeClusterer:
 
             # Find optimal number of clusters
             if num_clusters is None:
-                num_clusters = self._find_optimal_clusters(
-                    features_normalized, silhouette_score
-                )
+                num_clusters = self._find_optimal_clusters(features_normalized, silhouette_score)
 
             # Perform clustering
             clustering = AgglomerativeClustering(
@@ -142,9 +138,7 @@ class EpisodeClusterer:
 
                 if len(cluster_features) > 0:
                     centroid = np.mean(cluster_features, axis=0)
-                    distances = np.linalg.norm(
-                        cluster_features - centroid, axis=1
-                    )
+                    distances = np.linalg.norm(cluster_features - centroid, axis=1)
                     max_dist = np.max(distances) if np.max(distances) > 0 else 1.0
                     similarities = 1.0 - (distances / (max_dist + 1e-10))
 
@@ -192,9 +186,7 @@ class EpisodeClusterer:
 
         # Per-joint statistics
         for j in range(min(num_joints, 7)):  # Limit to 7 joints
-            joint_data = (
-                trajectory[:, j] if len(trajectory.shape) > 1 else trajectory
-            )
+            joint_data = trajectory[:, j] if len(trajectory.shape) > 1 else trajectory
             features.extend(
                 [
                     np.mean(joint_data),
