@@ -304,11 +304,9 @@ class LeRobotLoader:
                 joint_velocities = np.stack(df["qvel"].values)
 
             # Extract actions
-            actions: NDArray[np.float64]
-            if "action" in df.columns:
-                actions = np.stack(df["action"].values)
-            else:
-                actions = np.zeros_like(joint_positions)
+            actions: NDArray[np.float64] = (
+                np.stack(df["action"].values) if "action" in df.columns else np.zeros_like(joint_positions)
+            )
 
             # Get task index
             task_index = int(df["task_index"].iloc[0]) if "task_index" in df.columns else 0
