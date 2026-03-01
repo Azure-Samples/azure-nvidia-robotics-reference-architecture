@@ -6,45 +6,13 @@ These tests use mocking to avoid requiring actual Azure credentials.
 
 import asyncio
 import json
-from datetime import datetime
+import unittest.mock
 from unittest import TestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.api.models.annotations import (
-    AnnotationMetadata,
-    EpisodeAnnotationFile,
-    TaskCompletenessAnnotation,
-    TaskCompletenessRating,
-)
-
-
-def create_test_annotation(episode_index: int) -> EpisodeAnnotationFile:
-    """Create a test annotation file."""
-    now = datetime.utcnow()
-    return EpisodeAnnotationFile(
-        schema_version="1.0",
-        episode_index=episode_index,
-        metadata=AnnotationMetadata(
-            created_at=now,
-            updated_at=now,
-            annotator_id="test-user",
-            review_status="pending",
-        ),
-        task_completeness=TaskCompletenessAnnotation(
-            rating=TaskCompletenessRating.SUCCESS,
-            partial_progress_pct=100.0,
-            timestamped_ratings=[],
-            notes="Test annotation",
-        ),
-        trajectory_quality=None,
-        data_quality=None,
-        anomalies=[],
-        frame_annotations=[],
-        tags=[],
-        curriculum=None,
-    )
+from .conftest import create_test_annotation
 
 
 class TestAzureBlobStorageAdapter(TestCase):
@@ -58,16 +26,16 @@ class TestAzureBlobStorageAdapter(TestCase):
     @patch("src.api.storage.azure.BlobServiceClient")
     def test_get_annotation_not_found(self, mock_blob_service):
         """Test getting a non-existent annotation returns None."""
-        # Import the exception we need to mock
-        from azure.core.exceptions import ResourceNotFoundError
-
         from src.api.storage.azure import AzureBlobStorageAdapter
+
+        # Create a stand-in exception and patch it into the module
+        _ResourceNotFoundError = type("ResourceNotFoundError", (Exception,), {})
 
         # Set up mock to raise ResourceNotFoundError
         mock_client = MagicMock()
         mock_container = MagicMock()
         mock_blob = MagicMock()
-        mock_blob.download_blob = AsyncMock(side_effect=ResourceNotFoundError("Not found"))
+        mock_blob.download_blob = AsyncMock(side_effect=_ResourceNotFoundError("Not found"))
 
         mock_container.get_blob_client.return_value = mock_blob
         mock_client.get_container_client.return_value = mock_container
@@ -79,7 +47,8 @@ class TestAzureBlobStorageAdapter(TestCase):
         )
         adapter._client = mock_client
 
-        result = asyncio.run(adapter.get_annotation(self.dataset_id, 0))
+        with patch("src.api.storage.azure.ResourceNotFoundError", _ResourceNotFoundError):
+            result = asyncio.run(adapter.get_annotation(self.dataset_id, 0))
         assert result is None
 
     @patch("src.api.storage.azure.AZURE_AVAILABLE", True)
@@ -117,8 +86,9 @@ class TestAzureBlobStorageAdapter(TestCase):
         assert result.episode_index == 5
 
     @patch("src.api.storage.azure.AZURE_AVAILABLE", True)
+    @patch("src.api.storage.azure.ContentSettings")
     @patch("src.api.storage.azure.BlobServiceClient")
-    def test_save_annotation(self, mock_blob_service):
+    def test_save_annotation(self, mock_blob_service, mock_content_settings):
         """Test saving an annotation."""
         from src.api.storage.azure import AzureBlobStorageAdapter
 
@@ -145,7 +115,8 @@ class TestAzureBlobStorageAdapter(TestCase):
         mock_blob.upload_blob.assert_called_once()
         call_args = mock_blob.upload_blob.call_args
         assert call_args[1]["overwrite"] is True
-        assert call_args[1]["content_settings"]["content_type"] == "application/json"
+        mock_content_settings.assert_called_once_with(content_type="application/json")
+        assert call_args[1]["content_settings"] == mock_content_settings.return_value
 
     @patch("src.api.storage.azure.AZURE_AVAILABLE", True)
     @patch("src.api.storage.azure.BlobServiceClient")
@@ -154,11 +125,13 @@ class TestAzureBlobStorageAdapter(TestCase):
         from src.api.storage.azure import AzureBlobStorageAdapter
 
         # Create mock blob list
-        mock_blobs = [
-            MagicMock(name="test-dataset/annotations/episodes/episode_000003.json"),
-            MagicMock(name="test-dataset/annotations/episodes/episode_000001.json"),
-            MagicMock(name="test-dataset/annotations/episodes/episode_000005.json"),
-        ]
+        mock_blob_1 = MagicMock()
+        mock_blob_1.name = "test-dataset/annotations/episodes/episode_000003.json"
+        mock_blob_2 = MagicMock()
+        mock_blob_2.name = "test-dataset/annotations/episodes/episode_000001.json"
+        mock_blob_3 = MagicMock()
+        mock_blob_3.name = "test-dataset/annotations/episodes/episode_000005.json"
+        mock_blobs = [mock_blob_1, mock_blob_2, mock_blob_3]
 
         # Set up mock
         mock_client = MagicMock()
@@ -178,7 +151,8 @@ class TestAzureBlobStorageAdapter(TestCase):
         )
         adapter._client = mock_client
 
-        result = asyncio.run(adapter.list_annotated_episodes(self.dataset_id))
+        with patch("src.api.storage.azure.RetryPolicy", MagicMock()):
+            result = asyncio.run(adapter.list_annotated_episodes(self.dataset_id))
 
         assert result == [1, 3, 5]
 
@@ -213,15 +187,15 @@ class TestAzureBlobStorageAdapter(TestCase):
     @patch("src.api.storage.azure.BlobServiceClient")
     def test_delete_annotation_not_found(self, mock_blob_service):
         """Test deleting a non-existent annotation returns False."""
-        from azure.core.exceptions import ResourceNotFoundError
-
         from src.api.storage.azure import AzureBlobStorageAdapter
+
+        _ResourceNotFoundError = type("ResourceNotFoundError", (Exception,), {})
 
         # Set up mock
         mock_client = MagicMock()
         mock_container = MagicMock()
         mock_blob = MagicMock()
-        mock_blob.delete_blob = AsyncMock(side_effect=ResourceNotFoundError("Not found"))
+        mock_blob.delete_blob = AsyncMock(side_effect=_ResourceNotFoundError("Not found"))
 
         mock_container.get_blob_client.return_value = mock_blob
         mock_client.get_container_client.return_value = mock_container
@@ -233,10 +207,12 @@ class TestAzureBlobStorageAdapter(TestCase):
         )
         adapter._client = mock_client
 
-        result = asyncio.run(adapter.delete_annotation(self.dataset_id, 5))
+        with patch("src.api.storage.azure.ResourceNotFoundError", _ResourceNotFoundError):
+            result = asyncio.run(adapter.delete_annotation(self.dataset_id, 5))
 
         assert result is False
 
+    @patch("src.api.storage.azure.AZURE_AVAILABLE", True)
     def test_requires_auth_method(self):
         """Test that adapter requires SAS token or managed identity."""
         from src.api.storage.azure import AzureBlobStorageAdapter
@@ -260,6 +236,45 @@ class TestAzureBlobStorageAdapter(TestCase):
 
         path = adapter._get_blob_path("my-dataset", 42)
         assert path == "my-dataset/annotations/episodes/episode_000042.json"
+
+    @patch("src.api.storage.azure.AZURE_AVAILABLE", True)
+    def test_client_has_retry_policy(self):
+        """Verify BlobServiceClient is created with a retry policy."""
+        from src.api.storage.azure import AzureBlobStorageAdapter
+
+        adapter = AzureBlobStorageAdapter(
+            account_name="testaccount",
+            container_name="testcontainer",
+            sas_token="test-sas",
+        )
+        with (
+            unittest.mock.patch("src.api.storage.azure.BlobServiceClient") as mock_cls,
+            unittest.mock.patch("src.api.storage.azure.RetryPolicy"),
+        ):
+            asyncio.run(adapter._get_client())
+            call_kwargs = mock_cls.call_args
+            assert "retry_policy" in call_kwargs.kwargs
+
+    @patch("src.api.storage.azure.AZURE_AVAILABLE", True)
+    def test_retry_policy_configuration(self):
+        """Verify retry policy uses expected parameters."""
+        from src.api.storage.azure import AzureBlobStorageAdapter
+
+        adapter = AzureBlobStorageAdapter(
+            account_name="testaccount",
+            container_name="testcontainer",
+            sas_token="test-sas",
+        )
+        with (
+            unittest.mock.patch("src.api.storage.azure.BlobServiceClient"),
+            unittest.mock.patch("src.api.storage.azure.RetryPolicy") as mock_retry_cls,
+        ):
+            asyncio.run(adapter._get_client())
+            mock_retry_cls.assert_called_once_with(
+                retry_total=3,
+                retry_backoff_factor=0.8,
+                retry_backoff_max=60,
+            )
 
 
 if __name__ == "__main__":

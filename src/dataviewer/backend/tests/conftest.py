@@ -1,52 +1,37 @@
 """Pytest configuration and shared fixtures for integration tests."""
 
 import os
-from pathlib import Path
 
 import pytest
-from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
-# Load .env from the backend directory so tests pick up HMI_DATA_PATH / TEST_DATASET_ID
-_env_file = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(_env_file)
+TEST_DATASET_PATH = os.environ.get(
+    "TEST_DATASET_PATH",
+    "/home/alizaidi/dev/rl/azure-nvidia-robotics-reference-architecture/datasets",
+)
 
-_raw_data_path = os.environ.get("HMI_DATA_PATH", "")
-if _raw_data_path and not Path(_raw_data_path).is_absolute():
-    DATASET_BASE_PATH = str((_env_file.parent / _raw_data_path).resolve())
-else:
-    DATASET_BASE_PATH = _raw_data_path
-
-DATASET_ID = os.environ.get("TEST_DATASET_ID", "")
+TEST_DATASET_ID = os.environ.get("TEST_DATASET_ID", "sample_lerobot")
 
 
 @pytest.fixture(scope="session")
-def dataset_base_path():
-    """Absolute path to the directory containing datasets."""
-    assert DATASET_BASE_PATH, (
-        "HMI_DATA_PATH not set. Configure it in backend/.env or as an environment variable."
-    )
-    assert os.path.isdir(DATASET_BASE_PATH), (
-        f"Dataset base path not found: {DATASET_BASE_PATH}. Set HMI_DATA_PATH env var."
-    )
-    assert DATASET_ID, (
-        "TEST_DATASET_ID not set. Configure it in backend/.env or as an environment variable."
-    )
-    assert os.path.isdir(os.path.join(DATASET_BASE_PATH, DATASET_ID)), (
-        f"Dataset '{DATASET_ID}' not found at {DATASET_BASE_PATH}/{DATASET_ID}"
-    )
-    return DATASET_BASE_PATH
+def test_dataset_path():
+    """Absolute path to the directory containing the test LeRobot dataset."""
+    assert os.path.isdir(TEST_DATASET_PATH), f"Dataset base path not found: {TEST_DATASET_PATH}"
+    assert os.path.isdir(
+        os.path.join(TEST_DATASET_PATH, TEST_DATASET_ID)
+    ), f"LeRobot dataset not found at {TEST_DATASET_PATH}/{TEST_DATASET_ID}"
+    return TEST_DATASET_PATH
 
 
 @pytest.fixture(scope="session")
-def dataset_id():
-    return DATASET_ID
+def test_dataset_id():
+    return TEST_DATASET_ID
 
 
 @pytest.fixture
-def client(dataset_base_path):
+def client(test_dataset_path):
     """Create a FastAPI test client with HMI_DATA_PATH pointing to the real dataset."""
-    os.environ["HMI_DATA_PATH"] = dataset_base_path
+    os.environ["HMI_DATA_PATH"] = test_dataset_path
 
     import src.api.services.dataset_service as ds_mod
 

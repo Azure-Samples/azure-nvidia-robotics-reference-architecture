@@ -6,7 +6,7 @@ for task completeness, trajectory quality, data quality, and anomaly annotations
 """
 
 from datetime import datetime
-from enum import Enum, StrEnum
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 # ============================================================================
 
 
-class TaskCompletenessRating(StrEnum):
+class TaskCompletenessRating(str, Enum):
     """Task completion status rating."""
 
     SUCCESS = "success"
@@ -61,7 +61,7 @@ class QualityScore(int, Enum):
     FIVE = 5
 
 
-class TrajectoryFlag(StrEnum):
+class TrajectoryFlag(str, Enum):
     """Flags indicating specific trajectory issues."""
 
     JITTERY = "jittery"
@@ -99,7 +99,7 @@ class TrajectoryQualityAnnotation(BaseModel):
 # ============================================================================
 
 
-class DataQualityLevel(StrEnum):
+class DataQualityLevel(str, Enum):
     """Overall data quality level."""
 
     GOOD = "good"
@@ -108,7 +108,7 @@ class DataQualityLevel(StrEnum):
     UNUSABLE = "unusable"
 
 
-class DataQualityIssueType(StrEnum):
+class DataQualityIssueType(str, Enum):
     """Types of data quality issues."""
 
     FRAME_DROP = "frame-drop"
@@ -121,7 +121,7 @@ class DataQualityIssueType(StrEnum):
     MISSING_DATA = "missing-data"
 
 
-class IssueSeverity(StrEnum):
+class IssueSeverity(str, Enum):
     """Severity of a data quality issue."""
 
     MINOR = "minor"
@@ -155,7 +155,7 @@ class DataQualityAnnotation(BaseModel):
 # ============================================================================
 
 
-class AnomalySeverity(StrEnum):
+class AnomalySeverity(str, Enum):
     """Severity of an anomaly."""
 
     LOW = "low"
@@ -163,7 +163,7 @@ class AnomalySeverity(StrEnum):
     HIGH = "high"
 
 
-class AnomalyType(StrEnum):
+class AnomalyType(str, Enum):
     """Types of anomalies that can be detected."""
 
     UNEXPECTED_STOP = "unexpected-stop"

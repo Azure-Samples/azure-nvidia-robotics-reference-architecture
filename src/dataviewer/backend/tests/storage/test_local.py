@@ -4,46 +4,16 @@ Unit tests for local filesystem storage adapter.
 
 import asyncio
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 import pytest
 
-from src.api.models.annotations import (
-    AnnotationMetadata,
-    EpisodeAnnotationFile,
-    TaskCompletenessAnnotation,
-    TaskCompletenessRating,
-)
+from src.api.models.annotations import TaskCompletenessRating
 from src.api.storage.local import LocalStorageAdapter, StorageError
 
-
-def create_test_annotation(episode_index: int, user_id: str = "test-user") -> EpisodeAnnotationFile:
-    """Create a test annotation file."""
-    now = datetime.utcnow()
-    return EpisodeAnnotationFile(
-        schema_version="1.0",
-        episode_index=episode_index,
-        metadata=AnnotationMetadata(
-            created_at=now,
-            updated_at=now,
-            annotator_id=user_id,
-            review_status="pending",
-        ),
-        task_completeness=TaskCompletenessAnnotation(
-            rating=TaskCompletenessRating.SUCCESS,
-            partial_progress_pct=100.0,
-            timestamped_ratings=[],
-            notes="Test annotation",
-        ),
-        trajectory_quality=None,
-        data_quality=None,
-        anomalies=[],
-        frame_annotations=[],
-        tags=[],
-        curriculum=None,
-    )
+from .conftest import create_test_annotation
 
 
 class TestLocalStorageAdapter(TestCase):
@@ -87,7 +57,7 @@ class TestLocalStorageAdapter(TestCase):
         result = asyncio.run(self.adapter.get_annotation(self.dataset_id, 5))
         assert result is not None
         assert result.episode_index == 5
-        assert result.task_completeness.rating == TaskCompletenessRating.SUCCESS
+        assert result.annotations[0].task_completeness.rating == TaskCompletenessRating.SUCCESS
 
     def test_save_overwrites_existing(self):
         """Test that saving an annotation overwrites existing one."""
@@ -97,12 +67,12 @@ class TestLocalStorageAdapter(TestCase):
 
         # Save updated annotation
         annotation2 = create_test_annotation(episode_index=1)
-        annotation2.task_completeness.notes = "Updated notes"
+        annotation2.annotations[0].notes = "Updated notes"
         asyncio.run(self.adapter.save_annotation(self.dataset_id, 1, annotation2))
 
         # Retrieve and verify updated
         result = asyncio.run(self.adapter.get_annotation(self.dataset_id, 1))
-        assert result.task_completeness.notes == "Updated notes"
+        assert result.annotations[0].notes == "Updated notes"
 
     def test_list_annotated_episodes_empty(self):
         """Test listing episodes when no annotations exist."""
@@ -182,6 +152,21 @@ class TestLocalStorageAdapter(TestCase):
         asyncio.run(self.adapter.delete_annotation("dataset-a", 1))
         assert asyncio.run(self.adapter.get_annotation("dataset-a", 1)) is None
         assert asyncio.run(self.adapter.get_annotation("dataset-b", 1)) is not None
+
+    def test_save_uses_async_tempfile(self):
+        """Verify save_annotation delegates sync I/O to asyncio.to_thread."""
+        annotation = create_test_annotation(episode_index=0)
+        with patch(
+            "src.api.storage.local.asyncio.to_thread", wraps=asyncio.to_thread
+        ) as mock_to_thread:
+            asyncio.run(self.adapter.save_annotation(self.dataset_id, 0, annotation))
+            assert mock_to_thread.call_count >= 1
+
+    def test_path_traversal_rejected(self):
+        """Verify dataset_id with path traversal components raises StorageError."""
+        annotation = create_test_annotation(episode_index=0)
+        with pytest.raises(StorageError, match="path traversal detected"):
+            asyncio.run(self.adapter.save_annotation("../../etc", 0, annotation))
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ and retrieving cached results.
 """
 
 import logging
+import sys
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -15,11 +16,6 @@ from ..services.detection_service import DetectionService, get_detection_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def _sanitize(value: object) -> str:
-    """Sanitize a value for safe inclusion in log messages."""
-    return str(value).replace("\n", "\\n").replace("\r", "\\r")
 
 
 @router.post(
@@ -40,32 +36,30 @@ async def run_detection(
     returns detection results with bounding boxes and class labels.
     Results are cached for subsequent retrieval.
     """
-    logger.info(
-        "POST /detect called: dataset=%s, episode=%d",
-        _sanitize(dataset_id),
-        int(episode_idx),
+    print(f"\n{'='*60}", file=sys.stderr, flush=True)
+    print(
+        f"[API] POST /detect called: dataset={dataset_id}, episode={episode_idx}",
+        file=sys.stderr,
+        flush=True,
     )
-    logger.info(
-        "Request: model=%s, confidence=%s",
-        _sanitize(request.model),
-        _sanitize(request.confidence),
+    print(
+        f"[API] Request: model={request.model}, confidence={request.confidence}",
+        file=sys.stderr,
+        flush=True,
     )
+    print(f"{'='*60}", file=sys.stderr, flush=True)
 
     # Validate episode exists
     episode = await dataset_service.get_episode(dataset_id, episode_idx)
     if episode is None:
-        logger.debug(
-            "Episode not found: dataset=%s, episode=%d",
-            _sanitize(dataset_id),
-            int(episode_idx),
-        )
+        print("[API] ERROR: Episode not found", file=sys.stderr, flush=True)
         raise HTTPException(
             status_code=404,
             detail=f"Episode {episode_idx} not found in dataset '{dataset_id}'",
         )
 
     total_frames = episode.meta.length
-    logger.debug("Episode %d has %d frames", int(episode_idx), total_frames)
+    print(f"[API] Episode has {total_frames} frames", file=sys.stderr, flush=True)
 
     # Create frame image getter
     async def get_frame_image(frame_idx: int) -> bytes | None:
@@ -87,11 +81,11 @@ async def run_detection(
             status_code=503,
             detail="YOLO dependencies not installed. Run: uv sync --extra yolo",
         )
-    except Exception:
+    except Exception as e:
         logger.exception("Detection failed")
         raise HTTPException(
             status_code=500,
-            detail="Detection failed",
+            detail=f"Detection failed: {str(e)}",
         )
 
 

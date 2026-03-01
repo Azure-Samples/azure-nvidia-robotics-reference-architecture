@@ -124,7 +124,7 @@ class LeRobotLoader:
         """
         if not PARQUET_AVAILABLE:
             raise ImportError(
-                "LeRobot support requires pyarrow package. Install with: pip install pyarrow"
+                "LeRobot support requires pyarrow package. " "Install with: pip install pyarrow"
             )
 
         self.base_path = Path(base_path)
@@ -450,7 +450,7 @@ def is_lerobot_dataset(path: str | Path) -> bool:
     Returns:
         True if the path contains a LeRobot dataset structure.
     """
-    path = Path(path).resolve()
+    path = Path(path)
     info_path = path / "meta" / "info.json"
     data_dir = path / "data"
     return info_path.exists() and data_dir.exists()

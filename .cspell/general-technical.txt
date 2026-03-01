@@ -1,22 +1,22 @@
-# Industry Standards & Protocols (not covered by public dicts)
-# Academic & Technical Terms
-# Security & Compliance
-# Cloud Platforms & Services (not covered by public dicts)
-# Programming Languages & Frameworks (not covered by public dicts)
-# Data & Analytics
-# Business & Enterprise
-# Networking & Infrastructure (not covered by public dicts)
-# Company Names & Brands
-# Product Names & Trademarks (not covered by public dicts)
-# File Formats & Extensions
 # Abbreviations & Acronyms
-# Technical Terms
-# Proper Nouns & Company Names
-# Development & DevOps
-# Video & Image Processing
-# Hardware & Platforms (not covered by public dicts)
-# Software & CAD Tools
+# Academic & Technical Terms
 # Azure NVIDIA Robotics Reference Architecture
+# Business & Enterprise
+# Cloud Platforms & Services (not covered by public dicts)
+# Company Names & Brands
+# Data & Analytics
+# Development & DevOps
+# File Formats & Extensions
+# Hardware & Platforms (not covered by public dicts)
+# Industry Standards & Protocols (not covered by public dicts)
+# Networking & Infrastructure (not covered by public dicts)
+# Product Names & Trademarks (not covered by public dicts)
+# Programming Languages & Frameworks (not covered by public dicts)
+# Proper Nouns & Company Names
+# Security & Compliance
+# Software & CAD Tools
+# Technical Terms
+# Video & Image Processing
 abac
 abap
 abfs
@@ -345,6 +345,7 @@ datalake
 dataops
 datapoints
 dataset
+datasetanalysistool
 datasets
 datasize
 dataverse
@@ -366,8 +367,8 @@ deis
 delenv
 delimited
 dell
-denormalized
 denoising
+denormalized
 deployers
 deserialize
 deserialized
@@ -986,6 +987,7 @@ platform
 platformops
 platforms
 playfab
+playhead
 playment
 playsinline
 Plotly
@@ -1319,6 +1321,7 @@ supervisely
 suricata
 swid
 syft
+synchronisation
 syslog
 syslogs
 sysplex
@@ -1357,6 +1360,7 @@ testcase
 testcases
 testcontainer
 testdata
+testpaths
 testsrc
 testuser
 tflint
@@ -1382,6 +1386,7 @@ TOCTOU
 todatetime
 todynamic
 togaf
+toggleable
 tolerations
 tolong
 tomtom
@@ -1574,344 +1579,3 @@ zonemap
 zref
 zscaler
 zstd
-
-# Academic & Technical Terms
-anonymization
-anonymize
-anonymizing
-autoencoders
-automl
-inferencing
-magnetostatics
-neuromorphic
-operationalization
-operationalize
-operationalized
-scikit
-homomorphic
-onnxruntime
-memprofile
-cpuprofile
-minmax
-modreqs
-modreq
-modopts
-flexbox
-rgba
-srgb
-backface
-wmem
-rmem
-datapoints
-chromadb
-timescaledb
-
-# Security & Compliance
-antimalware
-auditable
-auditability
-auditifnotexists
-gdpr
-hipaa
-oidc
-OSSF
-passwordless
-siem
-sox
-Sarbanes
-Oxley
-
-# Cloud Platforms & Services (not covered by public dicts)
-amazonaws
-gcp
-googlecloud
-hybridcloud
-multicloud
-openshift
-redhat
-
-# Programming Languages & Frameworks (not covered by public dicts)
-angularjs
-dotnet
-golang
-javascript
-nodejs
-python
-reactjs
-typescript
-xamarin
-
-# Data & Analytics
-bigdata
-dataops
-etl
-elt
-lakehouse
-lakehouses
-mlops
-nosql
-olap
-oltp
-polybase
-realtime
-timeseries
-
-# Business & Enterprise
-chargeback
-crm
-epicor
-erp
-Exfiltration
-hrms
-scm
-workday
-
-# Networking & Infrastructure (not covered by public dicts)
-cidr
-cyclonedds
-dns
-iot
-loadbalancer
-nginx
-proxy
-ssl
-tls
-wan
-lan
-
-# Company Names & Brands
-adobe
-amazon
-apple
-cisco
-dell
-google
-hp
-ibm
-intel
-microsoft
-nvidia
-oracle
-salesforce
-sap
-vmware
-vpn
-
-# Product Names & Trademarks (not covered by public dicts)
-github
-gitlab
-vscode
-windows
-gruntwork
-
-# File Formats & Extensions
-csv
-docx
-json
-orc
-parquet
-pptx
-xlsx
-xml
-yaml
-yml
-
-# Abbreviations & Acronyms
-app
-cli
-cpu
-gpu
-sql
-tcp
-udp
-url
-uri
-uuid
-vm
-vpc
-
-# Technical Terms
-apis
-backend
-frontend
-middleware
-microservice
-microservices
-webhook
-webhooks
-
-# Proper Nouns & Company Names
-Katello
-Metaverse
-Upselling
-
-# Development & DevOps
-agile
-cicd
-devops
-scrum
-kanban
-sprint
-backlog
-pipeline
-pipelines
-pwsh
-shellcheck
-nslookup
-journalctl
-vimdiff
-mergetool
-gitmessage
-pipefail
-esac
-keyid
-openpgp
-difftool
-trustexitcode
-keepbackup
-checkpointed
-parameterless
-notnull
-gettype
-lockfiles
-workitem
-workitems
-timespan
-todatetime
-toreal
-tolong
-todynamic
-utcnow
-torutek
-backpressure
-execdir
-seealso
-cref
-defaultinstancetype
-levelname
-asctime
-datefmt
-newsection
-oneline
-typeresou
-param
-typeparam
-colcon
-pathlib
-popen
-expanduser
-reqwest
-pyyaml
-rabbitmq
-mqttbroker
-mqttbridgeconnector
-mqtts
-dmqtt
-brokerlistener
-cloudevents
-datasize
-mult
-reqs
-
-# Video & Image Processing
-drawtext
-fontcolor
-fontsize
-lanczos
-lavfi
-libx
-palettegen
-paletteuse
-posterized
-SMPTE
-smptebars
-testsrc
-
-# Hardware & Platforms (not covered by public dicts)
-Jetson
-microcontroller
-microcontrollers
-Mbed
-openvino
-Portworx
-Zigbee
-Hudi
-
-# Software & CAD Tools
-autocad
-autodesk
-Coppelia
-Creo
-GMSH
-Modelica
-postman
-powershell
-tableau
-Serilog
-Silverlight
-DYNPROXY
-Proxyable
-Cropp
-Clarius
-Retryable
-Remotable
-Finalizer
-Unproxied
-Memberwise
-Distro
-SHAP
-Plotly
-Anthos
-Trino
-Simbolic
-JENNI
-Clis
-Extended
-interceptable
-Hypervelocity
-junitxml
-PSScriptAnalyzer
-chatagent
-docstrings
-issubset
-isort
-mymodule
-mypy
-sandboxed
-
-# Azure NVIDIA Robotics Reference Architecture
-anymal
-autolog
-azureml
-cartpole
-chkpt
-cudnn
-DDPG
-erewbuffer
-flatdict
-gpuinstancetype
-infotensor
-IPPO
-irewbuffer
-alizaidi
-isaaclab
-isaacsim
-lenbuffer
-lerobot
-MAPPO
-meks
-nvcr
-nvml
-oauthtoken
-osmoauth
-pgadmin
-pyglet
-pylance
-PYTHONHASHSEED
-PYTHONPATH
-redisenterprise
-rewbuffer
-rslrl
-skrl
-timestep
-timesteps

@@ -7,13 +7,13 @@ statistical methods and threshold-based detection.
 
 import uuid
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 
 import numpy as np
 from numpy.typing import NDArray
 
 
-class AnomalyType(StrEnum):
+class AnomalyType(str, Enum):
     """Types of detectable anomalies."""
 
     VELOCITY_SPIKE = "velocity_spike"
@@ -25,7 +25,7 @@ class AnomalyType(StrEnum):
     JOINT_LIMIT = "joint_limit"
 
 
-class AnomalySeverity(StrEnum):
+class AnomalySeverity(str, Enum):
     """Anomaly severity levels."""
 
     LOW = "low"
