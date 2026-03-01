@@ -209,7 +209,7 @@ async def get_episode_frame(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to load frame: {str(e)}",
+            detail=f"Failed to load frame: {e!s}",
         )
 
 
