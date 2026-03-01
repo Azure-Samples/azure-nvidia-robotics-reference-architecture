@@ -4,32 +4,31 @@ Azure Blob Storage adapter for annotations.
 Supports both SAS token and managed identity authentication.
 """
 
+from __future__ import annotations
+
 import json
-import logging
-import re
-from datetime import datetime
 
 from ..models.annotations import EpisodeAnnotationFile
 from .base import StorageAdapter, StorageError
+from .serializers import DateTimeEncoder
 
 # Azure SDK imports are optional - only required when using this adapter
 try:
-    from azure.core.exceptions import ResourceNotFoundError
+    from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
+    from azure.core.pipeline.policies import RetryPolicy
     from azure.identity import DefaultAzureCredential
+    from azure.storage.blob import ContentSettings
     from azure.storage.blob.aio import BlobServiceClient
 
     AZURE_AVAILABLE = True
 except ImportError:
+    HttpResponseError = None
+    ResourceNotFoundError = None
+    RetryPolicy = None
+    DefaultAzureCredential = None
+    ContentSettings = None
+    BlobServiceClient = None
     AZURE_AVAILABLE = False
-
-
-class DateTimeEncoder(json.JSONEncoder):
-    """JSON encoder that handles datetime objects."""
-
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
 
 
 class AzureBlobStorageAdapter(StorageAdapter):
@@ -39,10 +38,6 @@ class AzureBlobStorageAdapter(StorageAdapter):
     Stores annotations in the container's annotations/episodes/ path,
     with each episode having its own JSON blob.
     """
-
-    _VALID_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
-
-    logger = logging.getLogger(__name__)
 
     def __init__(
         self,
@@ -83,25 +78,30 @@ class AzureBlobStorageAdapter(StorageAdapter):
         """Get or create the blob service client."""
         if self._client is None:
             account_url = f"https://{self.account_name}.blob.core.windows.net"
+            retry_policy = RetryPolicy(
+                retry_total=3,
+                retry_backoff_factor=0.8,
+                retry_backoff_max=60,
+            )
 
             if self.sas_token:
                 self._client = BlobServiceClient(
                     account_url=account_url,
                     credential=self.sas_token,
+                    retry_policy=retry_policy,
                 )
             else:
                 credential = DefaultAzureCredential()
                 self._client = BlobServiceClient(
                     account_url=account_url,
                     credential=credential,
+                    retry_policy=retry_policy,
                 )
 
         return self._client
 
     def _get_blob_path(self, dataset_id: str, episode_index: int) -> str:
         """Get the blob path for an episode's annotations."""
-        if not self._VALID_ID_PATTERN.match(dataset_id):
-            raise StorageError(f"Invalid dataset ID: '{dataset_id}'")
         return f"{dataset_id}/annotations/episodes/episode_{episode_index:06d}.json"
 
     async def get_annotation(
@@ -132,11 +132,15 @@ class AzureBlobStorageAdapter(StorageAdapter):
         except ResourceNotFoundError:
             return None
         except json.JSONDecodeError as e:
-            self.logger.exception("Invalid JSON in annotation blob")
-            raise StorageError("Invalid annotation file format", cause=e)
+            raise StorageError(f"Invalid JSON in blob {blob_path}: {e}", cause=e)
+        except HttpResponseError as e:
+            raise StorageError(
+                f"Azure HTTP error reading blob {blob_path}: "
+                f"status={e.status_code} error_code={e.error_code}",
+                cause=e,
+            )
         except Exception as e:
-            self.logger.exception("Failed to read annotation blob")
-            raise StorageError("Failed to read annotation data", cause=e)
+            raise StorageError(f"Failed to read blob {blob_path}: {e}", cause=e)
 
     async def save_annotation(
         self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile
@@ -170,9 +174,15 @@ class AzureBlobStorageAdapter(StorageAdapter):
             await blob_client.upload_blob(
                 json_content.encode("utf-8"),
                 overwrite=True,
-                content_settings={"content_type": "application/json"},
+                content_settings=ContentSettings(content_type="application/json"),
             )
 
+        except HttpResponseError as e:
+            raise StorageError(
+                f"Azure HTTP error saving blob {blob_path}: "
+                f"status={e.status_code} error_code={e.error_code}",
+                cause=e,
+            )
         except Exception as e:
             raise StorageError(f"Failed to save blob {blob_path}: {e}", cause=e)
 
@@ -207,6 +217,12 @@ class AzureBlobStorageAdapter(StorageAdapter):
 
             return sorted(episode_indices)
 
+        except HttpResponseError as e:
+            raise StorageError(
+                f"Azure HTTP error listing annotations for {dataset_id}: "
+                f"status={e.status_code} error_code={e.error_code}",
+                cause=e,
+            )
         except Exception as e:
             raise StorageError(f"Failed to list annotations for {dataset_id}: {e}", cause=e)
 
@@ -233,6 +249,12 @@ class AzureBlobStorageAdapter(StorageAdapter):
 
         except ResourceNotFoundError:
             return False
+        except HttpResponseError as e:
+            raise StorageError(
+                f"Azure HTTP error deleting blob {blob_path}: "
+                f"status={e.status_code} error_code={e.error_code}",
+                cause=e,
+            )
         except Exception as e:
             raise StorageError(f"Failed to delete blob {blob_path}: {e}", cause=e)
 

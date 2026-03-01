@@ -2,7 +2,7 @@
 title: Documentation Maintenance Policy
 description: Update triggers, ownership, review criteria, freshness policy, and release lifecycle for project documentation
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-11
+ms.date: 2026-02-25
 ms.topic: reference
 keywords:
   - documentation
@@ -41,7 +41,7 @@ Documentation ownership maps areas to responsible teams. The `.github/CODEOWNERS
 | Root `README.md`                               | Repository maintainers (`@Azure-Samples/edge-ai-core-dev`) |
 
 > [!TIP]
-> Full role definitions and governance structure are planned for v0.6.0 (issues #98 and #99). Current CODEOWNERS configuration uses the `@Azure-Samples/edge-ai-core-dev` team as code owners for all documentation paths.
+> Full role definitions and governance structure are tracked in [#98](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/98) and [#99](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/99). Current CODEOWNERS configuration uses the `@Azure-Samples/edge-ai-core-dev` team as code owners for all documentation paths.
 
 ## Review Process
 

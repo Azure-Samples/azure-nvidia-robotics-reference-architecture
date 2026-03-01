@@ -8,8 +8,7 @@ and LeRobot parquet-format datasets.
 
 import logging
 import os
-import pathlib
-import re
+from pathlib import Path
 
 from ..models.datasources import (
     DatasetInfo,
@@ -24,17 +23,19 @@ logger = logging.getLogger(__name__)
 
 # HDF5 support is optional
 try:
-    from .hdf5_loader import HDF5Loader
+    from .hdf5_loader import HDF5Loader, HDF5LoaderError
 
     HDF5_AVAILABLE = True
 except ImportError:
     HDF5_AVAILABLE = False
     HDF5Loader = None
+    HDF5LoaderError = Exception
 
 # LeRobot parquet support is optional
 try:
     from .lerobot_loader import (
         LeRobotLoader,
+        LeRobotLoaderError,
         is_lerobot_dataset,
     )
 
@@ -42,12 +43,8 @@ try:
 except ImportError:
     LEROBOT_AVAILABLE = False
     LeRobotLoader = None
+    LeRobotLoaderError = Exception
     is_lerobot_dataset = lambda x: False  # noqa: E731
-
-
-def _sanitize(value: object) -> str:
-    """Sanitize a value for safe log output by neutralizing newline characters."""
-    return str(value).replace("\n", "\\n").replace("\r", "\\r")
 
 
 class DatasetService:
@@ -58,14 +55,6 @@ class DatasetService:
     API for accessing dataset metadata and episode data.
     Supports loading trajectory data from HDF5 files and LeRobot parquet datasets.
     """
-
-    _VALID_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
-
-    @staticmethod
-    def _validate_dataset_id(dataset_id: str) -> None:
-        """Validate dataset_id against an allowlist pattern."""
-        if not DatasetService._VALID_ID_PATTERN.match(dataset_id):
-            raise ValueError(f"Invalid dataset ID: '{dataset_id}'")
 
     def __init__(self, base_path: str | None = None):
         """
@@ -96,24 +85,15 @@ class DatasetService:
         if not LEROBOT_AVAILABLE:
             return None
 
-        self._validate_dataset_id(dataset_id)
-
         if dataset_id not in self._lerobot_loaders:
             from pathlib import Path
 
-            base_resolved = Path(self.base_path).resolve()
-            dataset_path = (base_resolved / dataset_id).resolve()
-            if not str(dataset_path).startswith(str(base_resolved)):
-                return None
+            dataset_path = Path(self.base_path) / dataset_id
             if dataset_path.exists() and is_lerobot_dataset(dataset_path):
                 try:
                     self._lerobot_loaders[dataset_id] = LeRobotLoader(dataset_path)
                 except Exception as e:
-                    logger.warning(
-                        "Failed to create LeRobot loader for %s: %s",
-                        _sanitize(dataset_id),
-                        _sanitize(e),
-                    )
+                    logger.warning("Failed to create LeRobot loader for %s: %s", dataset_id, e)
                     return None
 
         return self._lerobot_loaders.get(dataset_id)
@@ -131,15 +111,10 @@ class DatasetService:
         if not HDF5_AVAILABLE:
             return None
 
-        self._validate_dataset_id(dataset_id)
-
         if dataset_id not in self._hdf5_loaders:
             from pathlib import Path
 
-            base_resolved = Path(self.base_path).resolve()
-            dataset_path = (base_resolved / dataset_id).resolve()
-            if not str(dataset_path).startswith(str(base_resolved)):
-                return None
+            dataset_path = Path(self.base_path) / dataset_id
             if dataset_path.exists():
                 # Check if there are HDF5 files
                 hdf5_files = list(dataset_path.glob("**/*.hdf5"))
@@ -163,12 +138,7 @@ class DatasetService:
         """
         from pathlib import Path
 
-        self._validate_dataset_id(dataset_id)
-
-        base_resolved = Path(self.base_path).resolve()
-        dataset_path = (base_resolved / dataset_id).resolve()
-        if not str(dataset_path).startswith(str(base_resolved)):
-            return None
+        dataset_path = Path(self.base_path) / dataset_id
 
         # Validate directory exists
         if not dataset_path.exists() or not dataset_path.is_dir():
@@ -215,9 +185,7 @@ class DatasetService:
 
         return dataset_info
 
-    def _discover_lerobot_dataset(
-        self, dataset_id: str, dataset_path: "pathlib.Path"
-    ) -> DatasetInfo | None:
+    def _discover_lerobot_dataset(self, dataset_id: str, dataset_path: Path) -> DatasetInfo | None:
         """
         Discover and create DatasetInfo from a LeRobot parquet dataset.
 
@@ -256,11 +224,7 @@ class DatasetService:
             return dataset_info
 
         except Exception as e:
-            logger.warning(
-                "Failed to discover LeRobot dataset %s: %s",
-                _sanitize(dataset_id),
-                _sanitize(e),
-            )
+            logger.warning("Failed to discover LeRobot dataset %s: %s", dataset_id, e)
             return None
 
     async def list_datasets(self) -> list[DatasetInfo]:
@@ -377,11 +341,7 @@ class DatasetService:
                     except Exception:
                         episode_info_map[idx] = {"length": 0, "task_index": 0}
             except Exception as e:
-                logger.warning(
-                    "LeRobot list_episodes failed for %s: %s",
-                    _sanitize(dataset_id),
-                    _sanitize(e),
-                )
+                logger.warning("LeRobot list_episodes failed for %s: %s", dataset_id, e)
                 episode_indices = []
 
         # Fall back to HDF5 loader
@@ -422,14 +382,14 @@ class DatasetService:
                     ep_length = ep_info.get("length", 0)
                     ep_task_index = ep_info.get("task_index", 0)
                 except Exception:
-                    logger.debug("Failed to get LeRobot episode info for %d", idx)
+                    pass
             elif self._get_hdf5_loader(dataset_id) is not None:
                 try:
                     ep_info = self._get_hdf5_loader(dataset_id).get_episode_info(idx)
                     ep_length = ep_info.get("length", 0)
                     ep_task_index = ep_info.get("task_index", 0)
                 except Exception:
-                    logger.debug("Failed to get HDF5 episode info for %d", idx)
+                    pass
 
             if task_index is not None and ep_task_index != task_index:
                 continue
@@ -527,10 +487,7 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot load_episode failed for %s/%d: %s",
-                    _sanitize(dataset_id),
-                    int(episode_idx),
-                    _sanitize(e),
+                    "LeRobot load_episode failed for %s/%d: %s", dataset_id, episode_idx, e
                 )
                 # Fall through to try HDF5
 
@@ -659,10 +616,7 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot trajectory load failed for %s/%d: %s",
-                    _sanitize(dataset_id),
-                    int(episode_idx),
-                    _sanitize(e),
+                    "LeRobot trajectory load failed for %s/%d: %s", dataset_id, episode_idx, e
                 )
 
         # Fall back to HDF5 loader
@@ -736,14 +690,9 @@ class DatasetService:
         """
         from pathlib import Path
 
-        self._validate_dataset_id(dataset_id)
-
-        base_resolved = Path(self.base_path).resolve()
-        dataset_path = (base_resolved / dataset_id).resolve()
-        if not str(dataset_path).startswith(str(base_resolved)):
-            return None
+        dataset_path = Path(self.base_path) / dataset_id
         if dataset_path.exists() and dataset_path.is_dir():
-            return str(dataset_path)
+            return str(dataset_path.resolve())
         return None
 
     async def get_frame_image(
@@ -772,7 +721,7 @@ class DatasetService:
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
         if hdf5_loader is None:
-            logger.warning("No loader found for dataset %s", _sanitize(dataset_id))
+            logger.warning("No loader found for dataset %s", dataset_id)
             return None
 
         try:
@@ -783,7 +732,7 @@ class DatasetService:
             if camera not in hdf5_data.images:
                 logger.warning(
                     "Camera %s not found in episode. Available cameras: %s",
-                    _sanitize(camera),
+                    camera,
                     list(hdf5_data.images.keys()),
                 )
                 return None
@@ -808,11 +757,7 @@ class DatasetService:
 
         except Exception as e:
             logger.exception(
-                "Error loading frame %d from %s/%d: %s",
-                int(frame_idx),
-                _sanitize(dataset_id),
-                int(episode_idx),
-                _sanitize(e),
+                "Error loading frame %d from %s/%d: %s", frame_idx, dataset_id, episode_idx, e
             )
             return None
 
@@ -831,11 +776,7 @@ class DatasetService:
 
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
-            logger.warning(
-                "No video for episode %d camera '%s'",
-                int(episode_idx),
-                _sanitize(camera),
-            )
+            logger.warning("No video for episode %d camera '%s'", episode_idx, camera)
             return None
 
         cap = cv2.VideoCapture(str(video_path))
@@ -843,7 +784,7 @@ class DatasetService:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             ret, frame = cap.read()
             if not ret or frame is None:
-                logger.warning("Failed to read frame %d from %s", int(frame_idx), video_path)
+                logger.warning("Failed to read frame %d from %s", frame_idx, video_path)
                 return None
 
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))

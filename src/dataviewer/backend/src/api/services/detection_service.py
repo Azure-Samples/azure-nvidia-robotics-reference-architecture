@@ -26,15 +26,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-def _sanitize(value: object) -> str:
-    """Sanitize a value for safe inclusion in log messages."""
-    return str(value).replace("\n", "\\n").replace("\r", "\\r")
-
-
 # COCO class names for YOLO models
-ALLOWED_MODELS = {"yolo11n", "yolo11s", "yolo11m", "yolo11l", "yolo11x"}
-
 COCO_CLASSES = [
     "person",
     "bicycle",
@@ -129,14 +121,11 @@ class DetectionService:
 
     def _get_model(self, model_name: str = "yolo11n") -> "YOLO":
         """Load or return cached YOLO model."""
-        if model_name not in ALLOWED_MODELS:
-            raise ValueError(f"Model '{model_name}' is not supported")
-
         if self._model is None or self._model_name != model_name:
             try:
                 from ultralytics import YOLO
 
-                logger.info("Loading YOLO model: %s", _sanitize(model_name))
+                logger.info("Loading YOLO model: %s", model_name)
                 self._model = YOLO(f"{model_name}.pt")
                 self._model_name = model_name
                 # Warmup with dummy inference
@@ -175,16 +164,17 @@ class DetectionService:
         model_name: str = "yolo11n",
     ) -> DetectionResult:
         """Run detection on a single frame."""
+        import sys
+
         model = self._get_model(model_name)
 
         # Load image
         image = Image.open(BytesIO(image_bytes))
-        logger.debug(
-            "Frame %d: image size=%s, mode=%s, bytes=%d",
-            int(frame_idx),
-            image.size,
-            image.mode,
-            len(image_bytes),
+        print(
+            f"[DETECT] Frame {frame_idx}: size={image.size}, "
+            f"mode={image.mode}, bytes={len(image_bytes)}",
+            file=sys.stderr,
+            flush=True,
         )
 
         # Run inference
@@ -192,11 +182,11 @@ class DetectionService:
         results = model(image, conf=confidence, verbose=False)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        logger.debug(
-            "Frame %d: model returned %d result(s) in %.1fms",
-            int(frame_idx),
-            len(results) if results else 0,
-            elapsed_ms,
+        print(
+            f"[DETECT] Frame {frame_idx}: model returned "
+            f"{len(results) if results else 0} result(s) in {elapsed_ms:.1f}ms",
+            file=sys.stderr,
+            flush=True,
         )
 
         # Parse results
@@ -204,14 +194,23 @@ class DetectionService:
         if results and len(results) > 0:
             result = results[0]
             boxes = result.boxes
-            logger.debug(
-                "Frame %d: boxes=%s, num_boxes=%d",
-                int(frame_idx),
-                boxes is not None,
-                len(boxes) if boxes is not None else 0,
+            print(
+                f"[DETECT] Frame {frame_idx}: boxes={boxes is not None}, "
+                f"num_boxes={len(boxes) if boxes is not None else 0}",
+                file=sys.stderr,
+                flush=True,
             )
 
             if boxes is not None and len(boxes) > 0:
+                classes = [int(c.item()) for c in boxes.cls]
+                confs = [float(c.item()) for c in boxes.conf]
+                print(
+                    f"[DETECT] Frame {frame_idx}: classes={classes}, "
+                    f"confidences={[f'{c:.3f}' for c in confs]}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+
                 for i in range(len(boxes)):
                     class_id = int(boxes.cls[i].item())
                     class_name = (
@@ -230,9 +229,13 @@ class DetectionService:
                         )
                     )
         else:
-            logger.debug("Frame %d: no results from model", int(frame_idx))
+            print(f"[DETECT] Frame {frame_idx}: no results from model", file=sys.stderr, flush=True)
 
-        logger.debug("Frame %d: returning %d detections", int(frame_idx), len(detections))
+        print(
+            f"[DETECT] Frame {frame_idx}: returning {len(detections)} detections",
+            file=sys.stderr,
+            flush=True,
+        )
         return DetectionResult(
             frame=frame_idx,
             detections=detections,
@@ -248,16 +251,18 @@ class DetectionService:
         total_frames: int,
     ) -> EpisodeDetectionSummary:
         """Run detection on episode frames."""
-        logger.debug(
-            "Starting detection: dataset=%s, episode=%d, frames=%d",
-            _sanitize(dataset_id),
-            int(episode_idx),
-            total_frames,
+        import sys
+
+        print(
+            f"[DETECT] Starting: dataset={dataset_id}, "
+            f"episode={episode_idx}, frames={total_frames}",
+            file=sys.stderr,
+            flush=True,
         )
 
         # Determine frames to process
         frames_to_process = request.frames if request.frames else list(range(total_frames))
-        logger.debug("Will process %d frames", len(frames_to_process))
+        print(f"[DETECT] Will process {len(frames_to_process)} frames", file=sys.stderr, flush=True)
 
         results_by_frame: list[DetectionResult] = []
         class_counts: dict[str, list[float]] = {}
@@ -269,11 +274,19 @@ class DetectionService:
                 if image_bytes is None:
                     skipped_frames += 1
                     if skipped_frames <= 3:
-                        logger.debug("Frame %d: image_bytes is None", int(frame_idx))
+                        print(
+                            f"[DETECT] Frame {frame_idx}: image_bytes is None",
+                            file=sys.stderr,
+                            flush=True,
+                        )
                     continue
 
                 if frame_idx == 0:
-                    logger.debug("Frame 0: got %d bytes", len(image_bytes))
+                    print(
+                        f"[DETECT] Frame 0: got {len(image_bytes)} bytes",
+                        file=sys.stderr,
+                        flush=True,
+                    )
 
                 result = await self.detect_frame(
                     image_bytes,
@@ -283,7 +296,11 @@ class DetectionService:
                 )
 
                 if frame_idx == 0:
-                    logger.debug("Frame 0: found %d detections", len(result.detections))
+                    print(
+                        f"[DETECT] Frame 0: found {len(result.detections)} detections",
+                        file=sys.stderr,
+                        flush=True,
+                    )
 
                 results_by_frame.append(result)
 
@@ -294,15 +311,16 @@ class DetectionService:
                     class_counts[det.class_name].append(det.confidence)
 
             except Exception as e:
-                logger.warning("Failed to process frame %d: %s", int(frame_idx), _sanitize(e))
+                print(f"[DETECT] Frame {frame_idx}: ERROR {e}", file=sys.stderr, flush=True)
+                logger.warning("Failed to process frame %d: %s", frame_idx, e)
                 continue
 
         total_dets = sum(len(r.detections) for r in results_by_frame)
-        logger.debug(
-            "Complete: processed=%d, skipped=%d, detections=%d",
-            len(results_by_frame),
-            skipped_frames,
-            total_dets,
+        print(
+            f"[DETECT] Complete: processed={len(results_by_frame)}, "
+            f"skipped={skipped_frames}, detections={total_dets}",
+            file=sys.stderr,
+            flush=True,
         )
 
         # Build class summary

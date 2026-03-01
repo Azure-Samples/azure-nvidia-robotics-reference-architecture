@@ -5,7 +5,6 @@ Provides endpoints for listing datasets, retrieving metadata,
 and accessing episode information with HDF5 and LeRobot parquet support.
 """
 
-import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,13 +15,6 @@ from ..models.datasources import DatasetInfo, EpisodeData, EpisodeMeta, Trajecto
 from ..services.dataset_service import DatasetService, get_dataset_service
 
 router = APIRouter()
-
-logger = logging.getLogger(__name__)
-
-
-def _sanitize(value: object) -> str:
-    """Sanitize a value for safe inclusion in log messages."""
-    return str(value).replace("\n", "\\n").replace("\r", "\\r")
 
 
 class DatasetCapabilities(BaseModel):
@@ -100,7 +92,7 @@ async def get_dataset_capabilities(
                 episodes = hdf5_loader.list_episodes()
                 episode_count = max(episode_count, len(episodes))
             except Exception:
-                logger.debug("Failed to get HDF5 episode count for %s", _sanitize(dataset_id))
+                pass
     elif is_lerobot:
         # Get episode count from LeRobot loader
         lerobot_loader = service._get_lerobot_loader(dataset_id)
@@ -109,7 +101,7 @@ async def get_dataset_capabilities(
                 episodes = lerobot_loader.list_episodes()
                 episode_count = max(episode_count, len(episodes))
             except Exception:
-                logger.debug("Failed to get LeRobot episode count for %s", _sanitize(dataset_id))
+                pass
 
     return DatasetCapabilities(
         hdf5_support=service.has_hdf5_support(),
@@ -214,15 +206,10 @@ async def get_episode_frame(
         return Response(content=image_bytes, media_type="image/jpeg")
     except HTTPException:
         raise
-    except Exception:
-        logger.exception(
-            "Failed to load frame %d for camera '%s'",
-            int(frame_idx),
-            _sanitize(camera),
-        )
+    except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="Failed to load frame",
+            detail=f"Failed to load frame: {str(e)}",
         )
 
 
@@ -266,7 +253,7 @@ async def get_episode_video(
     if not video_file.exists():
         raise HTTPException(
             status_code=404,
-            detail=f"Video not found for episode {episode_idx}, camera '{camera}'",
+            detail=f"Video file not found: {video_path}",
         )
 
     # Determine media type based on file extension

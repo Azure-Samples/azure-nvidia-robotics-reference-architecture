@@ -367,13 +367,12 @@ class HDF5Loader:
 
                 # Get available cameras
                 cameras = []
-                camera_paths = [
+                for group_path in [
                     "observations/images",
                     "observation/images",
                     "images",
                     "data/images",
-                ]
-                for group_path in camera_paths:
+                ]:
                     if group_path in f and isinstance(f[group_path], h5py.Group):
                         cameras = list(f[group_path].keys())
                         break
