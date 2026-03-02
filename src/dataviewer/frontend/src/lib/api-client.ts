@@ -17,6 +17,40 @@ import type {
 
 const API_BASE = '/api';
 
+const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/** Cached CSRF token fetched from the server. */
+let _csrfToken: string | null = null;
+/** In-flight CSRF token fetch promise to prevent duplicate requests. */
+let _csrfTokenFetch: Promise<string> | null = null;
+
+async function getCsrfToken(): Promise<string> {
+  if (_csrfToken) return _csrfToken;
+  if (!_csrfTokenFetch) {
+    _csrfTokenFetch = fetch(`${API_BASE}/csrf-token`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch CSRF token: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        _csrfToken = data.csrf_token as string;
+        _csrfTokenFetch = null;
+        return _csrfToken;
+      })
+      .catch((err) => {
+        _csrfTokenFetch = null;
+        throw err;
+      });
+  }
+  return _csrfTokenFetch;
+}
+
+async function mutationHeaders(): Promise<Record<string, string>> {
+  return { 'X-CSRF-Token': await getCsrfToken() };
+}
+
 /**
  * Convert snake_case keys to camelCase recursively.
  */
@@ -180,6 +214,7 @@ export async function saveAnnotation(
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        ...(await mutationHeaders()),
       },
       body: JSON.stringify(annotation),
     }
@@ -198,7 +233,10 @@ export async function deleteAnnotations(
   const params = annotatorId ? `?annotator_id=${annotatorId}` : '';
   const response = await fetch(
     `${API_BASE}/datasets/${datasetId}/episodes/${episodeIndex}/annotations${params}`,
-    { method: 'DELETE' }
+    {
+      method: 'DELETE',
+      headers: await mutationHeaders(),
+    }
   );
   return handleResponse(response);
 }
@@ -212,7 +250,10 @@ export async function triggerAutoAnalysis(
 ): Promise<AutoQualityAnalysis> {
   const response = await fetch(
     `${API_BASE}/datasets/${datasetId}/episodes/${episodeIndex}/annotations/auto`,
-    { method: 'POST' }
+    {
+      method: 'POST',
+      headers: await mutationHeaders(),
+    }
   );
   return handleResponse<AutoQualityAnalysis>(response);
 }
