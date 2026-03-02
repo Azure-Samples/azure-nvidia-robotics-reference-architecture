@@ -21,21 +21,20 @@ from ..storage import LocalStorageAdapter
 
 logger = logging.getLogger(__name__)
 
+
 # HDF5 support is optional
 try:
-    from .hdf5_loader import HDF5Loader, HDF5LoaderError
+    from .hdf5_loader import HDF5Loader
 
     HDF5_AVAILABLE = True
 except ImportError:
     HDF5_AVAILABLE = False
     HDF5Loader = None
-    HDF5LoaderError = Exception
 
 # LeRobot parquet support is optional
 try:
     from .lerobot_loader import (
         LeRobotLoader,
-        LeRobotLoaderError,
         is_lerobot_dataset,
     )
 
@@ -43,7 +42,6 @@ try:
 except ImportError:
     LEROBOT_AVAILABLE = False
     LeRobotLoader = None
-    LeRobotLoaderError = Exception
     is_lerobot_dataset = lambda x: False  # noqa: E731
 
 
@@ -82,18 +80,24 @@ class DatasetService:
         Returns:
             LeRobotLoader if available and dataset is LeRobot format, None otherwise.
         """
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         if not LEROBOT_AVAILABLE:
             return None
 
         if dataset_id not in self._lerobot_loaders:
-            from pathlib import Path
-
-            dataset_path = Path(self.base_path) / dataset_id
+            try:
+                dataset_path = self._get_dataset_path(dataset_id)
+            except ValueError:
+                return None
             if dataset_path.exists() and is_lerobot_dataset(dataset_path):
                 try:
                     self._lerobot_loaders[dataset_id] = LeRobotLoader(dataset_path)
                 except Exception as e:
-                    logger.warning("Failed to create LeRobot loader for %s: %s", dataset_id, e)
+                    logger.warning(
+                        "Failed to create LeRobot loader for %s: %s",
+                        dataset_id.replace("\r\n", "").replace("\n", ""),
+                        str(e).replace("\r\n", "").replace("\n", ""),
+                    )
                     return None
 
         return self._lerobot_loaders.get(dataset_id)
@@ -112,9 +116,10 @@ class DatasetService:
             return None
 
         if dataset_id not in self._hdf5_loaders:
-            from pathlib import Path
-
-            dataset_path = Path(self.base_path) / dataset_id
+            try:
+                dataset_path = self._get_dataset_path(dataset_id)
+            except ValueError:
+                return None
             if dataset_path.exists():
                 # Check if there are HDF5 files
                 hdf5_files = list(dataset_path.glob("**/*.hdf5"))
@@ -136,9 +141,10 @@ class DatasetService:
         Returns:
             DatasetInfo if directory with supported data exists, None otherwise.
         """
-        from pathlib import Path
-
-        dataset_path = Path(self.base_path) / dataset_id
+        try:
+            dataset_path = self._get_dataset_path(dataset_id)
+        except ValueError:
+            return None
 
         # Validate directory exists
         if not dataset_path.exists() or not dataset_path.is_dir():
@@ -196,6 +202,7 @@ class DatasetService:
         Returns:
             DatasetInfo if valid LeRobot dataset, None otherwise.
         """
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is None:
             return None
@@ -224,7 +231,11 @@ class DatasetService:
             return dataset_info
 
         except Exception as e:
-            logger.warning("Failed to discover LeRobot dataset %s: %s", dataset_id, e)
+            logger.warning(
+                "Failed to discover LeRobot dataset %s: %s",
+                dataset_id.replace("\r\n", "").replace("\n", ""),
+                str(e).replace("\r\n", "").replace("\n", ""),
+            )
             return None
 
     async def list_datasets(self) -> list[DatasetInfo]:
@@ -321,6 +332,7 @@ class DatasetService:
         Returns:
             List of EpisodeMeta matching the filters.
         """
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         dataset = self._datasets.get(dataset_id)
 
         # Get list of annotated episodes
@@ -341,7 +353,11 @@ class DatasetService:
                     except Exception:
                         episode_info_map[idx] = {"length": 0, "task_index": 0}
             except Exception as e:
-                logger.warning("LeRobot list_episodes failed for %s: %s", dataset_id, e)
+                logger.warning(
+                    "LeRobot list_episodes failed for %s: %s",
+                    dataset_id.replace("\r\n", "").replace("\n", ""),
+                    str(e).replace("\r\n", "").replace("\n", ""),
+                )
                 episode_indices = []
 
         # Fall back to HDF5 loader
@@ -382,14 +398,14 @@ class DatasetService:
                     ep_length = ep_info.get("length", 0)
                     ep_task_index = ep_info.get("task_index", 0)
                 except Exception:
-                    pass
+                    pass  # Best-effort; episode info unavailable
             elif self._get_hdf5_loader(dataset_id) is not None:
                 try:
                     ep_info = self._get_hdf5_loader(dataset_id).get_episode_info(idx)
                     ep_length = ep_info.get("length", 0)
                     ep_task_index = ep_info.get("task_index", 0)
                 except Exception:
-                    pass
+                    pass  # Best-effort; episode info unavailable
 
             if task_index is not None and ep_task_index != task_index:
                 continue
@@ -419,6 +435,7 @@ class DatasetService:
         Returns:
             EpisodeData if found, None otherwise.
         """
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         dataset = self._datasets.get(dataset_id)
 
         # Get annotation status
@@ -438,9 +455,7 @@ class DatasetService:
                 ep_task_index = lr_data.task_index
 
                 # Convert LeRobot data to TrajectoryPoint list
-                num_joints = (
-                    lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
-                )
+                num_joints = lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
 
                 for i in range(lr_data.length):
                     joint_pos = lr_data.joint_positions[i].tolist()
@@ -450,11 +465,7 @@ class DatasetService:
                         else [0.0] * num_joints
                     )
                     # Use action as surrogate for end-effector if not available
-                    ee_pose = (
-                        lr_data.actions[i][:6].tolist()
-                        if lr_data.actions is not None
-                        else [0.0] * 6
-                    )
+                    ee_pose = lr_data.actions[i][:6].tolist() if lr_data.actions is not None else [0.0] * 6
                     gripper = 0.0  # LeRobot UR10e doesn't have gripper in this dataset
 
                     trajectory_data.append(
@@ -470,9 +481,7 @@ class DatasetService:
 
                 # Generate video URLs for cameras
                 for camera in lr_data.video_paths:
-                    video_urls[camera] = (
-                        f"/api/datasets/{dataset_id}/episodes/{episode_idx}/video/{camera}"
-                    )
+                    video_urls[camera] = f"/api/datasets/{dataset_id}/episodes/{episode_idx}/video/{camera}"
 
                 return EpisodeData(
                     meta=EpisodeMeta(
@@ -487,7 +496,9 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot load_episode failed for %s/%d: %s", dataset_id, episode_idx, e
+                    "LeRobot load_episode failed for episode %s: %s",
+                    str(episode_idx).replace("\r\n", "").replace("\n", ""),
+                    type(e).__name__.replace("\r\n", "").replace("\n", ""),
                 )
                 # Fall through to try HDF5
 
@@ -519,11 +530,7 @@ class DatasetService:
                     )
 
                     # Get gripper state
-                    gripper = (
-                        float(hdf5_data.gripper_states[i])
-                        if hdf5_data.gripper_states is not None
-                        else 0.0
-                    )
+                    gripper = float(hdf5_data.gripper_states[i]) if hdf5_data.gripper_states is not None else 0.0
 
                     trajectory_data.append(
                         TrajectoryPoint(
@@ -539,9 +546,7 @@ class DatasetService:
                 # Get video URLs from metadata if available
                 cameras = hdf5_data.metadata.get("cameras", [])
                 for camera in cameras:
-                    video_urls[camera] = (
-                        f"/api/datasets/{dataset_id}/episodes/{episode_idx}/video/{camera}"
-                    )
+                    video_urls[camera] = f"/api/datasets/{dataset_id}/episodes/{episode_idx}/video/{camera}"
 
             except Exception:
                 # Fall back to empty data if HDF5 loading fails
@@ -562,9 +567,7 @@ class DatasetService:
             trajectory_data=trajectory_data,
         )
 
-    async def get_episode_trajectory(
-        self, dataset_id: str, episode_idx: int
-    ) -> list[TrajectoryPoint]:
+    async def get_episode_trajectory(self, dataset_id: str, episode_idx: int) -> list[TrajectoryPoint]:
         """
         Get only the trajectory data for an episode.
 
@@ -577,15 +580,14 @@ class DatasetService:
         Returns:
             List of TrajectoryPoint, empty if not found.
         """
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
         # Try LeRobot loader first
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is not None:
             try:
                 lr_data = lerobot_loader.load_episode(episode_idx)
                 trajectory_data: list[TrajectoryPoint] = []
-                num_joints = (
-                    lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
-                )
+                num_joints = lr_data.joint_positions.shape[1] if lr_data.joint_positions.ndim > 1 else 6
 
                 for i in range(lr_data.length):
                     joint_pos = lr_data.joint_positions[i].tolist()
@@ -594,11 +596,7 @@ class DatasetService:
                         if lr_data.joint_velocities is not None
                         else [0.0] * num_joints
                     )
-                    ee_pose = (
-                        lr_data.actions[i][:6].tolist()
-                        if lr_data.actions is not None
-                        else [0.0] * 6
-                    )
+                    ee_pose = lr_data.actions[i][:6].tolist() if lr_data.actions is not None else [0.0] * 6
                     gripper = 0.0
 
                     trajectory_data.append(
@@ -616,7 +614,9 @@ class DatasetService:
 
             except Exception as e:
                 logger.warning(
-                    "LeRobot trajectory load failed for %s/%d: %s", dataset_id, episode_idx, e
+                    "LeRobot trajectory load failed for episode %s: %s",
+                    str(episode_idx).replace("\r\n", "").replace("\n", ""),
+                    type(e).__name__.replace("\r\n", "").replace("\n", ""),
                 )
 
         # Fall back to HDF5 loader
@@ -636,15 +636,9 @@ class DatasetService:
                     else [0.0] * len(joint_pos)
                 )
                 ee_pose = (
-                    hdf5_data.end_effector_pose[i].tolist()
-                    if hdf5_data.end_effector_pose is not None
-                    else [0.0] * 6
+                    hdf5_data.end_effector_pose[i].tolist() if hdf5_data.end_effector_pose is not None else [0.0] * 6
                 )
-                gripper = (
-                    float(hdf5_data.gripper_states[i])
-                    if hdf5_data.gripper_states is not None
-                    else 0.0
-                )
+                gripper = float(hdf5_data.gripper_states[i]) if hdf5_data.gripper_states is not None else 0.0
 
                 trajectory_data.append(
                     TrajectoryPoint(
@@ -678,26 +672,29 @@ class DatasetService:
         """Check if a dataset is in LeRobot parquet format."""
         return self._get_lerobot_loader(dataset_id) is not None
 
-    def _get_dataset_path(self, dataset_id: str) -> str | None:
+    def _get_dataset_path(self, dataset_id: str) -> Path:
         """
-        Get the filesystem path for a dataset.
+        Build and validate the filesystem path for a dataset.
 
-        Args:
-            dataset_id: Dataset identifier (directory name).
+        Uses os.path.basename to strip directory components (a sanitizer
+        recognized by CodeQL) and filesystem enumeration to return a path
+        derived from the directory listing rather than from user input.
 
-        Returns:
-            Absolute path to the dataset directory, or None if not found.
+        Raises:
+            ValueError: If dataset_id contains path separators or
+                        the directory does not exist.
         """
-        from pathlib import Path
+        safe_name = os.path.basename(dataset_id)
+        if not safe_name or safe_name != dataset_id:
+            raise ValueError(f"Invalid dataset path: {dataset_id}")
 
-        dataset_path = Path(self.base_path) / dataset_id
-        if dataset_path.exists() and dataset_path.is_dir():
-            return str(dataset_path.resolve())
-        return None
+        base = Path(os.path.realpath(self.base_path))
+        for entry in base.iterdir():
+            if entry.name == safe_name and entry.is_dir():
+                return entry
+        raise ValueError(f"Dataset directory not found: {dataset_id}")
 
-    async def get_frame_image(
-        self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str
-    ) -> bytes | None:
+    async def get_frame_image(self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str) -> bytes | None:
         """
         Get a single frame image from an episode.
 
@@ -713,6 +710,8 @@ class DatasetService:
         Returns:
             JPEG image bytes, or None if not found.
         """
+        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
+        camera = camera.replace("\r\n", "").replace("\n", "")
         # Try LeRobot loader first (mp4 frame extraction)
         lerobot_loader = self._get_lerobot_loader(dataset_id)
         if lerobot_loader is not None:
@@ -721,18 +720,16 @@ class DatasetService:
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
         if hdf5_loader is None:
-            logger.warning("No loader found for dataset %s", dataset_id)
+            logger.warning("No loader found for dataset %s", dataset_id.replace("\r\n", "").replace("\n", ""))
             return None
 
         try:
-            hdf5_data = hdf5_loader.load_episode(
-                episode_idx, load_images=True, image_cameras=[camera]
-            )
+            hdf5_data = hdf5_loader.load_episode(episode_idx, load_images=True, image_cameras=[camera])
 
             if camera not in hdf5_data.images:
                 logger.warning(
                     "Camera %s not found in episode. Available cameras: %s",
-                    camera,
+                    camera.replace("\r\n", "").replace("\n", ""),
                     list(hdf5_data.images.keys()),
                 )
                 return None
@@ -756,8 +753,11 @@ class DatasetService:
             return buffer.getvalue()
 
         except Exception as e:
-            logger.exception(
-                "Error loading frame %d from %s/%d: %s", frame_idx, dataset_id, episode_idx, e
+            logger.warning(
+                "Error loading frame %s from episode %s: %s",
+                str(frame_idx).replace("\r\n", "").replace("\n", ""),
+                str(episode_idx).replace("\r\n", "").replace("\n", ""),
+                type(e).__name__.replace("\r\n", "").replace("\n", ""),
             )
             return None
 
@@ -769,6 +769,7 @@ class DatasetService:
         camera: str,
     ) -> bytes | None:
         """Extract a single JPEG frame from a LeRobot mp4 video using OpenCV."""
+        camera = camera.replace("\r\n", "").replace("\n", "")
         import io
 
         import cv2
@@ -776,7 +777,10 @@ class DatasetService:
 
         video_path = loader.get_video_path(episode_idx, camera)
         if video_path is None:
-            logger.warning("No video for episode %d camera '%s'", episode_idx, camera)
+            logger.warning(
+                "No video for episode %s",
+                str(episode_idx).replace("\r\n", "").replace("\n", ""),
+            )
             return None
 
         cap = cv2.VideoCapture(str(video_path))
@@ -784,7 +788,10 @@ class DatasetService:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             ret, frame = cap.read()
             if not ret or frame is None:
-                logger.warning("Failed to read frame %d from %s", frame_idx, video_path)
+                logger.warning(
+                    "Failed to read frame %s",
+                    str(frame_idx).replace("\r\n", "").replace("\n", ""),
+                )
                 return None
 
             img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -811,7 +818,7 @@ class DatasetService:
             try:
                 return lerobot_loader.get_cameras()
             except Exception:
-                pass
+                pass  # Best-effort; loader may not support camera listing
 
         # Fall back to HDF5 loader
         hdf5_loader = self._get_hdf5_loader(dataset_id)
@@ -843,7 +850,7 @@ class DatasetService:
                 if video_path is not None:
                     return str(video_path)
             except Exception as e:
-                logger.warning("Failed to get video path: %s", e)
+                logger.warning("Failed to get video path: %s", str(e).replace("\r\n", "").replace("\n", ""))
 
         return None
 
