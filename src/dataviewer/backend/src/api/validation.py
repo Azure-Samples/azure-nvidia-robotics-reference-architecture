@@ -39,15 +39,15 @@ def validated_camera_name(
 def validate_path_containment(path: Path, base_path: Path) -> Path:
     """Verify a path resolves within the expected base directory.
 
-    Returns a reconstructed path built from the validated base and relative
-    components, breaking the taint chain for static analysis tools.
+    Returns the normalized, validated path directly so that static analysis
+    tools recognize the normpath+startswith sanitizer pattern on the same
+    data-flow value.
     """
-    normalized = os.path.realpath(str(path))
     safe_base = os.path.realpath(str(base_path))
+    normalized = os.path.normpath(os.path.realpath(str(path)))
     if not normalized.startswith(safe_base + os.sep) and normalized != safe_base:
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: resolved path escapes base directory",
         )
-    relative = Path(normalized).relative_to(safe_base)
-    return Path(safe_base) / relative
+    return Path(normalized)

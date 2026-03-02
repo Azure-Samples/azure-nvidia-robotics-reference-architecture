@@ -676,24 +676,21 @@ class DatasetService:
         """
         Build and validate the filesystem path for a dataset.
 
-        Uses filesystem enumeration to return a path derived from the
-        directory listing rather than from user input, which breaks
-        the taint chain for static analysis tools like CodeQL.
+        Uses os.path.basename to strip directory components (a sanitizer
+        recognized by CodeQL) and filesystem enumeration to return a path
+        derived from the directory listing rather than from user input.
 
         Raises:
-            ValueError: If dataset_id would escape the base data directory
-                        or the directory does not exist.
+            ValueError: If dataset_id contains path separators or
+                        the directory does not exist.
         """
-        base_dir = os.path.realpath(self.base_path)
-        dataset_path = os.path.realpath(os.path.join(base_dir, dataset_id))
-        if not dataset_path.startswith(base_dir + os.sep) and dataset_path != base_dir:
+        safe_name = os.path.basename(dataset_id)
+        if not safe_name or safe_name != dataset_id:
             raise ValueError(f"Invalid dataset path: {dataset_id}")
 
-        # Look up the directory from the filesystem to produce an untainted path
-        target_name = Path(dataset_path).name
-        base = Path(base_dir)
+        base = Path(os.path.realpath(self.base_path))
         for entry in base.iterdir():
-            if entry.name == target_name and entry.is_dir():
+            if entry.name == safe_name and entry.is_dir():
                 return entry
         raise ValueError(f"Dataset directory not found: {dataset_id}")
 
