@@ -50,6 +50,15 @@ resource "azapi_resource" "ml_workspace" {
   }
 
   response_export_values = ["properties.workspaceId", "identity.principalId"]
+
+  lifecycle {
+    ignore_changes = [
+      // ARM API returns resource provider segments with varying casing
+      // (e.g. Microsoft.insights vs Microsoft.Insights) causing perpetual drift
+      body.properties.applicationInsights,
+      body.properties.keyVault,
+    ]
+  }
 }
 
 // ============================================================
