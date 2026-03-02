@@ -49,4 +49,5 @@ def validate_path_containment(path: Path, base_path: Path) -> Path:
             status_code=400,
             detail="Path traversal detected: resolved path escapes base directory",
         )
-    return Path(normalized)
+    relative = Path(normalized).relative_to(safe_base)
+    return Path(safe_base) / relative

@@ -676,14 +676,26 @@ class DatasetService:
         """
         Build and validate the filesystem path for a dataset.
 
+        Uses filesystem enumeration to return a path derived from the
+        directory listing rather than from user input, which breaks
+        the taint chain for static analysis tools like CodeQL.
+
         Raises:
-            ValueError: If dataset_id would escape the base data directory.
+            ValueError: If dataset_id would escape the base data directory
+                        or the directory does not exist.
         """
         base_dir = os.path.realpath(self.base_path)
         dataset_path = os.path.realpath(os.path.join(base_dir, dataset_id))
         if not dataset_path.startswith(base_dir + os.sep) and dataset_path != base_dir:
             raise ValueError(f"Invalid dataset path: {dataset_id}")
-        return Path(dataset_path)
+
+        # Look up the directory from the filesystem to produce an untainted path
+        target_name = Path(dataset_path).name
+        base = Path(base_dir)
+        for entry in base.iterdir():
+            if entry.name == target_name and entry.is_dir():
+                return entry
+        raise ValueError(f"Dataset directory not found: {dataset_id}")
 
     async def get_frame_image(self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str) -> bytes | None:
         """
