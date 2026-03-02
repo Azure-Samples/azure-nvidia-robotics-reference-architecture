@@ -117,9 +117,7 @@ class TrajectoryAnalyzer:
         flags = self._determine_flags(smoothness, jitter, hesitation_count, correction_count)
 
         # Compute overall score
-        overall_score = self._compute_overall_score(
-            smoothness, efficiency, jitter, hesitation_count, correction_count
-        )
+        overall_score = self._compute_overall_score(smoothness, efficiency, jitter, hesitation_count, correction_count)
 
         return TrajectoryMetrics(
             smoothness=smoothness,

@@ -261,7 +261,7 @@ fi
 # Build Training Command
 #
 # The AzureML job runs a training entry script that:
-# 1. Installs LeRobot via uv pip
+# 1. Installs LeRobot dependencies from the workflow manifest
 # 2. Authenticates with HuggingFace Hub
 # 3. Configures MLflow tracking
 # 4. Runs lerobot-train with appropriate arguments
@@ -274,16 +274,11 @@ set -euo pipefail
 
 echo "=== LeRobot AzureML Training ==="
 
-# Install uv and LeRobot
+# Install runtime dependencies from workflow manifest
 apt-get update -qq && apt-get install -y -qq ffmpeg git build-essential > /dev/null 2>&1
 pip install --quiet uv
-
-LEROBOT_VER="${LEROBOT_VERSION:-}"
-if [[ -n "$LEROBOT_VER" && "$LEROBOT_VER" != "latest" ]]; then
-  uv pip install "lerobot==${LEROBOT_VER}" wandb huggingface-hub azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0" --system
-else
-  uv pip install lerobot wandb huggingface-hub azure-identity azure-ai-ml azureml-mlflow "mlflow>=2.8.0" --system
-fi
+uv pip compile training/lerobot/pyproject.toml -o /tmp/lerobot-runtime-requirements.txt
+uv pip install --system --requirement /tmp/lerobot-runtime-requirements.txt
 
 # HuggingFace auth
 if [[ -n "${HF_TOKEN:-}" ]]; then

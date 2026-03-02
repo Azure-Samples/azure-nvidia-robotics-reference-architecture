@@ -247,7 +247,7 @@ The script stages files to exclude `__pycache__` and build artifacts via `.amlig
 
 ## 🤖 LeRobot Behavioral Cloning
 
-The `submit-osmo-lerobot-training.sh` script submits LeRobot training workflows supporting ACT and Diffusion policy architectures. Uses HuggingFace Hub datasets and installs LeRobot dynamically at runtime.
+The `submit-osmo-lerobot-training.sh` script submits LeRobot training workflows supporting ACT and Diffusion policy architectures. Uses HuggingFace Hub datasets and installs runtime dependencies from `src/training/lerobot/pyproject.toml`.
 
 ### LeRobot Submission Examples
 
@@ -317,7 +317,7 @@ The `submit-osmo-lerobot-inference.sh` script evaluates trained LeRobot policies
 
 ## 🏢 AzureML LeRobot Training
 
-The `submit-azureml-lerobot-training.sh` script submits LeRobot training directly to Azure ML instead of OSMO. Registers an environment, builds an inline training command, and submits via `az ml job create`.
+The `submit-azureml-lerobot-training.sh` script submits LeRobot training directly to Azure ML instead of OSMO. It registers an environment, compiles runtime dependencies from `src/training/lerobot/pyproject.toml`, and submits via `az ml job create`.
 
 ### AzureML LeRobot Examples
 

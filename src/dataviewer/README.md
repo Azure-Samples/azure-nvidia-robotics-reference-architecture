@@ -15,7 +15,7 @@ A full-stack application for analyzing and annotating robotic training data from
 
 ## Installation
 
-### Backend
+### Backend Setup
 
 ```bash
 cd backend
@@ -28,7 +28,7 @@ source .venv/bin/activate
 uv pip install -e ".[dev,analysis,export]"
 ```
 
-### Frontend
+### Frontend Setup
 
 ```bash
 cd frontend
@@ -85,7 +85,7 @@ cd frontend
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173`
+The application will be available at `http://localhost:5173`.
 
 ## Development
 

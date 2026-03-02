@@ -14,9 +14,7 @@ class StorageAdapter(ABC):
     """Abstract base class for annotation storage backends."""
 
     @abstractmethod
-    async def get_annotation(
-        self, dataset_id: str, episode_index: int
-    ) -> EpisodeAnnotationFile | None:
+    async def get_annotation(self, dataset_id: str, episode_index: int) -> EpisodeAnnotationFile | None:
         """
         Retrieve annotations for an episode.
 
@@ -30,9 +28,7 @@ class StorageAdapter(ABC):
         pass
 
     @abstractmethod
-    async def save_annotation(
-        self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile
-    ) -> None:
+    async def save_annotation(self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile) -> None:
         """
         Save annotations for an episode.
 
@@ -72,6 +68,9 @@ class StorageAdapter(ABC):
             True if annotations were deleted, False if they didn't exist.
         """
         pass
+
+    async def close(self) -> None:  # noqa: B027
+        """Release any held resources. Default implementation is a no-op."""
 
     async def get_annotations_batch(
         self, dataset_id: str, episode_indices: list[int]

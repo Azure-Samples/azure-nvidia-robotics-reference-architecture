@@ -4,80 +4,24 @@ version = "0.4.0"
 description = "Azure NVIDIA Robotics Reference Architecture for Isaac Lab training"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    # Dev tools
-    "ipykernel>=7.1.0",
-    "ipython>=9.7.0",
-    "ipywidgets>=8.1.8",
-    "pytest>=8.4.2",
-    "pytest-cov>=6.2.1",
-    "tqdm>=4.67.1",
-    # Core Isaac Lab dependencies
-    "numpy<3",
-    "onnx>=1.18.0",
-    "prettytable==3.17.0",
-    "toml",
-    "hidapi==0.15.0",
-    "gymnasium==1.2.3",
-    "trimesh",
-    "pyglet<3",
-    "transformers",
-    "einops",
-    "warp-lang",
-    "pillow>=12.1.1",
-    "starlette==0.52.1",
-    # RL Framework dependencies
-    "protobuf>=4.25.8,!=5.26.0",
-    "hydra-core",
-    "h5py",
-    "tensorboard",
-    "moviepy",
-    "packaging<27",
-    "skrl>=1.4.3",
-    # Isaac Lab Tasks
-    "scikit-learn",
-    "numba",
-    # Azure ML Integration
-    "azure-identity>=1.13.0",
-    "azure-ai-ml",
-    "azureml-mlflow",
-    "mlflow",
-    "psutil>=5.9.0",
-    "pydantic>=2.10.5",
-    "pynvml>=11.5.0",
-    "azure-core==1.38.2",
-    "azure-storage-blob>=12.5.0,<=12.28.0",
-    "urllib3>=2.2.2",
-    "pyperclip==1.11.0",
-    "rsl-rl-lib==4.0.1",
-]
-
-[project.optional-dependencies]
-training = [
-    "azure-identity>=1.13.0",
-    "azure-ai-ml",
-    "azureml-mlflow",
-    "mlflow",
-    "psutil>=5.9.0",
-    "pynvml>=11.5.0",
-    "rsl-rl-lib==4.0.1",
-    "skrl>=1.4.3",
-]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/training"]
-
 [dependency-groups]
 dev = [
-    "ipykernel>=7.1.0",
-    "ipywidgets>=8.1.8",
-    "pytest>=8.4.2",
-    "pytest-cov>=6.2.1",
+    "ruff",
+    "pytest",
+    "pytest-cov",
+    "pydantic",
+    "ipykernel",
+    "ipywidgets",
+    "tqdm",
 ]
+
+[tool.uv]
+package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -27,12 +27,8 @@ class AzureBlobDataSource(BaseModel):
     type: Literal["azure-blob"] = "azure-blob"
     account_name: str = Field(description="Azure storage account name")
     container_name: str = Field(description="Blob container name")
-    sas_token: str | None = Field(
-        default=None, repr=False, description="SAS token for authentication"
-    )
-    managed_identity: bool = Field(
-        default=False, description="Use managed identity for authentication"
-    )
+    sas_token: str | None = Field(default=None, description="SAS token for authentication")
+    managed_identity: bool = Field(default=False, description="Use managed identity for authentication")
 
 
 class HuggingFaceDataSource(BaseModel):
@@ -40,12 +36,8 @@ class HuggingFaceDataSource(BaseModel):
 
     type: Literal["huggingface"] = "huggingface"
     repo_id: str = Field(description="Repository ID in format 'owner/repo'")
-    revision: str | None = Field(
-        default=None, description="Git revision (branch, tag, or commit hash)"
-    )
-    token: str | None = Field(
-        default=None, repr=False, description="Hugging Face API token for private repos"
-    )
+    revision: str | None = Field(default=None, description="Git revision (branch, tag, or commit hash)")
+    token: str | None = Field(default=None, description="Hugging Face API token for private repos")
 
 
 # Discriminated union for data sources
@@ -81,9 +73,7 @@ class DatasetInfo(BaseModel):
     name: str = Field(description="Human-readable dataset name")
     total_episodes: int = Field(ge=0, description="Total number of episodes")
     fps: float = Field(gt=0, description="Frames per second")
-    features: dict[str, FeatureSchema] = Field(
-        default_factory=dict, description="Feature schemas by name"
-    )
+    features: dict[str, FeatureSchema] = Field(default_factory=dict, description="Feature schemas by name")
     tasks: list[TaskInfo] = Field(default_factory=list, description="Available tasks")
 
 
@@ -131,12 +121,8 @@ class EpisodeData(BaseModel):
     """Complete episode data for viewing."""
 
     meta: EpisodeMeta
-    video_urls: dict[str, str] = Field(
-        default_factory=dict, description="Video URLs by camera name"
-    )
-    trajectory_data: list[TrajectoryPoint] = Field(
-        default_factory=list, description="Trajectory data points"
-    )
+    video_urls: dict[str, str] = Field(default_factory=dict, description="Video URLs by camera name")
+    trajectory_data: list[TrajectoryPoint] = Field(default_factory=list, description="Trajectory data points")
 
 
 # ============================================================================
@@ -147,28 +133,18 @@ class EpisodeData(BaseModel):
 class CurriculumCriteria(BaseModel):
     """Criteria for filtering episodes into a curriculum stage."""
 
-    min_quality_score: int | None = Field(
-        default=None, ge=1, le=5, description="Minimum quality score"
-    )
-    task_completeness: list[str] | None = Field(
-        default=None, description="Task completeness ratings to include"
-    )
+    min_quality_score: int | None = Field(default=None, ge=1, le=5, description="Minimum quality score")
+    task_completeness: list[str] | None = Field(default=None, description="Task completeness ratings to include")
     exclude_flags: list[str] | None = Field(default=None, description="Trajectory flags to exclude")
-    max_anomaly_count: int | None = Field(
-        default=None, ge=0, description="Maximum anomalies allowed"
-    )
+    max_anomaly_count: int | None = Field(default=None, ge=0, description="Maximum anomalies allowed")
 
 
 class CurriculumStage(BaseModel):
     """Single stage in a training curriculum."""
 
     name: str = Field(description="Stage name")
-    episode_indices: list[int] = Field(
-        default_factory=list, description="Episode indices in this stage"
-    )
-    criteria: CurriculumCriteria = Field(
-        default_factory=CurriculumCriteria, description="Selection criteria"
-    )
+    episode_indices: list[int] = Field(default_factory=list, description="Episode indices in this stage")
+    criteria: CurriculumCriteria = Field(default_factory=CurriculumCriteria, description="Selection criteria")
 
 
 class CurriculumStrategy(str):
@@ -207,9 +183,7 @@ class EpisodeCluster(BaseModel):
     centroid_episode: int = Field(ge=0, description="Index of centroid episode")
     members: list[int] = Field(default_factory=list, description="Episode indices")
     similarity: str = Field(default="medium", description="Similarity level")
-    suggested_label: str | None = Field(
-        default=None, description="Suggested label if consensus exists"
-    )
+    suggested_label: str | None = Field(default=None, description="Suggested label if consensus exists")
 
 
 class EpisodeClustering(BaseModel):

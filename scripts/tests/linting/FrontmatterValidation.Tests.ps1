@@ -959,7 +959,7 @@ Describe 'Test-SingleFileFrontmatter' -Tag 'Unit' {
     }
 
     It 'validates a valid root community file with no issues' {
-        $filePath = Join-Path $script:FixtureDir 'valid-root-community.md'
+        $filePath = Join-Path $script:FixtureDir 'valid-root-community-with-footer.md'
         $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'README.md'
         $result.IsValid | Should -BeTrue
     }
@@ -1030,6 +1030,300 @@ Describe 'New-ValidationSummary function' -Tag 'Unit' {
         $summary | Should -Not -BeNullOrEmpty
         $null -eq $summary.Results | Should -BeFalse
         $summary.Results.Count | Should -Be 0
+    }
+}
+
+#endregion
+
+#region Test-MarkdownFooter
+
+Describe 'Test-MarkdownFooter' -Tag 'Unit' {
+    It 'returns true for plain-text Copilot footer' {
+        $content = @"
+# Title
+
+Some content here.
+
+🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for footer without "then"' {
+        $content = @"
+# Title
+
+🤖 Crafted with precision by ✨Copilot following brilliant human instruction, carefully refined by our team of discerning human reviewers.
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for footer with trailing period' {
+        $content = @"
+# Title
+
+🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for footer without trailing period' {
+        $content = @"
+# Title
+
+🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns false for empty string' {
+        Test-MarkdownFooter -Content '' | Should -BeFalse
+    }
+
+    It 'returns false for content without footer' {
+        $content = "# Title`n`nJust regular content."
+        Test-MarkdownFooter -Content $content | Should -BeFalse
+    }
+
+    It 'returns true for bold-wrapped footer' {
+        $content = @"
+# Title
+
+**🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.**
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for italic-wrapped footer' {
+        $content = @"
+# Title
+
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.*
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for underscore-italic footer' {
+        $content = @"
+# Title
+
+_🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers._
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for inline-code footer' {
+        $content = @"
+# Title
+
+``🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.``
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true when HTML comments precede footer' {
+        $content = @"
+# Title
+
+<!-- comment -->
+🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for fixture file with footer' {
+        $filePath = Join-Path $script:FixtureDir 'valid-docs-with-footer.md'
+        $content = Get-Content -Path $filePath -Raw
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns false for fixture file without footer' {
+        $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+        $content = Get-Content -Path $filePath -Raw
+        Test-MarkdownFooter -Content $content | Should -BeFalse
+    }
+
+    It 'returns true for fixture with bold formatting' {
+        $filePath = Join-Path $script:FixtureDir 'footer-with-formatting.md'
+        $content = Get-Content -Path $filePath -Raw
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns true for fixture with HTML comment' {
+        $filePath = Join-Path $script:FixtureDir 'footer-with-html-comment.md'
+        $content = Get-Content -Path $filePath -Raw
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+
+    It 'returns false for partial/truncated footer' {
+        $content = "# Title`n`n🤖 Crafted with precision by ✨Copilot"
+        Test-MarkdownFooter -Content $content | Should -BeFalse
+    }
+
+    It 'returns true for strikethrough-wrapped footer' {
+        $content = @"
+# Title
+
+~~🤖 Crafted with precision by ✨Copilot following brilliant human instruction, then carefully refined by our team of discerning human reviewers.~~
+"@
+        Test-MarkdownFooter -Content $content | Should -BeTrue
+    }
+}
+
+#endregion
+
+#region Test-FooterPresence
+
+Describe 'Test-FooterPresence' -Tag 'Unit' {
+    It 'returns null when footer is present' {
+        $result = Test-FooterPresence -HasFooter $true -RelativePath 'docs/guide.md'
+        $result | Should -BeNullOrEmpty
+    }
+
+    It 'returns ValidationIssue when footer is missing' {
+        $result = Test-FooterPresence -HasFooter $false -RelativePath 'docs/guide.md'
+        $result | Should -Not -BeNullOrEmpty
+        $result.Field | Should -Be 'footer'
+        $result.Type | Should -Be 'Warning'
+    }
+
+    It 'defaults to Warning severity' {
+        $result = Test-FooterPresence -HasFooter $false -RelativePath 'docs/guide.md'
+        $result.Type | Should -Be 'Warning'
+    }
+
+    It 'respects Error severity override' {
+        $result = Test-FooterPresence -HasFooter $false -RelativePath 'README.md' -Severity 'Error'
+        $result.Type | Should -Be 'Error'
+    }
+
+    It 'sets correct message' {
+        $result = Test-FooterPresence -HasFooter $false -RelativePath 'docs/guide.md'
+        $result.Message | Should -Be 'Missing standard Copilot footer'
+    }
+
+    It 'sets FilePath to RelativePath' {
+        $result = Test-FooterPresence -HasFooter $false -RelativePath 'docs/test.md'
+        $result.FilePath | Should -Be 'docs/test.md'
+    }
+}
+
+#endregion
+
+#region Test-SingleFileFrontmatter footer integration
+
+Describe 'Test-SingleFileFrontmatter footer integration' -Tag 'Unit' {
+    Context 'Footer detection in documentation files' {
+        It 'reports no footer issue when footer is present' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs-with-footer.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/valid-docs-with-footer.md'
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+
+        It 'reports footer warning for documentation file without footer' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/valid-docs.md'
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 1
+            $footerIssues[0].Type | Should -Be 'Warning'
+        }
+
+        It 'reports footer error for root community file without footer' {
+            $filePath = Join-Path $script:FixtureDir 'valid-root-community.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'README.md'
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 1
+            $footerIssues[0].Type | Should -Be 'Error'
+        }
+
+        It 'reports no footer error for root community file with footer' {
+            $filePath = Join-Path $script:FixtureDir 'valid-root-community-with-footer.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'CONTRIBUTING.md'
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+    }
+
+    Context 'AI artifact exemptions' {
+        It 'skips footer validation for instruction files' {
+            $filePath = Join-Path $script:FixtureDir 'valid-instruction.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath '.github/instructions/style.instructions.md'
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+
+        It 'skips footer validation for prompt files' {
+            $filePath = Join-Path $script:FixtureDir 'valid-prompt.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath '.github/prompts/summarize.prompt.md'
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+    }
+
+    Context 'SkipFooterValidation switch' {
+        It 'skips footer check when switch is set' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/valid-docs.md' -SkipFooterValidation
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+
+        It 'still validates frontmatter fields when footer is skipped' {
+            $filePath = Join-Path $script:FixtureDir 'empty-description.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/empty-description.md' -SkipFooterValidation
+            $result.HasErrors | Should -BeTrue
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+    }
+
+    Context 'FooterExcludePaths parameter' {
+        It 'excludes files matching wildcard pattern' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/valid-docs.md' -FooterExcludePaths @('docs/**')
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+
+        It 'does not exclude non-matching files' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/valid-docs.md' -FooterExcludePaths @('deploy/**')
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 1
+        }
+
+        It 'handles multiple exclusion patterns' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/valid-docs.md' -FooterExcludePaths @('deploy/**', 'docs/**')
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+
+        It 'normalizes backslash separators in paths' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs\valid-docs.md' -FooterExcludePaths @('docs/**')
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+
+        It 'accepts empty exclusion array' {
+            $filePath = Join-Path $script:FixtureDir 'valid-docs.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/valid-docs.md' -FooterExcludePaths @()
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 1
+        }
+    }
+
+    Context 'Non-requiring file types skip footer' {
+        It 'does not validate footer for non-matching paths' {
+            $content = "# Test`nSome content"
+            $tempFile = Join-Path $TestDrive 'helper.md'
+            Set-Content -Path $tempFile -Value $content
+            $result = Test-SingleFileFrontmatter -FilePath $tempFile -RelativePath 'scripts/linting/README.md'
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
     }
 }
 

@@ -557,6 +557,77 @@ function Test-RootCommunityFileFields {
     return , $issues.ToArray()
 }
 
+function Test-MarkdownFooter {
+    <#
+    .SYNOPSIS
+        Checks if markdown content contains the standard Copilot attribution footer.
+    .PARAMETER Content
+        The markdown content string to validate.
+    .OUTPUTS
+        [bool] $true if valid footer present; $false otherwise.
+    #>
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [AllowEmptyString()]
+        [string]$Content
+    )
+
+    process {
+        if ([string]::IsNullOrEmpty($Content)) {
+            return $false
+        }
+
+        $normalized = $Content -replace '(?s)<!--.*?-->', ''
+        $normalized = $normalized -replace '\*\*([^*]+)\*\*', '$1'
+        $normalized = $normalized -replace '__([^_]+)__', '$1'
+        $normalized = $normalized -replace '\*([^*]+)\*', '$1'
+        $normalized = $normalized -replace '_([^_]+)_', '$1'
+        $normalized = $normalized -replace '~~([^~]+)~~', '$1'
+        $normalized = $normalized -replace '`([^`]+)`', '$1'
+        $normalized = $normalized.TrimEnd()
+
+        $pattern = '🤖\s*Crafted\s+with\s+precision\s+by\s+\u2728Copilot\s+following\s+brilliant\s+human\s+instruction[,\s]+(then\s+)?carefully\s+refined\s+by\s+our\s+team\s+of\s+discerning\s+human\s+reviewers\.?'
+
+        return $normalized -match $pattern
+    }
+}
+
+function Test-FooterPresence {
+    <#
+    .SYNOPSIS
+        Validates Copilot attribution footer presence.
+    .PARAMETER HasFooter
+        Boolean result from Test-MarkdownFooter.
+    .PARAMETER RelativePath
+        Relative path to the file being validated.
+    .PARAMETER Severity
+        Issue severity: 'Error' or 'Warning'. Default: 'Warning'.
+    .OUTPUTS
+        ValidationIssue or $null if footer is present.
+    #>
+    [CmdletBinding()]
+    [OutputType([ValidationIssue])]
+    param(
+        [Parameter(Mandatory)]
+        [bool]$HasFooter,
+
+        [Parameter(Mandatory)]
+        [string]$RelativePath,
+
+        [Parameter()]
+        [ValidateSet('Error', 'Warning')]
+        [string]$Severity = 'Warning'
+    )
+
+    if (-not $HasFooter) {
+        return [ValidationIssue]::new($Severity, 'footer', 'Missing standard Copilot footer', $RelativePath)
+    }
+
+    return $null
+}
+
 #endregion Content-Type Validators
 
 #region Orchestration
@@ -572,6 +643,12 @@ function Test-SingleFileFrontmatter {
         Absolute path to the markdown file.
     .PARAMETER RelativePath
         Repository-relative path for classification and reporting.
+    .PARAMETER FooterExcludePaths
+        Array of wildcard patterns for files to exclude from footer validation.
+        Uses PowerShell -like operator for matching against relative paths.
+        Path separators are normalized to forward slashes for cross-platform support.
+    .PARAMETER SkipFooterValidation
+        When set, skips footer validation entirely.
     .OUTPUTS
         FileValidationResult with all issues found.
     #>
@@ -581,7 +658,11 @@ function Test-SingleFileFrontmatter {
         [string] $FilePath,
 
         [Parameter(Mandatory = $true)]
-        [string] $RelativePath
+        [string] $RelativePath,
+
+        [string[]]$FooterExcludePaths = @(),
+
+        [switch]$SkipFooterValidation
     )
 
     $result = [FileValidationResult]::new($FilePath, $RelativePath)
@@ -624,6 +705,30 @@ function Test-SingleFileFrontmatter {
         foreach ($issue in $fieldIssues) { $result.AddIssue($issue) }
     }
 
+    # Footer validation
+    $isAiArtifact = $fileType.IsPrompt -or $fileType.IsInstruction
+    $skipFooterForFile = $false
+    $normalizedRelativePath = $RelativePath -replace '\\', '/'
+    foreach ($pattern in $FooterExcludePaths) {
+        $normalizedPattern = $pattern -replace '\\', '/'
+        if ($normalizedRelativePath -like $normalizedPattern) {
+            $skipFooterForFile = $true
+            break
+        }
+    }
+
+    if (-not $isAiArtifact -and -not $SkipFooterValidation -and -not $skipFooterForFile) {
+        $footerSeverity = if ($fileType.IsRootCommunity) { 'Error' } else { 'Warning' }
+        $content = Get-Content -Path $FilePath -Raw -ErrorAction SilentlyContinue
+        if ($content) {
+            $hasFooter = Test-MarkdownFooter -Content $content
+            $footerIssue = Test-FooterPresence -HasFooter $hasFooter -RelativePath $RelativePath -Severity $footerSeverity
+            if ($footerIssue) {
+                $result.AddIssue($footerIssue)
+            }
+        }
+    }
+
     return $result
 }
 
@@ -657,6 +762,8 @@ Export-ModuleMember -Function @(
     'Test-InstructionFileFields',
     'Test-GitHubResourceFileFields',
     'Test-RootCommunityFileFields',
+    'Test-MarkdownFooter',
+    'Test-FooterPresence',
     'Test-SingleFileFrontmatter',
     'New-ValidationSummary'
 )

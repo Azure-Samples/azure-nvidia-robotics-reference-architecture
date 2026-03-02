@@ -1,22 +1,4 @@
 # Industry Standards & Protocols (not covered by public dicts)
-# Academic & Technical Terms
-# Security & Compliance
-# Cloud Platforms & Services (not covered by public dicts)
-# Programming Languages & Frameworks (not covered by public dicts)
-# Data & Analytics
-# Business & Enterprise
-# Networking & Infrastructure (not covered by public dicts)
-# Company Names & Brands
-# Product Names & Trademarks (not covered by public dicts)
-# File Formats & Extensions
-# Abbreviations & Acronyms
-# Technical Terms
-# Proper Nouns & Company Names
-# Development & DevOps
-# Video & Image Processing
-# Hardware & Platforms (not covered by public dicts)
-# Software & CAD Tools
-# Azure NVIDIA Robotics Reference Architecture
 abac
 abap
 abfs
@@ -37,7 +19,6 @@ allowlisting
 amazon
 amazonaws
 amet
-amlignore
 ammp
 amqp
 amsr
@@ -66,7 +47,6 @@ arachni
 aravis
 architected
 architecting
-argjson
 ariba
 arrowdown
 arrowleft
@@ -147,7 +127,6 @@ bssid
 btocompute
 buildpack
 bulletsprint
-Burstable
 byol
 byos
 caching
@@ -156,7 +135,6 @@ cannery
 canonicalize
 cantemo
 capex
-capsys
 captcha
 cartpole
 cassandra
@@ -165,7 +143,6 @@ cds
 cengage
 centrify
 ceo
-CFLAGS
 cfo
 chainalytics
 changefeed
@@ -222,7 +199,6 @@ cloudyn
 clu
 clustered
 clusterer
-clusterpolicies
 cmdb
 cmdlet
 cmdlets
@@ -282,7 +258,6 @@ corosync
 correlated
 correlations
 cortana
-coscheduling
 couchbase
 coupa
 cpps
@@ -291,7 +266,6 @@ cpuprofile
 cpus
 cqrs
 crc
-crds
 creds
 cref
 Creo
@@ -308,7 +282,6 @@ cse's
 csp
 cspell
 cspm
-CSPRNG
 csps
 csr
 csv
@@ -335,7 +308,6 @@ Cybercrime
 cybersecurity
 cyclomatic
 cyclonedds
-daemonset
 Dapr
 datacenter
 datacenters
@@ -345,13 +317,14 @@ datalake
 dataops
 datapoints
 dataset
+datasetanalysistool
 datasets
 datasize
+dataviewer
 dataverse
 datefmt
 davinci
 dbcc
-dbname
 dcgm
 DDPG
 debuggability
@@ -363,11 +336,9 @@ defaultazurecredential
 defaultinstancetype
 deidentification
 deis
-delenv
 delimited
 dell
 denormalized
-deployers
 deserialize
 deserialized
 dets
@@ -396,7 +367,6 @@ documentdb
 docx
 dogfood
 domino
-dones
 donotreply
 dotenv
 dotnet
@@ -425,8 +395,6 @@ endusers
 enhancements
 entitlement
 entitlements
-envsubst
-epch
 epicor
 eps
 erewbuffer
@@ -495,7 +463,6 @@ georeplicated
 georeplication
 geoserver
 geospatial
-getpid
 gettype
 gigabytes
 git
@@ -510,11 +477,8 @@ google
 googlecloud
 gpu
 gpuinstancetype
-gpupool
-gpuspot
 grafana
 graphql
-grdn
 greenfield
 grooming
 gruntwork
@@ -574,10 +538,8 @@ iisreset
 imagenet
 imap
 imds
-imgmsg
 incentivize
 incentivized
-incluster
 indexeddb
 inetpub
 inexhaustive
@@ -596,8 +558,6 @@ inmon
 innersource
 innodb
 inprivate
-instancetype
-instancetypes
 intel
 intellicode
 intellij
@@ -654,7 +614,6 @@ jira
 journalctl
 jpgs
 json
-jtzh
 jumpstart
 junitxml
 jupyter
@@ -673,7 +632,6 @@ kepware
 keras
 kerberos
 keyid
-keylength
 kics
 kinect
 kingsway
@@ -701,14 +659,11 @@ lan
 lanczos
 lavfi
 ldap
-LDFLAGS
 leaderboard
 lenbuffer
 lenovo
 lerobot
 levelname
-libgl
-libglib
 libx
 lifecycle
 lifecycles
@@ -725,10 +680,8 @@ liveops
 Llamacpp
 llap
 llms
-lnkmpfy
 loadbalancer
 localizationpriority
-localpath
 lockdown
 lockdowns
 lockfiles
@@ -783,7 +736,6 @@ midtones
 migratable
 minecraft
 minification
-MININTERVAL
 minio
 minmax
 misallocate
@@ -798,7 +750,6 @@ mlops
 moby
 modbus
 Modelica
-modeset
 modopts
 modreq
 modreqs
@@ -831,7 +782,6 @@ myregistry
 mysql
 namespace
 namespaces
-nanosec
 nant
 ncdc
 nei
@@ -856,7 +806,6 @@ noncompliant
 nosql
 notnull
 notpetya
-nsenter
 nsgs
 nslookup
 ntfs
@@ -867,7 +816,6 @@ nvarchar
 nvas
 nvcr
 nvidia
-nvidiadrivers
 nvme
 nvml
 nygard
@@ -884,10 +832,8 @@ okera
 okrs
 olap
 olas
-oldsha
 oltp
 omnichannel
-Omniverse
 onapsis
 onboarded
 onboards
@@ -895,7 +841,6 @@ oneline
 onmicrosoft
 onnx
 onnxruntime
-onnxscript
 onpremises
 onpremisesstorage
 openapi
@@ -916,7 +861,6 @@ operationalizes
 operationalizing
 opex
 opinsights
-opset
 Opsgenie
 optimised
 optimising
@@ -928,7 +872,6 @@ organisation
 organisations
 organised
 osmoauth
-osmorobo
 OSSF
 otel
 otlp
@@ -962,14 +905,10 @@ pdbs
 pdfs
 pebibyte
 peerings
-peermem
-pentry
 performant
-persistenced
 personalizer
 petya
 pgadmin
-PGPASSWORD
 pgsql
 phpinfo
 phpmyadmin
@@ -985,25 +924,22 @@ platform
 platformops
 platforms
 playfab
+playhead
 playment
 playsinline
 Plotly
 pluggable
 pluralsight
 pmks
-pname
 pngs
 pnrp
 pocs
 pod
-podgroups
 podmonitor
-podmonitors
 pointnext
 polybase
 popen
 popout
-portforward
 Portworx
 posix
 posterized
@@ -1015,7 +951,6 @@ ppac
 pptx
 prd
 preapproved
-prebundle
 precommitment
 precommitments
 preconfigured
@@ -1052,7 +987,6 @@ pseries
 pseudonymization
 pseudonymize
 psql
-psqladmin
 PSScriptAnalyzer
 pstn
 psversiontable
@@ -1061,7 +995,6 @@ pulsant
 pulumi
 purescale
 pwsh
-pyav
 pyglet
 pylance
 pyodbc
@@ -1073,7 +1006,6 @@ PYTHONPATH
 pyyaml
 Qdrant
 qgis
-qjqy
 qldrw
 qlik
 qpos
@@ -1097,7 +1029,6 @@ randn
 rasterio
 ratecard
 rbsc
-rclpy
 rcnn
 rdbms
 rdma
@@ -1139,7 +1070,6 @@ reimplementing
 reintegrate
 reintegrating
 relabelling
-relayserver
 Remotable
 renumbered
 reoccur
@@ -1161,11 +1091,9 @@ rewbuffer
 rfcs
 rgba
 rhn
-rhysd
 risc
 rlhf
 rmem
-rmmod
 roadmap
 roadmaps
 roadrunner
@@ -1194,7 +1122,6 @@ sandboxed
 Sankey
 sap
 Sarbanes
-savez
 scalability
 scalesetpriority
 scenario
@@ -1211,7 +1138,6 @@ sdks
 sdlc
 searchable
 seccomp
-secretproviderclass
 sectigo
 seealso
 Seldon
@@ -1247,7 +1173,6 @@ slos
 slsa
 smes
 smita
-smpl
 SMPTE
 smptebars
 smtp
@@ -1279,7 +1204,6 @@ ssds
 ssdt
 ssis
 ssl
-sslmode
 ssma
 ssrs
 sssc
@@ -1293,7 +1217,6 @@ stig
 stonith
 stopwords
 storsimple
-stosmorbt
 strategizing
 striim
 strpos
@@ -1318,6 +1241,7 @@ supervisely
 suricata
 swid
 syft
+synchronisation
 syslog
 syslogs
 sysplex
@@ -1342,7 +1266,6 @@ telemetry
 templating
 templatize
 templatized
-tensordict
 teradata
 teragen
 terasort
@@ -1356,8 +1279,8 @@ testcase
 testcases
 testcontainer
 testdata
+testpaths
 testsrc
-testuser
 tflint
 tflite
 tfvars
@@ -1381,6 +1304,7 @@ TOCTOU
 todatetime
 todynamic
 togaf
+toggleable
 tolerations
 tolong
 tomtom
@@ -1416,7 +1340,6 @@ typosquatting
 udfs
 udp
 udrs
-ueks
 umap
 unbootable
 uncompromised
@@ -1437,7 +1360,6 @@ uniqueidentifier
 unisys
 unjudged
 unmanaged
-unnormalization
 unoptimized
 Unproxied
 unpublish
@@ -1447,7 +1369,6 @@ unsnooze
 untrusted
 upbound
 upds
-updt
 upjet
 upns
 upsell
@@ -1572,4 +1493,405 @@ zipkin
 zonemap
 zref
 zscaler
+
+# Academic & Technical Terms
+anonymization
+anonymize
+anonymizing
+autoencoders
+automl
+inferencing
+magnetostatics
+neuromorphic
+operationalization
+operationalize
+operationalized
+scikit
+homomorphic
+onnxruntime
+memprofile
+cpuprofile
+minmax
+modreqs
+modreq
+modopts
+flexbox
+rgba
+srgb
+backface
+wmem
+rmem
+datapoints
+chromadb
+timescaledb
+
+# Security & Compliance
+antimalware
+auditable
+auditability
+auditifnotexists
+gdpr
+hipaa
+oidc
+OSSF
+passwordless
+siem
+sox
+Sarbanes
+Oxley
+
+# Cloud Platforms & Services (not covered by public dicts)
+amazonaws
+gcp
+googlecloud
+hybridcloud
+multicloud
+openshift
+redhat
+
+# Programming Languages & Frameworks (not covered by public dicts)
+angularjs
+dotnet
+golang
+javascript
+nodejs
+python
+reactjs
+typescript
+xamarin
+
+# Data & Analytics
+bigdata
+dataops
+etl
+elt
+lakehouse
+lakehouses
+mlops
+nosql
+olap
+oltp
+polybase
+realtime
+timeseries
+
+# Business & Enterprise
+chargeback
+crm
+epicor
+erp
+Exfiltration
+hrms
+scm
+workday
+
+# Networking & Infrastructure (not covered by public dicts)
+cidr
+cyclonedds
+dns
+iot
+loadbalancer
+nginx
+proxy
+ssl
+tls
+wan
+lan
+
+# Company Names & Brands
+adobe
+amazon
+apple
+cisco
+dell
+google
+hp
+ibm
+intel
+microsoft
+nvidia
+oracle
+salesforce
+sap
+vmware
+vpn
+
+# Product Names & Trademarks (not covered by public dicts)
+github
+gitlab
+vscode
+windows
+gruntwork
+
+# File Formats & Extensions
+csv
+docx
+json
+orc
+parquet
+pptx
+xlsx
+xml
+yaml
+yml
+
+# Abbreviations & Acronyms
+app
+cli
+cpu
+gpu
+sql
+tcp
+udp
+url
+uri
+uuid
+vm
+vpc
+
+# Technical Terms
+apis
+backend
+frontend
+middleware
+microservice
+microservices
+webhook
+webhooks
+
+# Proper Nouns & Company Names
+Katello
+Metaverse
+Upselling
+
+# Development & DevOps
+agile
+cicd
+devops
+scrum
+kanban
+sprint
+backlog
+pipeline
+pipelines
+pwsh
+shellcheck
+nslookup
+journalctl
+vimdiff
+mergetool
+gitmessage
+pipefail
+esac
+keyid
+openpgp
+difftool
+trustexitcode
+keepbackup
+checkpointed
+parameterless
+notnull
+gettype
+lockfiles
+workitem
+workitems
+timespan
+todatetime
+toreal
+tolong
+todynamic
+utcnow
+torutek
+backpressure
+execdir
+seealso
+cref
+defaultinstancetype
+levelname
+asctime
+datefmt
+newsection
+oneline
+typeresou
+param
+typeparam
+colcon
+pathlib
+popen
+expanduser
+reqwest
+pyyaml
+rabbitmq
+mqttbroker
+mqttbridgeconnector
+mqtts
+dmqtt
+brokerlistener
+cloudevents
+datasize
+mult
+reqs
+
+# Video & Image Processing
+drawtext
+fontcolor
+fontsize
+lanczos
+lavfi
+libx
+palettegen
+paletteuse
+posterized
+SMPTE
+smptebars
+testsrc
+
+# Hardware & Platforms (not covered by public dicts)
+Jetson
+microcontroller
+microcontrollers
+Mbed
+openvino
+Portworx
+Zigbee
+Hudi
+
+# Software & CAD Tools
+autocad
+autodesk
+Coppelia
+Creo
+GMSH
+Modelica
+postman
+powershell
+tableau
+Serilog
+Silverlight
+DYNPROXY
+Proxyable
+Cropp
+Clarius
+Retryable
+Remotable
+Finalizer
+Unproxied
+Memberwise
+Distro
+SHAP
+Plotly
+Anthos
+Trino
+Simbolic
+JENNI
+Clis
+Extended
+interceptable
+Hypervelocity
+junitxml
+PSScriptAnalyzer
+chatagent
+docstrings
+issubset
+isort
+mymodule
+mypy
+sandboxed
+
+# Azure NVIDIA Robotics Reference Architecture
+amlignore
+anymal
+autolog
+azureml
+cartpole
+chkpt
+coscheduling
+cudnn
+DDPG
+erewbuffer
+flatdict
+gpuinstancetype
+gpuspot
+infotensor
+IPPO
+irewbuffer
+isaaclab
+isaacsim
+lenbuffer
+MAPPO
+meks
+nvcr
+nvml
+oauthtoken
+osmoauth
+pgadmin
+pyglet
+pylance
+PYTHONHASHSEED
+PYTHONPATH
+redisenterprise
+rewbuffer
+rslrl
+skrl
+timestep
+timesteps
+argjson
+burstable
+capsys
+clusterpolicies
+crds
+daemonset
+dbname
+delenv
+denoising
+dones
+envsubst
+epch
+getpid
+gpupool
+grdn
+imgmsg
+incluster
+instancetype
+instancetypes
+jtzh
+libgl
+libglib
+lnkmpfy
+localpath
+mininterval
+modeset
+nanosec
+nsenter
+nvidiadrivers
+oldsha
+omniverse
+opset
+osmorobo
+peermem
+pentry
+persistenced
+pgpassword
+pname
+podgroups
+podmonitors
+portforward
+prebundle
+psqladmin
+pyav
+qjqy
+rclpy
+relayserver
+rhysd
+rmmod
+savez
+secretproviderclass
+smpl
+sslmode
+stosmorbt
+tensordict
+testuser
+ueks
+unnormalization
+updt
 zstd

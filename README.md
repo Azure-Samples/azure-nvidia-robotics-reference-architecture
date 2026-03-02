@@ -14,7 +14,7 @@ OSMO handles workflow orchestration and job scheduling while Azure provides elas
   - Automatic metric logging from SKRL agents to Azure ML
   - Comprehensive tracking of episode statistics, losses, optimization metrics, and timing data
   - Configurable logging intervals and metric filtering
-  - See [MLflow Integration Guide](docs/mlflow-integration.md) for details
+  - See [MLflow Integration Guide](docs/training/mlflow-integration.md) for details
 - **Scalable Compute** - Auto-scaling GPU nodes based on workload demands
 - **Cost Optimization** - Pay-per-use compute with automatic scaling
 - **Enterprise Security** - Entra ID integration

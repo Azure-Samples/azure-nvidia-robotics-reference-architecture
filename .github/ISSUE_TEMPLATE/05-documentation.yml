@@ -13,7 +13,7 @@ body:
     attributes:
       label: Documentation Location
       description: Which file or section has the issue?
-      placeholder: "README.md, docs/mlflow-integration.md, etc."
+      placeholder: "README.md, docs/training/mlflow-integration.md, etc."
     validations:
       required: true
 
