@@ -89,9 +89,7 @@ async def get_label_options(dataset_id: str = Depends(validated_dataset_id)) -> 
 
 
 @router.post("/{dataset_id}/labels/options")
-async def add_label_option(
-    dataset_id: str = Depends(validated_dataset_id), body: AddLabelOption = ...
-) -> list[str]:
+async def add_label_option(dataset_id: str = Depends(validated_dataset_id), body: AddLabelOption = ...) -> list[str]:
     """Add a new label option to the available set."""
     labels_file = await _load_labels(dataset_id)
     normalized = body.label.strip().upper()
@@ -104,9 +102,7 @@ async def add_label_option(
 
 
 @router.get("/{dataset_id}/episodes/{episode_idx}/labels")
-async def get_episode_labels(
-    dataset_id: str = Depends(validated_dataset_id), episode_idx: int = ...
-) -> EpisodeLabels:
+async def get_episode_labels(dataset_id: str = Depends(validated_dataset_id), episode_idx: int = ...) -> EpisodeLabels:
     """Get labels for a specific episode."""
     labels_file = await _load_labels(dataset_id)
     key = str(episode_idx)

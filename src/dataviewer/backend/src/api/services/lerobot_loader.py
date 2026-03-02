@@ -123,9 +123,7 @@ class LeRobotLoader:
             LeRobotLoaderError: If the dataset structure is invalid.
         """
         if not PARQUET_AVAILABLE:
-            raise ImportError(
-                "LeRobot support requires pyarrow package. Install with: pip install pyarrow"
-            )
+            raise ImportError("LeRobot support requires pyarrow package. Install with: pip install pyarrow")
 
         self.base_path = Path(base_path)
         self._info: LeRobotDatasetInfo | None = None

@@ -276,18 +276,12 @@ class HuggingFaceHubAdapter(StorageAdapter):
         feature_name = f"observation.images.{camera_name}"
         video_path = f"videos/{chunk_name}/{feature_name}/episode_{episode_index:06d}.mp4"
 
-        return (
-            f"https://huggingface.co/datasets/{self.repo_id}/resolve/{self.revision}/{video_path}"
-        )
+        return f"https://huggingface.co/datasets/{self.repo_id}/resolve/{self.revision}/{video_path}"
 
-    async def get_annotation(
-        self, dataset_id: str, episode_index: int
-    ) -> EpisodeAnnotationFile | None:
+    async def get_annotation(self, dataset_id: str, episode_index: int) -> EpisodeAnnotationFile | None:
         raise NotImplementedError("HuggingFaceHubAdapter is read-only")
 
-    async def save_annotation(
-        self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile
-    ) -> None:
+    async def save_annotation(self, dataset_id: str, episode_index: int, annotation: EpisodeAnnotationFile) -> None:
         raise NotImplementedError("HuggingFaceHubAdapter is read-only")
 
     async def list_annotated_episodes(self, dataset_id: str) -> list[int]:

@@ -137,9 +137,7 @@ def apply_resize(
         ImageTransformError: If PIL is not available or resize fails.
     """
     if not PIL_AVAILABLE:
-        raise ImageTransformError(
-            "PIL (Pillow) is required for resize operations. Install with: pip install Pillow"
-        )
+        raise ImageTransformError("PIL (Pillow) is required for resize operations. Install with: pip install Pillow")
 
     if size.width <= 0 or size.height <= 0:
         raise ImageTransformError(f"Resize dimensions must be positive: {size.width}x{size.height}")
@@ -179,9 +177,7 @@ def apply_brightness(
         ImageTransformError: If PIL is not available.
     """
     if not PIL_AVAILABLE:
-        raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
-        )
+        raise ImageTransformError("PIL (Pillow) is required for color operations. Install with: pip install Pillow")
 
     try:
         pil_image = Image.fromarray(frame)
@@ -211,9 +207,7 @@ def apply_contrast(
         ImageTransformError: If PIL is not available.
     """
     if not PIL_AVAILABLE:
-        raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
-        )
+        raise ImageTransformError("PIL (Pillow) is required for color operations. Install with: pip install Pillow")
 
     try:
         pil_image = Image.fromarray(frame)
@@ -243,9 +237,7 @@ def apply_saturation(
         ImageTransformError: If PIL is not available.
     """
     if not PIL_AVAILABLE:
-        raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
-        )
+        raise ImageTransformError("PIL (Pillow) is required for color operations. Install with: pip install Pillow")
 
     try:
         pil_image = Image.fromarray(frame)
@@ -306,9 +298,7 @@ def apply_hue_rotation(
         ImageTransformError: If PIL is not available or operation fails.
     """
     if not PIL_AVAILABLE:
-        raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
-        )
+        raise ImageTransformError("PIL (Pillow) is required for color operations. Install with: pip install Pillow")
 
     if frame.ndim != 3 or frame.shape[2] != 3:
         raise ImageTransformError(f"Hue rotation requires RGB image, got shape: {frame.shape}")
@@ -352,9 +342,7 @@ def apply_color_filter(
         return frame
 
     if not PIL_AVAILABLE:
-        raise ImageTransformError(
-            "PIL (Pillow) is required for color operations. Install with: pip install Pillow"
-        )
+        raise ImageTransformError("PIL (Pillow) is required for color operations. Install with: pip install Pillow")
 
     try:
         if filter_name == "grayscale":
