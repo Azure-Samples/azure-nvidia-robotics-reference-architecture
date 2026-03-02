@@ -159,6 +159,7 @@ capex
 capsys
 captcha
 cartpole
+carryforward
 cassandra
 catia
 cds
@@ -645,6 +646,7 @@ itemname
 itil
 itsm
 itsmc
+jacoco
 javascript
 jboss
 jdbc
