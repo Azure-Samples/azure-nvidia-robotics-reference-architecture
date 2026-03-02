@@ -11,8 +11,10 @@ from pathlib import Path
 
 import aiofiles
 import aiofiles.os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from ..validation import validate_path_containment, validated_dataset_id
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +54,20 @@ def _get_base_path() -> str:
 
 def _labels_path(dataset_id: str) -> Path:
     base = Path(_get_base_path())
-    return base / dataset_id / "meta" / "episode_labels.json"
+    path = base / dataset_id / "meta" / "episode_labels.json"
+    return validate_path_containment(path, base)
 
 
 async def _load_labels(dataset_id: str) -> DatasetLabelsFile:
     path = _labels_path(dataset_id)
+    safe_base = os.path.realpath(_get_base_path())
+    resolved = os.path.realpath(str(path))
+    if not resolved.startswith(safe_base + os.sep):
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: labels path escapes base directory",
+        )
+    path = Path(resolved)
     if not await aiofiles.os.path.exists(path):
         return DatasetLabelsFile(dataset_id=dataset_id)
     async with aiofiles.open(path, encoding="utf-8") as f:
@@ -66,6 +77,14 @@ async def _load_labels(dataset_id: str) -> DatasetLabelsFile:
 
 async def _save_labels(dataset_id: str, labels_file: DatasetLabelsFile) -> None:
     path = _labels_path(dataset_id)
+    safe_base = os.path.realpath(_get_base_path())
+    resolved = os.path.realpath(str(path))
+    if not resolved.startswith(safe_base + os.sep):
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: labels path escapes base directory",
+        )
+    path = Path(resolved)
     await aiofiles.os.makedirs(path.parent, exist_ok=True)
     content = json.dumps(labels_file.model_dump(), indent=2)
     async with aiofiles.open(path, "w", encoding="utf-8") as f:
@@ -73,20 +92,20 @@ async def _save_labels(dataset_id: str, labels_file: DatasetLabelsFile) -> None:
 
 
 @router.get("/{dataset_id}/labels")
-async def get_dataset_labels(dataset_id: str) -> DatasetLabelsFile:
+async def get_dataset_labels(dataset_id: str = Depends(validated_dataset_id)) -> DatasetLabelsFile:
     """Get all episode labels and available label options for a dataset."""
     return await _load_labels(dataset_id)
 
 
 @router.get("/{dataset_id}/labels/options")
-async def get_label_options(dataset_id: str) -> list[str]:
+async def get_label_options(dataset_id: str = Depends(validated_dataset_id)) -> list[str]:
     """Get the list of available label options for a dataset."""
     labels_file = await _load_labels(dataset_id)
     return labels_file.available_labels
 
 
 @router.post("/{dataset_id}/labels/options")
-async def add_label_option(dataset_id: str, body: AddLabelOption) -> list[str]:
+async def add_label_option(dataset_id: str = Depends(validated_dataset_id), body: AddLabelOption = ...) -> list[str]:
     """Add a new label option to the available set."""
     labels_file = await _load_labels(dataset_id)
     normalized = body.label.strip().upper()
@@ -99,7 +118,7 @@ async def add_label_option(dataset_id: str, body: AddLabelOption) -> list[str]:
 
 
 @router.get("/{dataset_id}/episodes/{episode_idx}/labels")
-async def get_episode_labels(dataset_id: str, episode_idx: int) -> EpisodeLabels:
+async def get_episode_labels(dataset_id: str = Depends(validated_dataset_id), episode_idx: int = ...) -> EpisodeLabels:
     """Get labels for a specific episode."""
     labels_file = await _load_labels(dataset_id)
     key = str(episode_idx)
@@ -111,7 +130,9 @@ async def get_episode_labels(dataset_id: str, episode_idx: int) -> EpisodeLabels
 
 @router.put("/{dataset_id}/episodes/{episode_idx}/labels")
 async def set_episode_labels(
-    dataset_id: str, episode_idx: int, body: BulkLabelUpdate
+    dataset_id: str = Depends(validated_dataset_id),
+    episode_idx: int = ...,
+    body: BulkLabelUpdate = ...,
 ) -> EpisodeLabels:
     """Set labels for a specific episode (replaces existing labels)."""
     labels_file = await _load_labels(dataset_id)
@@ -133,7 +154,7 @@ async def set_episode_labels(
 
 
 @router.post("/{dataset_id}/labels/save")
-async def save_all_labels(dataset_id: str) -> DatasetLabelsFile:
+async def save_all_labels(dataset_id: str = Depends(validated_dataset_id)) -> DatasetLabelsFile:
     """Persist all labels to disk (already persisted on each write, but
     this endpoint lets the frontend trigger an explicit save/confirmation)."""
     labels_file = await _load_labels(dataset_id)
