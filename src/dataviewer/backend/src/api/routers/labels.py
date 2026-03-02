@@ -61,8 +61,8 @@ def _labels_path(dataset_id: str) -> Path:
 async def _load_labels(dataset_id: str) -> DatasetLabelsFile:
     path = _labels_path(dataset_id)
     safe_base = os.path.realpath(_get_base_path())
-    resolved = os.path.normpath(os.path.realpath(str(path)))
-    if not resolved.startswith(safe_base + os.sep) and resolved != safe_base:
+    resolved = os.path.realpath(str(path))
+    if not resolved.startswith(safe_base + os.sep):
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: labels path escapes base directory",
@@ -78,8 +78,8 @@ async def _load_labels(dataset_id: str) -> DatasetLabelsFile:
 async def _save_labels(dataset_id: str, labels_file: DatasetLabelsFile) -> None:
     path = _labels_path(dataset_id)
     safe_base = os.path.realpath(_get_base_path())
-    resolved = os.path.normpath(os.path.realpath(str(path)))
-    if not resolved.startswith(safe_base + os.sep) and resolved != safe_base:
+    resolved = os.path.realpath(str(path))
+    if not resolved.startswith(safe_base + os.sep):
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: labels path escapes base directory",

@@ -135,8 +135,8 @@ async def export_episodes(
             detail=f"Dataset '{dataset_id}' does not have a valid path for export",
         )
     safe_dataset_base = os.path.realpath(service.base_path)
-    resolved_dataset = os.path.normpath(os.path.realpath(str(dataset_path)))
-    if not resolved_dataset.startswith(safe_dataset_base + os.sep) and resolved_dataset != safe_dataset_base:
+    resolved_dataset = os.path.realpath(str(dataset_path))
+    if not resolved_dataset.startswith(safe_dataset_base + os.sep):
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: dataset path escapes base directory",
@@ -150,8 +150,8 @@ async def export_episodes(
 
     # Validate output path
     safe_base = os.path.realpath(service.base_path)
-    output_path_str = os.path.normpath(os.path.realpath(request.outputPath))
-    if not output_path_str.startswith(safe_base + os.sep) and output_path_str != safe_base:
+    output_path_str = os.path.realpath(request.outputPath)
+    if not output_path_str.startswith(safe_base + os.sep):
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: resolved path escapes base directory",
@@ -251,6 +251,14 @@ async def export_episodes_stream(
             status_code=400,
             detail=f"Dataset '{dataset_id}' does not have a valid path for export",
         )
+    safe_stream_base = os.path.realpath(service.base_path)
+    resolved_stream = os.path.realpath(str(dataset_path))
+    if not resolved_stream.startswith(safe_stream_base + os.sep):
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: dataset path escapes base directory",
+        )
+    dataset_path = Path(resolved_stream)
     if not dataset_path.exists():
         raise HTTPException(
             status_code=400,
@@ -259,8 +267,8 @@ async def export_episodes_stream(
 
     # Validate output path
     safe_base = os.path.realpath(service.base_path)
-    output_path_str = os.path.normpath(os.path.realpath(request.outputPath))
-    if not output_path_str.startswith(safe_base + os.sep) and output_path_str != safe_base:
+    output_path_str = os.path.realpath(request.outputPath)
+    if not output_path_str.startswith(safe_base + os.sep):
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: resolved path escapes base directory",
