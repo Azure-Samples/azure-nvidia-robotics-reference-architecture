@@ -1,5 +1,6 @@
 """Input validation dependencies for the dataviewer API."""
 
+import os
 import re
 from pathlib import Path
 
@@ -41,12 +42,11 @@ def validate_path_containment(path: Path, base_path: Path) -> Path:
     Returns a reconstructed path built from the validated base and relative
     components, breaking the taint chain for static analysis tools.
     """
-    resolved = path.resolve()
-    base_resolved = base_path.resolve()
-    if not resolved.is_relative_to(base_resolved):
+    normalized = os.path.realpath(str(path))
+    safe_base = os.path.realpath(str(base_path))
+    if not normalized.startswith(safe_base + os.sep) and normalized != safe_base:
         raise HTTPException(
             status_code=400,
             detail="Path traversal detected: resolved path escapes base directory",
         )
-    relative = resolved.relative_to(base_resolved)
-    return base_resolved / relative
+    return Path(normalized)

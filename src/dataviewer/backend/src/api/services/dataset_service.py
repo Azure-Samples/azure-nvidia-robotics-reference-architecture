@@ -679,12 +679,11 @@ class DatasetService:
         Raises:
             ValueError: If dataset_id would escape the base data directory.
         """
-        base = Path(self.base_path).resolve()
-        dataset_path = (base / dataset_id).resolve()
-        if not dataset_path.is_relative_to(base):
+        base_dir = os.path.realpath(self.base_path)
+        dataset_path = os.path.realpath(os.path.join(base_dir, dataset_id))
+        if not dataset_path.startswith(base_dir + os.sep) and dataset_path != base_dir:
             raise ValueError(f"Invalid dataset path: {dataset_id}")
-        relative = dataset_path.relative_to(base)
-        return base / relative
+        return Path(dataset_path)
 
     async def get_frame_image(self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str) -> bytes | None:
         """

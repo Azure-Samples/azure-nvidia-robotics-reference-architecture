@@ -92,6 +92,21 @@ class TestValidatePathContainment:
             validate_path_containment(escape_path, tmp_path)
         assert exc_info.value.status_code == 400
 
+    def test_prefix_confusion_rejected(self, tmp_path):
+        """Base /tmp/data must not match /tmp/data-backup."""
+        base = tmp_path / "data"
+        base.mkdir()
+        imposter = tmp_path / "data-backup" / "secret"
+        imposter.mkdir(parents=True)
+        with pytest.raises(HTTPException) as exc_info:
+            validate_path_containment(imposter, base)
+        assert exc_info.value.status_code == 400
+
+    def test_base_directory_accepted(self, tmp_path):
+        """Path equal to base directory should be accepted."""
+        result = validate_path_containment(tmp_path, tmp_path)
+        assert result == tmp_path.resolve()
+
 
 class TestEndpointTraversalRejection:
     """Integration tests: endpoints reject traversal inputs with HTTP 400."""
