@@ -1895,3 +1895,24 @@ ueks
 unnormalization
 updt
 zstd
+
+# Matplotlib / plotting API terms
+axhline
+boxplots
+cmap
+colorbar
+figsize
+fontweight
+imshow
+labelsize
+linestyle
+maes
+sharex
+suptitle
+throughputs
+xlabel
+ylabel
+ylim
+yticklabels
+yticks
+zorder
