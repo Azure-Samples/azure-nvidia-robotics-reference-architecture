@@ -136,14 +136,18 @@ resource "azurerm_role_assignment" "osmo_kv_secrets_user" {
 
 // Grant Grafana identity Monitoring Reader on resource group
 resource "azurerm_role_assignment" "grafana_monitoring_reader" {
+  count = var.should_deploy_grafana ? 1 : 0
+
   scope                = var.resource_group.id
   role_definition_name = "Monitoring Reader"
-  principal_id         = azurerm_dashboard_grafana.main.identity[0].principal_id
+  principal_id         = azurerm_dashboard_grafana.main[0].identity[0].principal_id
 }
 
 // Grant Grafana identity Grafana Admin
 resource "azurerm_role_assignment" "grafana_admin" {
-  scope                = azurerm_dashboard_grafana.main.id
+  count = var.should_deploy_grafana ? 1 : 0
+
+  scope                = azurerm_dashboard_grafana.main[0].id
   role_definition_name = "Grafana Admin"
   principal_id         = var.current_user_oid
 }
