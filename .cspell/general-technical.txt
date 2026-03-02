@@ -10,6 +10,7 @@ adrm
 adrs
 agentless
 agile
+anom
 alam
 alation
 alizaidi
@@ -86,7 +87,9 @@ autostart
 avanade
 avere
 avro
+azmk
 azureml
+azurevpnconfig
 baas
 Babelscape
 backend
@@ -370,6 +373,7 @@ domino
 donotreply
 dotenv
 dotnet
+downsamples
 downtime
 dpu
 drawtext
@@ -665,6 +669,7 @@ lenovo
 lerobot
 levelname
 libx
+libzstd
 lifecycle
 lifecycles
 lightbox
@@ -705,6 +710,7 @@ maxar
 maxdb
 Mbed
 mbps
+mcap
 mcaps
 mcem
 mcra
@@ -1099,12 +1105,14 @@ roadmaps
 roadrunner
 rollout
 rollouts
+rosbag
 routable
 rpa
 rpc
 rpcs
 rsa
 rslrl
+rtde
 rtmp
 rubrik
 runbooks
@@ -1155,6 +1163,7 @@ shards
 shellcheck
 showbacks
 siem
+sigalrm
 signalr
 signingkey
 signup
@@ -1171,6 +1180,7 @@ sles
 sloc
 slos
 slsa
+smartctl
 smes
 smita
 SMPTE
@@ -1259,6 +1269,7 @@ tebibytes
 techops
 techsmith
 tecton
+tegrastats
 Tekton
 telco
 telehealth
@@ -1799,6 +1810,7 @@ mypy
 sandboxed
 
 # Azure NVIDIA Robotics Reference Architecture
+amlarc
 amlignore
 anymal
 autolog

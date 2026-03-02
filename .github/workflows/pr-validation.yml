@@ -101,6 +101,13 @@ jobs:
       contents: read
       id-token: write
 
+  # Dataviewer frontend lint, type-check, and unit tests
+  dataviewer-frontend-tests:
+    name: Dataviewer Frontend Tests
+    uses: ./.github/workflows/dataviewer-frontend-tests.yml
+    permissions:
+      contents: read
+
   # Python pytest test execution
   pytest-tests:
     name: Pytest Tests
