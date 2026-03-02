@@ -10,6 +10,7 @@ adrm
 adrs
 agentless
 agile
+anom
 alam
 alation
 alizaidi
