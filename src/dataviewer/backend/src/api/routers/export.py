@@ -7,6 +7,7 @@ frame editing, removal, and sub-task annotations applied.
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,7 @@ from ..services.hdf5_exporter import (
     HDF5ExportError,
     parse_edit_operations,
 )
-from ..validation import validate_path_containment, validated_dataset_id
+from ..validation import validated_dataset_id
 
 router = APIRouter()
 
@@ -125,6 +126,7 @@ async def export_episodes(
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
 
     # Get dataset path
+    dataset_id = os.path.basename(dataset_id)
     try:
         dataset_path = service._get_dataset_path(dataset_id)
     except ValueError:
@@ -139,7 +141,14 @@ async def export_episodes(
         )
 
     # Validate output path
-    output_path = validate_path_containment(Path(request.outputPath), Path(service.base_path))
+    safe_base = os.path.realpath(service.base_path)
+    output_path_str = os.path.normpath(os.path.realpath(request.outputPath))
+    if not output_path_str.startswith(safe_base + os.sep) and output_path_str != safe_base:
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: resolved path escapes base directory",
+        )
+    output_path = Path(output_path_str)
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
@@ -226,6 +235,7 @@ async def export_episodes_stream(
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
 
     # Get dataset path
+    dataset_id = os.path.basename(dataset_id)
     try:
         dataset_path = service._get_dataset_path(dataset_id)
     except ValueError:
@@ -240,7 +250,14 @@ async def export_episodes_stream(
         )
 
     # Validate output path
-    output_path = validate_path_containment(Path(request.outputPath), Path(service.base_path))
+    safe_base = os.path.realpath(service.base_path)
+    output_path_str = os.path.normpath(os.path.realpath(request.outputPath))
+    if not output_path_str.startswith(safe_base + os.sep) and output_path_str != safe_base:
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: resolved path escapes base directory",
+        )
+    output_path = Path(output_path_str)
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
