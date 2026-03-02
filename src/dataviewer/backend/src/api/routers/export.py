@@ -134,6 +134,14 @@ async def export_episodes(
             status_code=400,
             detail=f"Dataset '{dataset_id}' does not have a valid path for export",
         )
+    safe_dataset_base = os.path.realpath(service.base_path)
+    resolved_dataset = os.path.normpath(os.path.realpath(str(dataset_path)))
+    if not resolved_dataset.startswith(safe_dataset_base + os.sep) and resolved_dataset != safe_dataset_base:
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: dataset path escapes base directory",
+        )
+    dataset_path = Path(resolved_dataset)
     if not dataset_path.exists():
         raise HTTPException(
             status_code=400,

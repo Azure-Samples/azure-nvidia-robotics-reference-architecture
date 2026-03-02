@@ -60,6 +60,14 @@ def _labels_path(dataset_id: str) -> Path:
 
 async def _load_labels(dataset_id: str) -> DatasetLabelsFile:
     path = _labels_path(dataset_id)
+    safe_base = os.path.realpath(_get_base_path())
+    resolved = os.path.normpath(os.path.realpath(str(path)))
+    if not resolved.startswith(safe_base + os.sep) and resolved != safe_base:
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: labels path escapes base directory",
+        )
+    path = Path(resolved)
     if not await aiofiles.os.path.exists(path):
         return DatasetLabelsFile(dataset_id=dataset_id)
     async with aiofiles.open(path, encoding="utf-8") as f:
@@ -69,6 +77,14 @@ async def _load_labels(dataset_id: str) -> DatasetLabelsFile:
 
 async def _save_labels(dataset_id: str, labels_file: DatasetLabelsFile) -> None:
     path = _labels_path(dataset_id)
+    safe_base = os.path.realpath(_get_base_path())
+    resolved = os.path.normpath(os.path.realpath(str(path)))
+    if not resolved.startswith(safe_base + os.sep) and resolved != safe_base:
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal detected: labels path escapes base directory",
+        )
+    path = Path(resolved)
     await aiofiles.os.makedirs(path.parent, exist_ok=True)
     content = json.dumps(labels_file.model_dump(), indent=2)
     async with aiofiles.open(path, "w", encoding="utf-8") as f:
