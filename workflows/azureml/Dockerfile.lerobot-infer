@@ -15,3 +15,6 @@ RUN pip install --no-cache-dir uv && \
     azureml-mlflow \
     "mlflow>=2.8.0,<3.0.0" \
     av
+
+# Pre-download ResNet18 backbone weights (required by ACT policy, no internet at runtime)
+RUN python3 -c "import torchvision; torchvision.models.resnet18(weights='IMAGENET1K_V1')"
