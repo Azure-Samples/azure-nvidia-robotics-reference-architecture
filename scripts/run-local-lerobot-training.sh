@@ -51,6 +51,7 @@ TRAINING HYPERPARAMETERS:
         --lr-warmup-steps N       Learning rate warmup steps (default: 1000)
         --eval-freq N             Evaluation frequency
         --save-freq N             Checkpoint save frequency (default: 5000)
+        --num-workers N           Dataloader worker processes (default: 4)
 
 VALIDATION:
         --val-split RATIO         Validation split ratio (default: 0.1 = 10%%)
@@ -120,6 +121,7 @@ learning_rate="${LEARNING_RATE:-1e-4}"
 lr_warmup_steps="${LR_WARMUP_STEPS:-1000}"
 eval_freq="${EVAL_FREQ:-}"
 save_freq="${SAVE_FREQ:-5000}"
+num_workers="${NUM_WORKERS:-4}"
 
 val_split="${VAL_SPLIT:-0.1}"
 val_split_enabled=true
@@ -154,6 +156,7 @@ while [[ $# -gt 0 ]]; do
     --lr-warmup-steps)            lr_warmup_steps="$2"; shift 2 ;;
     --eval-freq)                  eval_freq="$2"; shift 2 ;;
     --save-freq)                  save_freq="$2"; shift 2 ;;
+    --num-workers)                num_workers="$2"; shift 2 ;;
     --val-split)                  val_split="$2"; shift 2 ;;
     --no-val-split)               val_split_enabled=false; shift ;;
     --wandb)                      wandb_enable=true; shift ;;
@@ -189,7 +192,7 @@ if [[ "$device" == "cuda" ]]; then
   gpu_name=$(python3 -c "import torch; print(torch.cuda.get_device_name(0))" 2>/dev/null || echo "unknown")
   gpu_mem=$(python3 -c "
 import torch
-mem = torch.cuda.get_device_properties(0).total_mem / (1024**3)
+mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
 print(f'{mem:.0f}')
 " 2>/dev/null || echo "?")
   info "GPU detected: ${gpu_name} (${gpu_mem} GB)"
@@ -219,6 +222,7 @@ fi
 # Validate dataset root when local-files-only
 if [[ "$local_files_only" == "true" && -n "$dataset_root" ]]; then
   [[ -d "$dataset_root" ]] || fatal "Dataset root not found: $dataset_root"
+  [[ -d "${dataset_root}/${dataset_repo_id}" ]] || fatal "Dataset directory not found: ${dataset_root}/${dataset_repo_id}"
 fi
 
 #------------------------------------------------------------------------------
@@ -233,17 +237,19 @@ train_cmd+=(
   "--output_dir=${output_dir}"
   "--job_name=${job_name}"
   "--policy.device=${device}"
+  "--optimizer.lr=${learning_rate}"
   "--steps=${training_steps}"
   "--batch_size=${batch_size}"
   "--save_freq=${save_freq}"
+  "--num_workers=${num_workers}"
 )
 
-[[ -n "$dataset_root" ]]     && train_cmd+=("--dataset.root=${dataset_root}")
+[[ -n "$dataset_root" ]]     && train_cmd+=("--dataset.root=${dataset_root}/${dataset_repo_id}")
 [[ -n "$policy_repo_id" ]]   && train_cmd+=("--policy.repo_id=${policy_repo_id}")
 [[ -n "$eval_freq" ]]        && train_cmd+=("--eval_freq=${eval_freq}")
 
 if [[ "$local_files_only" == "true" ]]; then
-  train_cmd+=("--dataset.local_files_only=true")
+  export HF_HUB_OFFLINE=1
 fi
 
 # W&B logging
@@ -291,6 +297,7 @@ print_kv "Batch Size" "$batch_size"
 print_kv "Learning Rate" "$learning_rate"
 print_kv "LR Warmup" "$lr_warmup_steps"
 print_kv "Save Freq" "$save_freq"
+print_kv "Num Workers" "$num_workers"
 print_kv "Val Split" "$val_split"
 print_kv "W&B" "$([[ "$wandb_enable" == "true" ]] && echo "enabled ($wandb_project)" || echo "disabled")"
 print_kv "MLflow" "$([[ "$mlflow_enable" == "true" ]] && echo "enabled" || echo "disabled")"
@@ -307,8 +314,6 @@ if [[ "$dry_run" == "true" ]]; then
   info "Command: ${train_cmd[*]}"
   exit 0
 fi
-
-mkdir -p "$output_dir"
 
 if [[ "$mlflow_enable" == "true" ]]; then
   info "Running training with MLflow logging via Python orchestrator..."

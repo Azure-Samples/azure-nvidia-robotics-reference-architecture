@@ -12,6 +12,7 @@ Submission scripts for training and validation workflows on Azure ML and OSMO pl
 
 | Script                               | Purpose                                             | Platform |
 | ------------------------------------ | --------------------------------------------------- | -------- |
+| `run-local-lerobot-training.sh`      | Run LeRobot training locally on RTX workstations    | Local    |
 | `submit-azureml-training.sh`         | Package code and submit Azure ML training job       | Azure ML |
 | `submit-azureml-validation.sh`       | Submit model validation job                         | Azure ML |
 | `submit-azureml-lerobot-training.sh` | Submit LeRobot training to Azure ML                 | Azure ML |
@@ -425,8 +426,9 @@ get_azureml_workspace  # Returns ML workspace name
 
 ## 🔗 Related Documentation
 
-| Resource                                  | Description                                        |
-| ----------------------------------------- | -------------------------------------------------- |
-| [workflows/](../workflows/)               | YAML templates for training and validation jobs    |
+| Resource                                                   | Description                                        |
+| ---------------------------------------------------------- | -------------------------------------------------- |
+| [docs/local-lerobot-training.md](../docs/local-lerobot-training.md) | Local LeRobot training guide (GPU tuning, params) |
+| [workflows/](../workflows/)                                | YAML templates for training and validation jobs    |
 | [workflows/osmo/](../workflows/osmo/)     | OSMO workflow templates including dataset training |
 | [deploy/002-setup/](../deploy/002-setup/) | Cluster configuration and OSMO deployment          |

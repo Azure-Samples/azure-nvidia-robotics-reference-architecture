@@ -29,7 +29,7 @@ dependencies = [
     # Testing
     "pytest-mock",
     "junitparser",
-    "flatdict==4.0.1",
+    "flatdict==4.1.0",
     "flaky",
     # RL Framework dependencies
     "protobuf>=4.25.8,!=5.26.0",
