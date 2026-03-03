@@ -2,7 +2,7 @@
 title: Infrastructure Deployment
 description: Terraform configuration and deployment for AKS, Azure ML, storage, and OSMO backend services
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-22
+ms.date: 2026-03-02
 ms.topic: how-to
 keywords:
   - terraform
@@ -83,6 +83,12 @@ terraform init && terraform apply -var-file=terraform.tfvars
 | `should_enable_public_network_access` | Allow public access to resources                          | `true`  |
 | `should_deploy_postgresql`            | Deploy PostgreSQL Flexible Server for OSMO                | `true`  |
 | `should_deploy_redis`                 | Deploy Azure Managed Redis for OSMO                       | `true`  |
+| `should_deploy_grafana`               | Deploy Azure Managed Grafana dashboard                    | `true`  |
+| `should_deploy_monitor_workspace`     | Deploy Azure Monitor Workspace for Prometheus metrics     | `true`  |
+| `should_deploy_ampls`                 | Deploy Azure Monitor Private Link Scope and endpoint      | `true`  |
+| `should_deploy_dce`                   | Deploy Data Collection Endpoint for observability         | `true`  |
+| `should_deploy_aml_compute`           | Deploy AzureML managed GPU compute cluster                | `false` |
+| `should_include_aks_dns_zone`         | Include AKS private DNS zone in core DNS zones            | `true`  |
 
 ### Network Configuration Modes
 
