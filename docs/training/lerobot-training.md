@@ -207,7 +207,7 @@ The `run-lerobot-pipeline.sh` script orchestrates the full lifecycle on OSMO:
 
 ## 🔗 Related Documentation
 
-- [LeRobot Inference](../lerobot-inference.md) for evaluating trained policies
+- [LeRobot Inference](../inference/lerobot-inference.md) for evaluating trained policies
 - [Experiment Tracking](experiment-tracking.md) for MLflow and WANDB configuration
 - [AzureML Workflows](../../workflows/azureml/README.md) for job template reference
 - [OSMO Workflows](../../workflows/osmo/README.md) for workflow template reference
