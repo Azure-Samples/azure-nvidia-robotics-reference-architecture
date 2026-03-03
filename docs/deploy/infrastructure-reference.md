@@ -70,31 +70,31 @@ Root Module (001-iac/)
 
 ### Resources by Category
 
-| Category         | Resources                                                                        |
-|------------------|----------------------------------------------------------------------------------|
-| Networking       | VNet, subnets (main, PE, AKS, GPU pools), NSG, NAT Gateway, DNS Private Resolver |
-| Security         | Key Vault (RBAC mode), ML identity, OSMO identity                                |
+| Category         | Resources                                                                                        |
+|------------------|--------------------------------------------------------------------------------------------------|
+| Networking       | VNet, subnets (main, PE, AKS, GPU pools), NSG, NAT Gateway, DNS Private Resolver                 |
+| Security         | Key Vault (RBAC mode), ML identity, OSMO identity                                                |
 | Observability    | Log Analytics (always), App Insights (always), Monitor Workspace, Grafana, DCE, AMPLS (optional) |
 | Storage          | Storage Account (blob/file), Container Registry (Premium)                                        |
 | Machine Learning | AzureML Workspace, optional managed compute cluster                                              |
 | AKS              | Cluster with Azure CNI Overlay, system pool, GPU node pools                                      |
 | Private DNS      | 6 base zones + conditional AKS zone + conditional monitor zones (up to 11)                       |
-| OSMO Services    | PostgreSQL Flexible Server (HA), Azure Managed Redis                             |
+| OSMO Services    | PostgreSQL Flexible Server (HA), Azure Managed Redis                                             |
 
 ### Conditional Resources
 
-| Condition                          | Resources Created                                              |
-|------------------------------------|----------------------------------------------------------------|
-| `should_enable_private_endpoint`   | Private endpoints, DNS zones, DNS resolver                     |
-| `should_enable_nat_gateway`        | NAT Gateway, Public IP, subnet associations                    |
-| `should_deploy_postgresql`         | PostgreSQL server, databases, delegated subnet, DNS zone       |
-| `should_deploy_redis`              | Redis cache, private endpoint (if PE enabled), DNS zone        |
-| `should_deploy_grafana`            | Azure Managed Grafana, role assignments                        |
-| `should_deploy_monitor_workspace`  | Azure Monitor Workspace for Prometheus                         |
-| `should_deploy_ampls`              | AMPLS, scoped services, private endpoint (if PE enabled)       |
-| `should_deploy_dce`                | Data Collection Endpoint, AMPLS link (if AMPLS enabled)        |
-| `should_deploy_aml_compute`        | AzureML managed GPU compute cluster                            |
-| `should_include_aks_dns_zone`      | AKS private DNS zone in core zones                             |
+| Condition                         | Resources Created                                        |
+|-----------------------------------|----------------------------------------------------------|
+| `should_enable_private_endpoint`  | Private endpoints, DNS zones, DNS resolver               |
+| `should_enable_nat_gateway`       | NAT Gateway, Public IP, subnet associations              |
+| `should_deploy_postgresql`        | PostgreSQL server, databases, delegated subnet, DNS zone |
+| `should_deploy_redis`             | Redis cache, private endpoint (if PE enabled), DNS zone  |
+| `should_deploy_grafana`           | Azure Managed Grafana, role assignments                  |
+| `should_deploy_monitor_workspace` | Azure Monitor Workspace for Prometheus                   |
+| `should_deploy_ampls`             | AMPLS, scoped services, private endpoint (if PE enabled) |
+| `should_deploy_dce`               | Data Collection Endpoint, AMPLS link (if AMPLS enabled)  |
+| `should_deploy_aml_compute`       | AzureML managed GPU compute cluster                      |
+| `should_include_aks_dns_zone`     | AKS private DNS zone in core zones                       |
 
 ## 📦 Modules
 
