@@ -71,8 +71,11 @@ resource "azurerm_dashboard_grafana" "main" {
   sku                               = "Standard"
   zone_redundancy_enabled           = false
 
-  azure_monitor_workspace_integrations {
-    resource_id = azurerm_monitor_workspace.main[0].id
+  dynamic "azure_monitor_workspace_integrations" {
+    for_each = var.should_deploy_monitor_workspace ? [1] : []
+    content {
+      resource_id = azurerm_monitor_workspace.main[0].id
+    }
   }
 
   identity {
