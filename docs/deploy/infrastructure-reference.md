@@ -121,6 +121,9 @@ terraform output key_vault_name
 
 # DNS server IP (for VPN clients)
 terraform output dns_server_ip
+
+# AzureML compute cluster (when enabled)
+terraform output aml_compute_cluster
 ```
 
 ## 🔧 Optional Components
