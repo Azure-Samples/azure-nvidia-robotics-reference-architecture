@@ -348,3 +348,73 @@ variable "should_enable_microsoft_defender" {
   description = "Whether to enable Microsoft Defender for Containers on the AKS cluster"
   default     = false
 }
+
+/*
+ * Observability Feature Flags - Optional
+ */
+
+variable "should_deploy_grafana" {
+  type        = bool
+  description = "Whether to deploy Azure Managed Grafana dashboard"
+  default     = true
+}
+
+variable "should_deploy_monitor_workspace" {
+  type        = bool
+  description = "Whether to deploy Azure Monitor Workspace for Prometheus metrics"
+  default     = true
+}
+
+variable "should_deploy_ampls" {
+  type        = bool
+  description = "Whether to deploy Azure Monitor Private Link Scope and its private endpoint"
+  default     = true
+}
+
+variable "should_deploy_dce" {
+  type        = bool
+  description = "Whether to deploy Data Collection Endpoint for observability"
+  default     = true
+}
+
+/*
+ * AzureML Compute Configuration - Optional
+ */
+
+variable "should_deploy_aml_compute" {
+  type        = bool
+  description = "Whether to deploy an AzureML managed compute cluster for GPU workloads"
+  default     = false
+}
+
+variable "aml_compute_config" {
+  type = object({
+    vm_size               = string
+    vm_priority           = string
+    min_node_count        = number
+    max_node_count        = number
+    scale_down_after_idle = optional(string, "PT5M")
+    cluster_name          = optional(string, "gpu-cluster")
+    subnet_id             = optional(string)
+  })
+  description = "AzureML managed compute cluster configuration including VM size, priority, scaling, and optional subnet placement"
+  default = {
+    vm_size               = "Standard_NC4as_T4_v3"
+    vm_priority           = "LowPriority"
+    min_node_count        = 0
+    max_node_count        = 1
+    scale_down_after_idle = "PT5M"
+    cluster_name          = "gpu-cluster"
+    subnet_id             = null
+  }
+}
+
+/*
+ * DNS Zone Feature Flags - Optional
+ */
+
+variable "should_include_aks_dns_zone" {
+  type        = bool
+  description = "Whether to include the AKS private DNS zone in core DNS zones"
+  default     = true
+}

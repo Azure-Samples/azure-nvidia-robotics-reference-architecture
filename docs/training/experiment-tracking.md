@@ -24,12 +24,12 @@ SKRL training logs metrics to MLflow without additional configuration. Metrics i
 
 Configure logging frequency with `--mlflow_log_interval`:
 
-| Interval    | Behavior                          | Use Case              |
-|-------------|-----------------------------------|-----------------------|
-| `step`      | Log every training step           | Debugging             |
-| `balanced`  | Log every 10 steps (default)      | Standard training     |
-| `rollout`   | Log once per rollout cycle        | Long runs             |
-| Integer     | Custom step interval              | Tuned granularity     |
+| Interval   | Behavior                     | Use Case          |
+|------------|------------------------------|-------------------|
+| `step`     | Log every training step      | Debugging         |
+| `balanced` | Log every 10 steps (default) | Standard training |
+| `rollout`  | Log once per rollout cycle   | Long runs         |
+| Integer    | Custom step interval         | Tuned granularity |
 
 See [MLflow Integration](mlflow-integration.md) for SKRL metric categories, filtering, and troubleshooting.
 
@@ -47,10 +47,10 @@ Azure ML LeRobot submissions use MLflow automatically.
 
 ### MLflow Configuration
 
-| Parameter                | Default | Description                        | Source                                  |
-|--------------------------|---------|------------------------------------|-----------------------------------------|
-| `--mlflow-token-retries` | `3`     | MLflow token refresh retry count   | `MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES` |
-| `--mlflow-http-timeout`  | `60`    | MLflow HTTP request timeout (sec)  | `MLFLOW_HTTP_REQUEST_TIMEOUT`           |
+| Parameter                | Default | Description                       | Source                                  |
+|--------------------------|---------|-----------------------------------|-----------------------------------------|
+| `--mlflow-token-retries` | `3`     | MLflow token refresh retry count  | `MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES` |
+| `--mlflow-http-timeout`  | `60`    | MLflow HTTP request timeout (sec) | `MLFLOW_HTTP_REQUEST_TIMEOUT`           |
 
 ## 📈 WANDB Integration
 
@@ -87,11 +87,11 @@ Training scripts register model checkpoints to Azure ML automatically at complet
 
 ### Registration Parameters
 
-| Parameter                    | Default            | Description                     |
-|------------------------------|--------------------|---------------------------------|
-| `--register-checkpoint`      | Derived from task  | Model name for registration     |
-| `--skip-register-checkpoint` | `false`            | Skip automatic registration     |
-| `--register-model`           | (none)             | Model name (LeRobot inference)  |
+| Parameter                    | Default           | Description                    |
+|------------------------------|-------------------|--------------------------------|
+| `--register-checkpoint`      | Derived from task | Model name for registration    |
+| `--skip-register-checkpoint` | `false`           | Skip automatic registration    |
+| `--register-model`           | (none)            | Model name (LeRobot inference) |
 
 ### Registration Examples
 
@@ -126,12 +126,12 @@ huggingface-cli download user/trained-policy --local-dir ./checkpoint
 
 Training supports four checkpoint initialization modes:
 
-| Mode           | Weights | Optimizer | Counters | Use Case                          |
-|----------------|---------|-----------|----------|-----------------------------------|
-| `from-scratch` | Random  | Fresh     | Reset    | Initial training                  |
-| `warm-start`   | Loaded  | Fresh     | Reset    | Transfer learning                 |
-| `resume`       | Loaded  | Loaded    | Loaded   | Continue interrupted training     |
-| `fresh`        | Random  | Fresh     | Reset    | Architecture-only initialization  |
+| Mode           | Weights | Optimizer | Counters | Use Case                         |
+|----------------|---------|-----------|----------|----------------------------------|
+| `from-scratch` | Random  | Fresh     | Reset    | Initial training                 |
+| `warm-start`   | Loaded  | Fresh     | Reset    | Transfer learning                |
+| `resume`       | Loaded  | Loaded    | Loaded   | Continue interrupted training    |
+| `fresh`        | Random  | Fresh     | Reset    | Architecture-only initialization |
 
 ```bash
 # Resume training from MLflow artifact

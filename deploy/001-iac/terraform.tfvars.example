@@ -100,3 +100,25 @@ should_enable_private_aks_cluster = true
 should_enable_public_network_access     = true
 should_add_current_user_key_vault_admin = true
 should_enable_microsoft_defender        = true
+
+// Observability
+// All observability components deploy by default. Disable individually to reduce cost.
+// should_deploy_grafana            = true
+// should_deploy_monitor_workspace  = true
+// should_deploy_ampls              = true
+// should_deploy_dce                = true
+
+// AzureML Managed Compute (disabled by default)
+// Enable to provision GPU compute directly in the AzureML workspace.
+// should_deploy_aml_compute = false
+// aml_compute_config = {
+//   vm_size               = "Standard_NC4as_T4_v3"
+//   vm_priority           = "LowPriority"
+//   min_node_count        = 0
+//   max_node_count        = 1
+//   scale_down_after_idle = "PT5M"
+//   cluster_name          = "gpu-cluster"
+// }
+
+// DNS Zones
+// should_include_aks_dns_zone = true

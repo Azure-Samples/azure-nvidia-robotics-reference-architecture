@@ -2,12 +2,12 @@
  * # Observability Resources
  *
  * This file creates the observability stack for the Platform module including:
- * - Log Analytics Workspace for centralized logging
- * - Application Insights for application telemetry
- * - Azure Monitor Workspace for Prometheus metrics
- * - Azure Managed Grafana for dashboards
- * - Data Collection Endpoint
- * - Azure Monitor Private Link Scope (AMPLS) with private endpoint
+ * - Log Analytics Workspace for centralized logging (always deployed)
+ * - Application Insights for application telemetry (always deployed)
+ * - Azure Monitor Workspace for Prometheus metrics (optional)
+ * - Azure Managed Grafana for dashboards (optional)
+ * - Data Collection Endpoint (optional)
+ * - Azure Monitor Private Link Scope (AMPLS) with private endpoint (optional)
  *
  * Note: AKS-specific Data Collection Rules (Container Insights, Prometheus) are in the SiL module
  * Note: AMPLS uses the SHARED storage_blob DNS zone from private-dns-zones.tf
@@ -42,10 +42,12 @@ resource "azurerm_application_insights" "main" {
 }
 
 // ============================================================
-// Azure Monitor Workspace (Prometheus)
+// Azure Monitor Workspace (Prometheus) - Optional
 // ============================================================
 
 resource "azurerm_monitor_workspace" "main" {
+  count = var.should_deploy_monitor_workspace ? 1 : 0
+
   name                          = "azmon-${local.resource_name_suffix}"
   location                      = var.resource_group.location
   resource_group_name           = var.resource_group.name
@@ -53,10 +55,12 @@ resource "azurerm_monitor_workspace" "main" {
 }
 
 // ============================================================
-// Azure Managed Grafana
+// Azure Managed Grafana - Optional
 // ============================================================
 
 resource "azurerm_dashboard_grafana" "main" {
+  count = var.should_deploy_grafana ? 1 : 0
+
   name                              = "graf-${local.resource_name_suffix}"
   location                          = var.resource_group.location
   resource_group_name               = var.resource_group.name
@@ -67,8 +71,11 @@ resource "azurerm_dashboard_grafana" "main" {
   sku                               = "Standard"
   zone_redundancy_enabled           = false
 
-  azure_monitor_workspace_integrations {
-    resource_id = azurerm_monitor_workspace.main.id
+  dynamic "azure_monitor_workspace_integrations" {
+    for_each = var.should_deploy_monitor_workspace ? [1] : []
+    content {
+      resource_id = azurerm_monitor_workspace.main[0].id
+    }
   }
 
   identity {
@@ -77,10 +84,12 @@ resource "azurerm_dashboard_grafana" "main" {
 }
 
 // ============================================================
-// Data Collection Endpoints
+// Data Collection Endpoints - Optional
 // ============================================================
 
 resource "azurerm_monitor_data_collection_endpoint" "main" {
+  count = var.should_deploy_dce ? 1 : 0
+
   name                          = "dce-${local.resource_name_suffix}"
   location                      = var.resource_group.location
   resource_group_name           = var.resource_group.name
@@ -89,11 +98,11 @@ resource "azurerm_monitor_data_collection_endpoint" "main" {
 }
 
 // ============================================================
-// Azure Monitor Private Link Scope (AMPLS)
+// Azure Monitor Private Link Scope (AMPLS) - Optional
 // ============================================================
 
 resource "azurerm_monitor_private_link_scope" "main" {
-  count = local.pe_enabled ? 1 : 0
+  count = local.pe_enabled && var.should_deploy_ampls ? 1 : 0
 
   name                  = "ampls-${local.resource_name_suffix}"
   resource_group_name   = var.resource_group.name
@@ -103,7 +112,7 @@ resource "azurerm_monitor_private_link_scope" "main" {
 
 // Link Log Analytics Workspace to AMPLS
 resource "azurerm_monitor_private_link_scoped_service" "law" {
-  count = local.pe_enabled ? 1 : 0
+  count = local.pe_enabled && var.should_deploy_ampls ? 1 : 0
 
   name                = "log-link"
   resource_group_name = var.resource_group.name
@@ -113,7 +122,7 @@ resource "azurerm_monitor_private_link_scoped_service" "law" {
 
 // Link Application Insights to AMPLS
 resource "azurerm_monitor_private_link_scoped_service" "ai" {
-  count = local.pe_enabled ? 1 : 0
+  count = local.pe_enabled && var.should_deploy_ampls ? 1 : 0
 
   name                = "ai-link"
   resource_group_name = var.resource_group.name
@@ -123,20 +132,20 @@ resource "azurerm_monitor_private_link_scoped_service" "ai" {
 
 // Link Data Collection Endpoint to AMPLS
 resource "azurerm_monitor_private_link_scoped_service" "dce" {
-  count = local.pe_enabled ? 1 : 0
+  count = local.pe_enabled && var.should_deploy_ampls && var.should_deploy_dce ? 1 : 0
 
   name                = "dce-link"
   resource_group_name = var.resource_group.name
   scope_name          = azurerm_monitor_private_link_scope.main[0].name
-  linked_resource_id  = azurerm_monitor_data_collection_endpoint.main.id
+  linked_resource_id  = azurerm_monitor_data_collection_endpoint.main[0].id
 }
 
 // ============================================================
-// AMPLS Private Endpoint
+// AMPLS Private Endpoint - Optional
 // ============================================================
 
 resource "azurerm_private_endpoint" "monitor" {
-  count = local.pe_enabled ? 1 : 0
+  count = local.pe_enabled && var.should_deploy_ampls ? 1 : 0
 
   name                = "pe-monitor-${local.resource_name_suffix}"
   location            = var.resource_group.location
