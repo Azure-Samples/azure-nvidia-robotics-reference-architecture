@@ -273,10 +273,15 @@ submit_args=(
   "save_freq=$save_freq"
   "val_split=$val_split"
   "system_metrics=$system_metrics"
-  "storage_account=$storage_account"
-  "storage_container=$storage_container"
-  "blob_prefix=$blob_prefix"
 )
+
+if [[ "$from_blob" == "true" ]]; then
+  submit_args+=(
+    "storage_account=$storage_account"
+    "storage_container=$storage_container"
+    "blob_prefix=$blob_prefix"
+  )
+fi
 
 [[ -n "$policy_repo_id" ]]      && submit_args+=("policy_repo_id=$policy_repo_id")
 [[ -n "$lerobot_version" ]]     && submit_args+=("lerobot_version=$lerobot_version")

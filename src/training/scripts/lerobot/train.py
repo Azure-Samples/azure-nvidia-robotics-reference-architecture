@@ -330,6 +330,12 @@ def main() -> int:
             if value:
                 cmd.append(f"{arg_name}={value}")
 
+    # LR warmup requires a scheduler type; use diffuser (only needs num_warmup_steps)
+    warmup_steps = os.environ.get("LR_WARMUP_STEPS", "")
+    if warmup_steps and "--scheduler" not in cli_text:
+        cmd.append("--scheduler.type=diffuser")
+        cmd.append(f"--scheduler.num_warmup_steps={warmup_steps}")
+
     # Determine source tag
     source = "osmo-lerobot-training"
     if os.environ.get("STORAGE_ACCOUNT"):
