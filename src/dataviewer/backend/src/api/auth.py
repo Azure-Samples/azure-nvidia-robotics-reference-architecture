@@ -46,6 +46,7 @@ class AuthProvider(ABC):
 # API Key provider
 # ============================================================================
 
+
 class ApiKeyProvider(AuthProvider):
     """Validates the ``X-API-Key`` header against a configured secret."""
 
@@ -95,7 +96,7 @@ class JwtProvider(AuthProvider):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             return None
-        token = auth_header[len("Bearer "):].strip()
+        token = auth_header[len("Bearer ") :].strip()
         try:
             import jwt  # pyjwt[cryptography]
 

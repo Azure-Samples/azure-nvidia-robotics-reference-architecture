@@ -90,9 +90,7 @@ class TestCsrfTokenEndpoint:
 class TestAuthDisabled:
     def test_mutation_succeeds_without_credentials(self, client_auth_disabled):
         """When DATAVIEWER_AUTH_DISABLED=true, mutations require no auth or CSRF."""
-        resp = client_auth_disabled.post(
-            "/api/datasets/nonexistent/episodes/0/annotations/auto"
-        )
+        resp = client_auth_disabled.post("/api/datasets/nonexistent/episodes/0/annotations/auto")
         # Auth/CSRF checks were bypassed; request was processed (404 = dataset not found)
         assert resp.status_code not in (401, 403)
 
