@@ -19,9 +19,16 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-# Load environment variables from .env file
+# Load .env before any config or service singletons are initialized so that
+# all env vars are available to get_app_config() on first access.
 env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_path)
+
+# Read config once at module load. CORS origins must be known before the app object
+# is created, and all service singletons share this same config instance.
+from .config import load_config  # noqa: E402
+
+_config = load_config()
 
 app = FastAPI(
     title="LeRobot Annotation API",
@@ -49,16 +56,10 @@ app = FastAPI(
     },
 )
 
-# Configure CORS for frontend
+# Configure CORS — origins are read from CORS_ORIGINS env var (comma-separated)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:5176",
-        "http://localhost:5177",
-    ],
+    allow_origins=_config.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

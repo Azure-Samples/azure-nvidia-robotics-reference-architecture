@@ -24,8 +24,8 @@ cd backend
 uv venv --python 3.11
 source .venv/bin/activate
 
-# Install dependencies
-uv pip install -e ".[dev,analysis,export]"
+# Install dependencies (include 'azure' extra for blob storage support)
+uv pip install -e ".[dev,analysis,export,azure]"
 ```
 
 ### Frontend Setup
@@ -37,13 +37,54 @@ npm install
 
 ## Configuration
 
-Create or edit `backend/.env` to configure your data path:
+Copy `backend/.env.example` to `backend/.env` and set values for your environment.
+
+### Local File Storage (default)
 
 ```env
-# Path to the directory containing datasets
-# Each subdirectory is treated as a dataset_id
+HMI_STORAGE_BACKEND=local
 HMI_DATA_PATH=/path/to/your/datasets
 ```
+
+### Azure Blob Storage
+
+Use this mode when datasets live in Azure Blob Storage. Authentication uses
+[DefaultAzureCredential](https://learn.microsoft.com/azure/developer/python/sdk/authentication-overview),
+which supports managed identity, workload identity, and Azure CLI credentials
+automatically — no SAS token required in AKS or Container Apps.
+
+```env
+HMI_STORAGE_BACKEND=azure
+AZURE_STORAGE_ACCOUNT_NAME=mystorageaccount
+AZURE_STORAGE_DATASET_CONTAINER=datasets
+AZURE_STORAGE_ANNOTATION_CONTAINER=annotations
+# Leave AZURE_STORAGE_SAS_TOKEN unset to use managed identity (MSI)
+```
+
+Expected blob structure:
+
+```
+{dataset_id}/meta/info.json
+{dataset_id}/meta/tasks.parquet
+{dataset_id}/data/chunk-000/file-000.parquet
+{dataset_id}/videos/{camera}/chunk-000/file-000.mp4
+{dataset_id}/annotations/episodes/episode_000000.json
+```
+
+### Full Environment Variable Reference
+
+| Variable | Default | Description |
+|---|---|---|
+| `HMI_STORAGE_BACKEND` | `local` | Storage backend: `local` or `azure` |
+| `HMI_DATA_PATH` | `./data` | Local dataset directory (local mode) |
+| `AZURE_STORAGE_ACCOUNT_NAME` | — | Azure Storage account name (azure mode) |
+| `AZURE_STORAGE_DATASET_CONTAINER` | — | Blob container for dataset files |
+| `AZURE_STORAGE_ANNOTATION_CONTAINER` | — | Blob container for annotations (defaults to dataset container) |
+| `AZURE_STORAGE_SAS_TOKEN` | — | SAS token (omit to use DefaultAzureCredential / MSI) |
+| `BACKEND_HOST` | `127.0.0.1` | Bind address (`0.0.0.0` for containers) |
+| `BACKEND_PORT` | `8000` | API server port |
+| `FRONTEND_PORT` | `5173` | Dev server port |
+| `CORS_ORIGINS` | localhost ports | Comma-separated allowed CORS origins |
 
 ## Running the Application
 
@@ -63,11 +104,6 @@ This launches both backend and frontend in the correct order, with health checki
 ./start.sh --help      # Show all options
 ```
 
-**Environment variables:**
-
-- `BACKEND_PORT` - Backend port (default: 8000)
-- `FRONTEND_PORT` - Frontend port (default: 5173)
-
 ### Manual Start
 
 #### Start Backend
@@ -86,6 +122,47 @@ npm run dev
 ```
 
 The application will be available at `http://localhost:5173`.
+
+## Container Deployment
+
+### Docker Compose (local)
+
+```bash
+# Local storage mode (mount datasets directory)
+HMI_LOCAL_DATA_PATH=/path/to/datasets docker compose up --build
+
+# Azure Blob Storage mode
+export HMI_STORAGE_BACKEND=azure
+export AZURE_STORAGE_ACCOUNT_NAME=mystorageaccount
+export AZURE_STORAGE_DATASET_CONTAINER=datasets
+export AZURE_STORAGE_ANNOTATION_CONTAINER=annotations
+docker compose up --build
+```
+
+### Azure Kubernetes Service (AKS) / Container Apps
+
+For AKS with workload identity or Container Apps with managed identity, set:
+
+```env
+HMI_STORAGE_BACKEND=azure
+AZURE_STORAGE_ACCOUNT_NAME=mystorageaccount
+AZURE_STORAGE_DATASET_CONTAINER=datasets
+BACKEND_HOST=0.0.0.0
+CORS_ORIGINS=https://your-frontend-url.example.com
+```
+
+`AZURE_STORAGE_SAS_TOKEN` is **not** needed — `DefaultAzureCredential` automatically
+uses the pod/container managed identity when running in Azure.
+
+### Building Images
+
+```bash
+# Backend
+docker build -t dataviewer-backend ./backend
+
+# Frontend
+docker build -t dataviewer-frontend ./frontend
+```
 
 ## Development
 
