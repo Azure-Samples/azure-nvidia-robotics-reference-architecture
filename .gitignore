@@ -461,3 +461,6 @@ venv/
 external/
 AGENTS.md
 .gitattributes
+
+# Terraform Environments
+envs/
