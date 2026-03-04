@@ -110,8 +110,7 @@ class TestListEpisodes:
 
     def test_dataset_not_found(self, client):
         resp = client.get("/api/datasets/nonexistent/episodes")
-        assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.status_code == 404
 
 
 class TestGetEpisode:

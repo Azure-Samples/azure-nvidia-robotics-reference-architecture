@@ -8,7 +8,7 @@ and accessing episode information with HDF5 and LeRobot parquet support.
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from ..models.datasources import DatasetInfo, EpisodeData, EpisodeMeta, TrajectoryPoint
@@ -85,25 +85,6 @@ async def get_dataset_capabilities(
     has_hdf5 = service.dataset_has_hdf5(dataset_id)
     is_lerobot = service.dataset_is_lerobot(dataset_id)
 
-    if has_hdf5:
-        # Get episode count from HDF5 loader
-        hdf5_loader = service._get_hdf5_loader(dataset_id)
-        if hdf5_loader:
-            try:
-                episodes = hdf5_loader.list_episodes()
-                episode_count = max(episode_count, len(episodes))
-            except Exception:
-                pass  # Best-effort; loader may not support listing
-    elif is_lerobot:
-        # Get episode count from LeRobot loader
-        lerobot_loader = service._get_lerobot_loader(dataset_id)
-        if lerobot_loader:
-            try:
-                episodes = lerobot_loader.list_episodes()
-                episode_count = max(episode_count, len(episodes))
-            except Exception:
-                pass  # Best-effort; loader may not support listing
-
     return DatasetCapabilities(
         hdf5_support=service.has_hdf5_support(),
         has_hdf5_files=has_hdf5,
@@ -129,6 +110,9 @@ async def list_episodes(
     and annotation status. When HDF5 files are available, episode
     length and task index are loaded from the files.
     """
+    dataset = await service.get_dataset(dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
     return await service.list_episodes(
         dataset_id,
         offset=offset,
@@ -151,6 +135,9 @@ async def get_episode(
     and trajectory data points. When HDF5 files are available,
     trajectory data is loaded directly from the HDF5 file.
     """
+    dataset = await service.get_dataset(dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
     episode = await service.get_episode(dataset_id, episode_idx)
     if episode is None:
         raise HTTPException(
@@ -227,48 +214,64 @@ async def get_episode_cameras(
     return cameras
 
 
-@router.get("/{dataset_id}/episodes/{episode_idx}/video/{camera}")
+@router.get("/{dataset_id}/episodes/{episode_idx}/video/{camera}", response_model=None)
 async def get_episode_video(
     episode_idx: int,
     dataset_id: str = Depends(validated_dataset_id),
     camera: str = Depends(validated_camera_name),
     service: DatasetService = Depends(get_dataset_service),
-) -> FileResponse:
+) -> FileResponse | StreamingResponse:
     """
     Get video file for an episode and camera.
 
     Returns the video file for streaming. Supports LeRobot parquet datasets
-    with video files stored alongside the parquet data.
+    with video files stored alongside the parquet data, as well as datasets
+    stored in Azure Blob Storage (streamed directly from blob).
 
     Note: camera parameter can include dots (e.g., 'observation.images.color')
     """
     video_path = service.get_video_file_path(dataset_id, episode_idx, camera)
 
-    if video_path is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Video not found for episode {episode_idx}, camera '{camera}'",
+    if video_path is not None:
+        video_file = validate_path_containment(Path(video_path), Path(service.base_path))
+        if not video_file.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Video file not found: {video_path}",
+            )
+        suffix = video_file.suffix.lower()
+        media_types = {
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            ".avi": "video/x-msvideo",
+            ".mov": "video/quicktime",
+        }
+        media_type = media_types.get(suffix, "video/mp4")
+        return FileResponse(
+            path=str(video_file),
+            media_type=media_type,
+            filename=f"{dataset_id}_ep{episode_idx}_{camera.replace('.', '_')}{suffix}",
         )
 
-    video_file = validate_path_containment(Path(video_path), Path(service.base_path))
-    if not video_file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Video file not found: {video_path}",
-        )
+    # Fall back to blob streaming when local file is unavailable
+    if service.has_blob_provider():
+        blob_path = await service.get_blob_video_path(dataset_id, episode_idx, camera)
+        if blob_path is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Video not found in blob storage for episode {episode_idx}, camera '{camera}'",
+            )
 
-    # Determine media type based on file extension
-    suffix = video_file.suffix.lower()
-    media_types = {
-        ".mp4": "video/mp4",
-        ".webm": "video/webm",
-        ".avi": "video/x-msvideo",
-        ".mov": "video/quicktime",
-    }
-    media_type = media_types.get(suffix, "video/mp4")
+        stream_result = await service.get_blob_video_stream(blob_path)
+        if stream_result is not None:
+            headers, media_type, stream = stream_result
+            return StreamingResponse(
+                stream,
+                media_type=media_type,
+                headers=headers,
+            )
 
-    return FileResponse(
-        path=str(video_file),
-        media_type=media_type,
-        filename=f"{dataset_id}_ep{episode_idx}_{camera.replace('.', '_')}{suffix}",
+    raise HTTPException(
+        status_code=404,
+        detail=f"Video not found for episode {episode_idx}, camera '{camera}'",
     )
