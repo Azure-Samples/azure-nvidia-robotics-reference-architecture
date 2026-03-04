@@ -135,6 +135,15 @@ output "storage_account" {
 }
 
 // ============================================================
+// AzureML Compute Outputs
+// ============================================================
+
+output "aml_compute_cluster" {
+  description = "AzureML managed compute cluster. Null when compute deployment is disabled."
+  value       = module.platform.aml_compute_cluster
+}
+
+// ============================================================
 // Observability Outputs
 // ============================================================
 
