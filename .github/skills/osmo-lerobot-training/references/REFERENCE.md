@@ -1,37 +1,61 @@
 # OSMO LeRobot Training Reference
 
-Detailed CLI commands, Python SDK patterns, and troubleshooting for LeRobot training on OSMO.
+Detailed CLI commands, Python SDK patterns, inference evaluation, and troubleshooting for LeRobot training on OSMO.
 
 ## OSMO CLI Reference
 
 ### Workflow Submission
 
 ```bash
-# Submit with the helper script (packages payload automatically)
+# Train from Azure Blob Storage with model registration
+scripts/submit-osmo-lerobot-training.sh \
+  -d my-robot-dataset \
+  --from-blob \
+  --storage-account mystorageaccount \
+  --blob-prefix my-robot-dataset \
+  --no-val-split \
+  --steps 100000 \
+  --batch-size 32 \
+  --learning-rate 1e-4 \
+  --save-freq 10000 \
+  -j my-robot-act-train \
+  --experiment-name my-robot-training \
+  -r my-robot-act-model
+
+# Train from HuggingFace Hub
 scripts/submit-osmo-lerobot-training.sh \
   -d user/dataset \
   -p act \
-  --training-steps 50000 \
+  --steps 50000 \
   -r my-model-name
 
-# Direct OSMO submission (already-built payload)
-osmo workflow submit workflows/osmo/lerobot-train.yaml \
-  --set-string "dataset_repo_id=user/dataset" \
-  "policy_type=act" \
-  "training_steps=50000"
+# Larger batch for RTX PRO 6000 (48GB VRAM)
+scripts/submit-osmo-lerobot-training.sh \
+  -d my-robot-dataset \
+  --from-blob \
+  --storage-account mystorageaccount \
+  --blob-prefix my-robot-dataset \
+  --no-val-split \
+  --steps 100000 \
+  --batch-size 64 \
+  --learning-rate 1e-4 \
+  --save-freq 10000 \
+  -j my-robot-train-rtx \
+  --experiment-name my-robot-training \
+  -r my-robot-act-model-rtx
 ```
 
 ### Workflow Monitoring
 
 ```bash
+# List all workflows
+osmo workflow list
+
 # Query workflow status (returns task table with statuses)
 osmo workflow query <workflow-id>
 
 # Stream live logs
 osmo workflow logs <workflow-id>
-
-# Stream logs for a specific task
-osmo workflow logs <workflow-id> --task lerobot-train
 
 # Show last N lines of logs
 osmo workflow logs <workflow-id> -n 100
@@ -39,28 +63,104 @@ osmo workflow logs <workflow-id> -n 100
 # Show only error output
 osmo workflow logs <workflow-id> --error
 
-# List recent workflows with filtering
-osmo workflow list --status running
-osmo workflow list --status completed --json
-osmo workflow list --name lerobot-training
-
 # Cancel a running workflow
 osmo workflow cancel <workflow-id>
-osmo workflow cancel <workflow-id> --force --message "reason"
 
 # Interactive shell into running container
 osmo workflow exec <workflow-id> --task lerobot-train
 ```
 
+### Log Parsing for Progress
+
+Training log lines follow this pattern:
+
+```text
+step:10000 smpl:320000 ep:5000 epch:78.12 loss:0.1234 grdn:1.5678 lr:1.0000e-04 updt_s:0.123 data_s:0.012
+```
+
+Key fields to monitor:
+- `step` / total steps = completion percentage
+- `loss` trending downward = convergence
+- `lr` should be `1e-04` (not `1e-05`, which indicates the learning rate fix is missing)
+- `grdn` (gradient norm) > 10 may indicate instability
+
 ### Workflow Status Values
 
-| Status | Meaning |
-|--------|---------|
-| `pending` | Queued, awaiting resources |
-| `running` | Actively executing |
-| `completed` | Finished successfully |
-| `failed` | Exited with error |
-| `cancelled` | Manually cancelled |
+| Status            | Meaning                                |
+| ----------------- | -------------------------------------- |
+| `pending`         | Queued, awaiting resources             |
+| `running`         | Actively executing                     |
+| `completed`       | Finished successfully                  |
+| `failed`          | Exited with error                      |
+| `failed_canceled` | Manually canceled but was running fine |
+| `cancelled`       | Canceled before starting               |
+
+## Post-Training Inference Evaluation
+
+### OSMO Inference (GPU)
+
+Replay dataset episodes through the trained policy and compare predicted vs ground truth actions:
+
+```bash
+# Check registered model versions
+source scripts/.env && az ml model list \
+  --name my-robot-act-model \
+  --resource-group "$AZURE_RESOURCE_GROUP" \
+  --workspace-name "$AZUREML_WORKSPACE_NAME" \
+  --query "[].{name:name, version:version, description:description}" -o table
+
+# Submit inference with the latest checkpoint
+scripts/submit-osmo-lerobot-inference.sh \
+  --from-aml-model \
+  --model-name my-robot-act-model \
+  --model-version 3 \
+  --from-blob-dataset \
+  --storage-account mystorageaccount \
+  --blob-prefix my-robot-dataset \
+  --mlflow-enable \
+  --eval-episodes 10 \
+  -j my-robot-eval \
+  --experiment-name my-robot-inference
+```
+
+### Local Inference (CPU/MPS)
+
+Run inference locally for quick validation without GPU allocation:
+
+```bash
+python scripts/run-local-lerobot-inference.py \
+  --model-name my-robot-act-model \
+  --model-version 3 \
+  --dataset-dir /path/to/local/dataset \
+  --episodes 5 \
+  --output-dir outputs/local-eval \
+  --device cpu
+```
+
+Local inference handles:
+- Auto-download from AzureML model registry via `--model-name`/`--model-version`
+- Stripping incompatible config fields (`use_peft`, `pretrained_path`) from older checkpoints
+- Loading normalizer stats from preprocessor safetensors files
+- Both v3.0 (`file-NNN`) and v2.1 (`episode_NNNNNN`) dataset formats
+- Per-episode trajectory plots and aggregate metrics
+
+### Inference Output
+
+Inference produces:
+- Per-episode `.npz` files with predicted/ground_truth/inference_times arrays
+- Per-episode trajectory plots (action deltas, summary panel)
+- Aggregate `eval_results.json` with MSE, MAE, throughput metrics
+- MLflow plots and metrics (when `--mlflow-enable` is set)
+
+### Periodic Evaluation Schedule
+
+For long training runs, evaluate intermediate checkpoints to track improvement:
+
+| Checkpoint                       | When to Evaluate                   | Purpose                                          |
+| -------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| First (e.g., step 10,000)        | After first `--save-freq` interval | Sanity check — policy produces non-zero actions  |
+| Mid-training (e.g., step 50,000) | ~50% completion                    | Convergence check — loss should be declining     |
+| Final (last registered version)  | After training completes           | Full evaluation — compare to earlier checkpoints |
 
 ## Azure ML Metric Retrieval
 
@@ -71,17 +171,14 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.ml import MLClient
 import mlflow
 
-# Connect to workspace
 credential = DefaultAzureCredential()
 ml_client = MLClient(credential, subscription_id, resource_group, workspace_name)
 workspace = ml_client.workspaces.get(workspace_name)
-
-# Configure MLflow tracking
 mlflow.set_tracking_uri(workspace.mlflow_tracking_uri)
 
 # Search for training runs
 runs = mlflow.search_runs(
-    experiment_names=["lerobot-training"],
+    experiment_names=["my-robot-training"],
     order_by=["start_time DESC"],
     max_results=10,
 )
@@ -93,47 +190,116 @@ history = client.get_metric_history(run_id, "train/loss")
 
 ### Key Metrics Logged
 
-| Metric | Description |
-|--------|-------------|
-| `train/loss` | Training loss per step |
-| `grad_norm` | Gradient norm |
-| `learning_rate` | Current learning rate |
-| `val/loss` | Validation loss (when val split enabled) |
-| `gpu_percent` | GPU utilization (when system metrics enabled) |
-| `gpu_memory_percent` | GPU memory usage |
-| `cpu_percent` | CPU utilization |
-| `ram_percent` | RAM usage |
+| Metric                | Description                                   |
+| --------------------- | --------------------------------------------- |
+| `train/loss`          | Training loss per step                        |
+| `train/grad_norm`     | Gradient norm                                 |
+| `train/learning_rate` | Current learning rate                         |
+| `train/samples`       | Cumulative samples processed                  |
+| `train/episodes`      | Cumulative episodes processed                 |
+| `train/epoch`         | Current epoch number                          |
+| `train/update_time_s` | Time per training step                        |
+| `train/data_time_s`   | Data loading time per step                    |
+| `val/loss`            | Validation loss (when val split enabled)      |
+| `gpu_percent`         | GPU utilization (when system metrics enabled) |
+| `gpu_memory_percent`  | GPU memory usage                              |
+| `cpu_percent`         | CPU utilization                               |
+| `ram_percent`         | RAM usage                                     |
 
-### CLI Quick Check
+### Model Registry
 
 ```bash
-# List experiments
-az ml job list \
+# List model versions
+source scripts/.env && az ml model list \
+  --name my-robot-act-model \
   --resource-group "$AZURE_RESOURCE_GROUP" \
-  --workspace-name "$AZUREML_WORKSPACE_NAME" \
-  --query "[?display_name=='lerobot-act-training']" \
-  -o table
+  --workspace-name "$AZUREML_WORKSPACE_NAME" -o table
+
+# Models are registered at each --save-freq checkpoint
+# Higher version numbers correspond to later training steps
+# Version descriptions include the checkpoint step number
 ```
 
 ## Training Progress Interpretation
 
 ### Loss Curve Analysis
 
-- ACT policy: Expect rapid initial descent in `train/loss` over first 5-10k steps, then gradual convergence. Typical final loss: 0.01-0.1 depending on dataset complexity.
-- Diffusion policy: Slower convergence, loss may plateau and resume descent. Typical training requires 50-100k steps minimum.
+- ACT policy: Expect rapid initial descent over first 5-10k steps (loss 6→2), then gradual convergence (loss 2→0.1). Typical convergence at 50-100k steps.
+- Diffusion policy: Slower convergence, loss may plateau and resume descent. Requires 50-100k steps minimum.
+- If `train/learning_rate` shows `1e-05` instead of specified `1e-04`, the learning rate mapping fix is missing.
 
-### Checkpoint Strategy
+### Checkpoint Registration Timeline
 
-Checkpoints saved at `--save-freq` intervals to `output_dir`. When `--register-checkpoint` is set, the final checkpoint uploads to the Azure ML model registry.
+Checkpoints are registered to AzureML at each `--save-freq` interval during training:
+
+- Step 5,000 → model version 1
+- Step 10,000 → model version 2
+- Training complete → final `register_final_checkpoint()` for the last checkpoint
+
+The training wrapper (`train.py`) scans for new checkpoints every 60 seconds and uploads them incrementally via `upload_new_checkpoints()`.
+
+### Spot GPU Eviction
+
+Training on spot instances may be interrupted by VM eviction. The training pipeline is designed for resilience:
+- Checkpoints already registered to AzureML survive eviction
+- The latest registered model version is available for inference regardless of training completion
+- Resubmit the same job to continue from the next unregistered step
+
+## LeRobot v0.3.x API Notes
+
+### Learning Rate Configuration
+
+LeRobot 0.3.x uses a preset system where `TrainPipelineConfig.__post_init__` overrides `optimizer`/`scheduler` with policy presets when `use_policy_training_preset=True` (default). The correct way to set learning rate is `--policy.optimizer_lr` (not `--optimizer.lr`). The submission script maps `LEARNING_RATE` → `--policy.optimizer_lr` in `train.py`.
+
+ACT policy default: `optimizer_lr: float = 1e-5`. This is 10x lower than the typical `1e-4` specified by users.
+
+### Dataset Format Conversion
+
+v3.0 datasets from Azure Blob use `{chunk_index}/{file_index}` path templates. LeRobot v0.3.x expects `{episode_chunk}/{episode_index}`. The `download_dataset.py` pipeline handles conversion:
+
+1. `patch_info_paths()` — splits monolithic parquet, reorganizes videos, updates path templates, sets `codebase_version = "v2.1"`
+2. `patch_image_stats()` — adds ImageNet normalization stats for video/image features
+3. `fix_video_timestamps()` — resets cumulative timestamps to per-episode
+4. `ensure_tasks_jsonl()` — creates required metadata files
+5. `ensure_episodes_stats()` — computes per-episode statistics
+
+### Inference API
+
+LeRobot 0.3.x does NOT have `PolicyProcessorPipeline`. The `ACTPolicy.select_action()` method calls `normalize_inputs()` and `unnormalize_outputs()` internally. Pass raw tensors with batch dimension directly:
+
+```python
+obs = {
+    "observation.state": torch.from_numpy(state).float().unsqueeze(0).to(device),
+    image_key: (torch.from_numpy(image).float().permute(2, 0, 1) / 255.0).unsqueeze(0).to(device),
+}
+action = policy.select_action(obs)
+action_np = action.squeeze(0).cpu().numpy()
+```
+
+### Checkpoint Compatibility
+
+Older checkpoints may have incompatible `config.json` fields or missing normalizer buffers:
+- Strip `use_peft`, `pretrained_path`, `peft_config` from config.json before loading
+- Load normalizer stats from `policy_preprocessor_step_3_normalizer_processor.safetensors` into policy buffers
+- The local inference script handles both automatically
 
 ## Common Issues
 
-| Symptom | Likely Cause | Resolution |
-|---------|-------------|------------|
-| `CUDA_ERROR_NO_DEVICE` | MIG strategy misconfigured | Verify `mig.strategy: single` for vGPU nodes |
-| MLflow connection timeout | Token refresh failure | Check `MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES` |
-| Dataset download failure | Blob auth issue | Verify managed identity has Storage Blob Reader role |
-| OOM during training | Batch size too large | Reduce `--batch-size` |
+| Symptom                                | Likely Cause                                        | Resolution                                                         |
+| -------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------ |
+| `lr: 1e-05` in training logs           | LEARNING_RATE not mapped to `--policy.optimizer_lr` | Update `train.py` env_arg_map                                      |
+| `KeyError: 'chunk_index'`              | v3.0 path templates not converted                   | Verify `patch_info_paths()` runs during dataset prep               |
+| `KeyError: 'file_index'`               | Partial template fix                                | Check both `data_path` and `video_path` templates                  |
+| Video `MISSING` in verification        | Videos renamed but not moved to correct chunk dirs  | Verify video reorganization in `patch_info_paths()`                |
+| `codebase_version` warning             | Dataset marked v3.0 after conversion                | Set `info["codebase_version"] = "v2.1"`                            |
+| `CUDA_ERROR_NO_DEVICE`                 | MIG strategy misconfigured on vGPU                  | Set `mig.strategy: single` for RTX PRO 6000                        |
+| `ImportError: PolicyProcessorPipeline` | Using old inference API                             | Remove preprocessor/postprocessor, use `select_action()` directly  |
+| `DecodingError: use_peft not valid`    | Old checkpoint config.json                          | Strip `use_peft`, `pretrained_path` from config.json               |
+| `AssertionError: mean is infinity`     | Normalizer buffers missing                          | Load stats from preprocessor safetensors files                     |
+| `ImportError: patch_info_paths`        | Payload missing training fixes                      | Ensure `src/training/` is on a branch with dataset conversion code |
+| VM eviction during training            | Spot GPU preempted                                  | Checkpoints already registered survive; resubmit job               |
+| MLflow connection timeout              | Token refresh failure                               | Check `MLFLOW_TRACKING_TOKEN_REFRESH_RETRIES`                      |
+| OOM during training                    | Batch size too large for GPU                        | 32 for 24GB (A10), 64 for 48GB (RTX PRO 6000)                      |
 
 ## Troubleshooting
 
@@ -143,26 +309,30 @@ Checkpoints saved at `--save-freq` intervals to `output_dir`. When `--register-c
 # Check error logs
 osmo workflow logs <workflow-id> --error
 
-# Interactive shell for inspection
-osmo workflow exec <workflow-id> --task lerobot-train
+# Check all workflows (training and inference)
+osmo workflow list
 
-# Validate workflow YAML before submission
-osmo workflow validate workflows/osmo/lerobot-train.yaml
+# Grep training logs for learning rate
+osmo workflow logs <workflow-id> 2>&1 | grep "lr:"
+
+# Grep for checkpoint registration
+osmo workflow logs <workflow-id> 2>&1 | grep "Registered"
+
+# Check dataset preparation
+osmo workflow logs <workflow-id> 2>&1 | grep -E "Patched|Reorganized|Split"
 ```
 
 ### Azure ML Connectivity
 
 ```bash
 # Verify workspace access
-az ml workspace show \
+source scripts/.env && az ml workspace show \
   --resource-group "$AZURE_RESOURCE_GROUP" \
   --name "$AZUREML_WORKSPACE_NAME"
 
-# Check tracking URI
-python3 -c "
-from azure.identity import DefaultAzureCredential
-from azure.ai.ml import MLClient
-c = MLClient(DefaultAzureCredential(), '$AZURE_SUBSCRIPTION_ID', '$AZURE_RESOURCE_GROUP', '$AZUREML_WORKSPACE_NAME')
-print(c.workspaces.get('$AZUREML_WORKSPACE_NAME').mlflow_tracking_uri)
-"
+# List registered models
+source scripts/.env && az ml model list \
+  --name my-robot-act-model \
+  --resource-group "$AZURE_RESOURCE_GROUP" \
+  --workspace-name "$AZUREML_WORKSPACE_NAME" -o table
 ```
