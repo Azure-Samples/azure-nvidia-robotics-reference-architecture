@@ -160,8 +160,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)                    show_help; exit 0 ;;
     -w|--workflow)                workflow="$2"; shift 2 ;;
-    -d|--dataset-repo-id)         dataset_repo_id="$2"; shift 2 ;;
-    -p|--policy-type)             policy_type="$2"; shift 2 ;;
+    -d|--dataset|--dataset-repo-id) dataset_repo_id="$2"; shift 2 ;;
+    -p|--policy|--policy-type)    policy_type="$2"; shift 2 ;;
     -j|--job-name)                job_name="$2"; shift 2 ;;
     -o|--output-dir)              output_dir="$2"; shift 2 ;;
     -i|--image)                   image="$2"; shift 2 ;;
@@ -171,7 +171,7 @@ while [[ $# -gt 0 ]]; do
     --storage-account)            storage_account="$2"; shift 2 ;;
     --storage-container)          storage_container="$2"; shift 2 ;;
     --blob-prefix)                blob_prefix="$2"; shift 2 ;;
-    --training-steps)             training_steps="$2"; shift 2 ;;
+    --steps|--training-steps)     training_steps="$2"; shift 2 ;;
     --batch-size)                 batch_size="$2"; shift 2 ;;
     --learning-rate)              learning_rate="$2"; shift 2 ;;
     --lr-warmup-steps)            lr_warmup_steps="$2"; shift 2 ;;

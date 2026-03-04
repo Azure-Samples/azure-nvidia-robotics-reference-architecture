@@ -40,7 +40,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -117,7 +117,11 @@ jobs:
         if: "!inputs.changed-files-only || steps.changed-files.outputs.has-changes == 'true'"
         continue-on-error: ${{ inputs.soft-fail }}
         run: |
-          Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1
+          # Capture workspace root before Pester — test mocks may clear $env:GITHUB_WORKSPACE
+          $workspaceRoot = $env:GITHUB_WORKSPACE
+          $ciHelpersPath = Join-Path $workspaceRoot 'scripts/lib/Modules/CIHelpers.psm1'
+
+          Import-Module $ciHelpersPath
 
           $env:PESTER_FAILED = 'false'
 
@@ -136,9 +140,10 @@ jobs:
             $config = & scripts/tests/pester.config.ps1 -CI @configParams
             $config.Run.Exit = $false
             $result = Invoke-Pester -Configuration $config
+            $global:LASTEXITCODE = 0
 
             # Re-import CIHelpers — Pester module isolation unloads it during test execution
-            Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1 -Force
+            Import-Module $ciHelpersPath -Force
 
             if ($result.FailedCount -gt 0) {
               $env:PESTER_FAILED = 'true'
@@ -151,15 +156,16 @@ jobs:
             }
           }
           catch {
+            $global:LASTEXITCODE = 0
             $env:PESTER_FAILED = 'true'
-            Import-Module $env:GITHUB_WORKSPACE/scripts/lib/Modules/CIHelpers.psm1 -Force -ErrorAction SilentlyContinue
+            Import-Module $ciHelpersPath -Force -ErrorAction SilentlyContinue
             Set-CIOutput -Name 'pester-failed' -Value 'true'
             Write-Error "Pester execution failed: $_"
           }
 
       - name: Upload test results
         if: always() && steps.pester.outcome != 'skipped'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: pester-results-${{ matrix.os }}
           path: logs/pester-results.xml
@@ -167,7 +173,7 @@ jobs:
 
       - name: Upload Coverage Report
         if: matrix.os == 'ubuntu-latest' && inputs.code-coverage && always() && steps.pester.outcome != 'skipped'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: coverage-report-${{ matrix.os }}
           path: logs/coverage.xml

@@ -13,8 +13,10 @@
 // Data Collection Rules
 // ============================================================
 
-// DCR for AKS Container Insights Logs
+// DCR for AKS Container Insights Logs (requires DCE)
 resource "azurerm_monitor_data_collection_rule" "logs" {
+  count = var.data_collection_endpoint != null ? 1 : 0
+
   name                        = "dcr-logs-${local.resource_name_suffix}"
   location                    = var.resource_group.location
   resource_group_name         = var.resource_group.name
@@ -50,8 +52,10 @@ resource "azurerm_monitor_data_collection_rule" "logs" {
   }
 }
 
-// DCR for AKS Prometheus Metrics
+// DCR for AKS Prometheus Metrics (requires DCE and Monitor Workspace)
 resource "azurerm_monitor_data_collection_rule" "metrics" {
+  count = var.data_collection_endpoint != null && var.monitor_workspace != null ? 1 : 0
+
   name                        = "dcr-metrics-${local.resource_name_suffix}"
   location                    = var.resource_group.location
   resource_group_name         = var.resource_group.name
@@ -84,16 +88,20 @@ resource "azurerm_monitor_data_collection_rule" "metrics" {
 
 // Associate Container Insights logs DCR with AKS
 resource "azurerm_monitor_data_collection_rule_association" "logs" {
+  count = var.data_collection_endpoint != null ? 1 : 0
+
   name                    = "dcra-logs-${local.resource_name_suffix}"
   target_resource_id      = azurerm_kubernetes_cluster.main.id
-  data_collection_rule_id = azurerm_monitor_data_collection_rule.logs.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.logs[0].id
 }
 
 // Associate Prometheus metrics DCR with AKS
 resource "azurerm_monitor_data_collection_rule_association" "metrics" {
+  count = var.data_collection_endpoint != null && var.monitor_workspace != null ? 1 : 0
+
   name                    = "dcra-metrics-${local.resource_name_suffix}"
   target_resource_id      = azurerm_kubernetes_cluster.main.id
-  data_collection_rule_id = azurerm_monitor_data_collection_rule.metrics.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.metrics[0].id
 }
 
 // ============================================================
@@ -102,6 +110,8 @@ resource "azurerm_monitor_data_collection_rule_association" "metrics" {
 
 // Required for Container Insights MSI authentication mode
 resource "azurerm_monitor_data_collection_rule_association" "dce" {
+  count = var.data_collection_endpoint != null ? 1 : 0
+
   target_resource_id          = azurerm_kubernetes_cluster.main.id
   data_collection_endpoint_id = var.data_collection_endpoint.id
 }

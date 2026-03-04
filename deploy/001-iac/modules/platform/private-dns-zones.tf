@@ -8,7 +8,8 @@
  */
 
 // ============================================================
-// Core Private DNS Zones (11 zones - created when PE enabled)
+// Core Private DNS Zones (conditional - created when PE enabled)
+// Base: 6 zones, +1 AKS zone, +4 monitor zones (up to 11)
 // ============================================================
 
 resource "azurerm_private_dns_zone" "core" {
