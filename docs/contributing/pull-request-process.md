@@ -101,7 +101,7 @@ helm repo update
 helm search repo nvidia-gpu-operator --versions
 
 # Update Python dependencies
-pip install -r requirements.txt --upgrade
+uv sync
 ```
 
 ### Migration Approach
