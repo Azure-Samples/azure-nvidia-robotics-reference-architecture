@@ -104,6 +104,8 @@ helm search repo nvidia-gpu-operator --versions
 uv sync
 ```
 
+After merging Dependabot dependency PRs that update Python manifests, run `uv lock` and commit `uv.lock` when it changes. Dependabot does not regenerate `uv.lock` in this repository workflow.
+
 ### Migration Approach
 
 When pulling upstream updates:
