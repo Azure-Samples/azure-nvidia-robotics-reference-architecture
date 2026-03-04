@@ -114,6 +114,19 @@ module "platform" {
 
   // OSMO workload identity
   should_enable_osmo_identity = var.osmo_config.should_enable_identity
+
+  // Observability feature flags
+  should_deploy_grafana           = var.should_deploy_grafana
+  should_deploy_monitor_workspace = var.should_deploy_monitor_workspace
+  should_deploy_ampls             = var.should_deploy_ampls
+  should_deploy_dce               = var.should_deploy_dce
+
+  // AzureML compute
+  should_deploy_aml_compute = var.should_deploy_aml_compute
+  aml_compute_config        = var.aml_compute_config
+
+  // DNS zone flags
+  should_include_aks_dns_zone = var.should_include_aks_dns_zone
 }
 
 // ============================================================

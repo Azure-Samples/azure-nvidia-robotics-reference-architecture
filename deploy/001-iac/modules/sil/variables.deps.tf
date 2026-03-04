@@ -56,14 +56,16 @@ variable "monitor_workspace" {
   type = object({
     id = string
   })
-  description = "Azure Monitor workspace from platform module"
+  description = "Azure Monitor workspace from platform module. Null when monitor workspace is disabled"
+  default     = null
 }
 
 variable "data_collection_endpoint" {
   type = object({
     id = string
   })
-  description = "Data Collection Endpoint from platform module"
+  description = "Data Collection Endpoint from platform module. Null when DCE is disabled"
+  default     = null
 }
 
 variable "container_registry" {

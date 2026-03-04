@@ -36,6 +36,16 @@ The `gpu-grid-driver-installer` DaemonSet ([manifests/gpu-grid-driver-installer.
 
 The GRID driver is installed via an init container that uses `nsenter` into the host namespace to download and compile the driver. New nodes added by the autoscaler receive the driver automatically through the DaemonSet.
 
+#### GPU Operator Validation Dependency
+
+The GPU Operator's downstream components (toolkit, device-plugin, GFD, DCGM exporter, validator) each have a `driver-validation` init container that performs two checks before allowing the main container to start:
+
+1. **Validation marker**: Polls for `/run/nvidia/validations/.driver-ctr-ready` on the host. On operator-managed nodes, the driver DaemonSet creates this file. On nodes with a pre-installed driver (`nvidia.com/gpu.deploy.driver=false`), the GRID driver installer creates it.
+
+2. **Driver root**: Validates the driver installation by looking for binaries and libraries under `/run/nvidia/driver/` — the path where the GPU Operator's driver container normally bind-mounts its rootfs. For pre-installed drivers, the GRID driver installer bind-mounts the host root (`/`) to `/run/nvidia/driver/` so the validator finds the system-installed driver at the expected paths.
+
+Without both of these, all downstream GPU Operator pods remain stuck in `Init:0/1` indefinitely.
+
 > [!NOTE]
 > The GPU Operator supports [custom vGPU driver containers](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/install-gpu-operator-vgpu.html),
 > but this requires building a private container image, a private registry, and NVIDIA vGPU licensing infrastructure.
@@ -117,9 +127,9 @@ When `NVIDIA_DRIVER_CAPABILITIES` omits `graphics`, the container toolkit does n
 
 ### Reference
 
-- [NVIDIA Container Toolkit specialized configurations](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html)
-- [Isaac Sim container installation](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html)
-- [Azure NC RTX PRO 6000 BSE v6 series](https://learn.microsoft.com/azure/virtual-machines/sizes/gpu-accelerated/nc-rtxpro6000-bse-v6-series)
+* [NVIDIA Container Toolkit specialized configurations](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html)
+* [Isaac Sim container installation](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html)
+* [Azure NC RTX PRO 6000 BSE v6 series](https://learn.microsoft.com/azure/virtual-machines/sizes/gpu-accelerated/nc-rtxpro6000-bse-v6-series)
 
 ## Isaac Sim 4.x Shutdown Fix
 
@@ -158,7 +168,7 @@ After `env.close()`, training scripts call `os._exit(0)` instead of `simulation_
 
 ## Related Resources
 
-- [NVIDIA GPU Operator with Azure AKS](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/microsoft-aks.html)
-- [NVIDIA GPU Operator vGPU support](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/install-gpu-operator-vgpu.html)
-- [GPU Operator Helm values](../deploy/002-setup/values/nvidia-gpu-operator.yaml)
-- [GRID driver installer DaemonSet](../deploy/002-setup/manifests/gpu-grid-driver-installer.yaml)
+* [NVIDIA GPU Operator with Azure AKS](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/microsoft-aks.html)
+* [NVIDIA GPU Operator vGPU support](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/install-gpu-operator-vgpu.html)
+* [GPU Operator Helm values](../deploy/002-setup/values/nvidia-gpu-operator.yaml)
+* [GRID driver installer DaemonSet](../deploy/002-setup/manifests/gpu-grid-driver-installer.yaml)

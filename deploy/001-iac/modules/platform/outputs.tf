@@ -75,17 +75,17 @@ output "log_analytics_workspace" {
 }
 
 output "monitor_workspace" {
-  description = "Azure Monitor workspace for Prometheus metrics"
-  value = {
-    id = azurerm_monitor_workspace.main.id
-  }
+  description = "Azure Monitor workspace for Prometheus metrics. Null when monitor workspace is disabled"
+  value = try({
+    id = azurerm_monitor_workspace.main[0].id
+  }, null)
 }
 
 output "data_collection_endpoint" {
-  description = "Data Collection Endpoint for observability"
-  value = {
-    id = azurerm_monitor_data_collection_endpoint.main.id
-  }
+  description = "Data Collection Endpoint for observability. Null when DCE is disabled"
+  value = try({
+    id = azurerm_monitor_data_collection_endpoint.main[0].id
+  }, null)
 }
 
 output "application_insights" {
@@ -99,11 +99,11 @@ output "application_insights" {
 }
 
 output "grafana" {
-  description = "Azure Managed Grafana dashboard"
-  value = {
-    id       = azurerm_dashboard_grafana.main.id
-    endpoint = azurerm_dashboard_grafana.main.endpoint
-  }
+  description = "Azure Managed Grafana dashboard. Null when Grafana is disabled"
+  value = try({
+    id       = azurerm_dashboard_grafana.main[0].id
+    endpoint = azurerm_dashboard_grafana.main[0].endpoint
+  }, null)
 }
 
 /*
@@ -174,6 +174,14 @@ output "ml_workload_identity" {
     client_id    = azurerm_user_assigned_identity.ml.client_id
     tenant_id    = azurerm_user_assigned_identity.ml.tenant_id
   }
+}
+
+output "aml_compute_cluster" {
+  description = "AzureML managed compute cluster. Null when compute deployment is disabled"
+  value = try({
+    id   = azurerm_machine_learning_compute_cluster.gpu[0].id
+    name = azurerm_machine_learning_compute_cluster.gpu[0].name
+  }, null)
 }
 
 /*
