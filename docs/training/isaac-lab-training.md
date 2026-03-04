@@ -18,14 +18,14 @@ Isaac Lab reinforcement learning training with SKRL and RSL-RL backends. Both Az
 
 ## 📋 Prerequisites
 
-| Component            | Requirement                                                                    |
-|----------------------|--------------------------------------------------------------------------------|
-| Infrastructure       | AKS cluster deployed via [Infrastructure Guide](../../deploy/README.md)        |
-| Azure ML             | Extension installed via `02-deploy-azureml-extension.sh`                       |
-| OSMO                 | Control plane and backend via `03-deploy-osmo-control-plane.sh`                |
-| Terraform outputs    | Available in `deploy/001-iac/` (or provide values via CLI / environment vars)  |
-| Azure CLI            | `az` with `ml` extension for Azure ML submissions                              |
-| OSMO CLI             | `osmo` CLI installed and authenticated for OSMO submissions                    |
+| Component         | Requirement                                                                   |
+|-------------------|-------------------------------------------------------------------------------|
+| Infrastructure    | AKS cluster deployed via [Infrastructure Guide](../../deploy/README.md)       |
+| Azure ML          | Extension installed via `02-deploy-azureml-extension.sh`                      |
+| OSMO              | Control plane and backend via `03-deploy-osmo-control-plane.sh`               |
+| Terraform outputs | Available in `deploy/001-iac/` (or provide values via CLI / environment vars) |
+| Azure CLI         | `az` with `ml` extension for Azure ML submissions                             |
+| OSMO CLI          | `osmo` CLI installed and authenticated for OSMO submissions                   |
 
 ## 🚀 Quick Start
 
@@ -58,14 +58,14 @@ Dataset injection removes the ~1 MB payload size limit of base64-encoded archive
 
 ## ⚖️ Platform Selection
 
-| Aspect              | Azure ML                              | OSMO                                      |
-|---------------------|---------------------------------------|-------------------------------------------|
-| Submission          | `az ml job create` via YAML templates | `osmo workflow submit`                    |
-| Orchestration       | AKS compute targets                   | KAI Scheduler / Volcano integration       |
-| Experiment tracking | MLflow (managed)                      | MLflow (Azure ML backend)                 |
-| Dataset delivery    | Azure ML datastores                   | Base64 payload or OSMO bucket upload      |
-| Monitoring          | Azure ML Studio                       | OSMO UI Dashboard                         |
-| Payload modes       | Single (YAML template)                | Base64 or dataset folder injection        |
+| Aspect              | Azure ML                              | OSMO                                 |
+|---------------------|---------------------------------------|--------------------------------------|
+| Submission          | `az ml job create` via YAML templates | `osmo workflow submit`               |
+| Orchestration       | AKS compute targets                   | KAI Scheduler / Volcano integration  |
+| Experiment tracking | MLflow (managed)                      | MLflow (Azure ML backend)            |
+| Dataset delivery    | Azure ML datastores                   | Base64 payload or OSMO bucket upload |
+| Monitoring          | Azure ML Studio                       | OSMO UI Dashboard                    |
+| Payload modes       | Single (YAML template)                | Base64 or dataset folder injection   |
 
 Azure ML provides managed compute and experiment tracking through Azure ML Studio. OSMO adds distributed training coordination, KAI Scheduler integration, and a dataset versioning system.
 
@@ -73,23 +73,23 @@ Azure ML provides managed compute and experiment tracking through Azure ML Studi
 
 Core parameters shared across platforms:
 
-| Parameter          | Default                            | Description                           |
-|--------------------|------------------------------------|---------------------------------------|
-| `--task`           | `Isaac-Velocity-Rough-Anymal-C-v0` | Isaac Lab task identifier             |
-| `--num-envs`       | `2048`                             | Parallel simulation environments      |
-| `--max-iterations` | (unset)                            | Training iteration limit              |
-| `--image`          | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                       |
-| `--backend`        | `skrl`                             | Training backend: `skrl` or `rsl_rl`  |
-| `--headless`       | `true`                             | Disable rendering                     |
+| Parameter          | Default                            | Description                          |
+|--------------------|------------------------------------|--------------------------------------|
+| `--task`           | `Isaac-Velocity-Rough-Anymal-C-v0` | Isaac Lab task identifier            |
+| `--num-envs`       | `2048`                             | Parallel simulation environments     |
+| `--max-iterations` | (unset)                            | Training iteration limit             |
+| `--image`          | `nvcr.io/nvidia/isaac-lab:2.2.0`   | Container image                      |
+| `--backend`        | `skrl`                             | Training backend: `skrl` or `rsl_rl` |
+| `--headless`       | `true`                             | Disable rendering                    |
 
 Values resolve in order: CLI arguments → environment variables → Terraform outputs.
 
 ### Training Backends
 
-| Backend  | Algorithms                     | Use Case                            |
-|----------|--------------------------------|-------------------------------------|
-| SKRL     | PPO, IPPO, MAPPO, AMP, SAC     | General-purpose RL with MLflow      |
-| RSL-RL   | PPO, Distillation              | Locomotion-focused, teacher-student |
+| Backend | Algorithms                 | Use Case                            |
+|---------|----------------------------|-------------------------------------|
+| SKRL    | PPO, IPPO, MAPPO, AMP, SAC | General-purpose RL with MLflow      |
+| RSL-RL  | PPO, Distillation          | Locomotion-focused, teacher-student |
 
 SKRL is the default backend and supports automatic MLflow metric logging via monkey-patching. See [MLflow Integration](mlflow-integration.md) for metric details.
 
@@ -136,10 +136,10 @@ Training scripts register checkpoints to Azure ML automatically. Override the mo
 
 OSMO supports two payload delivery modes for training code:
 
-| Mode              | Script                             | Size Limit | Versioning |
-|-------------------|------------------------------------|------------|------------|
-| Base64 payload    | `submit-osmo-training.sh`          | ~1 MB      | None       |
-| Dataset injection | `submit-osmo-dataset-training.sh`  | Unlimited  | Automatic  |
+| Mode              | Script                            | Size Limit | Versioning |
+|-------------------|-----------------------------------|------------|------------|
+| Base64 payload    | `submit-osmo-training.sh`         | ~1 MB      | None       |
+| Dataset injection | `submit-osmo-dataset-training.sh` | Unlimited  | Automatic  |
 
 Dataset injection uploads `src/training/` as a versioned OSMO dataset, mounted at `/data/<dataset_name>/training` in the container:
 
