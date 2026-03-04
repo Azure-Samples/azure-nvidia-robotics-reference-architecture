@@ -2,7 +2,7 @@
 title: Infrastructure Reference
 description: Architecture, module structure, outputs, and troubleshooting for the Terraform deployment
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-22
+ms.date: 2026-03-02
 ms.topic: reference
 keywords:
   - architecture
@@ -31,10 +31,10 @@ Architecture details, module structure, Terraform outputs, and troubleshooting f
 │   ├── platform/
 │   │   ├── networking.tf              # VNet, subnets, NAT Gateway, DNS resolver
 │   │   ├── security.tf                # Key Vault, managed identities
-│   │   ├── observability.tf           # LAW, Monitor, Grafana, AMPLS
+│   │   ├── observability.tf           # LAW, App Insights; optional Monitor, Grafana, AMPLS
 │   │   ├── storage.tf                 # Storage Account
 │   │   ├── acr.tf                     # Container Registry
-│   │   ├── azureml.tf                 # ML Workspace
+│   │   ├── azureml.tf                 # ML Workspace, optional compute cluster
 │   │   ├── postgresql.tf              # PostgreSQL Flexible Server
 │   │   ├── redis.tf                   # Azure Managed Redis
 │   │   └── private-dns-zones.tf       # Private DNS zones
@@ -57,9 +57,9 @@ Root Module (001-iac/)
 ├── Platform Module         # Shared Azure services
 │   ├── Networking          # VNet, subnets, NAT Gateway, DNS resolver
 │   ├── Security            # Key Vault (RBAC), managed identities
-│   ├── Observability       # Log Analytics, Monitor, Grafana, AMPLS
+│   ├── Observability       # LAW, App Insights (always); Monitor, Grafana, DCE, AMPLS (optional)
 │   ├── Storage             # Storage Account, ACR
-│   ├── Machine Learning    # AzureML Workspace
+│   ├── Machine Learning    # AzureML Workspace, optional compute cluster
 │   └── OSMO Backend        # PostgreSQL, Redis
 │
 └── SiL Module              # AKS-specific infrastructure
@@ -70,25 +70,31 @@ Root Module (001-iac/)
 
 ### Resources by Category
 
-| Category         | Resources                                                                        |
-|------------------|----------------------------------------------------------------------------------|
-| Networking       | VNet, subnets (main, PE, AKS, GPU pools), NSG, NAT Gateway, DNS Private Resolver |
-| Security         | Key Vault (RBAC mode), ML identity, OSMO identity                                |
-| Observability    | Log Analytics, App Insights, Monitor Workspace, Grafana, DCE, AMPLS              |
-| Storage          | Storage Account (blob/file), Container Registry (Premium)                        |
-| Machine Learning | AzureML Workspace                                                                |
-| AKS              | Cluster with Azure CNI Overlay, system pool, GPU node pools                      |
-| Private DNS      | 11 core zones (Key Vault, Storage, ACR, ML, AKS, Monitor)                        |
-| OSMO Services    | PostgreSQL Flexible Server (HA), Azure Managed Redis                             |
+| Category         | Resources                                                                                        |
+|------------------|--------------------------------------------------------------------------------------------------|
+| Networking       | VNet, subnets (main, PE, AKS, GPU pools), NSG, NAT Gateway, DNS Private Resolver                 |
+| Security         | Key Vault (RBAC mode), ML identity, OSMO identity                                                |
+| Observability    | Log Analytics (always), App Insights (always), Monitor Workspace, Grafana, DCE, AMPLS (optional) |
+| Storage          | Storage Account (blob/file), Container Registry (Premium)                                        |
+| Machine Learning | AzureML Workspace, optional managed compute cluster                                              |
+| AKS              | Cluster with Azure CNI Overlay, system pool, GPU node pools                                      |
+| Private DNS      | 6 base zones + conditional AKS zone + conditional monitor zones (up to 11)                       |
+| OSMO Services    | PostgreSQL Flexible Server (HA), Azure Managed Redis                                             |
 
 ### Conditional Resources
 
-| Condition                        | Resources Created                                        |
-|----------------------------------|----------------------------------------------------------|
-| `should_enable_private_endpoint` | Private endpoints, 11+ DNS zones, DNS resolver, AMPLS    |
-| `should_enable_nat_gateway`      | NAT Gateway, Public IP, subnet associations              |
-| `should_deploy_postgresql`       | PostgreSQL server, databases, delegated subnet, DNS zone |
-| `should_deploy_redis`            | Redis cache, private endpoint (if PE enabled), DNS zone  |
+| Condition                         | Resources Created                                        |
+|-----------------------------------|----------------------------------------------------------|
+| `should_enable_private_endpoint`  | Private endpoints, DNS zones, DNS resolver               |
+| `should_enable_nat_gateway`       | NAT Gateway, Public IP, subnet associations              |
+| `should_deploy_postgresql`        | PostgreSQL server, databases, delegated subnet, DNS zone |
+| `should_deploy_redis`             | Redis cache, private endpoint (if PE enabled), DNS zone  |
+| `should_deploy_grafana`           | Azure Managed Grafana, role assignments                  |
+| `should_deploy_monitor_workspace` | Azure Monitor Workspace for Prometheus                   |
+| `should_deploy_ampls`             | AMPLS, scoped services, private endpoint (if PE enabled) |
+| `should_deploy_dce`               | Data Collection Endpoint, AMPLS link (if AMPLS enabled)  |
+| `should_deploy_aml_compute`       | AzureML managed GPU compute cluster                      |
+| `should_include_aks_dns_zone`     | AKS private DNS zone in core zones                       |
 
 ## 📦 Modules
 
@@ -115,6 +121,9 @@ terraform output key_vault_name
 
 # DNS server IP (for VPN clients)
 terraform output dns_server_ip
+
+# AzureML compute cluster (when enabled)
+terraform output aml_compute_cluster
 ```
 
 ## 🔧 Optional Components

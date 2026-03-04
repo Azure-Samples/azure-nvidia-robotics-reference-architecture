@@ -73,6 +73,14 @@ spec:
               if nvidia-smi 2>/dev/null; then
                 echo "NVIDIA GRID driver already functional"
                 nvidia-smi
+                mkdir -p /run/nvidia/validations
+                touch /run/nvidia/validations/.driver-ctr-ready
+                # Expose host root at /run/nvidia/driver/ so the GPU Operator's
+                # driver-validation init container finds binaries and libraries
+                # at the same paths used by a containerized driver install.
+                if ! mountpoint -q /run/nvidia/driver 2>/dev/null; then
+                  mount --bind / /run/nvidia/driver
+                fi
                 exit 0
               fi
 
@@ -107,6 +115,24 @@ spec:
 
               echo "=== Verification ==="
               nvidia-smi
+
+              # Create the GPU Operator driver validation file.
+              # Other GPU Operator pods (toolkit, device-plugin, GFD, DCGM exporter,
+              # validator) have a driver-validation init container that polls for this
+              # file via a hostPath volume at /run/nvidia/validations/. Normally the
+              # GPU Operator's own driver DaemonSet creates it, but that pod is skipped
+              # on nodes labeled nvidia.com/gpu.deploy.driver=false.
+              echo "Creating GPU Operator driver validation marker..."
+              mkdir -p /run/nvidia/validations
+              touch /run/nvidia/validations/.driver-ctr-ready
+
+              # Expose host root at /run/nvidia/driver/ so the GPU Operator's
+              # driver-validation init container finds binaries and libraries
+              # at the same paths used by a containerized driver install.
+              if ! mountpoint -q /run/nvidia/driver 2>/dev/null; then
+                mount --bind / /run/nvidia/driver
+              fi
+
               echo "=== GRID driver installation complete ==="
               SCRIPT
 

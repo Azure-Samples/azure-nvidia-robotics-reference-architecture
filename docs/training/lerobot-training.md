@@ -18,12 +18,12 @@ LeRobot behavioral cloning training for ACT and Diffusion policy architectures. 
 
 ## 📋 Prerequisites
 
-| Component        | Requirement                                                                  |
-|------------------|------------------------------------------------------------------------------|
-| Infrastructure   | AKS cluster deployed via [Infrastructure Guide](../../deploy/README.md)      |
-| Azure ML or OSMO | At least one platform configured (see Platform Selection section)            |
-| HuggingFace token| Required for private datasets (`hf_token` credential)                        |
-| WANDB API key    | Required when `--wandb-enable` is set (default on OSMO)                      |
+| Component         | Requirement                                                             |
+|-------------------|-------------------------------------------------------------------------|
+| Infrastructure    | AKS cluster deployed via [Infrastructure Guide](../../deploy/README.md) |
+| Azure ML or OSMO  | At least one platform configured (see Platform Selection section)       |
+| HuggingFace token | Required for private datasets (`hf_token` credential)                   |
+| WANDB API key     | Required when `--wandb-enable` is set (default on OSMO)                 |
 
 ## 🚀 Quick Start
 
@@ -54,10 +54,10 @@ Train, evaluate, and register in one command:
 
 ## 🧠 Policy Architectures
 
-| Architecture | Type                                  | Strengths                                 |
-|--------------|---------------------------------------|-------------------------------------------|
-| ACT          | Action Chunking with Transformers     | Multi-step prediction, temporal coherence |
-| Diffusion    | Denoising Diffusion Policy            | Multi-modal action distributions          |
+| Architecture | Type                              | Strengths                                 |
+|--------------|-----------------------------------|-------------------------------------------|
+| ACT          | Action Chunking with Transformers | Multi-step prediction, temporal coherence |
+| Diffusion    | Denoising Diffusion Policy        | Multi-modal action distributions          |
 
 Select the architecture with `--policy-type`:
 
@@ -71,26 +71,26 @@ Select the architecture with `--policy-type`:
 
 ## ⚖️ Platform Selection
 
-| Aspect              | Azure ML                              | OSMO                                    |
-|---------------------|---------------------------------------|-----------------------------------------|
-| Submission          | `az ml job create`                    | `osmo workflow submit`                  |
-| Experiment tracking | MLflow (managed)                      | WANDB (default) + MLflow (optional)     |
-| Credential handling | Azure ML environment variables        | `osmo credential set` injection         |
-| Dataset delivery    | HuggingFace Hub download              | Hub download or OSMO bucket mount       |
-| Pipeline support    | Manual multi-step                     | `run-lerobot-pipeline.sh` orchestration |
+| Aspect              | Azure ML                       | OSMO                                    |
+|---------------------|--------------------------------|-----------------------------------------|
+| Submission          | `az ml job create`             | `osmo workflow submit`                  |
+| Experiment tracking | MLflow (managed)               | WANDB (default) + MLflow (optional)     |
+| Credential handling | Azure ML environment variables | `osmo credential set` injection         |
+| Dataset delivery    | HuggingFace Hub download       | Hub download or OSMO bucket mount       |
+| Pipeline support    | Manual multi-step              | `run-lerobot-pipeline.sh` orchestration |
 
 ## ⚙️ Training Configuration
 
-| Parameter           | Default                                         | Description                          |
-|---------------------|-------------------------------------------------|--------------------------------------|
-| `--dataset-repo-id` | (required)                                      | HuggingFace dataset repository       |
-| `--policy-type`     | `act`                                           | Policy: `act` or `diffusion`         |
-| `--job-name`        | `lerobot-act-training`                          | Job identifier                       |
-| `--image`           | `pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime` | Container image                      |
-| `--training-steps`  | (LeRobot default)                               | Total training iterations            |
-| `--batch-size`      | (LeRobot default)                               | Training batch size                  |
-| `--save-freq`       | `5000`                                          | Checkpoint save frequency            |
-| `--policy-repo-id`  | (none)                                          | Pre-trained policy for fine-tuning   |
+| Parameter           | Default                                         | Description                        |
+|---------------------|-------------------------------------------------|------------------------------------|
+| `--dataset-repo-id` | (required)                                      | HuggingFace dataset repository     |
+| `--policy-type`     | `act`                                           | Policy: `act` or `diffusion`       |
+| `--job-name`        | `lerobot-act-training`                          | Job identifier                     |
+| `--image`           | `pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime` | Container image                    |
+| `--training-steps`  | (LeRobot default)                               | Total training iterations          |
+| `--batch-size`      | (LeRobot default)                               | Training batch size                |
+| `--save-freq`       | `5000`                                          | Checkpoint save frequency          |
+| `--policy-repo-id`  | (none)                                          | Pre-trained policy for fine-tuning |
 
 ### Fine-Tuning from Existing Policy
 
@@ -120,12 +120,12 @@ osmo credential set wandb_api_key --generic --value "..."
 
 Azure ML uses workspace-managed identity. Set environment variables for custom configurations:
 
-| Variable                  | Description               |
-|---------------------------|---------------------------|
-| `AZURE_SUBSCRIPTION_ID`   | Azure subscription ID     |
-| `AZURE_RESOURCE_GROUP`    | Resource group name       |
-| `AZUREML_WORKSPACE_NAME`  | Azure ML workspace name   |
-| `AZUREML_COMPUTE`         | Compute target name       |
+| Variable                 | Description             |
+|--------------------------|-------------------------|
+| `AZURE_SUBSCRIPTION_ID`  | Azure subscription ID   |
+| `AZURE_RESOURCE_GROUP`   | Resource group name     |
+| `AZUREML_WORKSPACE_NAME` | Azure ML workspace name |
+| `AZUREML_COMPUTE`        | Compute target name     |
 
 ## 📊 Experiment Logging
 
@@ -207,7 +207,7 @@ The `run-lerobot-pipeline.sh` script orchestrates the full lifecycle on OSMO:
 
 ## 🔗 Related Documentation
 
-- [LeRobot Inference](../lerobot-inference.md) for evaluating trained policies
+- [LeRobot Inference](../inference/lerobot-inference.md) for evaluating trained policies
 - [Experiment Tracking](experiment-tracking.md) for MLflow and WANDB configuration
 - [AzureML Workflows](../../workflows/azureml/README.md) for job template reference
 - [OSMO Workflows](../../workflows/osmo/README.md) for workflow template reference

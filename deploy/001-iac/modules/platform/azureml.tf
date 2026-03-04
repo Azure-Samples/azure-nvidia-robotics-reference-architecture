@@ -50,6 +50,15 @@ resource "azapi_resource" "ml_workspace" {
   }
 
   response_export_values = ["properties.workspaceId", "identity.principalId"]
+
+  lifecycle {
+    ignore_changes = [
+      // ARM API returns resource provider segments with varying casing
+      // (e.g. Microsoft.insights vs Microsoft.Insights) causing perpetual drift
+      body.properties.applicationInsights,
+      body.properties.keyVault,
+    ]
+  }
 }
 
 // ============================================================
@@ -78,4 +87,32 @@ resource "azurerm_private_endpoint" "azureml_api" {
       azurerm_private_dns_zone.core["azureml_notebooks"].id,
     ]
   }
+}
+
+// ============================================================
+// AzureML Managed Compute Cluster (Optional)
+// ============================================================
+
+resource "azurerm_machine_learning_compute_cluster" "gpu" {
+  count = var.should_deploy_aml_compute ? 1 : 0
+
+  name                          = var.aml_compute_config.cluster_name
+  machine_learning_workspace_id = azapi_resource.ml_workspace.id
+  location                      = var.resource_group.location
+  vm_size                       = var.aml_compute_config.vm_size
+  vm_priority                   = var.aml_compute_config.vm_priority
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  scale_settings {
+    min_node_count                       = var.aml_compute_config.min_node_count
+    max_node_count                       = var.aml_compute_config.max_node_count
+    scale_down_nodes_after_idle_duration = var.aml_compute_config.scale_down_after_idle
+  }
+
+  // Custom subnet is incompatible with workspace managed VNet (AllowOnlyApprovedOutbound).
+  // Only set subnet_resource_id when workspace does NOT use managed VNet isolation.
+  subnet_resource_id = var.should_enable_private_endpoint ? null : coalesce(var.aml_compute_config.subnet_id, azurerm_subnet.main.id)
 }
