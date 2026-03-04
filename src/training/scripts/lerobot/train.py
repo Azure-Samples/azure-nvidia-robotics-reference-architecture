@@ -320,6 +320,7 @@ def main() -> int:
     env_arg_map = {
         "TRAINING_STEPS": "--steps",
         "BATCH_SIZE": "--batch_size",
+        "LEARNING_RATE": "--policy.optimizer_lr",
         "EVAL_FREQ": "--eval_freq",
         "SAVE_FREQ": "--save_freq",
     }
