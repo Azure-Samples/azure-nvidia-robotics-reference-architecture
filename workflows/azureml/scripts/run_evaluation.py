@@ -278,11 +278,10 @@ def main() -> int:
     num_episodes = min(eval_episodes, total_episodes)
 
     # Start MLflow run
-    mlflow_run = None
     if mlflow_enable:
         import mlflow
 
-        mlflow_run = mlflow.start_run(run_name=job_name)
+        mlflow.start_run(run_name=job_name)
         mlflow.log_params(
             {
                 "policy_repo_id": policy_repo_id,
