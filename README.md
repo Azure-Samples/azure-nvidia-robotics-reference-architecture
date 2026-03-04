@@ -1,9 +1,3 @@
----
-title: Azure Robotics Reference Architecture with NVIDIA OSMO
-description: Production-ready framework for orchestrating robotics AI workloads on Azure using NVIDIA Isaac Lab, Isaac Sim, and OSMO
-ms.date: 2026-03-02
----
-
 <!-- markdownlint-disable MD013 -->
 [![CI Status](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/main.yml/badge.svg)](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/main.yml)
 [![CodeQL](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/codeql-analysis.yml)
