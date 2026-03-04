@@ -2,6 +2,12 @@ name: Pytest Tests
 
 on:
   workflow_call:
+    inputs:
+      code-coverage:
+        description: 'Enable Codecov coverage upload'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -12,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -33,7 +40,20 @@ jobs:
         run: uv run pytest -v
 
       - name: Upload coverage.xml artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4.4.3
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: pytest-coverage-xml
           path: coverage.xml
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        if: ${{ inputs.code-coverage && always() }}
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        with:
+          files: coverage.xml
+          use_oidc: true
+          fail_ci_if_error: false
+          verbose: true
+          flags: pytest
+          name: pytest-coverage
