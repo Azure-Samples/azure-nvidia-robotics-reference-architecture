@@ -15,6 +15,72 @@ Launch and interact with the Dataset Analysis Tool — a full-stack application 
 
 The backend virtual environment and frontend `node_modules` are auto-created on first launch by `start.sh`.
 
+## Launch and Connect Workflow
+
+Follow these steps in order every time the dataviewer is started.
+
+### Step 1 — Start the app
+
+Launch `start.sh` as a background terminal process. The script prints `[OK] Both services are running` and the URLs when both services are healthy.
+
+```bash
+cd src/dataviewer && ./start.sh
+```
+
+With a custom dataset path:
+
+```bash
+cd src/dataviewer && HMI_DATA_PATH=/path/to/datasets ./start.sh
+```
+
+### Step 2 — Open SimpleBrowser
+
+After confirming both services are running (look for `[OK] Backend is healthy` in terminal output), open the frontend in SimpleBrowser using the `open_browser_page` tool:
+
+```
+open_browser_page("http://localhost:5173")
+```
+
+If a non-default `FRONTEND_PORT` was set, substitute that port instead of `5173`.
+
+### Step 3 — Load the Playwright MCP tools
+
+The Playwright MCP server is declared in `.vscode/mcp.json` and VS Code starts it automatically for this workspace:
+
+```json
+// .vscode/mcp.json
+{
+  "servers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}
+```
+
+Before issuing any browser actions, always load the Playwright tools with:
+
+```
+tool_search_tool_regex("playwright|browser_snapshot|browser_navigate|browser_click|browser_type")
+```
+
+If the search returns no results the MCP server has not started. Ask the user to open the VS Code Command Palette and run **MCP: Start Server** → **playwright**, then retry the search.
+
+### Step 4 — Interact via Playwright MCP
+
+Once the tools are available, use the following patterns for all UI interaction:
+
+| Action | Playwright MCP Tool | Notes |
+|--------|-------------------|-------|
+| Capture page state | `browser_snapshot` | Call first before any click/type to orient |
+| Navigate to URL | `browser_navigate` | Use to reload or go to a route |
+| Click an element | `browser_click` | Target `aside li button` for episodes |
+| Type into input | `browser_type` | For search or label inputs |
+| Take a screenshot | `browser_screenshot` | Use to verify visual state |
+
+Always call `browser_snapshot` first to inspect the current DOM before issuing click or type actions. Reference the selector patterns in the [Frontend UI Structure](#frontend-ui-structure) section below.
+
 ## Quick Start
 
 Start the dataviewer with the default dataset path:
@@ -97,18 +163,152 @@ src/dataviewer/
 
 ## API Reference
 
+### Core Endpoints
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/api/datasets` | GET | List all datasets |
+| `/api/datasets/{id}` | GET | Get dataset metadata and capabilities |
 | `/api/datasets/{id}/episodes` | GET | List episodes in a dataset |
-| `/api/datasets/{id}/episodes/{idx}` | GET | Get episode data with frames |
-| `/api/datasets/{id}/episodes/{idx}/frames/{frame}/image` | GET | Get frame image |
-| `/api/datasets/{id}/episodes/{idx}/export` | POST | Export episode data |
-| `/api/datasets/{id}/labels` | GET/POST | Manage dataset labels |
-| `/api/annotations` | GET/POST/PUT/DELETE | CRUD annotation operations |
-| `/api/analysis/*` | GET/POST | Analysis endpoints |
+| `/api/datasets/{id}/episodes/{idx}` | GET | Get episode data with trajectory and metadata |
+| `/api/datasets/{id}/episodes/{idx}/trajectory` | GET | Get trajectory data only |
+| `/api/datasets/{id}/episodes/{idx}/frames/{frame}` | GET | Get a single frame image |
+| `/api/datasets/{id}/episodes/{idx}/cameras` | GET | List available camera views |
+| `/api/datasets/{id}/episodes/{idx}/video/{camera}` | GET | Stream video for a camera |
 | `http://localhost:8000/docs` | GET | Swagger UI documentation |
+
+### Label Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/datasets/{id}/labels` | GET | Get all episode labels and available label options |
+| `/api/datasets/{id}/labels/options` | GET | List available label options |
+| `/api/datasets/{id}/labels/options` | POST | Add a new label option (`{"label": "NAME"}`) |
+| `/api/datasets/{id}/episodes/{idx}/labels` | GET | Get labels for one episode |
+| `/api/datasets/{id}/episodes/{idx}/labels` | PUT | Set labels for one episode (`{"labels": ["A", "B"]}`) |
+| `/api/datasets/{id}/labels/save` | POST | Persist all labels to disk |
+
+### Annotation Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/datasets/{id}/episodes/{idx}/annotations` | GET | Get structured annotations |
+| `/api/datasets/{id}/episodes/{idx}/annotations` | PUT | Update structured annotations |
+| `/api/datasets/{id}/episodes/{idx}/annotations` | DELETE | Remove annotations |
+| `/api/datasets/{id}/episodes/{idx}/annotations/auto` | POST | Trigger auto-annotation |
+| `/api/datasets/{id}/annotations/summary` | GET | Get annotation summary across episodes |
+
+### Export and Analysis Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/datasets/{id}/export` | POST | Export dataset with filters |
+| `/api/datasets/{id}/export/stream` | POST | Stream export |
+| `/api/datasets/{id}/export/preview` | GET | Preview export configuration |
+| `/api/datasets/{id}/episodes/{idx}/detect` | POST | Run object detection |
+| `/api/analysis/trajectory-quality` | POST | Trajectory quality analysis |
+| `/api/analysis/anomaly-detection` | POST | Anomaly detection |
+| `/api/ai/suggest-annotation` | POST | AI-suggested annotations |
+
+## Annotation Workflow
+
+Annotation combines API calls for efficiency with Playwright UI interaction for verification. Use the API for bulk operations and the UI for visual review and spot-checking.
+
+### Step 1 — Analyze trajectory data
+
+Fetch episode trajectory data from the API to determine labels programmatically:
+
+```bash
+curl -s "http://localhost:8000/api/datasets/{dataset_id}/episodes/{idx}" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+traj = d['trajectory_data']  # List of frames with joint_positions and timestamps
+print(f'Frames: {len(traj)}')
+print(f'First joint positions: {traj[0]["joint_positions"][:8]}')
+print(f'Last joint positions: {traj[-1]["joint_positions"][:8]}')
+"
+```
+
+Episode trajectory data is a list of frame dictionaries, each containing:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | float | Time in seconds from episode start |
+| `frame` | int | Frame index |
+| `joint_positions` | list[float] | Joint positions for all robot joints |
+
+The `meta` field of the episode response contains `index`, `length`, `task_index`, and `has_annotations`.
+
+### Step 2 — Determine labels from trajectory
+
+Analyze gripper and joint data at multiple time points to classify episodes. Check the midpoint first, then 25% and 75% for episodes where grasp actions happen earlier or later:
+
+```python
+# Example: check grip values at multiple points for robust classification
+for pct in [25, 50, 75]:
+    idx = int(len(traj) * pct / 100)
+    jp = traj[idx]['joint_positions']
+    right_grip = jp[7]   # Right arm gripper index
+    left_grip = jp[15]   # Left arm gripper index
+```
+
+> [!IMPORTANT]
+> Some episodes have late or early grasp actions, so checking only the midpoint may yield UNKNOWN results. Always check multiple time points (25%, 50%, 75%) and the minimum grip value across the full trajectory for robust classification.
+
+### Step 3 — Apply labels via API
+
+Use the PUT endpoint for each episode:
+
+```bash
+curl -s -X PUT "http://localhost:8000/api/datasets/{dataset_id}/episodes/{idx}/labels" \
+  -H "Content-Type: application/json" \
+  -d '{"labels": ["RIGHT", "SUCCESS"]}'
+```
+
+For bulk annotation, loop over episodes in a script:
+
+```python
+import json, urllib.request
+
+def annotate(dataset_id, episode_idx, labels):
+    data = json.dumps({"labels": labels}).encode()
+    req = urllib.request.Request(
+        f"http://localhost:8000/api/datasets/{dataset_id}/episodes/{episode_idx}/labels",
+        data=data, method="PUT",
+        headers={"Content-Type": "application/json"})
+    return json.loads(urllib.request.urlopen(req).read())
+```
+
+### Step 4 — Persist labels
+
+After applying labels via the API, persist them to disk:
+
+```bash
+curl -s -X POST "http://localhost:8000/api/datasets/{dataset_id}/labels/save"
+```
+
+> [!WARNING]
+> Labels applied via PUT are held in memory until saved. Always call the save endpoint after bulk annotation to avoid data loss.
+
+### Step 5 — Verify in UI with Playwright
+
+After applying labels via API, refresh the browser and verify using Playwright:
+
+1. Navigate to the app: `browser_navigate` to `http://localhost:5173`.
+2. Wait for episode list to load: `browser_wait_for` with text like `"64 Episodes"`.
+3. Take a screenshot to confirm labels appear in the sidebar.
+4. Use label filter buttons in the sidebar to verify counts match expectations.
+5. Click individual episodes and scroll to the "Episode Labels" section to verify correct labels are applied.
+
+### Step 6 — Interactive annotation via UI
+
+For individual episode review or correction:
+
+1. Click an episode in the sidebar (`aside li button` elements).
+2. Scroll to the "Edit Tools" / "Episode Labels" section using `browser_evaluate` with `scrollIntoView`.
+3. Toggle label buttons (SUCCESS, FAILURE, PARTIAL, or custom labels) — clicking a selected label removes it.
+4. Click "Save All" to persist.
 
 ## Frontend UI Structure
 
@@ -132,5 +332,9 @@ The React app has these key areas for Playwright interaction:
 | No datasets visible | Check `HMI_DATA_PATH` in `backend/.env` points to a directory with dataset subdirectories |
 | Port conflict | Set `BACKEND_PORT` or `FRONTEND_PORT` environment variables |
 | CORS errors | Backend allows localhost ports 5173-5177; check the frontend port is in range |
+| Labels not persisted after restart | Call `POST /api/datasets/{id}/labels/save` after API-based annotation |
+| Snapshot refs stale after navigation | Always take a fresh `browser_snapshot` before clicking; refs change on page updates |
+| Slider not responding to Playwright | Use `browser_evaluate` with native input value setter and dispatch `input` + `change` events |
+| Sidebar not scrolling | Scroll the `aside ul` element directly via `browser_evaluate` with `element.scrollTop = N` |
 
 > Brought to you by azure-nvidia-robotics-reference-architecture
