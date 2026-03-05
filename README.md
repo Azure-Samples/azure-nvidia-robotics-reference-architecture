@@ -1,3 +1,5 @@
+# Azure NVIDIA Robotics Reference Architecture
+
 <!-- markdownlint-disable MD013 -->
 [![CI Status](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/main.yml/badge.svg)](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/main.yml)
 [![CodeQL](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/actions/workflows/codeql-analysis.yml)
