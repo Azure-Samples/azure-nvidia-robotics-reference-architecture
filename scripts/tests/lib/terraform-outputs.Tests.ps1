@@ -7,7 +7,8 @@
 # Purpose: Pester tests for Terraform output reading and accessor functions
 # Author: Edge AI Team
 
-#Requires -Modules Pester
+#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {
     . $PSScriptRoot/../../lib/terraform-outputs.ps1

@@ -7,7 +7,8 @@
 # Purpose: Pester tests for Azure subscription initialization functions
 # Author: Edge AI Team
 
-#Requires -Modules Pester
+#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 BeforeAll {
     $script:SavedArmSubId = $env:ARM_SUBSCRIPTION_ID

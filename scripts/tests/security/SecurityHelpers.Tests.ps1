@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 # Licensed under the MIT license.
 
-#Requires -Modules Pester
+#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 # SecurityHelpers.Tests.ps1
 #
 # Purpose: Unit tests for SecurityHelpers.psm1 module
