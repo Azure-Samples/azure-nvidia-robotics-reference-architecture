@@ -30,6 +30,10 @@ Install these tools before contributing:
 | Node.js/npm | 20+ LTS         | <https://nodejs.org/>                                     |
 | Python      | 3.11+           | <https://www.python.org/downloads/>                       |
 | shellcheck  | 0.10+           | <https://www.shellcheck.net/>                             |
+| uv          | latest          | <https://docs.astral.sh/uv/>                              |
+| Docker      | latest          | <https://docs.docker.com/get-docker/> (with NVIDIA Container Toolkit) |
+| OSMO CLI    | latest          | <https://developer.nvidia.com/osmo>                       |
+| hve-core    | latest          | <https://github.com/microsoft/hve-core>                   |
 
 ## Azure Access Requirements
 
@@ -117,6 +121,19 @@ python --version  # >= 3.11
 
 # shellcheck (for shell script validation)
 shellcheck --version  # >= 0.10
+
+# uv (Python package manager)
+uv --version
+
+# Docker with NVIDIA Container Toolkit
+docker --version
+nvidia-ctk --version
+
+# OSMO CLI
+osmo --version
+
+# hve-core (VS Code extension — verify via extensions list)
+code --list-extensions | grep -i hve-core
 ```
 
 ### Validation Commands
@@ -151,6 +168,26 @@ npm install
 # Lint markdown (required for documentation changes)
 npm run lint:md
 ```
+
+## VS Code Configuration
+
+The workspace is configured with `python.analysis.extraPaths` pointing to `src/`, enabling imports like:
+
+```python
+from training.utils import AzureMLContext, bootstrap_azure_ml
+```
+
+Select the `.venv/bin/python` interpreter in VS Code for IntelliSense support.
+
+The workspace `.vscode/settings.json` also configures Copilot Chat to load instructions, prompts, and chat modes from hve-core:
+
+| Setting                           | hve-core Paths                                                               |
+|-----------------------------------|------------------------------------------------------------------------------|
+| `chat.modeFilesLocations`         | `../hve-core/.github/chatmodes`, `../hve-core/copilot/beads/chatmodes`       |
+| `chat.instructionsFilesLocations` | `../hve-core/.github/instructions`, `../hve-core/copilot/beads/instructions` |
+| `chat.promptFilesLocations`       | `../hve-core/.github/prompts`, `../hve-core/copilot/beads/prompts`           |
+
+These paths resolve when hve-core is installed as a peer directory or via the VS Code Extension. Without hve-core, Copilot still functions but shared conventions, prompts, and chat modes are unavailable.
 
 ## Related Documentation
 
