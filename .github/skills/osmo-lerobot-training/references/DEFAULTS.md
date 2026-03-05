@@ -23,7 +23,7 @@ Datasets available in Azure Blob Storage for training and inference:
 
 | Dataset           | Blob Prefix       | Robot | Episodes | Frames | FPS | Action Dims | Camera Key                     |
 | ----------------- | ----------------- | ----- | -------- | ------ | --- | ----------- | ------------------------------ |
-| `hexagon_lerobot` | `hexagon_lerobot` | UR10e | 64       | 20,251 | 30  | 6           | `observation.images.il-camera` |
+| `ur10e_episodes` | `ur10e_episodes` | UR10e | 64       | 20,251 | 30  | 6           | `observation.images.il-camera` |
 
 When a user references a known dataset by name, auto-populate `--from-blob`, `--storage-account`, `--blob-prefix`, and `--no-val-split`.
 
@@ -75,7 +75,7 @@ notes: Standard datacenter driver via GPU Operator. MIG disabled.
 
 ## Training Duration Estimates
 
-Based on observed runs with the hexagon_lerobot dataset (64 episodes, 20K frames):
+Based on observed runs with the ur10e_episodes dataset (64 episodes, 20K frames):
 
 | Steps   | A10 (32 batch) | RTX PRO 6000 (64 batch) | H100 (128 batch) |
 | ------- | -------------- | ----------------------- | ---------------- |

@@ -309,14 +309,14 @@ The save endpoint writes labels to a JSON file inside the dataset's `meta/` dire
 For example, with the default dataset path:
 
 ```text
-datasets/hexagon_lerobot/meta/episode_labels.json
+datasets/ur10e_episodes/meta/episode_labels.json
 ```
 
 File structure:
 
 ```json
 {
-  "dataset_id": "hexagon_lerobot",
+  "dataset_id": "ur10e_episodes",
   "available_labels": ["SUCCESS", "FAILURE", "PARTIAL", "LEFT", "RIGHT"],
   "episodes": {
     "0": ["LEFT", "SUCCESS"],
