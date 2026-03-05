@@ -68,6 +68,9 @@ param(
     [string[]]$FooterExcludePaths = @('dependency-pinning-artifacts/**'),
 
     [Parameter()]
+    [string[]]$FrontmatterExcludePaths = @('README.md'),
+
+    [Parameter()]
     [switch]$SkipFooterValidation,
 
     [Parameter()]
@@ -557,7 +560,7 @@ function Invoke-Validation {
         } elseif ([System.IO.Path]::IsPathRooted($filePath)) {
             $relativePath = [System.IO.Path]::GetFileName($filePath)
         }
-        $fileResult = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath $relativePath -FooterExcludePaths $script:FooterExcludePaths -SkipFooterValidation:$script:SkipFooterValidation
+        $fileResult = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath $relativePath -FooterExcludePaths $script:FooterExcludePaths -FrontmatterExcludePaths $script:FrontmatterExcludePaths -SkipFooterValidation:$script:SkipFooterValidation
         $results.Add($fileResult)
     }
 
