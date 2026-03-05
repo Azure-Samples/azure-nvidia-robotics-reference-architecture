@@ -2,7 +2,7 @@
 title: Documentation Maintenance Policy
 description: Update triggers, ownership, review criteria, freshness policy, and release lifecycle for project documentation
 author: Microsoft Robotics-AI Team
-ms.date: 2026-02-25
+ms.date: 2026-03-05
 ms.topic: reference
 keywords:
   - documentation
@@ -71,7 +71,7 @@ Documentation freshness is tracked through the `ms.date` frontmatter field.
 * Report stale or inaccurate content using the [documentation issue template](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new?template=05-documentation.yml). Include the file path and a description of the inaccuracy.
 
 > [!NOTE]
-> Automated `ms.date` freshness checking (GitHub Actions) is planned for a future milestone.
+> Automated `ms.date` freshness checking runs weekly via the [ms.date Freshness Check workflow](../../.github/workflows/msdate-freshness-check.yml). Files with `ms.date` older than 90 days are flagged in the workflow summary.
 
 ## PR Documentation Requirements
 
