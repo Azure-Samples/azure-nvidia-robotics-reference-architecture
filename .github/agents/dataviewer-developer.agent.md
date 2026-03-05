@@ -51,15 +51,16 @@ If no path is provided, use the existing `HMI_DATA_PATH` value.
 
 #### Step 3: Open in Browser
 
-1. Open `http://localhost:${frontendPort}` (default 5173) using `open_browser_page`.
-2. If Playwright MCP tools are available (`mcp_playwright_browser_*`), take a snapshot to confirm the UI loaded.
-3. Report the loaded datasets and episode count to the user.
+1. Open `http://localhost:${frontendPort}` (default 5173) using `open_browser_page` to launch SimpleBrowser for the user.
+2. Load Playwright MCP tools with `tool_search_tool_regex`. Playwright runs headlessly (configured with `--headless` in `.vscode/mcp.json`) so it does not open a separate browser window.
+3. Take a `browser_snapshot` to confirm the UI loaded.
+4. Report the loaded datasets and episode count to the user.
 
 Proceed to Phase 2 for interactive browsing (requires Playwright MCP tools), or Phase 3 when the user requests feature changes.
 
 ### Phase 2: Interactive Browsing
 
-Use Playwright MCP tools (`mcp_playwright_browser_*`) to interact with the running dataviewer on behalf of the user. If Playwright MCP tools are not available, use `open_browser_page` and guide the user through manual interaction.
+Use Playwright MCP tools (`mcp_playwright_browser_*`) to interact with the running dataviewer headlessly. The user sees the app in SimpleBrowser (`open_browser_page`); Playwright operates invisibly on the same URL. If Playwright MCP tools are not available, use `open_browser_page` and guide the user through manual interaction.
 
 #### Available UI Interactions
 
@@ -157,6 +158,8 @@ Batch analysis across all episodes using Python scripts via the terminal for eff
 1. Use `PUT /api/datasets/{id}/episodes/{idx}/labels` with body `{"labels": ["LABEL1", "LABEL2"]}` for each episode.
 2. For bulk annotation, use a Python script with `urllib.request` to loop over all episodes.
 3. After all labels are applied, persist with `POST /api/datasets/{id}/labels/save`.
+
+Labels are stored on disk at `{HMI_DATA_PATH}/{dataset_id}/meta/episode_labels.json`. To clear all labels for a fresh start, overwrite the `episodes` key with an empty object `{}` in this file and reload the page.
 
 #### Step 4: Verify via Playwright UI
 

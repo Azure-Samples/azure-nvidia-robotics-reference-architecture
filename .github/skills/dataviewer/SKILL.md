@@ -35,17 +35,19 @@ cd src/dataviewer && HMI_DATA_PATH=/path/to/datasets ./start.sh
 
 ### Step 2 — Open SimpleBrowser
 
-After confirming both services are running (look for `[OK] Backend is healthy` in terminal output), open the frontend in SimpleBrowser using the `open_browser_page` tool:
+After confirming both services are running (look for `[OK] Backend is healthy` in terminal output), open the frontend in VS Code's SimpleBrowser using the `open_browser_page` tool:
 
 ```
 open_browser_page("http://localhost:5173")
 ```
 
+SimpleBrowser is the primary visual interface for the user. All Playwright automation operates headlessly in the background — the user sees results in SimpleBrowser.
+
 If a non-default `FRONTEND_PORT` was set, substitute that port instead of `5173`.
 
 ### Step 3 — Load the Playwright MCP tools
 
-The Playwright MCP server is declared in `.vscode/mcp.json` and VS Code starts it automatically for this workspace:
+Playwright runs in **headless mode** so it does not open a separate browser window. All visual feedback goes through SimpleBrowser (Step 2). The Playwright MCP server must be declared in `.vscode/mcp.json` with the `--headless` flag:
 
 ```json
 // .vscode/mcp.json
@@ -53,11 +55,14 @@ The Playwright MCP server is declared in `.vscode/mcp.json` and VS Code starts i
   "servers": {
     "playwright": {
       "command": "npx",
-      "args": ["@playwright/mcp@latest"]
+      "args": ["@playwright/mcp@latest", "--headless"]
     }
   }
 }
 ```
+
+> [!IMPORTANT]
+> The `--headless` flag is required. Without it, Playwright opens a separate Chromium window instead of working invisibly behind SimpleBrowser.
 
 Before issuing any browser actions, always load the Playwright tools with:
 
@@ -69,6 +74,8 @@ If the search returns no results the MCP server has not started. Ask the user to
 
 ### Step 4 — Interact via Playwright MCP
 
+Playwright operates headlessly on the same URL as SimpleBrowser. Both see the same backend state, so API-driven changes (labels, annotations) appear in both.
+
 Once the tools are available, use the following patterns for all UI interaction:
 
 | Action | Playwright MCP Tool | Notes |
@@ -77,7 +84,7 @@ Once the tools are available, use the following patterns for all UI interaction:
 | Navigate to URL | `browser_navigate` | Use to reload or go to a route |
 | Click an element | `browser_click` | Target `aside li button` for episodes |
 | Type into input | `browser_type` | For search or label inputs |
-| Take a screenshot | `browser_screenshot` | Use to verify visual state |
+| Take a screenshot | `browser_take_screenshot` | Use to verify visual state |
 
 Always call `browser_snapshot` first to inspect the current DOM before issuing click or type actions. Reference the selector patterns in the [Frontend UI Structure](#frontend-ui-structure) section below.
 
@@ -291,6 +298,45 @@ curl -s -X POST "http://localhost:8000/api/datasets/{dataset_id}/labels/save"
 > [!WARNING]
 > Labels applied via PUT are held in memory until saved. Always call the save endpoint after bulk annotation to avoid data loss.
 
+#### Label storage on disk
+
+The save endpoint writes labels to a JSON file inside the dataset's `meta/` directory:
+
+```text
+{HMI_DATA_PATH}/{dataset_id}/meta/episode_labels.json
+```
+
+For example, with the default dataset path:
+
+```text
+datasets/hexagon_lerobot/meta/episode_labels.json
+```
+
+File structure:
+
+```json
+{
+  "dataset_id": "hexagon_lerobot",
+  "available_labels": ["SUCCESS", "FAILURE", "PARTIAL", "LEFT", "RIGHT"],
+  "episodes": {
+    "0": ["LEFT", "SUCCESS"],
+    "1": ["RIGHT", "SUCCESS"]
+  }
+}
+```
+
+To clear all labels for a fresh start, overwrite the file with an empty `episodes` object:
+
+```json
+{
+  "dataset_id": "{dataset_id}",
+  "available_labels": ["SUCCESS", "FAILURE", "PARTIAL", "LEFT", "RIGHT"],
+  "episodes": {}
+}
+```
+
+After editing the file on disk, restart the backend or reload the page for changes to take effect.
+
 ### Step 5 — Verify in UI with Playwright
 
 After applying labels via API, refresh the browser and verify using Playwright:
@@ -333,6 +379,7 @@ The React app has these key areas for Playwright interaction:
 | Port conflict | Set `BACKEND_PORT` or `FRONTEND_PORT` environment variables |
 | CORS errors | Backend allows localhost ports 5173-5177; check the frontend port is in range |
 | Labels not persisted after restart | Call `POST /api/datasets/{id}/labels/save` after API-based annotation |
+| Playwright opens separate Chrome window | Ensure `--headless` is in the Playwright MCP args in `.vscode/mcp.json`; restart the MCP server after changing |
 | Snapshot refs stale after navigation | Always take a fresh `browser_snapshot` before clicking; refs change on page updates |
 | Slider not responding to Playwright | Use `browser_evaluate` with native input value setter and dispatch `input` + `change` events |
 | Sidebar not scrolling | Scroll the `aside ul` element directly via `browser_evaluate` with `element.scrollTop = N` |

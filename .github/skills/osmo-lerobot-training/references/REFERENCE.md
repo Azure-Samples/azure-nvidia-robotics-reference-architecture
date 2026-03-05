@@ -154,13 +154,117 @@ Inference produces:
 
 ### Periodic Evaluation Schedule
 
-For long training runs, evaluate intermediate checkpoints to track improvement:
+For long training runs, use `scripts/poll-and-eval-checkpoints.sh` to automatically evaluate each checkpoint as it is registered. Launch it in the background immediately after submitting training:
+
+```bash
+nohup scripts/poll-and-eval-checkpoints.sh \
+  --model-name my-robot-act-model \
+  --training-workflow-id lerobot-training-32 \
+  --blob-prefix my-robot-dataset \
+  --job-prefix my-robot-eval \
+  --experiment-name my-robot-inference \
+  --poll-interval 60 \
+  --max-concurrent 2 \
+  > /tmp/my-robot-eval.log 2>&1 & disown
+```
+
+The poller:
+- Polls AzureML every `--poll-interval` seconds for new versions of `--model-name`
+- Submits `submit-osmo-lerobot-inference.sh` for each new version
+- Caps concurrent inference workflows at `--max-concurrent`
+- Stops automatically when the training workflow reaches a terminal state
+- Tracks submitted versions in `/tmp/<model-name>-submitted-versions.txt`
+- Logs all activity to `/tmp/<model-name>-eval.log`
+
+For manual evaluation of specific checkpoints without the poller:
 
 | Checkpoint                       | When to Evaluate                   | Purpose                                          |
 | -------------------------------- | ---------------------------------- | ------------------------------------------------ |
 | First (e.g., step 10,000)        | After first `--save-freq` interval | Sanity check — policy produces non-zero actions  |
 | Mid-training (e.g., step 50,000) | ~50% completion                    | Convergence check — loss should be declining     |
 | Final (last registered version)  | After training completes           | Full evaluation — compare to earlier checkpoints |
+
+## AzureML Portal Navigation (Playwright)
+
+Step-by-step Playwright navigation for the Azure ML portal. Use these patterns to open training metrics and inference trajectory plots during active workflows.
+
+### URL Construction
+
+Build portal deep-links from variables in `scripts/.env`:
+
+| Page                 | URL Pattern                                                                                                                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Experiment runs list | `https://ml.azure.com/experiments/{experiment_name}?wsid=/subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/{AZUREML_WORKSPACE_NAME}` |
+| Direct run           | `https://ml.azure.com/runs/{run_id}?wsid=/subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/{AZUREML_WORKSPACE_NAME}`                 |
+
+Resolve the URL before navigating:
+
+```bash
+source scripts/.env
+echo "https://ml.azure.com/experiments/${EXPERIMENT_NAME}?wsid=/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/${AZUREML_WORKSPACE_NAME}"
+```
+
+If the deep link does not load (portal prompts for sign-in), navigate to `https://ml.azure.com` first to establish the browser session, then re-navigate to the experiment URL.
+
+### Training Metrics Navigation
+
+```
+1. mcp_playwright_browser_navigate  → experiment page URL
+2. mcp_playwright_browser_snapshot  → locate run table; most recent run is first row
+3. mcp_playwright_browser_click     → click run name link (first row)
+4. mcp_playwright_browser_snapshot  → confirm run detail page (look for "Job detail" heading or run ID)
+5. mcp_playwright_browser_click     → click "Metrics" tab
+6. mcp_playwright_browser_snapshot  → confirm metric charts loaded (train/loss chart visible)
+7. mcp_playwright_browser_take_screenshot → show training curves to user
+```
+
+Expected metrics in the Metrics pane:
+
+| Metric                | Expected Behaviour                                 |
+| --------------------- | -------------------------------------------------- |
+| `train/loss`          | Rapid descent early, gradual convergence           |
+| `train/learning_rate` | Flat at `1e-04` (flag `1e-05` as misconfiguration) |
+| `train/grad_norm`     | Stable; spikes > 10 indicate instability           |
+| `gpu_percent`         | Sustained high utilization (>70%)                  |
+| `gpu_memory_percent`  | Below VRAM limit                                   |
+
+### Inference Job Plots Navigation
+
+```
+1. mcp_playwright_browser_navigate  → inference experiment page URL
+2. mcp_playwright_browser_snapshot  → locate run table; latest run = most recently submitted checkpoint eval
+3. mcp_playwright_browser_click     → click run name link (first row)
+4. mcp_playwright_browser_snapshot  → confirm run detail page loaded
+5. mcp_playwright_browser_click     → click "Images" tab
+6. mcp_playwright_browser_snapshot  → confirm trajectory plot images have loaded
+7. mcp_playwright_browser_take_screenshot → show plots to user
+```
+
+Expected images in the Images pane:
+
+| Image                        | Content                                                          |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `episode_NNN_trajectory.png` | Per-episode action delta overlay (predicted vs ground truth)     |
+| `eval_summary.png`           | Aggregate summary panel (MSE, MAE across all evaluated episodes) |
+
+If images are absent, the OSMO inference workflow is still running. Check status and wait:
+
+```bash
+osmo workflow query <inference-workflow-id>
+# Wait for status: completed
+```
+
+### Polling for New Eval Runs
+
+When the checkpoint poller is active, new inference runs appear in AzureML after each `--save-freq` interval. Workflow to track progress:
+
+1. Check the poller log for newly submitted inference workflows:
+   ```bash
+   tail -n 30 /tmp/<model-name>-eval.log | grep -E "Submitting|Workflow ID|version"
+   ```
+2. Refresh the inference experiment page by calling `mcp_playwright_browser_navigate` again with the same URL.
+3. The new run will appear at the top of the run table — click it → **Images** tab → screenshot.
+4. Repeat after each new checkpoint is registered (every `--save-freq` training steps).
 
 ## Azure ML Metric Retrieval
 

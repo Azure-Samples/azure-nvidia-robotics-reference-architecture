@@ -52,7 +52,29 @@ scripts/submit-osmo-lerobot-training.sh \
 scripts/submit-osmo-lerobot-training.sh -d lerobot/aloha_sim_insertion_human
 ```
 
-### Run Inference After Training
+### Run Continuous Eval During Training (preferred)
+
+Start the background poller immediately after submitting training. It watches AzureML for new checkpoint versions and submits an inference job per version automatically, stopping when training reaches a terminal state.
+
+```bash
+# Launch in the background — runs until training completes
+nohup scripts/poll-and-eval-checkpoints.sh \
+  --model-name my-robot-act-model \
+  --training-workflow-id lerobot-training-32 \
+  --blob-prefix my-robot-dataset \
+  --job-prefix my-robot-eval \
+  --experiment-name my-robot-inference \
+  --poll-interval 60 \
+  --max-concurrent 2 \
+  > /tmp/my-robot-eval.log 2>&1 & disown
+
+# Monitor the poller
+tail -f /tmp/my-robot-eval.log
+```
+
+The poller caps concurrent inference workflows at `--max-concurrent` (default 2) to avoid cluster saturation. Submitted versions are tracked in `/tmp/<model-name>-submitted-versions.txt`.
+
+### Run a Single Inference Job
 
 ```bash
 # OSMO inference (GPU, evaluates against the same dataset)
@@ -109,6 +131,51 @@ Open: `http://10.0.5.7/workflows/lerobot-inference-20`
 
 > The page has a **Logs** tab with per-task log streams. For training, select the `lerobot-train` task. For inference, select the `lerobot-infer` task. Use the OSMO CLI (`osmo workflow logs <id> -t <task> -n 100`) as a fallback when the browser is not reachable.
 
+## Azure ML Portal Monitoring (Playwright)
+
+After submitting a training job, and whenever the background eval poller reports a new inference job, open the Azure ML portal with Playwright to view live metrics and trajectory plots. Use `mcp_playwright_browser_navigate`, `mcp_playwright_browser_snapshot`, `mcp_playwright_browser_click`, and `mcp_playwright_browser_take_screenshot`.
+
+### Training Metrics — Open Immediately After Submission
+
+After the training job is submitted, navigate to the training experiment page and open the **Metrics** tab:
+
+1. Construct the experiment URL from Azure environment variables in `scripts/.env`:
+   ```
+   https://ml.azure.com/experiments/{experiment_name}?wsid=/subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/{AZUREML_WORKSPACE_NAME}
+   ```
+2. Call `mcp_playwright_browser_navigate` with that URL.
+3. Call `mcp_playwright_browser_snapshot` to confirm the page loaded and identify the latest run row in the table.
+4. Click the first (most recent) run link.
+5. On the run detail page, call `mcp_playwright_browser_snapshot` to locate the **Metrics** tab.
+6. Click **Metrics**.
+7. Call `mcp_playwright_browser_take_screenshot` and show the live training curves to the user.
+
+Key metrics to surface: `train/loss`, `train/learning_rate` (confirm `1e-04`, not `1e-05`), `train/grad_norm`, `gpu_percent`.
+
+Refresh by calling `mcp_playwright_browser_navigate` again on the same URL at any time.
+
+> See [references/REFERENCE.md](references/REFERENCE.md) for exact click paths, tab selectors, and screenshot guidance.
+
+### Inference / Eval Plots — Open When Poller Submits a Job
+
+While the background eval poller is running, monitor the poller log and navigate to Azure ML to view trajectory plots as each inference job completes:
+
+1. Tail the poller log to detect a new inference submission:
+   ```bash
+   tail -n 30 /tmp/<model-name>-eval.log | grep -E "Submitting|Workflow ID"
+   ```
+2. Construct the inference experiment URL using the `--experiment-name` passed to the poller:
+   ```
+   https://ml.azure.com/experiments/{inference_experiment_name}?wsid=/subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/{AZUREML_WORKSPACE_NAME}
+   ```
+3. Call `mcp_playwright_browser_navigate` with that URL.
+4. Call `mcp_playwright_browser_snapshot` to identify the latest run row (most recently submitted checkpoint eval).
+5. Click that run.
+6. On the run detail page, click the **Images** tab.
+7. Call `mcp_playwright_browser_take_screenshot` and show the trajectory plots to the user.
+
+> The **Images** tab contains per-episode trajectory plots logged by the inference job (`episode_NNN_trajectory.png` and `eval_summary.png`). They appear after the OSMO inference workflow reaches `completed` status. If images are not yet present, check `osmo workflow query <inference-workflow-id>` and wait for `completed`.
+
 ## Parameters Reference
 
 ### Training Submission Parameters
@@ -142,7 +209,22 @@ Open: `http://10.0.5.7/workflows/lerobot-inference-20`
 | Eval episodes | `--eval-episodes` | `10` | Number of episodes to evaluate |
 | MLflow enable | `--mlflow-enable` | `false` | Log trajectory plots to AzureML |
 
+### Continuous Evaluation Parameters (`poll-and-eval-checkpoints.sh`)
+
+| Parameter | Flag | Default | Description |
+|-----------|------|---------|-------------|
+| Model name | `--model-name` | (required) | AzureML model registry name to watch |
+| Training workflow | `--training-workflow-id` | (required) | OSMO workflow ID of the training job |
+| Blob prefix | `--blob-prefix` | (required) | Blob path prefix for the evaluation dataset |
+| Storage account | `--storage-account` | (from .env) | Azure Storage account |
+| Eval episodes | `--eval-episodes` | `10` | Episodes per inference run |
+| Job prefix | `--job-prefix` | (from model name) | Prefix for inference job names |
+| Experiment name | `--experiment-name` | (from model name) | MLflow experiment for inference runs |
+| Poll interval | `--poll-interval` | `60` | Seconds between AzureML registry polls |
+| Max concurrent | `--max-concurrent` | `2` | Max simultaneous inference workflows |
+
 ### GPU Configuration Guidelines
+
 
 | GPU | VRAM | Recommended Batch Size | Notes |
 |-----|------|----------------------|-------|
@@ -185,6 +267,26 @@ osmo workflow list
 osmo workflow cancel <workflow-id>
 ```
 
+### Checkpoint Poller Commands
+
+```bash
+# Start continuous eval loop in background
+nohup scripts/poll-and-eval-checkpoints.sh \
+  --model-name <model-name> \
+  --training-workflow-id <workflow-id> \
+  --blob-prefix <dataset-blob-prefix> \
+  > /tmp/<model-name>-eval.log 2>&1 & disown
+
+# Monitor poller
+tail -f /tmp/<model-name>-eval.log
+
+# Check which versions have been submitted
+cat /tmp/<model-name>-submitted-versions.txt
+
+# Stop the poller early
+pkill -f poll-and-eval-checkpoints
+```
+
 ## Key Metrics Logged
 
 | Metric | Description |
@@ -206,6 +308,10 @@ osmo workflow cancel <workflow-id>
 | VM eviction mid-training | Spot GPU preempted | Checkpoints already registered to AML survive eviction |
 | `ImportError: patch_info_paths` | Payload missing training fixes | Ensure `src/training/` includes `download_dataset.py` with `patch_info_paths` |
 | OOM during training | Batch size too large | Reduce `--batch-size` (32 for 24GB, 64 for 48GB) |
+| Poller exits immediately | Training workflow already terminal | Check `osmo workflow query <id>`; rerun poller or submit inference manually |
+| Poller stalls at max-concurrent | Inference jobs not finishing | Check inference workflow status; increase `--max-concurrent` or cancel stuck jobs |
+| Many pending inference jobs after stopping poller | Poller submitted jobs faster than cluster could drain | `osmo workflow list` only returns the last 12 — iterate over expected ID range to cancel all: `for id in $(seq <first> <last>); do osmo workflow cancel lerobot-inference-$id; done` |
+| `info: command not found` in poller | `common.sh` not sourced | Verify `deploy/002-setup/lib/common.sh` exists and is readable |
 
 See [references/REFERENCE.md](references/REFERENCE.md) for detailed debugging commands.
 
