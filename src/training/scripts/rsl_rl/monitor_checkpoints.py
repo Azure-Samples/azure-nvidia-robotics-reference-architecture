@@ -7,10 +7,6 @@ import os
 import sys
 from pathlib import Path
 
-# Add src/ to path for common module
-_SRC_DIR = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(_SRC_DIR))
-
 from isaaclab.app import AppLauncher
 
 from common import cli_args  # isort: skip

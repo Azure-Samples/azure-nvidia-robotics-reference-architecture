@@ -36,8 +36,8 @@ Training scripts and Python code act as integration shims between NVIDIA's open-
 
 The root `pyproject.toml` serves local development dependency management:
 
-| Context           | Usage                                                         |
-|-------------------|---------------------------------------------------------------|
+| Context           | Usage                                                           |
+|-------------------|-----------------------------------------------------------------|
 | Local development | Providing module availability for intellisense and verification |
 
 This setup is not intended for building publishable Python packages. The `pyproject.toml` build target only packages `src/training` into a wheel for in-container use.

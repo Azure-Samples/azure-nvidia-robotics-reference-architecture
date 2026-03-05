@@ -18,12 +18,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# Add the src directory to the path for common module import
-_SRC_DIR = Path(__file__).resolve().parents[3]  # src/ directory
-_TRAINING_DIR = Path(__file__).resolve().parents[2]  # src/training directory
-sys.path.insert(0, str(_SRC_DIR))
-sys.path.insert(0, str(_TRAINING_DIR))
-
 from isaaclab.app import AppLauncher
 
 from common import cli_args
@@ -139,11 +133,6 @@ import omni
 import torch
 from rsl_rl.runners import DistillationRunner, OnPolicyRunner
 from tensordict import TensorDict
-
-_CURRENT_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _CURRENT_DIR.parents[2]
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 import contextlib
 
