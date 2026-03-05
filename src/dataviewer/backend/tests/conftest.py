@@ -13,6 +13,14 @@ TEST_DATASET_PATH = os.environ.get(
 TEST_DATASET_ID = os.environ.get("TEST_DATASET_ID", "sample_lerobot")
 
 
+@pytest.fixture(autouse=True, scope="session")
+def disable_auth_for_tests():
+    """Disable authentication and CSRF checks for all tests."""
+    os.environ["DATAVIEWER_AUTH_DISABLED"] = "true"
+    yield
+    os.environ.pop("DATAVIEWER_AUTH_DISABLED", None)
+
+
 @pytest.fixture(scope="session")
 def test_dataset_path():
     """Absolute path to the directory containing the test LeRobot dataset."""

@@ -1681,6 +1681,7 @@ Upselling
 
 # Development & DevOps
 agile
+apikey
 cicd
 devops
 scrum
@@ -1852,6 +1853,7 @@ skrl
 timestep
 timesteps
 argjson
+autouse
 burstable
 capsys
 clusterpolicies
