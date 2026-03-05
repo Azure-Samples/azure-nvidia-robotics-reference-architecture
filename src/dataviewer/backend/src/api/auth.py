@@ -99,7 +99,13 @@ class JwtProvider(AuthProvider):
         token = auth_header[len("Bearer ") :].strip()
         try:
             import jwt  # pyjwt[cryptography]
+        except ImportError as exc:
+            raise RuntimeError(
+                "pyjwt[cryptography] is required for JWT auth. "
+                "Install with: uv pip install 'lerobot-annotation-api[auth]'"
+            ) from exc
 
+        try:
             client = self._get_jwks_client()
             signing_key = client.get_signing_key_from_jwt(token)
             payload: dict[str, Any] = jwt.decode(
@@ -110,7 +116,7 @@ class JwtProvider(AuthProvider):
                 issuer=self._issuer,
             )
             return payload
-        except Exception:
+        except jwt.PyJWTError:
             return None
 
     @property
