@@ -89,8 +89,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
   );
 
   const resolveLabel = useCallback(
-    (idx: number) => jointConfig?.labels?.[String(idx)] ?? getJointLabel(idx),
-    [jointConfig?.labels],
+    (idx: number) => jointConfig.labels[String(idx)] ?? getJointLabel(idx),
+    [jointConfig.labels],
   );
 
   // Transform trajectory data for Recharts - memoized
@@ -188,9 +188,9 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
           selectedJoints={selectedJoints}
           onSelectJoints={setSelectedJoints}
           colors={JOINT_COLORS}
-          groups={jointConfig?.groups}
-          labels={jointConfig?.labels}
-          editable={!!jointConfig}
+          groups={jointConfig.groups}
+          labels={jointConfig.labels}
+          editable
           onEditJointLabel={withSave(updateLabel)}
           onEditGroupLabel={withSave(updateGroupLabel)}
           onCreateGroup={withSave(createGroup)}

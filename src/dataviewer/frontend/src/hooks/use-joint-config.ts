@@ -93,7 +93,7 @@ export function useSaveJointConfig() {
 
   const mutation = useMutation({
     mutationFn: () => {
-      if (!currentDataset || !config) throw new Error('No dataset or config')
+      if (!currentDataset) throw new Error('No dataset selected')
       return saveJointConfig(currentDataset.id, config)
     },
     onSuccess: () => {
@@ -106,8 +106,8 @@ export function useSaveJointConfig() {
   })
 
   const save = useCallback(() => {
-    if (currentDataset && config) mutation.mutate()
-  }, [currentDataset, config, mutation])
+    if (currentDataset) mutation.mutate()
+  }, [currentDataset, mutation])
 
   return { save, ...mutation }
 }

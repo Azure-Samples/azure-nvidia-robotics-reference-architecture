@@ -20,31 +20,38 @@ afterEach(() => {
 })
 
 describe('joint-config-store', () => {
+  it('initializes with default config', () => {
+    const state = useJointConfigStore.getState()
+    expect(state.config).toBeDefined()
+    expect(state.config.groups.length).toBeGreaterThan(0)
+    expect(state.isLoaded).toBe(false)
+  })
+
   it('sets config and marks as loaded', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     const state = useJointConfigStore.getState()
     expect(state.isLoaded).toBe(true)
-    expect(state.config?.datasetId).toBe('test-dataset')
-    expect(state.config?.groups).toHaveLength(2)
+    expect(state.config.datasetId).toBe('test-dataset')
+    expect(state.config.groups).toHaveLength(2)
   })
 
   it('updates a joint label', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().updateLabel(0, 'Renamed X')
-    expect(useJointConfigStore.getState().config?.labels['0']).toBe('Renamed X')
+    expect(useJointConfigStore.getState().config.labels['0']).toBe('Renamed X')
   })
 
   it('updates a group label', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().updateGroupLabel('right-pos', 'Right Position')
-    const group = useJointConfigStore.getState().config?.groups.find((g) => g.id === 'right-pos')
+    const group = useJointConfigStore.getState().config.groups.find((g) => g.id === 'right-pos')
     expect(group?.label).toBe('Right Position')
   })
 
   it('moves a joint between groups', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().moveJoint(2, 'right-pos', 'left-pos', 0)
-    const state = useJointConfigStore.getState().config!
+    const state = useJointConfigStore.getState().config
     const rightGroup = state.groups.find((g) => g.id === 'right-pos')!
     const leftGroup = state.groups.find((g) => g.id === 'left-pos')!
     expect(rightGroup.indices).toEqual([0, 1])
@@ -54,7 +61,7 @@ describe('joint-config-store', () => {
   it('creates a new group and removes joints from existing groups', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().createGroup('Custom Group', [1, 4])
-    const state = useJointConfigStore.getState().config!
+    const state = useJointConfigStore.getState().config
     const rightGroup = state.groups.find((g) => g.id === 'right-pos')!
     const leftGroup = state.groups.find((g) => g.id === 'left-pos')!
     const customGroup = state.groups.find((g) => g.label === 'Custom Group')!
@@ -66,22 +73,22 @@ describe('joint-config-store', () => {
   it('deletes a group', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().deleteGroup('left-pos')
-    expect(useJointConfigStore.getState().config?.groups).toHaveLength(1)
-    expect(useJointConfigStore.getState().config?.groups[0].id).toBe('right-pos')
+    expect(useJointConfigStore.getState().config.groups).toHaveLength(1)
+    expect(useJointConfigStore.getState().config.groups[0].id).toBe('right-pos')
   })
 
   it('reorders groups', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().reorderGroups(['left-pos', 'right-pos'])
-    const groups = useJointConfigStore.getState().config?.groups
-    expect(groups?.[0].id).toBe('left-pos')
-    expect(groups?.[1].id).toBe('right-pos')
+    const groups = useJointConfigStore.getState().config.groups
+    expect(groups[0].id).toBe('left-pos')
+    expect(groups[1].id).toBe('right-pos')
   })
 
-  it('reset clears config', () => {
+  it('reset restores default config', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().reset()
-    expect(useJointConfigStore.getState().config).toBeNull()
+    expect(useJointConfigStore.getState().config.datasetId).toBe('_local')
     expect(useJointConfigStore.getState().isLoaded).toBe(false)
   })
 })
