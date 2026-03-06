@@ -18,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 
 import {
@@ -372,7 +371,7 @@ export function JointConfigDefaultsEditor({
           </Alert>
         )}
 
-        <ScrollArea data-testid="joint-config-scroll-area" className="flex-1 min-h-0">
+        <div data-testid="joint-config-scroll-area" className="flex-1 min-h-0 overflow-y-auto">
           <div className="flex flex-col gap-4 py-2 pr-4">
             {groups.map((group) => (
               <div
@@ -609,8 +608,7 @@ export function JointConfigDefaultsEditor({
               </>
             )}
           </div>
-          <ScrollBar data-testid="joint-config-scrollbar" forceMount />
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="flex items-center justify-between gap-2 pt-4">
           <Button variant="outline" size="sm" onClick={handleReset}>
