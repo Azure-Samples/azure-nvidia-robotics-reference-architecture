@@ -19,11 +19,13 @@ import {
   YAxis,
 } from 'recharts';
 
+import { useSaveJointConfig } from '@/hooks/use-joint-config'
 import { cn } from '@/lib/utils'
 import { useEpisodeStore } from '@/stores'
 import { useTrajectoryAdjustmentState } from '@/stores/edit-store'
+import { useJointConfigStore } from '@/stores/joint-config-store'
 
-import { JOINT_COLORS, OBSERVATION_LABELS } from './joint-constants'
+import { getJointLabel, JOINT_COLORS } from './joint-constants'
 import { JointSelector } from './JointSelector'
 
 /**
@@ -65,9 +67,31 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
   const setCurrentFrame = useEpisodeStore((state) => state.setCurrentFrame);
   const { trajectoryAdjustments } = useTrajectoryAdjustmentState();
+  const jointConfig = useJointConfigStore((state) => state.config);
+  const updateLabel = useJointConfigStore((state) => state.updateLabel);
+  const updateGroupLabel = useJointConfigStore((state) => state.updateGroupLabel);
+  const createGroup = useJointConfigStore((state) => state.createGroup);
+  const deleteGroup = useJointConfigStore((state) => state.deleteGroup);
+  const moveJoint = useJointConfigStore((state) => state.moveJoint);
+  const { save: saveJointConfig } = useSaveJointConfig();
 
   const [selectedJoints, setSelectedJoints] = useState<number[]>([0, 1, 2]);
   const [showVelocity, setShowVelocity] = useState(false);
+
+  const withSave = useCallback(
+    <T extends unknown[]>(fn: (...args: T) => void) =>
+      (...args: T) => {
+        fn(...args)
+        // Defer save to allow store update to complete
+        queueMicrotask(saveJointConfig)
+      },
+    [saveJointConfig],
+  );
+
+  const resolveLabel = useCallback(
+    (idx: number) => jointConfig?.labels?.[String(idx)] ?? getJointLabel(idx),
+    [jointConfig?.labels],
+  );
 
   // Transform trajectory data for Recharts - memoized
   // Apply trajectory adjustments to show modified values
@@ -164,6 +188,14 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
           selectedJoints={selectedJoints}
           onSelectJoints={setSelectedJoints}
           colors={JOINT_COLORS}
+          groups={jointConfig?.groups}
+          labels={jointConfig?.labels}
+          editable={!!jointConfig}
+          onEditJointLabel={withSave(updateLabel)}
+          onEditGroupLabel={withSave(updateGroupLabel)}
+          onCreateGroup={withSave(createGroup)}
+          onDeleteGroup={withSave(deleteGroup)}
+          onMoveJoint={withSave(moveJoint)}
         />
         <div className="flex items-center gap-2">
           <button
@@ -235,7 +267,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
                 key={jointIdx}
                 type="monotone"
                 dataKey={`joint_${jointIdx}`}
-                name={OBSERVATION_LABELS[jointIdx] || `Channel ${jointIdx}`}
+                name={resolveLabel(jointIdx)}
                 stroke={JOINT_COLORS[jointIdx % JOINT_COLORS.length]}
                 dot={false}
                 strokeWidth={1.5}

@@ -26,5 +26,6 @@ export {
   useEpisodeStore,
   usePlaybackControls,
 } from './episode-store';
+export { type JointConfig, useJointConfigStore } from './joint-config-store';
 export { useLabelStore } from './label-store';
 export { usePlaybackSettings, useViewerDisplay,useViewerSettingsStore } from './viewer-settings-store';

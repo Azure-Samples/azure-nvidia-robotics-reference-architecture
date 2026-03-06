@@ -53,6 +53,13 @@ export {
 } from './use-episodes';
 export { useExport } from './use-export';
 export {
+  jointConfigKeys,
+  useJointConfig,
+  useJointConfigDefaults,
+  useSaveJointConfig,
+  useSaveJointConfigDefaults,
+} from './use-joint-config';
+export {
   formatShortcut,
   type KeyboardShortcut,
   useAnnotationShortcuts,
