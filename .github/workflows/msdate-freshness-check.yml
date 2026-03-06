@@ -61,17 +61,16 @@ jobs:
 
       - name: Run ms.date Freshness Check
         run: |
-          $scriptArgs = @{
-            ThresholdDays = [int]'${{ inputs.staleness-threshold-days }}'
-            Paths = @('.')
-          }
+          $args = @(
+            '-ThresholdDays', [int]'${{ inputs.staleness-threshold-days }}'
+          )
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $scriptArgs['ChangedFilesOnly'] = $true
+            $args += '-ChangedFilesOnly'
           }
           if ('${{ inputs.soft-fail }}' -eq 'true') {
-            $scriptArgs['SoftFail'] = $true
+            $args += '-SoftFail'
           }
-          & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 @scriptArgs
+          & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 @args
 
       - name: Upload freshness check results
         if: always()
