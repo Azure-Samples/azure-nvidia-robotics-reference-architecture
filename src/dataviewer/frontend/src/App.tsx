@@ -6,6 +6,7 @@ import { AnnotationWorkspace } from '@/components/annotation-workspace/Annotatio
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useCapabilities,useDatasets, useEpisode, useEpisodes } from '@/hooks/use-datasets';
+import { useJointConfig } from '@/hooks/use-joint-config';
 import { useDatasetLabels } from '@/hooks/use-labels';
 import { queryClient } from '@/lib/query-client';
 import { useDatasetStore,useEpisodeStore } from '@/stores';
@@ -176,6 +177,9 @@ function AppContent() {
 
   // Load labels for the selected dataset
   useDatasetLabels();
+
+  // Load joint configuration for the selected dataset
+  useJointConfig();
 
   // Auto-select the first available dataset
   useEffect(() => {

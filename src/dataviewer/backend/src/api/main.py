@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .csrf import CSRF_COOKIE_NAME, generate_csrf_token
-from .routers import analysis, annotations, datasets, detection, export, labels
+from .routers import analysis, annotations, datasets, detection, export, joint_config, labels
 from .routes import ai_analysis
 
 # Configure logging to show INFO level
@@ -73,6 +73,8 @@ app.include_router(annotations.router, prefix="/api", tags=["annotations"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(ai_analysis.router, prefix="/api", tags=["ai"])
 app.include_router(labels.router, prefix="/api/datasets", tags=["labels"])
+app.include_router(joint_config.router, prefix="/api/datasets", tags=["joint-config"])
+app.include_router(joint_config.defaults_router, prefix="/api", tags=["joint-config"])
 
 
 @app.get("/health")

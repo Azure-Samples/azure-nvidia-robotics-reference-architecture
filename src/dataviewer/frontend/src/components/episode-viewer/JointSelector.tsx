@@ -2,17 +2,28 @@
  * Joint selector for trajectory visualization.
  *
  * Renders grouped toggle chips organized by actuator category,
- * with per-group and global selection controls.
+ * with per-group and global selection controls. Supports inline editing,
+ * context menus, and drag-and-drop reordering when editable.
  */
+
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import * as ContextMenu from '@radix-ui/react-context-menu'
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 
-import {
-  getJointColor,
-  getJointLabel,
-  JOINT_GROUPS,
-  type JointGroup,
-} from './joint-constants'
+import { getJointColor, getJointLabel, JOINT_GROUPS, type JointGroup } from './joint-constants'
 
 interface JointSelectorProps {
   jointCount: number
@@ -20,6 +31,142 @@ interface JointSelectorProps {
   onSelectJoints: (joints: number[]) => void
   colors: string[]
   groups?: JointGroup[]
+  labels?: Record<string, string>
+  editable?: boolean
+  onEditJointLabel?: (index: number, label: string) => void
+  onEditGroupLabel?: (groupId: string, label: string) => void
+  onCreateGroup?: (label: string, jointIndices: number[]) => void
+  onDeleteGroup?: (groupId: string) => void
+  onMoveJoint?: (jointIndex: number, fromGroupId: string, toGroupId: string, toPosition: number) => void
+}
+
+function InlineEdit({
+  value,
+  onCommit,
+  onCancel,
+}: {
+  value: string
+  onCommit: (val: string) => void
+  onCancel: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [text, setText] = useState(value)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const trimmed = text.trim()
+      if (trimmed) onCommit(trimmed)
+      else onCancel()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      onCancel()
+    }
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onBlur={onCancel}
+      className="bg-transparent border-b border-primary text-xs outline-none w-20"
+    />
+  )
+}
+
+function SortableChip({
+  idx,
+  isSelected,
+  color,
+  label,
+  editable,
+  editingJoint,
+  onToggle,
+  onStartEdit,
+  onCommitEdit,
+  onCancelEdit,
+  onCreateGroup,
+}: {
+  idx: number
+  isSelected: boolean
+  color: string
+  label: string
+  editable?: boolean
+  editingJoint: number | null
+  onToggle: () => void
+  onStartEdit: () => void
+  onCommitEdit: (val: string) => void
+  onCancelEdit: () => void
+  onCreateGroup?: (jointIdx: number) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `joint-${idx}`,
+    disabled: !editable,
+  })
+
+  const style = {
+    color,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  }
+
+  const chip = (
+    <button
+      ref={setNodeRef}
+      data-joint-chip
+      onClick={onToggle}
+      onDoubleClick={editable ? onStartEdit : undefined}
+      className={cn(
+        'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-all',
+        isSelected
+          ? 'border-current font-medium'
+          : 'border-transparent opacity-40 hover:opacity-70',
+      )}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+      {editingJoint === idx ? (
+        <InlineEdit value={label} onCommit={onCommitEdit} onCancel={onCancelEdit} />
+      ) : (
+        label
+      )}
+    </button>
+  )
+
+  if (!editable) return chip
+
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>{chip}</ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+          <ContextMenu.Item
+            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
+            onSelect={onStartEdit}
+          >
+            Edit Name
+          </ContextMenu.Item>
+          {onCreateGroup && (
+            <ContextMenu.Item
+              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
+              onSelect={() => onCreateGroup(idx)}
+            >
+              New Grouping
+            </ContextMenu.Item>
+          )}
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
+  )
 }
 
 export function JointSelector({
@@ -28,7 +175,25 @@ export function JointSelector({
   onSelectJoints,
   colors,
   groups = JOINT_GROUPS,
+  labels,
+  editable,
+  onEditJointLabel,
+  onEditGroupLabel,
+  onCreateGroup,
+  onDeleteGroup,
+  onMoveJoint,
 }: JointSelectorProps) {
+  const [editingJoint, setEditingJoint] = useState<number | null>(null)
+  const [editingGroup, setEditingGroup] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const resolveLabel = useCallback(
+    (idx: number) => labels?.[String(idx)] ?? getJointLabel(idx),
+    [labels],
+  )
+
   const toggleJoint = (jointIdx: number) => {
     if (selectedJoints.includes(jointIdx)) {
       onSelectJoints(selectedJoints.filter((j) => j !== jointIdx))
@@ -56,143 +221,209 @@ export function JointSelector({
     }
   }
 
-  if (jointCount === 0) {
-    return (
-      <span className="text-sm text-muted-foreground">No joints available</span>
-    )
+  const handleCreateGroup = useCallback(
+    (jointIdx: number) => {
+      onCreateGroup?.('New Group', [jointIdx])
+    },
+    [onCreateGroup],
+  )
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
   }
 
-  // Build visible groups filtered to valid indices
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
+    const { active, over } = event
+    if (!over || active.id === over.id || !onMoveJoint) return
+
+    const activeIdx = parseInt((active.id as string).replace('joint-', ''), 10)
+    const overIdx = parseInt((over.id as string).replace('joint-', ''), 10)
+
+    // Find source and target groups
+    const fromGroup = groups.find((g) => g.indices.includes(activeIdx))
+    const toGroup = groups.find((g) => g.indices.includes(overIdx))
+    if (!fromGroup || !toGroup) return
+
+    const toPosition = toGroup.indices.indexOf(overIdx)
+    onMoveJoint(activeIdx, fromGroup.id, toGroup.id, toPosition)
+  }
+
+  if (jointCount === 0) {
+    return <span className="text-sm text-muted-foreground">No joints available</span>
+  }
+
   const allGroupedIndices = new Set(groups.flatMap((g) => g.indices))
   const visibleGroups = groups
     .map((g) => ({ ...g, indices: g.indices.filter((i) => i < jointCount) }))
     .filter((g) => g.indices.length > 0)
 
-  // Collect ungrouped joints into an "Other" section
   const otherIndices = Array.from({ length: jointCount }, (_, i) => i).filter(
     (i) => !allGroupedIndices.has(i),
   )
 
-  return (
-    <div className="flex flex-col gap-1">
-      {/* Global controls */}
-      <div className="flex items-center gap-1">
-        <button
-          onClick={selectAll}
-          className={cn(
-            'px-2 py-0.5 text-xs rounded border transition-colors',
-            selectedJoints.length === jointCount
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-muted text-muted-foreground border-transparent hover:border-border',
-          )}
-        >
-          All
-        </button>
-        <button
-          onClick={clearAll}
-          className={cn(
-            'px-2 py-0.5 text-xs rounded border transition-colors',
-            selectedJoints.length === 0
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-muted text-muted-foreground border-transparent hover:border-border',
-          )}
-        >
-          None
-        </button>
-      </div>
+  const allSortableIds = visibleGroups
+    .flatMap((g) => g.indices)
+    .concat(otherIndices)
+    .map((i) => `joint-${i}`)
 
-      {/* Grouped joint sections */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
-        {visibleGroups.map((group) => {
-          const allActive = group.indices.every((i) => selectedJoints.includes(i))
-          return (
-            <div
-              key={group.id}
-              data-testid={`joint-group-${group.id}`}
-              className="flex items-center gap-1"
-            >
-              <button
-                onClick={() => toggleGroup(group.indices)}
-                className={cn(
-                  'text-xs font-medium transition-colors whitespace-nowrap',
-                  allActive
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {group.label}
-              </button>
-              {group.indices.map((idx) => {
-                const isSelected = selectedJoints.includes(idx)
-                const color = getJointColor(idx, colors)
-                return (
-                  <button
-                    key={idx}
-                    data-joint-chip
-                    onClick={() => toggleJoint(idx)}
-                    className={cn(
-                      'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-all',
-                      isSelected
-                        ? 'border-current font-medium'
-                        : 'border-transparent opacity-40 hover:opacity-70',
-                    )}
-                    style={{ color }}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: color }}
-                    />
-                    {getJointLabel(idx)}
-                  </button>
-                )
-              })}
-            </div>
-          )
-        })}
+  const renderGroupLabel = (group: { id: string; label: string; indices: number[] }) => {
+    const allActive = group.indices.every((i) => selectedJoints.includes(i))
 
-        {otherIndices.length > 0 && (
-          <div
-            data-testid="joint-group-other"
-            className="flex items-center gap-1"
-          >
-            <button
-              onClick={() => toggleGroup(otherIndices)}
-              className={cn(
-                'text-xs font-medium transition-colors whitespace-nowrap',
-                otherIndices.every((i) => selectedJoints.includes(i))
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              Other
-            </button>
-            {otherIndices.map((idx) => {
-              const isSelected = selectedJoints.includes(idx)
-              const color = getJointColor(idx, colors)
-              return (
-                <button
-                  key={idx}
-                  data-joint-chip
-                  onClick={() => toggleJoint(idx)}
-                  className={cn(
-                    'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-all',
-                    isSelected
-                      ? 'border-current font-medium'
-                      : 'border-transparent opacity-40 hover:opacity-70',
-                  )}
-                  style={{ color }}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                  />
-                  {getJointLabel(idx)}
-                </button>
-              )
-            })}
-          </div>
+    if (editingGroup === group.id) {
+      return (
+        <InlineEdit
+          value={group.label}
+          onCommit={(val) => {
+            onEditGroupLabel?.(group.id, val)
+            setEditingGroup(null)
+          }}
+          onCancel={() => setEditingGroup(null)}
+        />
+      )
+    }
+
+    const labelButton = (
+      <button
+        onClick={() => toggleGroup(group.indices)}
+        onDoubleClick={editable ? () => setEditingGroup(group.id) : undefined}
+        className={cn(
+          'text-xs font-medium transition-colors whitespace-nowrap',
+          allActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
         )}
+      >
+        {group.label}
+      </button>
+    )
+
+    if (!editable) return labelButton
+
+    return (
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>{labelButton}</ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+            <ContextMenu.Item
+              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
+              onSelect={() => setEditingGroup(group.id)}
+            >
+              Edit Name
+            </ContextMenu.Item>
+            {onDeleteGroup && (
+              <ContextMenu.Item
+                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent text-destructive"
+                onSelect={() => onDeleteGroup(group.id)}
+              >
+                Delete Grouping
+              </ContextMenu.Item>
+            )}
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
+    )
+  }
+
+  const renderChips = (indices: number[]) =>
+    indices.map((idx) => (
+      <SortableChip
+        key={idx}
+        idx={idx}
+        isSelected={selectedJoints.includes(idx)}
+        color={getJointColor(idx, colors)}
+        label={resolveLabel(idx)}
+        editable={editable}
+        editingJoint={editingJoint}
+        onToggle={() => toggleJoint(idx)}
+        onStartEdit={() => setEditingJoint(idx)}
+        onCommitEdit={(val) => {
+          onEditJointLabel?.(idx, val)
+          setEditingJoint(null)
+        }}
+        onCancelEdit={() => setEditingJoint(null)}
+        onCreateGroup={onCreateGroup ? handleCreateGroup : undefined}
+      />
+    ))
+
+  const activeIdx = activeId ? parseInt(activeId.replace('joint-', ''), 10) : null
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex flex-col gap-1">
+        {/* Global controls */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={selectAll}
+            className={cn(
+              'px-2 py-0.5 text-xs rounded border transition-colors',
+              selectedJoints.length === jointCount
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-muted text-muted-foreground border-transparent hover:border-border',
+            )}
+          >
+            All
+          </button>
+          <button
+            onClick={clearAll}
+            className={cn(
+              'px-2 py-0.5 text-xs rounded border transition-colors',
+              selectedJoints.length === 0
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-muted text-muted-foreground border-transparent hover:border-border',
+            )}
+          >
+            None
+          </button>
+        </div>
+
+        {/* Grouped joint sections */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <SortableContext items={allSortableIds} strategy={horizontalListSortingStrategy}>
+            {visibleGroups.map((group) => (
+              <div key={group.id} data-testid={`joint-group-${group.id}`} className="flex items-center gap-1">
+                {renderGroupLabel(group)}
+                {renderChips(group.indices)}
+              </div>
+            ))}
+
+            {otherIndices.length > 0 && (
+              <div data-testid="joint-group-other" className="flex items-center gap-1">
+                <button
+                  onClick={() => toggleGroup(otherIndices)}
+                  className={cn(
+                    'text-xs font-medium transition-colors whitespace-nowrap',
+                    otherIndices.every((i) => selectedJoints.includes(i))
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  Other
+                </button>
+                {renderChips(otherIndices)}
+              </div>
+            )}
+          </SortableContext>
+        </div>
       </div>
-    </div>
+
+      <DragOverlay>
+        {activeIdx !== null && (
+          <button
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border border-current font-medium shadow-lg"
+            style={{ color: getJointColor(activeIdx, colors) }}
+          >
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: getJointColor(activeIdx, colors) }}
+            />
+            {resolveLabel(activeIdx)}
+          </button>
+        )}
+      </DragOverlay>
+    </DndContext>
   )
 }
