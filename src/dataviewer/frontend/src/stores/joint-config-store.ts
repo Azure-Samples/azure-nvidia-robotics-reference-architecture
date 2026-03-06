@@ -5,7 +5,11 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 
-import type { JointGroup } from '@/components/episode-viewer/joint-constants'
+import {
+  JOINT_GROUPS,
+  type JointGroup,
+  OBSERVATION_LABELS,
+} from '@/components/episode-viewer/joint-constants'
 
 export interface JointConfig {
   datasetId: string
@@ -13,13 +17,22 @@ export interface JointConfig {
   groups: JointGroup[]
 }
 
+function buildDefaultConfig(datasetId = '_local'): JointConfig {
+  const labels: Record<string, string> = {}
+  for (const [k, v] of Object.entries(OBSERVATION_LABELS)) {
+    labels[k] = v
+  }
+  return { datasetId, labels, groups: JOINT_GROUPS.map((g) => ({ ...g })) }
+}
+
 interface JointConfigState {
-  config: JointConfig | null
+  config: JointConfig
   isLoaded: boolean
 }
 
 interface JointConfigActions {
   setConfig: (config: JointConfig) => void
+  initDefaults: (datasetId?: string) => void
   updateLabel: (index: number, label: string) => void
   updateGroupLabel: (groupId: string, label: string) => void
   moveJoint: (jointIndex: number, fromGroupId: string, toGroupId: string, toPosition: number) => void
@@ -32,7 +45,7 @@ interface JointConfigActions {
 type JointConfigStore = JointConfigState & JointConfigActions
 
 const initialState: JointConfigState = {
-  config: null,
+  config: buildDefaultConfig(),
   isLoaded: false,
 }
 
@@ -47,9 +60,14 @@ export const useJointConfigStore = create<JointConfigStore>()(
         set({ config, isLoaded: true }, false, 'setConfig')
       },
 
+      initDefaults: (datasetId) => {
+        const { isLoaded } = get()
+        if (isLoaded) return
+        set({ config: buildDefaultConfig(datasetId) }, false, 'initDefaults')
+      },
+
       updateLabel: (index, label) => {
         const { config } = get()
-        if (!config) return
         set(
           {
             config: {
@@ -64,7 +82,6 @@ export const useJointConfigStore = create<JointConfigStore>()(
 
       updateGroupLabel: (groupId, label) => {
         const { config } = get()
-        if (!config) return
         set(
           {
             config: {
@@ -79,7 +96,6 @@ export const useJointConfigStore = create<JointConfigStore>()(
 
       moveJoint: (jointIndex, fromGroupId, toGroupId, toPosition) => {
         const { config } = get()
-        if (!config) return
         const groups = config.groups.map((g) => {
           if (g.id === fromGroupId) {
             return { ...g, indices: g.indices.filter((i) => i !== jointIndex) }
@@ -96,14 +112,12 @@ export const useJointConfigStore = create<JointConfigStore>()(
 
       createGroup: (label, jointIndices) => {
         const { config } = get()
-        if (!config) return
         _groupCounter++
         const newGroup: JointGroup = {
           id: `custom-${Date.now()}-${_groupCounter}`,
           label,
           indices: jointIndices,
         }
-        // Remove joints from existing groups
         const groups = config.groups.map((g) => ({
           ...g,
           indices: g.indices.filter((i) => !jointIndices.includes(i)),
@@ -117,7 +131,6 @@ export const useJointConfigStore = create<JointConfigStore>()(
 
       deleteGroup: (groupId) => {
         const { config } = get()
-        if (!config) return
         set(
           {
             config: {
@@ -132,7 +145,6 @@ export const useJointConfigStore = create<JointConfigStore>()(
 
       reorderGroups: (groupIds) => {
         const { config } = get()
-        if (!config) return
         const groupMap = new Map(config.groups.map((g) => [g.id, g]))
         const reordered = groupIds.map((id) => groupMap.get(id)).filter(Boolean) as JointGroup[]
         // Append any groups not in the new order

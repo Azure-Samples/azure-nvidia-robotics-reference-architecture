@@ -262,11 +262,11 @@ export function JointSelector({
   }
 
   const findGroupForJoint = useCallback(
-    (jointIdx: number): string | null => {
+    (jointIdx: number): string => {
       for (const g of groups) {
         if (g.indices.includes(jointIdx)) return g.id
       }
-      return null
+      return 'other'
     },
     [groups],
   )
@@ -280,7 +280,6 @@ export function JointSelector({
     const overId = over.id as string
 
     const fromGroupId = findGroupForJoint(activeIdx)
-    if (!fromGroupId) return
 
     // Dropped on a group container
     if (overId.startsWith('group-')) {
@@ -296,7 +295,6 @@ export function JointSelector({
       const overIdx = parseInt(overId.replace('joint-', ''), 10)
       if (activeIdx === overIdx) return
       const toGroupId = findGroupForJoint(overIdx)
-      if (!toGroupId) return
       const toGroup = groups.find((g) => g.id === toGroupId)
       if (!toGroup) return
       const toPosition = toGroup.indices.indexOf(overIdx)
