@@ -66,8 +66,8 @@ Describe 'Invoke-LinkLanguageCheckCore' -Tag 'Unit' {
             # Mock Link-Lang-Check.ps1 companion script output
             $mockJson = @'
 [
-    {"file": "docs/a.md", "line_number": 1, "original_url": "https://learn.microsoft.com/en-us/a", "fixed_url": "https://learn.microsoft.com/a"},
-    {"file": "docs/b.md", "line_number": 2, "original_url": "https://learn.microsoft.com/en-us/b", "fixed_url": "https://learn.microsoft.com/b"}
+    {"file": "docs/a.md", "line_number": 1, "original_url": "https://learn.microsoft.com/fr-fr/a", "fixed_url": "https://learn.microsoft.com/a"},
+    {"file": "docs/b.md", "line_number": 2, "original_url": "https://learn.microsoft.com/fr-fr/b", "fixed_url": "https://learn.microsoft.com/b"}
 ]
 '@
             $mockScriptContent = @"
@@ -211,7 +211,7 @@ Describe 'JSON Output Parsing' -Tag 'Unit' {
     Context 'Valid JSON with results' {
         It 'Parses a two-element JSON array' {
             $json = @'
-[{"file":"a.md","line_number":1,"original_url":"http://example.com/en-us/x","fixed_url":"http://example.com/x"},{"file":"b.md","line_number":2,"original_url":"http://example.com/en-us/y","fixed_url":"http://example.com/y"}]
+[{"file":"a.md","line_number":1,"original_url":"http://example.com/fr-fr/x","fixed_url":"http://example.com/x"},{"file":"b.md","line_number":2,"original_url":"http://example.com/fr-fr/y","fixed_url":"http://example.com/y"}]
 '@
             $parsed = $json | ConvertFrom-Json
             @($parsed) | Should -HaveCount 2
@@ -219,12 +219,12 @@ Describe 'JSON Output Parsing' -Tag 'Unit' {
 
         It 'Contains expected properties' {
             $json = @'
-[{"file":"a.md","line_number":1,"original_url":"http://example.com/en-us/x","fixed_url":"http://example.com/x"}]
+[{"file":"a.md","line_number":1,"original_url":"http://example.com/fr-fr/x","fixed_url":"http://example.com/x"}]
 '@
             $parsed = ($json | ConvertFrom-Json)
             $parsed.file | Should -Be 'a.md'
             $parsed.line_number | Should -Be 1
-            $parsed.original_url | Should -Be 'http://example.com/en-us/x'
+            $parsed.original_url | Should -Be 'http://example.com/fr-fr/x'
             $parsed.fixed_url | Should -Be 'http://example.com/x'
         }
     }
@@ -287,12 +287,12 @@ Describe 'Annotation Generation' -Tag 'Unit' {
             $item = [PSCustomObject]@{
                 file         = 'docs/test.md'
                 line_number  = 42
-                original_url = 'https://example.com/en-us/page'
+                original_url = 'https://example.com/fr-fr/page'
                 fixed_url    = 'https://example.com/page'
             }
             $item.file | Should -Be 'docs/test.md'
             $item.line_number | Should -Be 42
-            $item.original_url | Should -BeLike '*en-us*'
+            $item.original_url | Should -BeLike '*fr-fr*'
         }
     }
 
@@ -342,9 +342,9 @@ Describe 'Output Format' -Tag 'Unit' {
     Context 'Console output formatting' {
         It 'Formats issue data as structured objects' {
             $issues = @(
-                [PSCustomObject]@{ file = 'docs/a.md'; line_number = 1; original_url = 'https://example.com/en-us/a'; fixed_url = 'https://example.com/a' }
-                [PSCustomObject]@{ file = 'docs/a.md'; line_number = 5; original_url = 'https://example.com/en-us/b'; fixed_url = 'https://example.com/b' }
-                [PSCustomObject]@{ file = 'docs/b.md'; line_number = 3; original_url = 'https://example.com/en-us/c'; fixed_url = 'https://example.com/c' }
+                [PSCustomObject]@{ file = 'docs/a.md'; line_number = 1; original_url = 'https://example.com/fr-fr/a'; fixed_url = 'https://example.com/a' }
+                [PSCustomObject]@{ file = 'docs/a.md'; line_number = 5; original_url = 'https://example.com/fr-fr/b'; fixed_url = 'https://example.com/b' }
+                [PSCustomObject]@{ file = 'docs/b.md'; line_number = 3; original_url = 'https://example.com/fr-fr/c'; fixed_url = 'https://example.com/c' }
             )
             @($issues) | Should -HaveCount 3
             $issues[0].file | Should -Be 'docs/a.md'
@@ -387,7 +387,7 @@ Describe 'Link-Lang-Check Integration' -Tag 'Integration' {
     Context 'Output compatibility' {
         It 'Parses expected JSON output format' {
             $sampleJson = @'
-[{"file":"test.md","line_number":1,"original_url":"https://example.com/en-us/page","fixed_url":"https://example.com/page"}]
+[{"file":"test.md","line_number":1,"original_url":"https://example.com/fr-fr/page","fixed_url":"https://example.com/page"}]
 '@
             $parsed = $sampleJson | ConvertFrom-Json
             @($parsed) | Should -HaveCount 1
@@ -395,7 +395,7 @@ Describe 'Link-Lang-Check Integration' -Tag 'Integration' {
 
         It 'Result objects have required properties' {
             $sampleJson = @'
-[{"file":"test.md","line_number":1,"original_url":"https://example.com/en-us/page","fixed_url":"https://example.com/page"}]
+[{"file":"test.md","line_number":1,"original_url":"https://example.com/fr-fr/page","fixed_url":"https://example.com/page"}]
 '@
             $parsed = ($sampleJson | ConvertFrom-Json)
             $parsed.PSObject.Properties.Name | Should -Contain 'file'
