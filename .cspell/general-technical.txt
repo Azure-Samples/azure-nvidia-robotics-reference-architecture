@@ -767,6 +767,7 @@ moneybal
 mongodb
 monitoring
 monolithic
+mountpoint
 mqttbridgeconnector
 mqttbroker
 mqtts
@@ -1109,6 +1110,7 @@ rollout
 rollouts
 rosbag
 routable
+rootfs
 rpa
 rpc
 rpcs
@@ -1679,6 +1681,7 @@ Upselling
 
 # Development & DevOps
 agile
+apikey
 cicd
 devops
 scrum
@@ -1850,6 +1853,7 @@ skrl
 timestep
 timesteps
 argjson
+autouse
 burstable
 capsys
 clusterpolicies

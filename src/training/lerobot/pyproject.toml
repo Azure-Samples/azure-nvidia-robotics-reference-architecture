@@ -18,7 +18,7 @@ dependencies = [
     "azureml-mlflow==1.61.0.post1",
     "datasets",
     "huggingface-hub[hf_xet]>=0.31.4,<1.0.0",
-    "lerobot",
+    "lerobot>=0.3.0,<0.4.0",
     "pyarrow",
     "torchcodec; platform_machine == 'x86_64' or platform_machine == 'AMD64'",
     "wandb",

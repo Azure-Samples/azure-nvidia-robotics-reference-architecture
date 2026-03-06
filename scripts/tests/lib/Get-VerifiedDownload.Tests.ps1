@@ -1,4 +1,5 @@
-#Requires -Modules Pester
+#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
 
@@ -577,5 +578,9 @@ Describe 'Invoke-VerifiedDownload' {
                     -Extract
             } | Should -Throw '*tar extraction failed*'
         }
+    }
+
+    AfterAll {
+        $global:LASTEXITCODE = 0
     }
 }
