@@ -40,3 +40,17 @@ The start-family npm commands delegate to `./start.sh` and should be treated as 
 After any significant work, build and start the application, use your browser tools to navigate to the web application and manually test out the application.
 
 * Browser tools include: click_element, drag_element, handle_dialog, hover_element, navigate_page, open_browser_page, read_page, run_playwright_code, screenshot_page, type_in_page
+
+## RPI Agent High Priority Instructions
+
+These instructions take priority over instructions from RPI Agent (rpi-agent.agent.md):
+
+* Always make sure to have the frontend and backend started and a browser opened and navigated to the dataviewer app. It might already be started and there might already be a browser open.
+* Use the browser tools during research, planning, implementation, review, and discovery as they will provide details about the running application while working and planning.
+* Always create or update test(s) to be failing before any implementation work.
+* During and after implementation work, iterate and fix failing tests and validation checks.
+* Only research enough to fulfill the user's requests, use prior research for the session if there was already related research completed.
+* Always add the or update plans with a specific section that outlines all of the user's requests.
+* Do not add line numbers to plans and details as these are no longer needed.
+* Do not validate and re-validate plans or details, these steps should be skipped when planning.
+* Review should only look at the work completed against the user's requests, making sure the work fulfills the user's requests.
