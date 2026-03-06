@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client';
-import { useDatasets, useEpisodes, useEpisode } from '@/hooks/use-datasets';
+import { useDatasets, useEpisodes, useEpisode, useCapabilities } from '@/hooks/use-datasets';
 import { useDatasetLabels } from '@/hooks/use-labels';
 import { useEpisodeStore, useDatasetStore } from '@/stores';
 import { useLabelStore } from '@/stores/label-store';
 import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace';
 import { LabelFilter } from '@/components/annotation-panel';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import type { EpisodeMeta } from '@/types';
 
 /**
@@ -170,6 +171,7 @@ function AppContent() {
   const [datasetId, setDatasetId] = useState('');
   const [selectedEpisode, setSelectedEpisode] = useState<number>(0);
   const { data: datasets } = useDatasets();
+  const { data: capabilities } = useCapabilities(datasetId || undefined);
 
   // Load labels for the selected dataset
   useDatasetLabels();
@@ -211,6 +213,12 @@ function AppContent() {
               className="px-3 py-1 border rounded text-sm w-64"
               placeholder="Dataset ID"
             />
+          )}
+          {capabilities?.isLerobotDataset && (
+            <Badge variant="secondary">LeRobot</Badge>
+          )}
+          {capabilities?.hasHdf5Files && !capabilities?.isLerobotDataset && (
+            <Badge variant="outline">HDF5</Badge>
           )}
         </div>
       </header>

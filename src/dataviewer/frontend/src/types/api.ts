@@ -52,6 +52,10 @@ export interface DatasetCapabilities {
   hdf5Support: boolean;
   /** Whether this dataset has HDF5 episode files */
   hasHdf5Files: boolean;
+  /** Whether pyarrow is installed and available on backend */
+  lerobotSupport: boolean;
+  /** Whether this dataset is in LeRobot parquet format */
+  isLerobotDataset: boolean;
   /** Number of episodes detected */
   episodeCount: number;
 }

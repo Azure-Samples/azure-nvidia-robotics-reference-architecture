@@ -20,7 +20,8 @@ def dataset_path():
     from pathlib import Path
 
     path = Path(TEST_DATASET_PATH) / DATASET_ID
-    assert path.is_dir(), f"LeRobot dataset not found: {path}"
+    if not path.is_dir():
+        pytest.skip(f"LeRobot dataset not found: {path}")
     return path
 
 

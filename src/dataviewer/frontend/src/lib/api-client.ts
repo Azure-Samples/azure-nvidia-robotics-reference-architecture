@@ -6,6 +6,7 @@
 
 import type {
   DatasetInfo,
+  DatasetCapabilities,
   EpisodeMeta,
   EpisodeData,
   EpisodeAnnotationFile,
@@ -16,8 +17,6 @@ import type {
 } from '@/types';
 
 const API_BASE = '/api';
-
-const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Cached CSRF token fetched from the server. */
 let _csrfToken: string | null = null;
@@ -132,6 +131,15 @@ export async function fetchDatasets(): Promise<DatasetInfo[]> {
 export async function fetchDataset(datasetId: string): Promise<DatasetInfo> {
   const response = await fetch(`${API_BASE}/datasets/${datasetId}`);
   return handleResponse<DatasetInfo>(response);
+}
+
+/**
+ * Fetch capabilities for a dataset.
+ */
+export async function fetchCapabilities(datasetId: string): Promise<DatasetCapabilities> {
+  const response = await fetch(`${API_BASE}/datasets/${datasetId}/capabilities`);
+  const data = await handleResponse<unknown>(response);
+  return transformKeys<DatasetCapabilities>(data);
 }
 
 /**

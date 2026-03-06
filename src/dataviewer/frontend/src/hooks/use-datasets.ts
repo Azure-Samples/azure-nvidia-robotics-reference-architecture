@@ -3,7 +3,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchDatasets, fetchDataset, fetchEpisodes, fetchEpisode } from '@/lib/api-client';
+import { fetchDatasets, fetchDataset, fetchEpisodes, fetchEpisode, fetchCapabilities } from '@/lib/api-client';
 import { useDatasetStore } from '@/stores';
 import { useEffect } from 'react';
 
@@ -20,6 +20,11 @@ export const datasetKeys = {
     [...datasetKeys.detail(datasetId), 'episodes'] as const,
   episode: (datasetId: string, episodeIndex: number) =>
     [...datasetKeys.episodes(datasetId), episodeIndex] as const,
+};
+
+export const capabilityKeys = {
+  all: ['capabilities'] as const,
+  detail: (datasetId: string) => [...capabilityKeys.all, datasetId] as const,
 };
 
 /**
@@ -133,5 +138,19 @@ export function useEpisode(
     queryFn: () => fetchEpisode(datasetId!, episodeIndex!),
     enabled: !!datasetId && episodeIndex !== undefined && episodeIndex >= 0,
     staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook to fetch capabilities for a dataset.
+ *
+ * @param datasetId - Dataset ID
+ */
+export function useCapabilities(datasetId: string | undefined) {
+  return useQuery({
+    queryKey: capabilityKeys.detail(datasetId ?? ''),
+    queryFn: () => fetchCapabilities(datasetId!),
+    enabled: !!datasetId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

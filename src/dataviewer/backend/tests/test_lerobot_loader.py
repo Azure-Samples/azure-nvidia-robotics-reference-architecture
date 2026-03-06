@@ -23,7 +23,8 @@ def dataset_dir():
     import os
 
     path = os.path.join(TEST_DATASET_PATH, TEST_DATASET_ID)
-    assert os.path.isdir(path), f"LeRobot dataset not found: {path}"
+    if not os.path.isdir(path):
+        pytest.skip(f"LeRobot dataset not found: {path}")
     return path
 
 
