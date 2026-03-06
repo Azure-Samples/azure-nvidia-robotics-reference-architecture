@@ -35,7 +35,7 @@ param(
     [int]$ThresholdDays = 90,
 
     [Parameter()]
-    [string[]]$Paths = @('.'),
+    [string[]]$Paths = @("."),
 
     [Parameter()]
     [switch]$ChangedFilesOnly,
@@ -90,7 +90,7 @@ function Get-MarkdownFiles {
 
         $allFiles += @($files | Where-Object {
             $file = $_
-            
+
             if ($isExplicitPath) {
                 return $true
             }

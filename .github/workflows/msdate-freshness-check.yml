@@ -69,6 +69,7 @@ jobs:
           $scriptArgs = @{
             ThresholdDays = ${{ inputs.staleness-threshold-days }}
           }
+          # Do not pass Paths - let script use default @('.')
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
             $scriptArgs['ChangedFilesOnly'] = $true
           }
