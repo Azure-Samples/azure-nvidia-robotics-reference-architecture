@@ -27,3 +27,4 @@ export {
   getEffectiveFrameCount,
 } from './edit-store';
 export { useLabelStore } from './label-store';
+export { useViewerSettingsStore, useViewerDisplay } from './viewer-settings-store';

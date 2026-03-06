@@ -37,7 +37,7 @@ describe('PlaybackControls', () => {
   })
 
   it('play button uses icon-only variant with consistent size', () => {
-    const { container } = render(<PlaybackControls {...defaultProps} />)
+    render(<PlaybackControls {...defaultProps} />)
     const playButton = screen.getByTitle(/play/i)
     // Button should use size="icon" for consistent dimensions
     expect(playButton).toBeInTheDocument()
