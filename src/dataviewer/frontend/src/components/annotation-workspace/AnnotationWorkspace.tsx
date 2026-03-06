@@ -1,8 +1,8 @@
-import { Download, Layers, Pause, Play, Repeat, RotateCcw, Scan, SkipBack,SkipForward, Video } from 'lucide-react';
+import { Download, Pause, Play, Repeat, RotateCcw, Scan, SkipBack,SkipForward, Video } from 'lucide-react';
 import { type SyntheticEvent,useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { LabelPanel } from '@/components/annotation-panel';
-import { Timeline, TrajectoryPlot } from '@/components/episode-viewer';
+import { TrajectoryPlot } from '@/components/episode-viewer';
 import { ExportDialog } from '@/components/export';
 import { ColorAdjustmentControls,FrameInsertionToolbar, FrameRemovalToolbar, TrajectoryEditor, TransformControls } from '@/components/frame-editor';
 import { DetectionPanel } from '@/components/object-detection';
@@ -133,35 +133,6 @@ export function AnnotationWorkspace() {
     }
     return null;
   }, [isInsertedFrame, currentFrame, insertedFrames, removedFrames, originalFrameCount]);
-
-  // Get current trajectory point for display (use original index if available)
-  const currentPoint = useMemo(() => {
-    const trajectoryData = currentEpisode?.trajectoryData || [];
-    if (trajectoryData.length === 0) return null;
-
-    if (originalFrameIndex !== null) {
-      return trajectoryData[Math.min(originalFrameIndex, trajectoryData.length - 1)];
-    }
-
-    if (adjacentFrames) {
-      const before = trajectoryData[adjacentFrames.beforeFrame];
-      const after = trajectoryData[adjacentFrames.afterFrame];
-      if (before && after) {
-        const t = adjacentFrames.factor;
-        return {
-          frame: currentFrame,
-          timestamp: before.timestamp + (after.timestamp - before.timestamp) * t,
-          jointPositions: before.jointPositions.map((v, i) =>
-            v + (after.jointPositions[i] - v) * t
-          ),
-          jointVelocities: before.jointVelocities.map((v, i) =>
-            v + (after.jointVelocities[i] - v) * t
-          ),
-        };
-      }
-    }
-    return null;
-  }, [currentEpisode?.trajectoryData, originalFrameIndex, currentFrame, adjacentFrames]);
 
   // Keep refs in sync for the play/pause sync effect (avoids feedback loop)
   currentFrameRef.current = currentFrame;
@@ -549,85 +520,17 @@ export function AnnotationWorkspace() {
                 </CardContent>
               </Card>
 
-              {/* Subtask timeline - moved up for visibility */}
-              <Card className="flex-shrink-0">
-                <CardHeader className="py-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Layers className="h-4 w-4" />
-                      Subtask Segments
-                    </CardTitle>
-                    <SubtaskToolbar />
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <SubtaskTimelineTrack totalFrames={totalFrames} editable />
-                </CardContent>
-              </Card>
-
-              {/* Trajectory Plot */}
-              <Card className="h-[250px] flex-shrink-0">
-                <CardHeader className="py-3 px-4">
-                  <CardTitle className="text-sm">Trajectory</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 h-[calc(100%-48px)]">
-                  <TrajectoryPlot className="h-full" />
-                </CardContent>
-              </Card>
-
-              {/* Current Frame Data */}
-              {currentPoint && (
-                <Card className="flex-shrink-0">
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      {/* Right Arm */}
-                      <div>
-                        <div className="font-medium mb-2 text-blue-600">Right Arm</div>
-                        <div className="space-y-1 font-mono text-xs">
-                          <div className="bg-muted px-2 py-1 rounded">
-                            Pos: [{currentPoint.jointPositions[0]?.toFixed(3)}, {currentPoint.jointPositions[1]?.toFixed(3)}, {currentPoint.jointPositions[2]?.toFixed(3)}]
-                          </div>
-                          <div className="bg-muted px-2 py-1 rounded">
-                            Gripper: {currentPoint.jointPositions[7]?.toFixed(3)}
-                          </div>
-                        </div>
-                      </div>
-                      {/* Left Arm */}
-                      <div>
-                        <div className="font-medium mb-2 text-green-600">Left Arm</div>
-                        <div className="space-y-1 font-mono text-xs">
-                          <div className="bg-muted px-2 py-1 rounded">
-                            Pos: [{currentPoint.jointPositions[8]?.toFixed(3)}, {currentPoint.jointPositions[9]?.toFixed(3)}, {currentPoint.jointPositions[10]?.toFixed(3)}]
-                          </div>
-                          <div className="bg-muted px-2 py-1 rounded">
-                            Gripper: {currentPoint.jointPositions[15]?.toFixed(3)}
-                          </div>
-                        </div>
-                      </div>
-                      {/* Frame Info */}
-                      <div>
-                        <div className="font-medium mb-2">Frame Info</div>
-                        <div className="space-y-1 text-xs">
-                          <div className="bg-muted px-2 py-1 rounded">
-                            Time: {currentPoint.timestamp.toFixed(3)}s
-                          </div>
-                          <div className="bg-muted px-2 py-1 rounded">
-                            Frame: {currentFrame} / {totalFrames - 1}
-                          </div>
-                        </div>
-                      </div>
+              {/* Trajectory & Subtasks */}
+              <Card className="h-[300px] flex-shrink-0">
+                <CardContent className="p-4 h-full flex flex-col gap-2">
+                  <TrajectoryPlot className="flex-1 min-h-0" />
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">Subtasks</span>
+                      <SubtaskToolbar />
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Timeline with annotations */}
-              <Card className="flex-shrink-0">
-                <CardHeader className="py-3 px-4">
-                  <CardTitle className="text-sm">Timeline</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <Timeline />
+                    <SubtaskTimelineTrack totalFrames={totalFrames} editable />
+                  </div>
                 </CardContent>
               </Card>
             </div>

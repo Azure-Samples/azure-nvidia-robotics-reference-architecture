@@ -9,7 +9,6 @@
 
 import { useCallback,useMemo, useRef } from 'react';
 
-import { FrameInsertionMarker } from '@/components/frame-editor/FrameInsertionMarker';
 import { cn } from '@/lib/utils';
 import { useAnnotationStore, useEditStore,useEpisodeStore, usePlaybackControls } from '@/stores';
 import { useFrameInsertionState, useTrajectoryAdjustmentState } from '@/stores/edit-store';
@@ -55,7 +54,7 @@ export function Timeline({ className }: TimelineProps) {
   const { currentFrame, setCurrentFrame } = usePlaybackControls();
   const currentAnnotation = useAnnotationStore((state) => state.currentAnnotation);
   const removedFrames = useEditStore((state) => state.removedFrames);
-  const { insertedFrames, insertFrame, removeInsertedFrame } = useFrameInsertionState();
+  const { insertedFrames } = useFrameInsertionState();
   const { trajectoryAdjustments } = useTrajectoryAdjustmentState();
 
   // Total frames (use episode length or estimate from trajectory data)
@@ -283,22 +282,6 @@ export function Timeline({ className }: TimelineProps) {
             onClick={createMarkerClickHandler(cluster.anomaly.frameRange[0])}
           />
         ))}
-
-        {/* Frame insertion markers - shown between frames */}
-        {Array.from({ length: totalFrames - 1 }, (_, i) => {
-          // Skip if this frame or the next is removed
-          if (removedFrames.has(i) || removedFrames.has(i + 1)) return null;
-          return (
-            <FrameInsertionMarker
-              key={`insert-marker-${i}`}
-              afterFrameIndex={i}
-              isInserted={insertedFrames.has(i)}
-              position={frameToPercent(i + 1)}
-              onClick={() => insertFrame(i)}
-              onRemove={() => removeInsertedFrame(i)}
-            />
-          );
-        })}
 
         {/* Inserted frame indicators */}
         {Array.from(insertedFrames.entries()).map(([afterIdx, insertion]) => {

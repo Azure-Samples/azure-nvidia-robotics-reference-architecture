@@ -10,7 +10,6 @@
 import { memo, useCallback,useMemo, useState } from 'react';
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -20,11 +19,12 @@ import {
   YAxis,
 } from 'recharts';
 
-import { cn } from '@/lib/utils';
-import { useEpisodeStore } from '@/stores';
-import { useTrajectoryAdjustmentState } from '@/stores/edit-store';
+import { cn } from '@/lib/utils'
+import { useEpisodeStore } from '@/stores'
+import { useTrajectoryAdjustmentState } from '@/stores/edit-store'
 
-import { JointSelector } from './JointSelector';
+import { JOINT_COLORS, OBSERVATION_LABELS } from './joint-constants'
+import { JointSelector } from './JointSelector'
 
 /**
  * Isolated current frame marker component.
@@ -48,37 +48,7 @@ interface TrajectoryPlotProps {
   className?: string;
 }
 
-// Labels for bimanual task-space observations
-const OBSERVATION_LABELS: Record<number, string> = {
-  0: 'Right X',
-  1: 'Right Y',
-  2: 'Right Z',
-  3: 'Right Qx',
-  4: 'Right Qy',
-  5: 'Right Qz',
-  6: 'Right Qw',
-  7: 'Right Gripper',
-  8: 'Left X',
-  9: 'Left Y',
-  10: 'Left Z',
-  11: 'Left Qx',
-  12: 'Left Qy',
-  13: 'Left Qz',
-  14: 'Left Qw',
-  15: 'Left Gripper',
-};
 
-// Color palette for different joints
-const JOINT_COLORS = [
-  '#ef4444', // red
-  '#f97316', // orange
-  '#eab308', // yellow
-  '#22c55e', // green
-  '#06b6d4', // cyan
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#d946ef', // fuchsia
-];
 
 /**
  * Line chart showing joint positions over time with current frame marker.
@@ -187,8 +157,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      {/* Controls — z-10 establishes a stacking context above the chart SVG */}
-      <div className="relative z-10 flex items-center justify-between">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
         <JointSelector
           jointCount={jointCount}
           selectedJoints={selectedJoints}
@@ -243,7 +213,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
                 borderRadius: '6px',
               }}
             />
-            <Legend />
+            {/* Legend hidden — joint chips above serve as interactive legend */}
 
             {/* Trajectory adjustment markers - show orange lines on adjusted frames */}
             {Array.from(trajectoryAdjustments.keys()).map((frameIdx) => (
