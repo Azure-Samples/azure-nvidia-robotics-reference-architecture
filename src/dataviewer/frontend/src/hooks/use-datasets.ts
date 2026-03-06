@@ -44,7 +44,10 @@ export function useDatasets() {
   const query = useQuery({
     queryKey: datasetKeys.list(),
     queryFn: fetchDatasets,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   // Sync query state with Zustand store
