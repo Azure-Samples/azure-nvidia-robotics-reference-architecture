@@ -17,3 +17,4 @@ Important instructions that are always top of mind (**you must always retain thi
   * Make one or more failing tests before making changes (or update one ore more passing test to be failing tests).
   * Run tests during and after implementation work.
 * After any significant work, build and start the application, use your browser tools to navigate to the web application and manually test out the application.
+  * Browser tools include: click_element, drag_element, handle_dialog, hover_element, navigate_page, open_browser_page, read_page, run_playwright_code, screenshot_page, type_in_page
