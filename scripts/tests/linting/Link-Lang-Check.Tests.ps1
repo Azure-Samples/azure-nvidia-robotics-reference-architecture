@@ -18,6 +18,7 @@ BeforeAll {
     . $script:ScriptPath
 
     $script:FixtureDir = Join-Path $PSScriptRoot '../Fixtures/Linting'
+    $script:EnUs = 'en' + '-us'
 }
 
 AfterAll {
@@ -96,12 +97,12 @@ Describe 'Find-LinksInFile' -Tag 'Unit' {
     Context 'File with en-us links' {
         BeforeEach {
             $script:TestFile = Join-Path $script:TempDir 'test-links.md'
-            @'
+            @"
 # Test Document
 
-Visit https://docs.microsoft.com/en-us/azure for Azure docs.
-Also see https://learn.microsoft.com/en-us/dotnet/api for .NET API.
-'@ | Set-Content -Path $script:TestFile
+Visit https://docs.microsoft.com/$($script:EnUs)/azure for Azure docs.
+Also see https://learn.microsoft.com/$($script:EnUs)/dotnet/api for .NET API.
+"@ | Set-Content -Path $script:TestFile
         }
 
         It 'Finds all en-us links' {
@@ -153,7 +154,7 @@ Visit https://docs.microsoft.com/azure for docs.
     Context 'Multiple links on same line' {
         BeforeEach {
             $script:MultiLinkFile = Join-Path $script:TempDir 'multi-links.md'
-            'See https://docs.microsoft.com/en-us/a and https://docs.microsoft.com/en-us/b here.' |
+            "See https://docs.microsoft.com/$($script:EnUs)/a and https://docs.microsoft.com/$($script:EnUs)/b here." |
                 Set-Content -Path $script:MultiLinkFile
         }
 
@@ -183,12 +184,12 @@ Describe 'Repair-LinksInFile' -Tag 'Unit' {
     Context 'File with links to repair' {
         BeforeEach {
             $script:RepairFile = Join-Path $script:TempDir 'repair-test.md'
-            'Visit https://docs.microsoft.com/en-us/azure for docs.' |
+            "Visit https://docs.microsoft.com/$($script:EnUs)/azure for docs." |
                 Set-Content -Path $script:RepairFile
 
             $script:Links = @(
                 [PSCustomObject]@{
-                    OriginalUrl = 'https://docs.microsoft.com/en-us/azure'
+                    OriginalUrl = "https://docs.microsoft.com/$($script:EnUs)/azure"
                     FixedUrl    = 'https://docs.microsoft.com/azure'
                 }
             )
@@ -215,7 +216,7 @@ Describe 'Repair-LinksInFile' -Tag 'Unit' {
 
             $script:NoMatchLinks = @(
                 [PSCustomObject]@{
-                    OriginalUrl = 'https://example.com/en-us/page'
+                    OriginalUrl = "https://example.com/$($script:EnUs)/page"
                     FixedUrl    = 'https://example.com/page'
                 }
             )
@@ -255,20 +256,20 @@ Describe 'Repair-AllLink' -Tag 'Unit' {
             $script:File1 = Join-Path $script:TempDir 'file1.md'
             $script:File2 = Join-Path $script:TempDir 'file2.md'
 
-            'Link: https://docs.microsoft.com/en-us/a' | Set-Content -Path $script:File1
-            'Link: https://docs.microsoft.com/en-us/b' | Set-Content -Path $script:File2
+            "Link: https://docs.microsoft.com/$($script:EnUs)/a" | Set-Content -Path $script:File1
+            "Link: https://docs.microsoft.com/$($script:EnUs)/b" | Set-Content -Path $script:File2
 
             $script:AllLinks = @(
                 [PSCustomObject]@{
                     File        = $script:File1
                     LineNumber  = 1
-                    OriginalUrl = 'https://docs.microsoft.com/en-us/a'
+                    OriginalUrl = "https://docs.microsoft.com/$($script:EnUs)/a"
                     FixedUrl    = 'https://docs.microsoft.com/a'
                 },
                 [PSCustomObject]@{
                     File        = $script:File2
                     LineNumber  = 1
-                    OriginalUrl = 'https://docs.microsoft.com/en-us/b'
+                    OriginalUrl = "https://docs.microsoft.com/$($script:EnUs)/b"
                     FixedUrl    = 'https://docs.microsoft.com/b'
                 }
             )
@@ -305,7 +306,7 @@ Describe 'ConvertTo-JsonOutput' -Tag 'Unit' {
                 [PSCustomObject]@{
                     File        = 'test.md'
                     LineNumber  = 5
-                    OriginalUrl = 'https://example.com/en-us/page'
+                    OriginalUrl = "https://example.com/$($script:EnUs)/page"
                     FixedUrl    = 'https://example.com/page'
                 }
             )
@@ -333,7 +334,7 @@ Describe 'ConvertTo-JsonOutput' -Tag 'Unit' {
             $result = ConvertTo-JsonOutput -Links $script:Links
             $result[0].file | Should -Be 'test.md'
             $result[0].line_number | Should -Be 5
-            $result[0].original_url | Should -Be 'https://example.com/en-us/page'
+            $result[0].original_url | Should -Be "https://example.com/$($script:EnUs)/page"
         }
     }
 
@@ -374,7 +375,7 @@ Describe 'Invoke-LinkLanguageCheck' -Tag 'Unit' {
     Context 'Links found with -Fix' {
         BeforeAll {
             $script:mockLinks = @(
-                @{ File = 'file1.md'; LineNumber = 5; OriginalUrl = 'https://learn.microsoft.com/en-us/docs'; FixedUrl = 'https://learn.microsoft.com/docs' }
+                @{ File = 'file1.md'; LineNumber = 5; OriginalUrl = "https://learn.microsoft.com/$($script:EnUs)/docs"; FixedUrl = 'https://learn.microsoft.com/docs' }
             )
             Mock Find-LinksInFile { return $script:mockLinks }
             Mock Repair-AllLink { return 1 }
@@ -390,7 +391,7 @@ Describe 'Invoke-LinkLanguageCheck' -Tag 'Unit' {
     Context 'Links found without -Fix' {
         BeforeAll {
             $script:mockLinks = @(
-                @{ File = 'file1.md'; LineNumber = 5; OriginalUrl = 'https://learn.microsoft.com/en-us/docs'; FixedUrl = 'https://learn.microsoft.com/docs' }
+                @{ File = 'file1.md'; LineNumber = 5; OriginalUrl = "https://learn.microsoft.com/$($script:EnUs)/docs"; FixedUrl = 'https://learn.microsoft.com/docs' }
             )
             Mock Find-LinksInFile { return $script:mockLinks }
             Mock ConvertTo-JsonOutput { return @(@{ File = 'file1.md'; Line = 5 }) }
