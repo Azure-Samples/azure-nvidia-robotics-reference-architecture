@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildCssFilter } from '../css-filters'
+import { buildCssFilter, combineCssFilters } from '../css-filters'
 
 describe('buildCssFilter', () => {
   it('returns empty string when no adjustments are active', () => {
@@ -65,5 +65,53 @@ describe('buildCssFilter', () => {
     const result = buildCssFilter({ brightness: 0.5 }, 'grayscale')
     expect(result).toContain('brightness(1.5)')
     expect(result).toContain('grayscale(1)')
+  })
+})
+
+describe('combineCssFilters', () => {
+  it('returns undefined when both sources are inactive', () => {
+    expect(combineCssFilters(undefined, false, undefined, undefined)).toBeUndefined()
+  })
+
+  it('returns undefined when display is default and no edit filters', () => {
+    const defaults = { brightness: 0, contrast: 0, saturation: 0, gamma: 1, hue: 0 }
+    expect(combineCssFilters(defaults, true, undefined, undefined)).toBeUndefined()
+  })
+
+  it('applies display adjustment when active', () => {
+    const result = combineCssFilters({ brightness: 0.5 }, true, undefined, undefined)
+    expect(result).toBe('brightness(1.5)')
+  })
+
+  it('ignores display adjustment when not active', () => {
+    expect(combineCssFilters({ brightness: 0.5 }, false, undefined, undefined)).toBeUndefined()
+  })
+
+  it('applies edit color adjustment', () => {
+    const result = combineCssFilters(undefined, false, { contrast: 0.3 }, undefined)
+    expect(result).toBe('contrast(1.3)')
+  })
+
+  it('applies edit color filter', () => {
+    const result = combineCssFilters(undefined, false, undefined, 'grayscale')
+    expect(result).toBe('grayscale(1)')
+  })
+
+  it('combines display and edit adjustments', () => {
+    const result = combineCssFilters(
+      { brightness: 0.2 }, true,
+      { contrast: 0.3 }, 'sepia',
+    )
+    expect(result).toContain('brightness(1.2)')
+    expect(result).toContain('contrast(1.3)')
+    expect(result).toContain('sepia(1)')
+  })
+
+  it('applies edit filter even when display is inactive', () => {
+    const result = combineCssFilters(
+      { brightness: 0.5 }, false,
+      undefined, 'invert',
+    )
+    expect(result).toBe('invert(1)')
   })
 })

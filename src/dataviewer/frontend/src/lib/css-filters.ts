@@ -64,3 +64,27 @@ export function buildCssFilter(
 
   return filters.join(' ');
 }
+
+/**
+ * Combine display-only viewer adjustments with edit-store transform filters.
+ *
+ * Returns a single CSS filter string, or undefined when both sources are inactive.
+ */
+export function combineCssFilters(
+  displayAdjustment?: ColorAdjustment,
+  displayActive?: boolean,
+  editAdjustment?: ColorAdjustment,
+  editFilter?: ColorFilterPreset,
+): string | undefined {
+  const parts: string[] = [];
+
+  if (displayActive && displayAdjustment) {
+    const display = buildCssFilter(displayAdjustment);
+    if (display) parts.push(display);
+  }
+
+  const edit = buildCssFilter(editAdjustment, editFilter);
+  if (edit) parts.push(edit);
+
+  return parts.length > 0 ? parts.join(' ') : undefined;
+}
