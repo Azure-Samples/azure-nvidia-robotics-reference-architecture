@@ -51,6 +51,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Setup PowerShell
+        uses: ./.github/actions/setup-powershell
+        with:
+          version: '7.5.4'
+
       - name: Create logs directory
         run: |
           New-Item -ItemType Directory -Force -Path logs | Out-Null
@@ -58,11 +63,6 @@ jobs:
       - name: Install PowerShell-Yaml
         run: |
           Install-Module -Name PowerShell-Yaml -Force -Scope CurrentUser
-
-      - name: Check PowerShell Version
-        run: |
-          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          Write-Host "OS: $($PSVersionTable.OS)"
 
       - name: Run ms.date Freshness Check
         run: |
