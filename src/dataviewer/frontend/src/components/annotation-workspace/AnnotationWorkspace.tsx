@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { computeEffectiveFps, computePlaybackTarget, needsSeekBeforePlay } from '@/lib/playback-utils';
 import {
   useDatasetStore,
   useEditDirtyState,
@@ -145,7 +146,7 @@ export function AnnotationWorkspace() {
 
   // Derive effective fps from the video's actual duration to avoid
   // mismatches between dataset metadata fps and video encoding fps.
-  const fps = videoDuration > 0 ? totalFrames / videoDuration : datasetFps;
+  const fps = computeEffectiveFps(totalFrames, videoDuration, datasetFps);
 
   // Resolve the first available camera from episode video URLs
   const cameraName = useMemo(() => {
@@ -230,17 +231,20 @@ export function AnnotationWorkspace() {
 
     video.playbackRate = playbackSpeed;
     if (isPlaying) {
-      // Seek to the correct position before playing to prevent the
-      // browser from restarting at 0 when the video has ended.
-      const targetTime = (originalFrameIndex ?? currentFrame) / fps;
-      if (Math.abs(video.currentTime - targetTime) > 0.5 / fps) {
+      const { targetTime, shouldRestart } = computePlaybackTarget(
+        currentFrame, totalFrames, originalFrameIndex, fps,
+      );
+      if (shouldRestart) {
+        setCurrentFrame(0);
+        video.currentTime = 0;
+      } else if (needsSeekBeforePlay(video.currentTime, targetTime, fps)) {
         video.currentTime = targetTime;
       }
       video.play().catch(() => { /* autoplay may be blocked */ });
     } else {
       video.pause();
     }
-  }, [isPlaying, playbackSpeed, videoSrc, currentFrame, originalFrameIndex, fps]);
+  }, [isPlaying, playbackSpeed, videoSrc, currentFrame, originalFrameIndex, fps, totalFrames, setCurrentFrame]);
 
   // During playback, drive frame counter from video.currentTime via rAF
   useEffect(() => {
