@@ -27,4 +27,4 @@ export {
   usePlaybackControls,
 } from './episode-store';
 export { useLabelStore } from './label-store';
-export { useViewerDisplay,useViewerSettingsStore } from './viewer-settings-store';
+export { usePlaybackSettings, useViewerDisplay,useViewerSettingsStore } from './viewer-settings-store';
