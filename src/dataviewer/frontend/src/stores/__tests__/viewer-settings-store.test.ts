@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useViewerDisplay, useViewerSettingsStore } from '../viewer-settings-store'
+import { usePlaybackSettings, useViewerDisplay, useViewerSettingsStore } from '../viewer-settings-store'
 
 describe('viewer-settings-store', () => {
   beforeEach(() => {
@@ -65,5 +65,48 @@ describe('viewer-settings-store', () => {
 
     expect(result.current.displayAdjustment.brightness).toBe(0.2)
     expect(result.current.displayAdjustment.contrast).toBe(0.4)
+  })
+})
+
+describe('playback settings', () => {
+  beforeEach(() => {
+    useViewerSettingsStore.getState().resetAdjustments()
+  })
+
+  it('defaults to autoPlay true and autoLoop true', () => {
+    const { result } = renderHook(() => usePlaybackSettings())
+    expect(result.current.autoPlay).toBe(true)
+    expect(result.current.autoLoop).toBe(true)
+  })
+
+  it('toggles autoPlay', () => {
+    const { result } = renderHook(() => usePlaybackSettings())
+
+    act(() => result.current.setAutoPlay(false))
+    expect(result.current.autoPlay).toBe(false)
+
+    act(() => result.current.setAutoPlay(true))
+    expect(result.current.autoPlay).toBe(true)
+  })
+
+  it('toggles autoLoop', () => {
+    const { result } = renderHook(() => usePlaybackSettings())
+
+    act(() => result.current.setAutoLoop(false))
+    expect(result.current.autoLoop).toBe(false)
+
+    act(() => result.current.setAutoLoop(true))
+    expect(result.current.autoLoop).toBe(true)
+  })
+
+  it('persists across hook renders', () => {
+    act(() => {
+      useViewerSettingsStore.getState().setAutoPlay(false)
+      useViewerSettingsStore.getState().setAutoLoop(false)
+    })
+
+    const { result } = renderHook(() => usePlaybackSettings())
+    expect(result.current.autoPlay).toBe(false)
+    expect(result.current.autoLoop).toBe(false)
   })
 })

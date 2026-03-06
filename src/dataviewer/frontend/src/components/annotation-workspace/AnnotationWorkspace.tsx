@@ -1,4 +1,4 @@
-import { Download, Layers, Pause, Play, RotateCcw, Scan, SkipBack,SkipForward, Video } from 'lucide-react';
+import { Download, Layers, Pause, Play, Repeat, RotateCcw, Scan, SkipBack,SkipForward, Video } from 'lucide-react';
 import { type SyntheticEvent,useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { LabelPanel } from '@/components/annotation-panel';
@@ -20,6 +20,7 @@ import {
   useEditStore,
   useEpisodeStore,
   usePlaybackControls,
+  usePlaybackSettings,
   useViewerDisplay,
 } from '@/stores';
 import {
@@ -54,6 +55,7 @@ export function AnnotationWorkspace() {
   const { isDirty: hasEdits } = useEditDirtyState();
   const { currentFrame, isPlaying, playbackSpeed, setCurrentFrame, togglePlayback, setPlaybackSpeed } = usePlaybackControls();
   const { displayAdjustment, isActive: displayActive } = useViewerDisplay();
+  const { autoPlay, autoLoop, setAutoPlay, setAutoLoop } = usePlaybackSettings();
   const globalTransform = useEditStore((state) => state.globalTransform);
 
   // Combined CSS filter: viewer display adjustments + edit color transforms
@@ -243,7 +245,11 @@ export function AnnotationWorkspace() {
   // Track video duration for accurate frame↔time mapping
   const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLVideoElement>) => {
     setVideoDuration(e.currentTarget.duration);
-  }, []);
+    // Auto-play when video loads and autoPlay is enabled
+    if (autoPlay && !isPlaying) {
+      togglePlayback();
+    }
+  }, [autoPlay, isPlaying, togglePlayback]);
 
   // Sync play/pause and playback speed to native video element.
   // Reads currentFrame/originalFrameIndex from refs to avoid re-triggering
@@ -310,11 +316,22 @@ export function AnnotationWorkspace() {
     }
   }, [currentFrame, originalFrameIndex, fps, isPlaying]);
 
-  // When the video ends, stop playback
+  // When the video ends, loop or stop based on autoLoop setting
   const handleVideoEnded = useCallback(() => {
-    if (isPlaying) togglePlayback();
-    setCurrentFrame(totalFrames - 1);
-  }, [isPlaying, togglePlayback, setCurrentFrame, totalFrames]);
+    if (autoLoop) {
+      // Restart directly — the sync effect won't re-trigger since isPlaying
+      // hasn't changed, so we must seek and play the video element ourselves.
+      const video = videoRef.current;
+      setCurrentFrame(0);
+      if (video) {
+        video.currentTime = 0;
+        video.play().catch(() => { /* autoplay may be blocked */ });
+      }
+    } else {
+      if (isPlaying) togglePlayback();
+      setCurrentFrame(totalFrames - 1);
+    }
+  }, [autoLoop, isPlaying, togglePlayback, setCurrentFrame, totalFrames]);
 
   // Step forward / backward one frame (when paused)
   const stepFrame = useCallback(
@@ -486,6 +503,28 @@ export function AnnotationWorkspace() {
                           {speed}x
                         </Button>
                       ))}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant={autoPlay ? 'default' : 'outline'}
+                        onClick={() => setAutoPlay(!autoPlay)}
+                        className="px-2"
+                        title={autoPlay ? 'Auto-play on (click to disable)' : 'Auto-play off (click to enable)'}
+                      >
+                        <Play className="h-3 w-3 mr-1" />
+                        Auto
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={autoLoop ? 'default' : 'outline'}
+                        onClick={() => setAutoLoop(!autoLoop)}
+                        className="px-2"
+                        title={autoLoop ? 'Loop on (click to disable)' : 'Loop off (click to enable)'}
+                      >
+                        <Repeat className="h-3 w-3 mr-1" />
+                        Loop
+                      </Button>
                     </div>
                     <input
                       type="range"

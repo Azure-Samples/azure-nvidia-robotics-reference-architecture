@@ -17,6 +17,10 @@ interface ViewerSettingsState {
   displayAdjustment: Required<ColorAdjustment>;
   /** Whether viewer adjustments are active (non-default) */
   isActive: boolean;
+  /** Auto-play episodes on load */
+  autoPlay: boolean;
+  /** Loop playback when reaching the end */
+  autoLoop: boolean;
 }
 
 interface ViewerSettingsActions {
@@ -24,6 +28,10 @@ interface ViewerSettingsActions {
   setAdjustment: (key: keyof ColorAdjustment, value: number) => void;
   /** Reset all display adjustments to defaults */
   resetAdjustments: () => void;
+  /** Set auto-play preference */
+  setAutoPlay: (enabled: boolean) => void;
+  /** Set auto-loop preference */
+  setAutoLoop: (enabled: boolean) => void;
 }
 
 type ViewerSettingsStore = ViewerSettingsState & ViewerSettingsActions;
@@ -51,6 +59,8 @@ export const useViewerSettingsStore = create<ViewerSettingsStore>()(
     (set) => ({
       displayAdjustment: { ...DEFAULT_DISPLAY },
       isActive: false,
+      autoPlay: true,
+      autoLoop: true,
 
       setAdjustment: (key, value) =>
         set((state) => {
@@ -60,6 +70,9 @@ export const useViewerSettingsStore = create<ViewerSettingsStore>()(
 
       resetAdjustments: () =>
         set({ displayAdjustment: { ...DEFAULT_DISPLAY }, isActive: false }),
+
+      setAutoPlay: (enabled) => set({ autoPlay: enabled }),
+      setAutoLoop: (enabled) => set({ autoLoop: enabled }),
     }),
     { name: 'viewer-settings' },
   ),
@@ -73,6 +86,18 @@ export function useViewerDisplay() {
       isActive: s.isActive,
       setAdjustment: s.setAdjustment,
       resetAdjustments: s.resetAdjustments,
+    })),
+  );
+}
+
+/** Convenience hook returning playback preference settings. */
+export function usePlaybackSettings() {
+  return useViewerSettingsStore(
+    useShallow((s) => ({
+      autoPlay: s.autoPlay,
+      autoLoop: s.autoLoop,
+      setAutoPlay: s.setAutoPlay,
+      setAutoLoop: s.setAutoLoop,
     })),
   );
 }
