@@ -1,26 +1,27 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { Download, Layers, Pause, Play, RotateCcw, Scan, SkipBack,SkipForward, Video } from 'lucide-react';
+import { type SyntheticEvent,useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { LabelPanel } from '@/components/annotation-panel';
+import { Timeline, TrajectoryPlot } from '@/components/episode-viewer';
+import { ExportDialog } from '@/components/export';
+import { ColorAdjustmentControls,FrameInsertionToolbar, FrameRemovalToolbar, TrajectoryEditor, TransformControls } from '@/components/frame-editor';
+import { DetectionPanel } from '@/components/object-detection';
+import { SubtaskTimelineTrack, SubtaskToolbar } from '@/components/subtask-timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, Layers, Play, Pause, RotateCcw, Video, Scan, SkipForward, SkipBack } from 'lucide-react';
-import { Timeline, TrajectoryPlot } from '@/components/episode-viewer';
-import { TransformControls, FrameRemovalToolbar, FrameInsertionToolbar, TrajectoryEditor, ColorAdjustmentControls } from '@/components/frame-editor';
-import { SubtaskTimelineTrack, SubtaskToolbar } from '@/components/subtask-timeline';
-import { ExportDialog } from '@/components/export';
-import { DetectionPanel } from '@/components/object-detection';
-import { LabelPanel } from '@/components/annotation-panel';
 import {
   useDatasetStore,
-  useEpisodeStore,
-  useEditStore,
   useEditDirtyState,
+  useEditStore,
+  useEpisodeStore,
   usePlaybackControls,
 } from '@/stores';
 import {
-  useFrameInsertionState,
-  getOriginalIndex,
   getEffectiveFrameCount,
+  getOriginalIndex,
+  useFrameInsertionState,
 } from '@/stores/edit-store';
 
 /**
@@ -34,6 +35,7 @@ export function AnnotationWorkspace() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
@@ -68,7 +70,7 @@ export function AnnotationWorkspace() {
     return 100;
   }, [currentEpisode]);
 
-  const fps = currentDataset?.fps ?? 30;
+  const datasetFps = currentDataset?.fps ?? 30;
 
   // Calculate effective frame count including insertions and removals
   const totalFrames = useMemo(() => {
@@ -141,6 +143,10 @@ export function AnnotationWorkspace() {
     return null;
   }, [currentEpisode?.trajectoryData, originalFrameIndex, currentFrame, adjacentFrames]);
 
+  // Derive effective fps from the video's actual duration to avoid
+  // mismatches between dataset metadata fps and video encoding fps.
+  const fps = videoDuration > 0 ? totalFrames / videoDuration : datasetFps;
+
   // Resolve the first available camera from episode video URLs
   const cameraName = useMemo(() => {
     if (!currentEpisode?.videoUrls) return null;
@@ -212,6 +218,11 @@ export function AnnotationWorkspace() {
 
   // --- Video element synchronisation ---
 
+  // Track video duration for accurate frame↔time mapping
+  const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLVideoElement>) => {
+    setVideoDuration(e.currentTarget.duration);
+  }, []);
+
   // Sync play/pause and playback speed to native video element
   useEffect(() => {
     const video = videoRef.current;
@@ -219,11 +230,17 @@ export function AnnotationWorkspace() {
 
     video.playbackRate = playbackSpeed;
     if (isPlaying) {
+      // Seek to the correct position before playing to prevent the
+      // browser from restarting at 0 when the video has ended.
+      const targetTime = (originalFrameIndex ?? currentFrame) / fps;
+      if (Math.abs(video.currentTime - targetTime) > 0.5 / fps) {
+        video.currentTime = targetTime;
+      }
       video.play().catch(() => { /* autoplay may be blocked */ });
     } else {
       video.pause();
     }
-  }, [isPlaying, playbackSpeed, videoSrc]);
+  }, [isPlaying, playbackSpeed, videoSrc, currentFrame, originalFrameIndex, fps]);
 
   // During playback, drive frame counter from video.currentTime via rAF
   useEffect(() => {
@@ -342,6 +359,7 @@ export function AnnotationWorkspace() {
                         ref={videoRef}
                         src={videoSrc}
                         onEnded={handleVideoEnded}
+                        onLoadedMetadata={handleLoadedMetadata}
                         muted
                         playsInline
                         preload="auto"
