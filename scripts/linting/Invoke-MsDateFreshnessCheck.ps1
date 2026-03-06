@@ -35,7 +35,7 @@ param(
     [int]$ThresholdDays = 90,
 
     [Parameter()]
-    [string[]]$Paths,
+    [string[]]$Paths = @("$PWD"),
 
     [Parameter()]
     [switch]$ChangedFilesOnly,
@@ -49,11 +49,6 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-
-# Set default for Paths if not provided
-if (-not $Paths) {
-    $Paths = @('.')
-}
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
 Import-Module (Join-Path $scriptRoot 'Modules' 'LintingHelpers.psm1') -Force
