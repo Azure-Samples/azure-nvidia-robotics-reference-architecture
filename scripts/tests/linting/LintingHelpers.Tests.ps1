@@ -1,14 +1,11 @@
-#Requires -Modules Pester
+#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
 
 BeforeAll {
     $modulePath = Join-Path $PSScriptRoot '../../linting/Modules/LintingHelpers.psm1'
     Import-Module $modulePath -Force
-}
-
-AfterAll {
-    Remove-Module 'LintingHelpers' -Force -ErrorAction SilentlyContinue
 }
 
 #region Get-ChangedFilesFromGit Tests

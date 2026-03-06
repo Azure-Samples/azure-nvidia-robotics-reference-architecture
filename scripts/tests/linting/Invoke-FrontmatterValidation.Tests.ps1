@@ -31,13 +31,6 @@ BeforeAll {
     . (Join-Path $lintingDir 'Invoke-FrontmatterValidation.ps1')
 }
 
-AfterAll {
-    Remove-Module FrontmatterValidation -Force -ErrorAction SilentlyContinue
-    Remove-Module CIHelpers -Force -ErrorAction SilentlyContinue
-    Remove-Module LintingHelpers -Force -ErrorAction SilentlyContinue
-    Remove-Module GitMocks -Force -ErrorAction SilentlyContinue
-}
-
 #region Initialize-JsonSchemaValidation
 
 Describe 'Initialize-JsonSchemaValidation' -Tag 'Unit' {
@@ -533,6 +526,7 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
         $script:SoftFail = $false
         $script:WarningsAsErrors = $false
         $script:FooterExcludePaths = @('dependency-pinning-artifacts/**')
+        $script:FrontmatterExcludePaths = @('README.md')
         $script:SkipFooterValidation = $true
         $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
     }

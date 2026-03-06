@@ -7,7 +7,8 @@
 # Purpose: Pester tests for deploy default configuration values
 # Author: Edge AI Team
 
-#Requires -Modules Pester
+#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 Describe 'Default configuration values' -Tag 'Unit' {
     BeforeAll {
