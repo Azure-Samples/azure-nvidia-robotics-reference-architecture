@@ -52,7 +52,7 @@ export function AnnotationWorkspace() {
   const editDatasetId = useEditStore((state) => state.datasetId);
   const editEpisodeIndex = useEditStore((state) => state.episodeIndex);
   const { insertedFrames } = useFrameInsertionState();
-  const { isDirty: hasEdits } = useEditDirtyState();
+  const { isDirty: hasEdits, resetEdits } = useEditDirtyState();
   const { currentFrame, isPlaying, playbackSpeed, setCurrentFrame, togglePlayback, setPlaybackSpeed } = usePlaybackControls();
   const { displayAdjustment, isActive: displayActive } = useViewerDisplay();
   const { autoPlay, autoLoop, setAutoPlay, setAutoLoop } = usePlaybackSettings();
@@ -374,6 +374,14 @@ export function AnnotationWorkspace() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={resetEdits}
+            disabled={!hasEdits}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reset All
+          </Button>
           <Button
             variant="outline"
             onClick={() => setExportDialogOpen(true)}
