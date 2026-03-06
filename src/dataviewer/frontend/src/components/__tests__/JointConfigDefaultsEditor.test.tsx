@@ -181,4 +181,91 @@ describe('JointConfigDefaultsEditor', () => {
     render(<JointConfigDefaultsEditor {...baseProps} isSaving />)
     expect(screen.getByText('Saving…')).toBeInTheDocument()
   })
+
+  describe('move joint between groups', () => {
+    it('shows move-to-group options when clicking move button on a grouped joint', async () => {
+      const user = userEvent.setup()
+      render(<JointConfigDefaultsEditor {...baseProps} />)
+      const moveButtons = screen.getAllByLabelText('Move to group')
+      await user.click(moveButtons[0])
+      // Should show target group options (excluding the joint's current group)
+      const picker = screen.getByTestId('group-picker')
+      expect(within(picker).getByText('Right Orientation')).toBeInTheDocument()
+      expect(within(picker).getByText('Left Arm')).toBeInTheDocument()
+    })
+
+    it('moves a joint from one group to another', async () => {
+      const user = userEvent.setup()
+      const onSave = vi.fn()
+      render(<JointConfigDefaultsEditor {...baseProps} onSave={onSave} />)
+      // Move joint 0 (Right X) from Right Arm to Left Arm
+      const moveButtons = screen.getAllByLabelText('Move to group')
+      await user.click(moveButtons[0])
+      // Click Left Arm in the group picker
+      const groupPicker = screen.getByTestId('group-picker')
+      await user.click(within(groupPicker).getByText('Left Arm'))
+      // Save and verify
+      await user.click(screen.getByText('Save'))
+      const savedConfig = onSave.mock.calls[0][0]
+      const rightArm = savedConfig.groups.find((g: { id: string }) => g.id === 'right-pos')
+      const leftArm = savedConfig.groups.find((g: { id: string }) => g.id === 'left-pos')
+      expect(rightArm.indices).not.toContain(0)
+      expect(leftArm.indices).toContain(0)
+    })
+  })
+
+  describe('edit joint index', () => {
+    it('displays joint indices next to labels', () => {
+      render(<JointConfigDefaultsEditor {...baseProps} />)
+      const indexBadges = screen.getAllByTestId('joint-index')
+      expect(indexBadges.length).toBe(10)
+      expect(indexBadges[0].textContent).toBe('0')
+    })
+
+    it('allows editing a joint index', async () => {
+      const user = userEvent.setup()
+      render(<JointConfigDefaultsEditor {...baseProps} />)
+      const editIndexButtons = screen.getAllByLabelText('Edit joint index')
+      await user.click(editIndexButtons[0])
+      const input = screen.getByRole('spinbutton')
+      await user.clear(input)
+      await user.type(input, '20{Enter}')
+      // Verify the index changed
+      const indexBadges = screen.getAllByTestId('joint-index')
+      expect(indexBadges[0].textContent).toBe('20')
+    })
+
+    it('saves updated indices correctly', async () => {
+      const user = userEvent.setup()
+      const onSave = vi.fn()
+      render(<JointConfigDefaultsEditor {...baseProps} onSave={onSave} />)
+      // Edit index of first joint from 0 to 42
+      const editIndexButtons = screen.getAllByLabelText('Edit joint index')
+      await user.click(editIndexButtons[0])
+      const input = screen.getByRole('spinbutton')
+      await user.clear(input)
+      await user.type(input, '42{Enter}')
+      await user.click(screen.getByText('Save'))
+      const savedConfig = onSave.mock.calls[0][0]
+      const rightArm = savedConfig.groups.find((g: { id: string }) => g.id === 'right-pos')
+      expect(rightArm.indices).toContain(42)
+      expect(rightArm.indices).not.toContain(0)
+      // Label should transfer to new index
+      expect(savedConfig.labels['42']).toBe('Right X')
+    })
+
+    it('prevents duplicate indices', async () => {
+      const user = userEvent.setup()
+      render(<JointConfigDefaultsEditor {...baseProps} />)
+      // Try to change index 0 to 1 (already exists)
+      const editIndexButtons = screen.getAllByLabelText('Edit joint index')
+      await user.click(editIndexButtons[0])
+      const input = screen.getByRole('spinbutton')
+      await user.clear(input)
+      await user.type(input, '1{Enter}')
+      // Should show error or revert — index 0 should remain
+      const indexBadges = screen.getAllByTestId('joint-index')
+      expect(indexBadges[0].textContent).toBe('0')
+    })
+  })
 })
