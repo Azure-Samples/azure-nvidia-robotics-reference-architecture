@@ -184,25 +184,30 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
   }
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex min-h-0 flex-col gap-2', className)}>
       {/* Controls */}
-      <div className="flex items-center justify-between">
-        <JointSelector
-          jointCount={jointCount}
-          selectedJoints={selectedJoints}
-          onSelectJoints={setSelectedJoints}
-          colors={JOINT_COLORS}
-          groups={jointConfig.groups}
-          labels={jointConfig.labels}
-          editable
-          onEditJointLabel={withSave(updateLabel)}
-          onEditGroupLabel={withSave(updateGroupLabel)}
-          onCreateGroup={withSave(createGroup)}
-          onDeleteGroup={withSave(deleteGroup)}
-          onMoveJoint={withSave(moveJoint)}
-          onOpenDefaults={() => setDefaultsOpen(true)}
-        />
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-3">
+        <div
+          data-testid="trajectory-joint-selector-scroll"
+          className="flex-1 min-w-0 max-h-32 overflow-y-auto pr-2"
+        >
+          <JointSelector
+            jointCount={jointCount}
+            selectedJoints={selectedJoints}
+            onSelectJoints={setSelectedJoints}
+            colors={JOINT_COLORS}
+            groups={jointConfig.groups}
+            labels={jointConfig.labels}
+            editable
+            onEditJointLabel={withSave(updateLabel)}
+            onEditGroupLabel={withSave(updateGroupLabel)}
+            onCreateGroup={withSave(createGroup)}
+            onDeleteGroup={withSave(deleteGroup)}
+            onMoveJoint={withSave(moveJoint)}
+            onOpenDefaults={() => setDefaultsOpen(true)}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-2 self-start">
           <button
             onClick={() => setShowVelocity(false)}
             className={cn(

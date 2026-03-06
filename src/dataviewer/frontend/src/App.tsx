@@ -169,7 +169,7 @@ function EpisodeViewer({ datasetId, episodeIndex }: { datasetId: string; episode
   return <AnnotationWorkspace />;
 }
 
-function AppContent() {
+export function AppContent() {
   const [datasetId, setDatasetId] = useState('');
   const [selectedEpisode, setSelectedEpisode] = useState<number>(0);
   const { data: datasets } = useDatasets();
@@ -181,10 +181,21 @@ function AppContent() {
   // Load joint configuration for the selected dataset
   useJointConfig();
 
-  // Auto-select the first available dataset
+  // Keep the active dataset aligned with the latest dataset list.
   useEffect(() => {
-    if (datasets && datasets.length > 0 && !datasetId) {
+    if (!datasets || datasets.length === 0) {
+      if (datasetId) {
+        setDatasetId('');
+        setSelectedEpisode(0);
+      }
+      return;
+    }
+
+    const hasSelectedDataset = datasets.some((dataset) => dataset.id === datasetId);
+
+    if (!datasetId || !hasSelectedDataset) {
       setDatasetId(datasets[0].id);
+      setSelectedEpisode(0);
     }
   }, [datasets, datasetId]);
 

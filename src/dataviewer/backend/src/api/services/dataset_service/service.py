@@ -54,6 +54,8 @@ class DatasetService:
             self._storage: StorageAdapter = storage_adapter
         else:
             self._storage = LocalStorageAdapter(base_path)
+        self._local_dataset_ids: set[str] = set()
+        self._blob_dataset_ids: set[str] = set()
         self._blob_provider: BlobDatasetProvider | None = blob_provider
         self._blob_synced: dict[str, Path] = {}
         self._blob_meta_synced: dict[str, Path] = {}
@@ -171,6 +173,7 @@ class DatasetService:
             tasks=[],
         )
         self._datasets[dataset_id] = dataset_info
+        self._blob_dataset_ids.add(dataset_id)
         return dataset_info
 
     async def get_blob_video_path(self, dataset_id: str, episode_idx: int, camera: str) -> str | None:
@@ -224,7 +227,26 @@ class DatasetService:
         dataset_info = handler.discover(dataset_id, dataset_path)
         if dataset_info is not None:
             self._datasets[dataset_id] = dataset_info
+            self._local_dataset_ids.add(dataset_id)
         return dataset_info
+
+    def _evict_dataset(self, dataset_id: str) -> None:
+        """Remove cached dataset metadata and handler state for a dataset."""
+        self._datasets.pop(dataset_id, None)
+        self._local_dataset_ids.discard(dataset_id)
+        self._blob_dataset_ids.discard(dataset_id)
+        self._blob_synced.pop(dataset_id, None)
+        self._blob_meta_synced.pop(dataset_id, None)
+        for handler in self._handlers:
+            loaders = getattr(handler, "_loaders", None)
+            if isinstance(loaders, dict):
+                loaders.pop(dataset_id, None)
+
+    def _prune_missing_local_datasets(self, discovered_ids: set[str]) -> None:
+        """Evict cached local datasets that no longer exist on disk."""
+        stale_ids = self._local_dataset_ids - discovered_ids
+        for dataset_id in stale_ids:
+            self._evict_dataset(dataset_id)
 
     async def list_datasets(self) -> list[DatasetInfo]:
         """List all available datasets."""
@@ -254,6 +276,8 @@ class DatasetService:
         except OSError:
             return list(self._datasets.values())
 
+        self._prune_missing_local_datasets(discovered_ids)
+
         for dataset_id in discovered_ids:
             if dataset_id not in self._datasets:
                 self._discover_dataset(dataset_id)
@@ -262,6 +286,13 @@ class DatasetService:
 
     async def get_dataset(self, dataset_id: str) -> DatasetInfo | None:
         """Get metadata for a specific dataset."""
+        if dataset_id in self._local_dataset_ids:
+            try:
+                self._get_dataset_path(dataset_id)
+            except ValueError:
+                self._evict_dataset(dataset_id)
+                return None
+
         dataset = self._datasets.get(dataset_id)
         if dataset is not None:
             return dataset

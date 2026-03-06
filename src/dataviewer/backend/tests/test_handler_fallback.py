@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.api.models.datasources import EpisodeData, EpisodeMeta
+from src.api.models.datasources import DatasetInfo, EpisodeData, EpisodeMeta
 from src.api.services.dataset_service.hdf5_handler import HDF5FormatHandler
 from src.api.services.dataset_service.lerobot_handler import LeRobotFormatHandler
 from src.api.services.dataset_service.service import DatasetService
@@ -28,7 +28,7 @@ class StubHandler:
         return dataset_id in self._has_loader_ids
 
     def can_handle(self, dataset_path) -> bool:
-        return False
+        return self._results.get("can_handle", False)
 
     def get_loader(self, dataset_id: str, dataset_path) -> bool:
         return False
@@ -52,7 +52,7 @@ class StubHandler:
         return self._results.get("load_episode", None)
 
     def discover(self, dataset_id: str, dataset_path):
-        return None
+        return self._results.get("discover", None)
 
 
 @pytest.fixture
@@ -130,6 +130,46 @@ class TestResolveHandler:
         svc = service_with_stubs
         handler = svc._resolve_handler("nonexistent")
         assert handler is None
+
+
+class TestListDatasetsRefresh:
+    """Test local dataset discovery refresh removes deleted datasets."""
+
+    @pytest.mark.asyncio
+    async def test_list_datasets_prunes_deleted_local_dataset(self, tmp_path):
+        svc = DatasetService(base_path=str(tmp_path))
+        dataset_dir = tmp_path / "deleted-dataset"
+        dataset_dir.mkdir()
+
+        dataset_info = DatasetInfo(
+            id="deleted-dataset",
+            name="Deleted Dataset",
+            total_episodes=1,
+            fps=30.0,
+            features={},
+            tasks=[],
+        )
+
+        handler = StubHandler(
+            "local",
+            results={
+                "can_handle": True,
+                "discover": dataset_info,
+            },
+        )
+        svc._handlers = [handler]
+        svc._lerobot_handler = handler
+        svc._hdf5_handler = handler
+
+        initial = await svc.list_datasets()
+
+        assert [dataset.id for dataset in initial] == ["deleted-dataset"]
+
+        dataset_dir.rmdir()
+
+        refreshed = await svc.list_datasets()
+
+        assert [dataset.id for dataset in refreshed] == []
 
 
 class TestHasLoader:
