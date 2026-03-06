@@ -30,7 +30,6 @@ Usage:
 from __future__ import annotations
 
 import numpy as np
-
 import rclpy
 from builtin_interfaces.msg import Duration
 from cv_bridge import CvBridge

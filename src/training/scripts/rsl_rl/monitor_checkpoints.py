@@ -79,7 +79,6 @@ import glob
 import json
 import time
 from datetime import datetime
-from pathlib import Path
 
 import gymnasium as gym
 import isaaclab_tasks  # noqa: F401

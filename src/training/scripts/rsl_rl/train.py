@@ -126,17 +126,13 @@ if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
     )
     exit(1)
 
+import contextlib
 import statistics
 
 import gymnasium as gym
+import isaaclab_tasks  # noqa: F401
 import omni
 import torch
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner
-from tensordict import TensorDict
-
-import contextlib
-
-import isaaclab_tasks  # noqa: F401
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
@@ -149,6 +145,8 @@ from isaaclab.utils.io import dump_yaml
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from tensordict import TensorDict
 
 try:
     import isaaclab_aeon.tasks  # noqa: F401
