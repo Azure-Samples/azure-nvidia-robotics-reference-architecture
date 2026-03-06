@@ -43,6 +43,17 @@ jobs:
     permissions:
       contents: read
 
+  # ms.date Freshness Check
+  msdate-freshness:
+    name: ms.date Freshness Check
+    uses: ./.github/workflows/msdate-freshness-check.yml
+    with:
+      staleness-threshold-days: 90
+      soft-fail: true
+      changed-files-only: true
+    permissions:
+      contents: read
+
   # PowerShell script analysis
   psscriptanalyzer:
     name: PSScriptAnalyzer

@@ -1,0 +1,26 @@
+name: Weekly Validation
+
+on:
+  schedule:
+    # Weekly scan: Mondays at 09:00 UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  # ms.date freshness validation - hard-fail mode for notification
+  msdate-freshness:
+    name: ms.date Freshness Check
+    uses: ./.github/workflows/msdate-freshness-check.yml
+    with:
+      staleness-threshold-days: 90
+      soft-fail: false           # Hard-fail for scheduled runs
+      changed-files-only: false  # Check all files
+    permissions:
+      contents: read
