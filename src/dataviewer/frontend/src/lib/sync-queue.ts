@@ -4,13 +4,14 @@
  * Handles background synchronization of local changes with the server.
  */
 
+import { apiClient } from '@/api/client';
+
 import {
   getPendingSyncItems,
   removeSyncItem,
-  updateSyncItemRetry,
   updateAnnotationSyncStatus,
+  updateSyncItemRetry,
 } from './offline-storage';
-import { apiClient } from '@/api/client';
 
 export interface SyncQueueItem {
   id: string;
@@ -247,8 +248,8 @@ export class SyncQueueManager {
     for (const listener of this.listeners) {
       try {
         listener(result);
-      } catch (error) {
-        console.error('Sync listener error:', error);
+      } catch {
+        // Listener errors are non-fatal
       }
     }
   }

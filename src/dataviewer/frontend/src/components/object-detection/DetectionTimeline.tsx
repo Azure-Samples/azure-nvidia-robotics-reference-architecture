@@ -3,6 +3,7 @@
  */
 
 import { useMemo } from 'react';
+
 import type { DetectionResult } from '@/types/detection';
 
 interface DetectionTimelineProps {
@@ -56,7 +57,7 @@ export function DetectionTimeline({
         <span>Detection Density ({framesWithDetections.length} frames with detections)</span>
         <span>Frame {totalFrames - 1}</span>
       </div>
-      <div className="relative h-10 bg-muted rounded cursor-pointer" onClick={handleClick}>
+      <div className="relative h-10 bg-muted rounded cursor-pointer" role="slider" tabIndex={0} aria-valuenow={currentFrame} aria-valuemin={0} aria-valuemax={totalFrames - 1} onClick={handleClick} onKeyDown={(e) => { if (e.key === 'Enter') handleClick(e as unknown as React.MouseEvent<HTMLDivElement>); }}>
         {/* Detection density bars */}
         {Array.from({ length: Math.min(totalFrames, 200) }).map((_, i) => {
           // Sample frames for display if many frames
@@ -89,7 +90,10 @@ export function DetectionTimeline({
             key={frame}
             className="absolute top-0 w-1 h-2 bg-green-500 cursor-pointer hover:h-3 transition-all z-5"
             style={{ left: `${(frame / totalFrames) * 100}%` }}
+            role="button"
+            tabIndex={0}
             onClick={(e) => handleMarkerClick(frame, e)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onFrameClick(frame); }}
             title={`Jump to frame ${frame}`}
           />
         ))}

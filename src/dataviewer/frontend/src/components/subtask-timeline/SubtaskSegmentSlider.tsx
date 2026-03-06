@@ -4,8 +4,9 @@
  * Uses Radix UI Slider for accessible range selection.
  */
 
-import { useCallback } from 'react';
 import * as Slider from '@radix-ui/react-slider';
+import { useCallback } from 'react';
+
 import { cn } from '@/lib/utils';
 import type { SubtaskSegment } from '@/types/episode-edit';
 

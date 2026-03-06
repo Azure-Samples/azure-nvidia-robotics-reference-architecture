@@ -5,17 +5,18 @@
  * and auto-saves on toggle.
  */
 
-import { useState, useCallback } from 'react';
+import { Check,Plus, Save } from 'lucide-react';
+import { useCallback,useState } from 'react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Save, Check } from 'lucide-react';
-import { useLabelStore } from '@/stores/label-store';
 import {
-    useCurrentEpisodeLabels,
     useAddLabelOption,
+    useCurrentEpisodeLabels,
     useSaveAllLabels,
 } from '@/hooks/use-labels';
+import { useLabelStore } from '@/stores/label-store';
 
 interface LabelPanelProps {
     episodeIndex: number;

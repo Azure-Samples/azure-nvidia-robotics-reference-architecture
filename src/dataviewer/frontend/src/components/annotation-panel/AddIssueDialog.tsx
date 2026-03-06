@@ -2,10 +2,11 @@
  * Dialog for adding a new data quality issue.
  */
 
+import { X } from 'lucide-react';
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { X } from 'lucide-react';
 import type { DataQualityIssue, DataQualityIssueType, IssueSeverity } from '@/types';
 
 interface AddIssueDialogProps {
@@ -85,8 +86,9 @@ export function AddIssueDialog({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Issue type */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Issue Type</label>
+              <label htmlFor="issue-type" className="text-sm font-medium">Issue Type</label>
               <select
+                id="issue-type"
                 value={type}
                 onChange={(e) => setType(e.target.value as DataQualityIssueType)}
                 className="w-full p-2 text-sm border rounded-md bg-background"
@@ -101,8 +103,8 @@ export function AddIssueDialog({
 
             {/* Severity */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Severity</label>
-              <div className="flex gap-2">
+              <span id="issue-severity-label" className="text-sm font-medium">Severity</span>
+              <div className="flex gap-2" role="group" aria-labelledby="issue-severity-label">
                 {(['minor', 'major', 'critical'] as const).map((s) => (
                   <Button
                     key={s}
@@ -120,8 +122,8 @@ export function AddIssueDialog({
 
             {/* Frame range */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Affected Frames</label>
-              <div className="flex gap-2 items-center">
+              <span id="issue-frames-label" className="text-sm font-medium">Affected Frames</span>
+              <div className="flex gap-2 items-center" role="group" aria-labelledby="issue-frames-label">
                 <input
                   type="number"
                   value={frameStart}
@@ -142,8 +144,9 @@ export function AddIssueDialog({
 
             {/* Description */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Notes (optional)</label>
+              <label htmlFor="issue-notes" className="text-sm font-medium">Notes (optional)</label>
               <textarea
+                id="issue-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Describe the issue..."

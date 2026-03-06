@@ -5,11 +5,13 @@
  * labeled sub-task regions.
  */
 
-import { useMemo, useCallback } from 'react';
-import { useSubtaskState, usePlaybackControls, useEpisodeStore } from '@/stores';
-import { SubtaskSegmentSlider } from './SubtaskSegmentSlider';
+import { useCallback,useMemo } from 'react';
+
 import { cn } from '@/lib/utils';
+import { useEpisodeStore,usePlaybackControls, useSubtaskState } from '@/stores';
 import type { SubtaskSegment } from '@/types/episode-edit';
+
+import { SubtaskSegmentSlider } from './SubtaskSegmentSlider';
 
 interface SubtaskTimelineTrackProps {
   /** Total frames in the episode */

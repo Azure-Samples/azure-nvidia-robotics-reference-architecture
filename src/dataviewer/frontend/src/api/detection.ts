@@ -2,8 +2,9 @@
  * API client functions for YOLO11 object detection.
  */
 
-import { apiClient } from './client';
 import type { DetectionRequest, EpisodeDetectionSummary } from '@/types/detection';
+
+import { apiClient } from './client';
 
 /**
  * Run YOLO11 object detection on episode frames.
@@ -14,9 +15,7 @@ export async function runDetection(
   request: DetectionRequest = {}
 ): Promise<EpisodeDetectionSummary> {
   const url = `/api/datasets/${datasetId}/episodes/${episodeIdx}/detect`;
-  console.log('[detection.ts] POST', url, request);
   const result = await apiClient.post<EpisodeDetectionSummary>(url, request);
-  console.log('[detection.ts] Response', { totalDetections: result.total_detections });
   return result;
 }
 

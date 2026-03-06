@@ -2,11 +2,12 @@
  * Dialog for adding a new anomaly.
  */
 
-import { useState, useEffect } from 'react';
+import { MapPin,X } from 'lucide-react';
+import { useEffect,useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { X, MapPin } from 'lucide-react';
-import type { Anomaly, AnomalyType, AnomalySeverity } from '@/types';
+import type { Anomaly, AnomalySeverity,AnomalyType } from '@/types';
 
 interface AddAnomalyDialogProps {
   /** Whether the dialog is open */
@@ -113,8 +114,9 @@ export function AddAnomalyDialog({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Anomaly type */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Anomaly Type</label>
+              <label htmlFor="anomaly-type" className="text-sm font-medium">Anomaly Type</label>
               <select
+                id="anomaly-type"
                 value={type}
                 onChange={(e) => setType(e.target.value as AnomalyType)}
                 className="w-full p-2 text-sm border rounded-md bg-background"
@@ -129,8 +131,8 @@ export function AddAnomalyDialog({
 
             {/* Severity */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Severity</label>
-              <div className="flex gap-2">
+              <span id="anomaly-severity-label" className="text-sm font-medium">Severity</span>
+              <div className="flex gap-2" role="group" aria-labelledby="anomaly-severity-label">
                 {(['low', 'medium', 'high'] as const).map((s) => (
                   <Button
                     key={s}
@@ -148,8 +150,8 @@ export function AddAnomalyDialog({
 
             {/* Frame range */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Frame Range</label>
-              <div className="flex gap-2 items-center">
+              <span id="anomaly-frame-range-label" className="text-sm font-medium">Frame Range</span>
+              <div className="flex gap-2 items-center" role="group" aria-labelledby="anomaly-frame-range-label">
                 <div className="flex-1 flex gap-1">
                   <input
                     type="number"
@@ -197,8 +199,9 @@ export function AddAnomalyDialog({
 
             {/* Description */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
+              <label htmlFor="anomaly-description" className="text-sm font-medium">Description</label>
               <textarea
+                id="anomaly-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe the anomaly..."

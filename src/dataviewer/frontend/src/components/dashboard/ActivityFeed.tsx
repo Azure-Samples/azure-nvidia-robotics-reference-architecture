@@ -2,19 +2,20 @@
  * Recent activity feed showing latest annotation actions.
  */
 
-import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatDistanceToNow } from 'date-fns';
 import {
+  Activity,
   CheckCircle,
+  Clock,
   Edit,
   Eye,
-  Clock,
   FileText,
-  Activity,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 export interface ActivityItem {
   id: string;

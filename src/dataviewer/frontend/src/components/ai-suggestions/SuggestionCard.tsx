@@ -2,25 +2,26 @@
  * Card displaying AI annotation suggestions with accept/reject actions.
  */
 
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import {
-  Check,
-  X,
-  Sparkles,
   AlertTriangle,
-  Star,
-  Flag,
+  Check,
   ChevronDown,
   ChevronUp,
+  Flag,
   Info,
+  Sparkles,
+  Star,
+  X,
 } from 'lucide-react';
 import { useState } from 'react';
+
 import type { AnnotationSuggestion, DetectedAnomaly } from '@/api/ai-analysis';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 export interface SuggestionCardProps {
   /** AI suggestion data */

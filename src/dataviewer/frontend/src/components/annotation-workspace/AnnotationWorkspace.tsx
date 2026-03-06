@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ViewerDisplayControls } from '@/components/viewer-display';
 import { buildCssFilter } from '@/lib/css-filters';
-import { computeEffectiveFps, computePlaybackTarget, needsSeekBeforePlay } from '@/lib/playback-utils';
+import { computeEffectiveFps, computeSyncAction } from '@/lib/playback-utils';
 import {
   useDatasetStore,
   useEditDirtyState,
@@ -38,6 +38,8 @@ export function AnnotationWorkspace() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const currentFrameRef = useRef(0);
+  const originalFrameIndexRef = useRef<number | null>(null);
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
 
@@ -154,6 +156,10 @@ export function AnnotationWorkspace() {
     return null;
   }, [currentEpisode?.trajectoryData, originalFrameIndex, currentFrame, adjacentFrames]);
 
+  // Keep refs in sync for the play/pause sync effect (avoids feedback loop)
+  currentFrameRef.current = currentFrame;
+  originalFrameIndexRef.current = originalFrameIndex;
+
   // Derive effective fps from the video's actual duration to avoid
   // mismatches between dataset metadata fps and video encoding fps.
   const fps = computeEffectiveFps(totalFrames, videoDuration, datasetFps);
@@ -234,27 +240,40 @@ export function AnnotationWorkspace() {
     setVideoDuration(e.currentTarget.duration);
   }, []);
 
-  // Sync play/pause and playback speed to native video element
+  // Sync play/pause and playback speed to native video element.
+  // Reads currentFrame/originalFrameIndex from refs to avoid re-triggering
+  // on every rAF frame update, which would fight the native playbackRate.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
 
-    video.playbackRate = playbackSpeed;
-    if (isPlaying) {
-      const { targetTime, shouldRestart } = computePlaybackTarget(
-        currentFrame, totalFrames, originalFrameIndex, fps,
-      );
-      if (shouldRestart) {
+    const action = computeSyncAction(
+      isPlaying, playbackSpeed,
+      currentFrameRef.current, totalFrames, originalFrameIndexRef.current,
+      fps, video.currentTime,
+    );
+
+    switch (action.kind) {
+      case 'restart':
+        video.playbackRate = action.playbackRate;
         setCurrentFrame(0);
         video.currentTime = 0;
-      } else if (needsSeekBeforePlay(video.currentTime, targetTime, fps)) {
-        video.currentTime = targetTime;
-      }
-      video.play().catch(() => { /* autoplay may be blocked */ });
-    } else {
-      video.pause();
+        video.play().catch(() => { /* autoplay may be blocked */ });
+        break;
+      case 'seek-and-play':
+        video.playbackRate = action.playbackRate;
+        video.currentTime = action.seekTo;
+        video.play().catch(() => { /* autoplay may be blocked */ });
+        break;
+      case 'play':
+        video.playbackRate = action.playbackRate;
+        video.play().catch(() => { /* autoplay may be blocked */ });
+        break;
+      case 'pause':
+        video.pause();
+        break;
     }
-  }, [isPlaying, playbackSpeed, videoSrc, currentFrame, originalFrameIndex, fps, totalFrames, setCurrentFrame]);
+  }, [isPlaying, playbackSpeed, videoSrc, fps, totalFrames, setCurrentFrame]);
 
   // During playback, drive frame counter from video.currentTime via rAF
   useEffect(() => {
@@ -357,10 +376,10 @@ export function AnnotationWorkspace() {
         </TabsList>
 
         {/* Tab 1: Episode Viewer */}
-        <TabsContent value="episode" className="flex-1 mt-4 min-h-0 overflow-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <TabsContent value="episode" className="flex-1 mt-4 min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             {/* Left panel: Video and timeline */}
-            <div className="lg:col-span-2 flex flex-col gap-4">
+            <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto">
               {/* Frame display with playback controls */}
               <Card className="flex-shrink-0">
                 <CardContent className="p-4">
@@ -555,8 +574,8 @@ export function AnnotationWorkspace() {
             </div>
 
             {/* Right panel: Annotation/edit tools */}
-            <div className="flex flex-col min-h-0">
-              <Card className="flex-1 flex flex-col min-h-0 overflow-auto">
+            <div className="flex flex-col min-h-0 overflow-y-auto">
+              <Card>
                 <CardHeader className="py-3 px-4">
                   <CardTitle className="text-sm">Edit Tools</CardTitle>
                 </CardHeader>

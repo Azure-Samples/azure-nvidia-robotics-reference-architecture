@@ -2,7 +2,8 @@
  * Issue list component for data quality issues.
  */
 
-import { Trash2, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Info,Trash2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { DataQualityIssue } from '@/types';

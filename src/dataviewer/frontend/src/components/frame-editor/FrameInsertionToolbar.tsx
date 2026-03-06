@@ -1,10 +1,11 @@
+import { Layers,Plus, PlusCircle, Timer, Undo2 } from 'lucide-react';
 import { useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { PlusCircle, Undo2, Plus, Timer, Layers } from 'lucide-react';
 import { useEpisodeStore } from '@/stores';
 import { useFrameInsertionState } from '@/stores/edit-store';
 

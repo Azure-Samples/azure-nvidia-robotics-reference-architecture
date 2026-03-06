@@ -2,7 +2,8 @@
  * Anomaly list component displaying detected anomalies.
  */
 
-import { Trash2, CheckCircle, Zap, AlertTriangle } from 'lucide-react';
+import { AlertTriangle,CheckCircle, Trash2, Zap } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Anomaly } from '@/types';

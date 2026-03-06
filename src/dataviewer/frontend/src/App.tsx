@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback, memo } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from '@/lib/query-client';
-import { useDatasets, useEpisodes, useEpisode, useCapabilities } from '@/hooks/use-datasets';
-import { useDatasetLabels } from '@/hooks/use-labels';
-import { useEpisodeStore, useDatasetStore } from '@/stores';
-import { useLabelStore } from '@/stores/label-store';
-import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace';
+import { memo,useCallback, useEffect, useState } from 'react';
+
 import { LabelFilter } from '@/components/annotation-panel';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace';
 import { Badge } from '@/components/ui/badge';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { useCapabilities,useDatasets, useEpisode, useEpisodes } from '@/hooks/use-datasets';
+import { useDatasetLabels } from '@/hooks/use-labels';
+import { queryClient } from '@/lib/query-client';
+import { useDatasetStore,useEpisodeStore } from '@/stores';
+import { useLabelStore } from '@/stores/label-store';
 import type { EpisodeMeta } from '@/types';
 
 /**
@@ -194,9 +195,10 @@ function AppContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm">Dataset:</label>
+          <label htmlFor="dataset-selector" className="text-sm">Dataset:</label>
           {datasets && datasets.length > 1 ? (
             <select
+              id="dataset-selector"
               value={datasetId}
               onChange={(e) => { setDatasetId(e.target.value); setSelectedEpisode(0); }}
               className="px-3 py-1 border rounded text-sm w-64"

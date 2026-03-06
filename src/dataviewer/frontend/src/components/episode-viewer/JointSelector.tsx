@@ -2,9 +2,10 @@
  * Joint selector for trajectory visualization.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { Check,ChevronDown } from 'lucide-react';
+import { useEffect,useRef, useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Labels for bimanual task-space observations
