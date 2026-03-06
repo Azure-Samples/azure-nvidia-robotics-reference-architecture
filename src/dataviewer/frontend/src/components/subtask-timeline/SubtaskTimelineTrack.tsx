@@ -142,8 +142,8 @@ export function SubtaskTimelineTrack({
       {/* Validation errors */}
       {validationErrors.length > 0 && (
         <div className="text-xs text-destructive">
-          {validationErrors.map((error, idx) => (
-            <div key={idx}>⚠ {error}</div>
+          {validationErrors.map((error) => (
+            <div key={error}>⚠ {error}</div>
           ))}
         </div>
       )}

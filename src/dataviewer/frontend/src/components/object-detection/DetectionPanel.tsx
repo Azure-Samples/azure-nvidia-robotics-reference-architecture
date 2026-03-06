@@ -303,9 +303,9 @@ export function DetectionPanel() {
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <div className="space-y-2">
-                {currentDetections.map((det, i) => (
+                {currentDetections.map((det) => (
                   <div
-                    key={i}
+                    key={`${det.class_name}-${det.confidence}-${det.bbox.join('-')}`}
                     className="flex items-center justify-between p-2 bg-muted rounded text-sm"
                   >
                     <span className="font-medium">{det.class_name}</span>

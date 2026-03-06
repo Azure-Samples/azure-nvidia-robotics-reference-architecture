@@ -95,9 +95,9 @@ export function HelpOverlay({ open, onClose, shortcuts = [] }: HelpOverlayProps)
           {title}
         </h3>
         <div className="grid gap-1">
-          {items.map((item, idx) => (
+          {items.map((item) => (
             <div
-              key={idx}
+              key={`${item.key}-${item.description}`}
               className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50"
             >
               <span className="text-sm">{'description' in item ? item.description : ''}</span>

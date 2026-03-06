@@ -53,8 +53,8 @@ export function CurriculumPreview({
           <CardTitle className="text-base">Preview</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+          {['preview-1', 'preview-2', 'preview-3', 'preview-4', 'preview-5'].map((placeholder) => (
+            <Skeleton key={placeholder} className="h-12 w-full" />
           ))}
         </CardContent>
       </Card>
