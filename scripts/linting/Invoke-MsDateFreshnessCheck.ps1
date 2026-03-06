@@ -31,11 +31,11 @@
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'Parameters consumed via script scope')]
 [CmdletBinding()]
 param(
-    [Parameter()]
+    [Parameter(Position = 0)]
     [int]$ThresholdDays = 90,
 
     [Parameter()]
-    [string[]]$Paths = @("."),
+    [string[]]$Paths = @('.'),
 
     [Parameter()]
     [switch]$ChangedFilesOnly,
