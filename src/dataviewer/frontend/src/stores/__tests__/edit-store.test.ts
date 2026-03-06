@@ -246,6 +246,25 @@ describe('useEditStore', () => {
       expect(useEditStore.getState().globalTransform).toBeNull()
       expect(useEditStore.getState().cameraTransforms).toEqual({})
     })
+
+    it('isDirty returns false after clearTransforms when only transforms were changed', () => {
+      useEditStore.getState().setGlobalTransform({ resize: { width: 320, height: 240 } })
+      expect(useEditStore.getState().isDirty).toBe(true)
+
+      useEditStore.getState().clearTransforms()
+      expect(useEditStore.getState().isDirty).toBe(false)
+    })
+
+    it('isDirty returns false after setting globalTransform back to null', () => {
+      useEditStore.getState().setGlobalTransform({
+        colorAdjustment: { brightness: 0.5 },
+        colorFilter: 'grayscale',
+      })
+      expect(useEditStore.getState().isDirty).toBe(true)
+
+      useEditStore.getState().setGlobalTransform(null)
+      expect(useEditStore.getState().isDirty).toBe(false)
+    })
   })
 
   describe('markSaved / resetEdits', () => {

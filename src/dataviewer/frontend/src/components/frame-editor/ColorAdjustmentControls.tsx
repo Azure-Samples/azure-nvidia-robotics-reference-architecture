@@ -151,19 +151,24 @@ export function ColorAdjustmentControls({
       if (adj.gamma !== 1) colorAdjustment.gamma = adj.gamma;
       if (adj.hue !== 0) colorAdjustment.hue = adj.hue;
 
+      const hasColorAdj = Object.keys(colorAdjustment).length > 0;
       const colorFilter = flt !== 'none' ? flt : undefined;
 
       if (cameraName) {
-        setCameraTransform(cameraName, {
-          colorAdjustment: Object.keys(colorAdjustment).length > 0 ? colorAdjustment : undefined,
-          colorFilter,
-        });
+        const hasAny = hasColorAdj || colorFilter;
+        setCameraTransform(cameraName, hasAny ? { colorAdjustment: hasColorAdj ? colorAdjustment : undefined, colorFilter } : null);
       } else {
-        setGlobalTransform({
-          ...globalTransform,
-          colorAdjustment: Object.keys(colorAdjustment).length > 0 ? colorAdjustment : undefined,
-          colorFilter,
-        });
+        // Preserve resize/crop if they exist, but clear color fields
+        const hasResize = !!globalTransform?.resize;
+        const hasCrop = !!globalTransform?.crop;
+        const hasAny = hasColorAdj || colorFilter || hasResize || hasCrop;
+
+        setGlobalTransform(hasAny ? {
+          ...(hasCrop ? { crop: globalTransform!.crop } : {}),
+          ...(hasResize ? { resize: globalTransform!.resize } : {}),
+          ...(hasColorAdj ? { colorAdjustment } : {}),
+          ...(colorFilter ? { colorFilter } : {}),
+        } : null);
       }
     },
     [cameraName, globalTransform, setGlobalTransform, setCameraTransform],

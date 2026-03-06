@@ -47,6 +47,7 @@ export function AnnotationWorkspace() {
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
   const removedFrames = useEditStore((state) => state.removedFrames);
   const initializeEdit = useEditStore((state) => state.initializeEdit);
+  const clearTransforms = useEditStore((state) => state.clearTransforms);
   const editDatasetId = useEditStore((state) => state.datasetId);
   const editEpisodeIndex = useEditStore((state) => state.episodeIndex);
   const { insertedFrames } = useFrameInsertionState();
@@ -624,6 +625,20 @@ export function AnnotationWorkspace() {
                     <h3 className="text-sm font-medium mb-3">Trajectory Adjustment</h3>
                     <TrajectoryEditor />
                   </div>
+
+                  <Separator />
+
+                  {/* Reset All Transforms */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearTransforms}
+                    disabled={!globalTransform}
+                    className="w-full"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset All Image Transforms
+                  </Button>
                 </CardContent>
               </Card>
             </div>
