@@ -31,7 +31,7 @@
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'Parameters consumed via script scope')]
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)]
+    [Parameter()]
     [int]$ThresholdDays = 90,
 
     [Parameter()]
