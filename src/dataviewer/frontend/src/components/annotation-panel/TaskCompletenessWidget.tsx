@@ -6,10 +6,11 @@
  */
 
 import { useEffect } from 'react';
-import { useAnnotationStore } from '@/stores';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useAnnotationStore } from '@/stores';
 import type { TaskCompletenessRating } from '@/types';
 
 /**
@@ -179,8 +180,9 @@ export function TaskCompletenessWidget() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Last Subtask Reached</label>
+              <label htmlFor="subtask-reached" className="text-sm font-medium">Last Subtask Reached</label>
               <select
+                id="subtask-reached"
                 value={taskCompleteness.subtaskReached ?? ''}
                 onChange={(e) =>
                   updateTaskCompleteness({ subtaskReached: e.target.value })
@@ -201,8 +203,9 @@ export function TaskCompletenessWidget() {
         {/* Conditional: Failure - Reason */}
         {taskCompleteness?.rating === 'failure' && (
           <div className="space-y-2">
-            <label className="text-sm font-medium">Failure Reason</label>
+            <label htmlFor="failure-reason" className="text-sm font-medium">Failure Reason</label>
             <textarea
+              id="failure-reason"
               value={taskCompleteness.failureReason ?? ''}
               onChange={(e) =>
                 updateTaskCompleteness({ failureReason: e.target.value })

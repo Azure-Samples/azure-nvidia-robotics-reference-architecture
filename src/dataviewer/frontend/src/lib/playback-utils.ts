@@ -55,3 +55,42 @@ export function needsSeekBeforePlay(
 ): boolean {
   return Math.abs(videoCurrentTime - targetTime) > 0.5 / fps;
 }
+
+/** Action the sync effect should take on the video element. */
+export type SyncAction =
+  | { kind: 'restart'; playbackRate: number }
+  | { kind: 'seek-and-play'; seekTo: number; playbackRate: number }
+  | { kind: 'play'; playbackRate: number }
+  | { kind: 'pause' };
+
+/**
+ * Determine what the play/pause sync effect should do.
+ *
+ * Encapsulates the full decision tree so it can be tested in isolation
+ * without a video element or React effects.
+ */
+export function computeSyncAction(
+  isPlaying: boolean,
+  playbackSpeed: number,
+  currentFrame: number,
+  totalFrames: number,
+  originalFrameIndex: number | null,
+  fps: number,
+  videoCurrentTime: number,
+): SyncAction {
+  if (!isPlaying) return { kind: 'pause' };
+
+  const { targetTime, shouldRestart } = computePlaybackTarget(
+    currentFrame, totalFrames, originalFrameIndex, fps,
+  );
+
+  if (shouldRestart) {
+    return { kind: 'restart', playbackRate: playbackSpeed };
+  }
+
+  if (needsSeekBeforePlay(videoCurrentTime, targetTime, fps)) {
+    return { kind: 'seek-and-play', seekTo: targetTime, playbackRate: playbackSpeed };
+  }
+
+  return { kind: 'play', playbackRate: playbackSpeed };
+}

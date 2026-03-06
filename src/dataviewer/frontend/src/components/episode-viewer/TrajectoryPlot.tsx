@@ -7,22 +7,24 @@
  * - Reference line position updates without re-rendering chart lines
  */
 
-import { useMemo, useState, memo, useCallback } from 'react';
+import { memo, useCallback,useMemo, useState } from 'react';
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
   CartesianGrid,
-  Tooltip,
   Legend,
+  Line,
+  LineChart,
   ReferenceLine,
   ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
+
+import { cn } from '@/lib/utils';
 import { useEpisodeStore } from '@/stores';
 import { useTrajectoryAdjustmentState } from '@/stores/edit-store';
+
 import { JointSelector } from './JointSelector';
-import { cn } from '@/lib/utils';
 
 /**
  * Isolated current frame marker component.

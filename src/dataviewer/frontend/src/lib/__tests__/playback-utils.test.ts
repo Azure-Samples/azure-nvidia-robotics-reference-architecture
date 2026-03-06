@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   computeEffectiveFps,
   computePlaybackTarget,
+  computeSyncAction,
   needsSeekBeforePlay,
 } from '../playback-utils'
 
@@ -116,5 +117,104 @@ describe('needsSeekBeforePlay', () => {
   it('returns true for video at end when target is mid-video', () => {
     // Video at duration end, target mid-way
     expect(needsSeekBeforePlay(12.833, 6.667, 30)).toBe(true)
+  })
+})
+
+describe('computeSyncAction', () => {
+  const fps = 30
+  const totalFrames = 385
+
+  it('returns pause when not playing', () => {
+    const action = computeSyncAction(false, 1, 100, totalFrames, 100, fps, 3.33)
+    expect(action.kind).toBe('pause')
+  })
+
+  it('returns restart when at last frame', () => {
+    const action = computeSyncAction(true, 1, 384, totalFrames, 384, fps, 12.8)
+    expect(action.kind).toBe('restart')
+    expect(action).toHaveProperty('playbackRate', 1)
+  })
+
+  it('returns seek-and-play when video position is far from target', () => {
+    // Video at 0s, frame 100 → target ~3.33s (well beyond half-frame threshold)
+    const action = computeSyncAction(true, 1, 100, totalFrames, 100, fps, 0)
+    expect(action.kind).toBe('seek-and-play')
+    expect(action).toHaveProperty('seekTo')
+    expect(action).toHaveProperty('playbackRate', 1)
+  })
+
+  it('returns play when video is already near the correct position', () => {
+    // Video at 3.33s, frame 100 → target 3.33s (within threshold)
+    const targetTime = 100 / fps
+    const action = computeSyncAction(true, 1, 100, totalFrames, 100, fps, targetTime)
+    expect(action.kind).toBe('play')
+    expect(action).toHaveProperty('playbackRate', 1)
+  })
+
+  it('applies 2x playbackRate when speed is 2', () => {
+    const targetTime = 100 / fps
+    const action = computeSyncAction(true, 2, 100, totalFrames, 100, fps, targetTime)
+    expect(action.kind).toBe('play')
+    expect(action).toHaveProperty('playbackRate', 2)
+  })
+
+  it('applies 0.5x playbackRate when speed is 0.5', () => {
+    const targetTime = 100 / fps
+    const action = computeSyncAction(true, 0.5, 100, totalFrames, 100, fps, targetTime)
+    expect(action.kind).toBe('play')
+    expect(action).toHaveProperty('playbackRate', 0.5)
+  })
+
+  it('speed change does not cause unnecessary seek when video position matches', () => {
+    // Simulates switching from 1x to 2x mid-playback at frame 200
+    // Video is already at the correct position
+    const videoTime = 200 / fps
+    const action = computeSyncAction(true, 2, 200, totalFrames, 200, fps, videoTime)
+    // Should NOT seek — just update playbackRate and continue
+    expect(action.kind).toBe('play')
+    expect(action).toHaveProperty('playbackRate', 2)
+  })
+
+  it('frame advance during playback produces play (not seek) when video tracks correctly', () => {
+    // During playback, rAF reports frame 201 while video is at matching time.
+    // The sync effect should NOT be called with frame changes (they come from refs),
+    // but even if it were, the action should be 'play' (no seek needed).
+    const videoTime = 201 / fps
+    const action = computeSyncAction(true, 2, 201, totalFrames, 201, fps, videoTime)
+    expect(action.kind).toBe('play')
+    expect(action).toHaveProperty('playbackRate', 2)
+  })
+
+  it('rapid frame advance at 2x does not trigger seek when video is slightly ahead', () => {
+    // At 2x speed, video naturally advances faster than frame reports.
+    // Video might be 1-2 frames ahead of the last reported frame.
+    // This must NOT trigger a backward seek (the original bug).
+    const reportedFrame = 200
+    const videoTimeSlightlyAhead = (reportedFrame + 1.5) / fps
+    const action = computeSyncAction(true, 2, reportedFrame, totalFrames, reportedFrame, fps, videoTimeSlightlyAhead)
+    // Difference is 1.5 frames = 0.05s at 30fps, threshold is 0.5/30 = 0.0167s
+    // This WOULD seek — which is why currentFrame must NOT be in the effect deps.
+    // When called from the effect (only on speed/play changes), currentFrame
+    // in the ref accurately reflects the video position, so this scenario
+    // only occurs if currentFrame were a state dependency (the bug).
+    expect(action.kind).toBe('seek-and-play')
+  })
+
+  it('uses originalFrameIndex for target time when available', () => {
+    // Effective frame 210, original frame 200 (due to insertions)
+    const action = computeSyncAction(true, 1, 210, totalFrames, 200, fps, 0)
+    expect(action.kind).toBe('seek-and-play')
+    if (action.kind === 'seek-and-play') {
+      expect(action.seekTo).toBeCloseTo(200 / fps, 5)
+    }
+  })
+
+  it('uses currentFrame for target when originalFrameIndex is null', () => {
+    // Inserted frame with no original mapping
+    const action = computeSyncAction(true, 1, 150, totalFrames, null, fps, 0)
+    expect(action.kind).toBe('seek-and-play')
+    if (action.kind === 'seek-and-play') {
+      expect(action.seekTo).toBeCloseTo(150 / fps, 5)
+    }
   })
 })

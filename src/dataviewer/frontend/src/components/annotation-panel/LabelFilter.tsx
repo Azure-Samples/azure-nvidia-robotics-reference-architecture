@@ -2,9 +2,10 @@
  * LabelFilter - filter episodes by label in the sidebar.
  */
 
+import { X } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { useLabelStore } from '@/stores/label-store';
-import { X } from 'lucide-react';
 
 export function LabelFilter() {
     const availableLabels = useLabelStore((state) => state.availableLabels);

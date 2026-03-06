@@ -1,6 +1,6 @@
 /**
  * Full detection panel for the YOLO11 tab in AnnotationWorkspace.
- * 
+ *
  * This component provides a full-page detection experience with:
  * - Detection controls and progress indicator
  * - Detection viewer with bounding boxes
@@ -8,27 +8,24 @@
  * - Filters and charts
  */
 
-import { useMemo, useState, useEffect } from 'react';
+import { AlertTriangle, BarChart3, Eye, Filter, Loader2, Pause, Play, RotateCcw,Scan } from 'lucide-react';
+import { useEffect,useMemo, useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Scan, BarChart3, Filter, Eye, Loader2, AlertTriangle, Play, Pause, RotateCcw } from 'lucide-react';
 import { useObjectDetection } from '@/hooks/use-object-detection';
 import { useDatasetStore, useEpisodeStore, usePlaybackControls } from '@/stores';
-import { DetectionViewer } from './DetectionViewer';
-import { DetectionTimeline } from './DetectionTimeline';
-import { DetectionFilters } from './DetectionFilters';
+
 import { DetectionCharts } from './DetectionCharts';
+import { DetectionFilters } from './DetectionFilters';
+import { DetectionTimeline } from './DetectionTimeline';
+import { DetectionViewer } from './DetectionViewer';
 
 export function DetectionPanel() {
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
   const { currentFrame, setCurrentFrame, isPlaying, togglePlayback, playbackSpeed, setPlaybackSpeed } = usePlaybackControls();
-
-  console.log('[DetectionPanel] Mounted', { 
-    datasetId: currentDataset?.id,
-    episodeIdx: currentEpisode?.meta.index,
-  });
 
   const {
     data,
@@ -42,13 +39,6 @@ export function DetectionPanel() {
     runDetection,
     availableClasses,
   } = useObjectDetection();
-
-  console.log('[DetectionPanel] Detection state', { 
-    hasData: !!data, 
-    isLoading, 
-    isRunning,
-    error: error?.message,
-  });
 
   // Progress simulation for detection
   const [progress, setProgress] = useState(0);
@@ -144,7 +134,6 @@ export function DetectionPanel() {
                 )}
                 <Button
                   onClick={() => {
-                    console.log('[DetectionPanel] Run Detection clicked');
                     runDetection({ confidence: filters.minConfidence });
                   }}
                   disabled={isRunning || isLoading}

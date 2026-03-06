@@ -2,14 +2,15 @@
  * Badge showing AI suggestion confidence level.
  */
 
-import { cn } from '@/lib/utils';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Loader2,Sparkles } from 'lucide-react';
+
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 export interface AISuggestionBadgeProps {
   /** Confidence level 0-1 */

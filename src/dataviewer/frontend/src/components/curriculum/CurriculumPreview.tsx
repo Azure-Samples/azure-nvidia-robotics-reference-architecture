@@ -2,12 +2,13 @@
  * Preview of filtered episodes for curriculum.
  */
 
-import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle, CheckCircle,FileText, Star } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, Star, AlertTriangle, CheckCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface EpisodePreviewItem {
   id: string;

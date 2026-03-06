@@ -10,12 +10,13 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
+
 import type {
-  ImageTransform,
   EpisodeEditOperations,
+  FrameInsertion,
+  ImageTransform,
   SubtaskSegment,
   TrajectoryAdjustment,
-  FrameInsertion,
 } from '@/types/episode-edit';
 import {
   createDefaultSubtask,
@@ -327,12 +328,6 @@ export const useEditStore = create<EditStore>()(
       ...initialState,
 
       initializeEdit: (datasetId, episodeIndex) => {
-        console.log('initializeEdit called:', { datasetId, episodeIndex });
-        console.log('Current state before init:', {
-          datasetId: get().datasetId,
-          episodeIndex: get().episodeIndex,
-          insertedFrames: Array.from(get().insertedFrames.entries()),
-        });
         const newState = {
           datasetId,
           episodeIndex,
@@ -518,7 +513,6 @@ export const useEditStore = create<EditStore>()(
       },
 
       insertFrame: (afterFrameIndex, factor = 0.5) => {
-        console.log('insertFrame called:', { afterFrameIndex, factor });
         set(
           (state) => {
             const newInserted = new Map(state.insertedFrames);
@@ -526,7 +520,6 @@ export const useEditStore = create<EditStore>()(
               afterFrameIndex,
               interpolationFactor: factor,
             });
-            console.log('insertedFrames after insert:', Array.from(newInserted.entries()));
             const newState = { ...state, insertedFrames: newInserted };
             return { ...newState, isDirty: computeDirty(newState) };
           },

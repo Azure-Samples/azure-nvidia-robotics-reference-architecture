@@ -169,20 +169,38 @@ docker build -t dataviewer-frontend ./frontend
 ### Backend Development
 
 ```bash
-# Run tests
 cd backend
+source .venv/bin/activate
+
+# Run tests
 pytest
 
 # Lint
 ruff check src/
+
+# Lint with auto-fix
+ruff check src/ --fix
 ```
 
 ### Frontend Development
 
+All frontend validation runs through npm scripts in `src/dataviewer/frontend/`.
+
 ```bash
 cd frontend
-npm run lint
-npm run build
+
+# Full validation (type-check + lint + test)
+npm run validate
+
+# Individual checks
+npm run type-check   # TypeScript compilation
+npm run lint         # ESLint
+npm run lint:fix     # ESLint with auto-fix
+npm run test         # Vitest unit tests
+npm run test:watch   # Vitest in watch mode
+npm run format       # Prettier check
+npm run format:fix   # Prettier auto-fix
+npm run build        # Production build
 ```
 
 ## API Documentation

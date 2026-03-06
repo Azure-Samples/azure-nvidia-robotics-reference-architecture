@@ -2,7 +2,16 @@
  * Offline status indicator component.
  */
 
-import { cn } from '@/lib/utils';
+import {
+  AlertTriangle,
+  Check,
+  Cloud,
+  Loader2,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,16 +20,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
-import {
-  Wifi,
-  WifiOff,
-  RefreshCw,
-  Cloud,
-  Check,
-  AlertTriangle,
-  Loader2,
-} from 'lucide-react';
 import { useOfflineAnnotations } from '@/hooks/use-offline-annotations';
+import { cn } from '@/lib/utils';
 
 export interface OfflineIndicatorProps {
   /** Additional class names */

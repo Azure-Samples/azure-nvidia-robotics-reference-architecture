@@ -5,15 +5,15 @@
  */
 
 import type {
-  DatasetInfo,
-  DatasetCapabilities,
-  EpisodeMeta,
-  EpisodeData,
-  EpisodeAnnotationFile,
-  EpisodeAnnotation,
   AnnotationSummary,
-  AutoQualityAnalysis,
   ApiError,
+  AutoQualityAnalysis,
+  DatasetCapabilities,
+  DatasetInfo,
+  EpisodeAnnotation,
+  EpisodeAnnotationFile,
+  EpisodeData,
+  EpisodeMeta,
 } from '@/types';
 
 const API_BASE = '/api';
@@ -48,6 +48,12 @@ async function getCsrfToken(): Promise<string> {
 
 async function mutationHeaders(): Promise<Record<string, string>> {
   return { 'X-CSRF-Token': await getCsrfToken() };
+}
+
+/** Reset cached CSRF token (for testing). */
+export function _resetCsrfToken(): void {
+  _csrfToken = null;
+  _csrfTokenFetch = null;
 }
 
 /**

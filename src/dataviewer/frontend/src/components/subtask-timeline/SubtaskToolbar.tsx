@@ -2,10 +2,10 @@
  * Subtask toolbar for adding, editing, and deleting segments.
  */
 
-import { useState, useCallback } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import { useCallback,useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -15,16 +15,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { useSubtaskState, usePlaybackControls, useEpisodeStore } from '@/stores';
-import { SUBTASK_COLORS, getNextSubtaskColor, generateSubtaskId } from '@/types/episode-edit';
 import { cn } from '@/lib/utils';
+import { useEpisodeStore,usePlaybackControls, useSubtaskState } from '@/stores';
 import type { SubtaskSegment } from '@/types/episode-edit';
-import { Plus, Trash2 } from 'lucide-react';
+import { generateSubtaskId,getNextSubtaskColor, SUBTASK_COLORS } from '@/types/episode-edit';
 
 interface SubtaskToolbarProps {
   /** Currently selected segment ID */

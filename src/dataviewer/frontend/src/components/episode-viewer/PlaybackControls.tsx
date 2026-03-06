@@ -2,16 +2,17 @@
  * Custom playback controls for the video player.
  */
 
-import { usePlaybackControls } from '@/stores';
-import { Button } from '@/components/ui/button';
 import {
+  ChevronLeft,
+  ChevronRight,
   Pause,
   Play,
   SkipBack,
   SkipForward,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { usePlaybackControls } from '@/stores';
 
 interface PlaybackControlsProps {
   /** Current frame number */

@@ -4,7 +4,7 @@
  * Provides local persistence of annotations and pending sync queue.
  */
 
-import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
+import { type DBSchema,type IDBPDatabase, openDB } from 'idb';
 
 /** Schema for the annotation offline database */
 interface AnnotationDBSchema extends DBSchema {
