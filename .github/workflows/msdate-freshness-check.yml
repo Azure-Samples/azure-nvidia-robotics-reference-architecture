@@ -61,8 +61,10 @@ jobs:
 
       - name: Run ms.date Freshness Check
         run: |
-          $scriptArgs = @{}
-          $scriptArgs['ThresholdDays'] = [int]'${{ inputs.staleness-threshold-days }}'
+          $scriptArgs = @{
+            ThresholdDays = [int]'${{ inputs.staleness-threshold-days }}'
+            Paths = @('.')
+          }
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
             $scriptArgs['ChangedFilesOnly'] = $true
           }
