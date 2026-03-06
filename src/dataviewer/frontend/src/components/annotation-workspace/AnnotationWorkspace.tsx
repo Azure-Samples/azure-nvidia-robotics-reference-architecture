@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ViewerDisplayControls } from '@/components/viewer-display';
+import { buildCssFilter } from '@/lib/css-filters';
 import { computeEffectiveFps, computePlaybackTarget, needsSeekBeforePlay } from '@/lib/playback-utils';
 import {
   useDatasetStore,
@@ -18,6 +20,7 @@ import {
   useEditStore,
   useEpisodeStore,
   usePlaybackControls,
+  useViewerDisplay,
 } from '@/stores';
 import {
   getEffectiveFrameCount,
@@ -47,6 +50,13 @@ export function AnnotationWorkspace() {
   const { insertedFrames } = useFrameInsertionState();
   const { isDirty: hasEdits } = useEditDirtyState();
   const { currentFrame, isPlaying, playbackSpeed, setCurrentFrame, togglePlayback, setPlaybackSpeed } = usePlaybackControls();
+  const { displayAdjustment, isActive: displayActive } = useViewerDisplay();
+
+  // CSS filter for non-destructive viewer display adjustments
+  const displayFilter = useMemo(
+    () => (displayActive ? buildCssFilter(displayAdjustment) : undefined),
+    [displayAdjustment, displayActive],
+  );
 
   // Initialize edit store when dataset/episode changes
   useEffect(() => {
@@ -354,7 +364,8 @@ export function AnnotationWorkspace() {
               {/* Frame display with playback controls */}
               <Card className="flex-shrink-0">
                 <CardContent className="p-4">
-                  <div className="aspect-video bg-black rounded-lg flex items-center justify-center overflow-hidden relative">
+                  <ViewerDisplayControls />
+                  <div className="mt-2 aspect-video bg-black rounded-lg flex items-center justify-center overflow-hidden relative">
                     {/* Hidden canvas for image blending */}
                     <canvas ref={canvasRef} className="hidden" />
 
@@ -368,18 +379,21 @@ export function AnnotationWorkspace() {
                         playsInline
                         preload="auto"
                         className="max-w-full max-h-full object-contain"
+                        style={displayFilter ? { filter: displayFilter } : undefined}
                       />
                     ) : isInsertedFrame && interpolatedImageUrl ? (
                       <img
                         src={interpolatedImageUrl}
                         alt={`Interpolated frame ${currentFrame}`}
                         className="max-w-full max-h-full object-contain"
+                        style={displayFilter ? { filter: displayFilter } : undefined}
                       />
                     ) : frameImageUrl ? (
                       <img
                         src={frameImageUrl}
                         alt={`Frame ${currentFrame}`}
                         className="max-w-full max-h-full object-contain"
+                        style={displayFilter ? { filter: displayFilter } : undefined}
                       />
                     ) : (
                       <span className="text-white">Frame {currentFrame + 1} of {totalFrames}</span>

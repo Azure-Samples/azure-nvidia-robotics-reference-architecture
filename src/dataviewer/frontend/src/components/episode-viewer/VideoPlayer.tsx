@@ -4,12 +4,14 @@
  * Supports multiple cameras, custom playback controls, and keyboard shortcuts.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactPlayer from 'react-player';
 
+import { ViewerDisplayControls } from '@/components/viewer-display';
+import { buildCssFilter } from '@/lib/css-filters';
 import { computeEffectiveFps } from '@/lib/playback-utils';
 import { cn } from '@/lib/utils';
-import { useEpisodeStore, usePlaybackControls } from '@/stores';
+import { useEpisodeStore, usePlaybackControls, useViewerDisplay } from '@/stores';
 
 import { CameraSelector } from './CameraSelector';
 import { PlaybackControls } from './PlaybackControls';
@@ -37,6 +39,12 @@ export function VideoPlayer({ className }: VideoPlayerProps) {
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const { displayAdjustment, isActive: displayActive } = useViewerDisplay();
+
+  const displayFilter = useMemo(
+    () => (displayActive ? buildCssFilter(displayAdjustment) : undefined),
+    [displayAdjustment, displayActive],
+  );
 
   // Get available cameras from episode data
   const cameras = Object.keys(currentEpisode?.videoUrls ?? {});
@@ -170,8 +178,14 @@ export function VideoPlayer({ className }: VideoPlayerProps) {
         </span>
       </div>
 
+      {/* Viewer display settings */}
+      <ViewerDisplayControls />
+
       {/* Video player */}
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+      <div
+        className="relative aspect-video bg-black rounded-lg overflow-hidden"
+        style={displayFilter ? { filter: displayFilter } : undefined}
+      >
         {videoUrl ? (
           <ReactPlayer
             ref={playerRef}
