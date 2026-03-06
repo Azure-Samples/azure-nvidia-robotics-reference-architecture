@@ -5,9 +5,10 @@
  * persisted when the user explicitly clicks Save.
  */
 
-import { ArrowRightLeft, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
-import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, ArrowRightLeft, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 
 import {
@@ -36,6 +37,82 @@ export interface JointConfigDefaultsEditorProps {
   onSave: (config: { groups: JointGroup[]; labels: Record<string, string> }) => void
   isSaving?: boolean
   colors?: string[]
+}
+
+interface DraftJoint {
+  id: string
+  index: number
+  label: string
+}
+
+interface DraftGroup {
+  id: string
+  label: string
+  jointIds: string[]
+}
+
+function createDraftState(groups: JointGroup[], labels: Record<string, string>) {
+  const groupedIndices = new Set(groups.flatMap((group) => group.indices))
+  const allIndices = [...new Set([...groups.flatMap((group) => group.indices), ...Object.keys(labels).map(Number)])].sort(
+    (left, right) => left - right,
+  )
+
+  const joints: Record<string, DraftJoint> = {}
+  const jointIdsByIndex = new Map<number, string>()
+
+  for (const index of allIndices) {
+    const jointId = `joint-${index}`
+    jointIdsByIndex.set(index, jointId)
+    joints[jointId] = {
+      id: jointId,
+      index,
+      label: labels[String(index)] ?? OBSERVATION_LABELS[index] ?? `Ch ${index}`,
+    }
+  }
+
+  const draftGroups: DraftGroup[] = groups.map((group) => ({
+    id: group.id,
+    label: group.label,
+    jointIds: group.indices.map((index) => jointIdsByIndex.get(index)).filter((jointId): jointId is string => Boolean(jointId)),
+  }))
+
+  const groupedJointIds = new Set(draftGroups.flatMap((group) => group.jointIds))
+  for (const index of allIndices) {
+    if (groupedIndices.has(index)) {
+      continue
+    }
+
+    const jointId = jointIdsByIndex.get(index)
+    if (jointId && !groupedJointIds.has(jointId)) {
+      groupedJointIds.add(jointId)
+    }
+  }
+
+  return { groups: draftGroups, joints }
+}
+
+function createBuiltInLabels() {
+  const builtInLabels: Record<string, string> = {}
+  for (const [index, label] of Object.entries(OBSERVATION_LABELS)) {
+    builtInLabels[String(index)] = label
+  }
+  return builtInLabels
+}
+
+function buildPersistedConfig(groups: DraftGroup[], joints: Record<string, DraftJoint>) {
+  const nextLabels: Record<string, string> = {}
+  for (const joint of Object.values(joints)) {
+    nextLabels[String(joint.index)] = joint.label
+  }
+
+  return {
+    groups: groups.map((group) => ({
+      id: group.id,
+      label: group.label,
+      indices: group.jointIds.map((jointId) => joints[jointId].index),
+    })),
+    labels: nextLabels,
+  }
 }
 
 function InlineEditField({
@@ -120,7 +197,11 @@ function IndexEditField({
       value={num}
       onChange={(e) => setNum(e.target.value)}
       onKeyDown={handleKeyDown}
-      onBlur={onCancel}
+      onBlur={() => {
+        const parsed = parseInt(num, 10)
+        if (!isNaN(parsed) && parsed >= 0) onCommit(parsed)
+        else onCancel()
+      }}
       className="bg-transparent border-b border-primary text-[10px] outline-none w-10 text-center"
     />
   )
@@ -137,19 +218,21 @@ export function JointConfigDefaultsEditor({
   isSaving,
   colors = JOINT_COLORS,
 }: JointConfigDefaultsEditorProps) {
-  const [groups, setGroups] = useState<JointGroup[]>(() => initialGroups.map((g) => ({ ...g, indices: [...g.indices] })))
-  const [labels, setLabels] = useState<Record<string, string>>(() => ({ ...initialLabels }))
-  const [editingJoint, setEditingJoint] = useState<number | null>(null)
+  const [groups, setGroups] = useState<DraftGroup[]>(() => createDraftState(initialGroups, initialLabels).groups)
+  const [joints, setJoints] = useState<Record<string, DraftJoint>>(() => createDraftState(initialGroups, initialLabels).joints)
+  const [editingJoint, setEditingJoint] = useState<string | null>(null)
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
-  const [assigningJoint, setAssigningJoint] = useState<number | null>(null)
-  const [movingJoint, setMovingJoint] = useState<number | null>(null)
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [assigningJoint, setAssigningJoint] = useState<string | null>(null)
+  const [movingJoint, setMovingJoint] = useState<string | null>(null)
+  const [editingIndex, setEditingIndex] = useState<string | null>(null)
+  const groupRefs = useRef(new Map<string, HTMLDivElement>())
 
   // Reset local state when dialog opens with new props
   useEffect(() => {
     if (open) {
-      setGroups(initialGroups.map((g) => ({ ...g, indices: [...g.indices] })))
-      setLabels({ ...initialLabels })
+      const nextDraftState = createDraftState(initialGroups, initialLabels)
+      setGroups(nextDraftState.groups)
+      setJoints(nextDraftState.joints)
       setEditingJoint(null)
       setEditingGroup(null)
       setAssigningJoint(null)
@@ -158,17 +241,35 @@ export function JointConfigDefaultsEditor({
     }
   }, [open, initialGroups, initialLabels])
 
-  const allGroupedIndices = new Set(groups.flatMap((g) => g.indices))
-  const allKnownIndices = Object.keys(labels).map(Number).sort((a, b) => a - b)
-  const ungroupedIndices = allKnownIndices.filter((i) => !allGroupedIndices.has(i))
+  useEffect(() => {
+    if (!editingGroup) {
+      return
+    }
 
-  const resolveLabel = useCallback(
-    (idx: number) => labels[String(idx)] ?? OBSERVATION_LABELS[idx] ?? `Ch ${idx}`,
-    [labels],
+    const groupElement = groupRefs.current.get(editingGroup)
+    groupElement?.scrollIntoView({ block: 'nearest' })
+  }, [editingGroup, groups])
+
+  const groupedJointIds = new Set(groups.flatMap((group) => group.jointIds))
+  const ungroupedJointIds = Object.values(joints)
+    .filter((joint) => !groupedJointIds.has(joint.id))
+    .sort((left, right) => left.index - right.index)
+    .map((joint) => joint.id)
+
+  const duplicateIndices = Object.entries(
+    Object.values(joints).reduce<Record<number, number>>((counts, joint) => {
+      counts[joint.index] = (counts[joint.index] ?? 0) + 1
+      return counts
+    }, {}),
   )
+    .filter(([, count]) => count > 1)
+    .map(([index]) => Number(index))
+    .sort((left, right) => left - right)
 
-  const handleEditJointLabel = (idx: number, label: string) => {
-    setLabels((prev) => ({ ...prev, [String(idx)]: label }))
+  const hasDuplicateIndices = duplicateIndices.length > 0
+
+  const handleEditJointLabel = (jointId: string, label: string) => {
+    setJoints((prev) => ({ ...prev, [jointId]: { ...prev[jointId], label } }))
     setEditingJoint(null)
   }
 
@@ -183,71 +284,55 @@ export function JointConfigDefaultsEditor({
 
   const handleAddGroup = () => {
     _groupCounter++
-    const newGroup: JointGroup = {
+    const newGroup: DraftGroup = {
       id: `custom-${Date.now()}-${_groupCounter}`,
       label: 'New Group',
-      indices: [],
+      jointIds: [],
     }
     setGroups((prev) => [...prev, newGroup])
+    setEditingGroup(newGroup.id)
   }
 
-  const handleAssignJoint = (jointIdx: number, groupId: string) => {
+  const handleAssignJoint = (jointId: string, groupId: string) => {
     setGroups((prev) =>
       prev.map((g) => {
-        if (g.id === groupId) return { ...g, indices: [...g.indices, jointIdx] }
-        return { ...g, indices: g.indices.filter((i) => i !== jointIdx) }
+        if (g.id === groupId) return { ...g, jointIds: [...g.jointIds.filter((id) => id !== jointId), jointId] }
+        return { ...g, jointIds: g.jointIds.filter((id) => id !== jointId) }
       }),
     )
     setAssigningJoint(null)
   }
 
-  const handleUnassignJoint = (jointIdx: number) => {
+  const handleUnassignJoint = (jointId: string) => {
     setGroups((prev) =>
       prev.map((g) => ({
         ...g,
-        indices: g.indices.filter((i) => i !== jointIdx),
+        jointIds: g.jointIds.filter((id) => id !== jointId),
       })),
     )
   }
 
-  const handleMoveJoint = (jointIdx: number, toGroupId: string) => {
+  const handleMoveJoint = (jointId: string, toGroupId: string) => {
     setGroups((prev) =>
       prev.map((g) => {
-        if (g.id === toGroupId) return { ...g, indices: [...g.indices, jointIdx] }
-        return { ...g, indices: g.indices.filter((i) => i !== jointIdx) }
+        if (g.id === toGroupId) return { ...g, jointIds: [...g.jointIds.filter((id) => id !== jointId), jointId] }
+        return { ...g, jointIds: g.jointIds.filter((id) => id !== jointId) }
       }),
     )
     setMovingJoint(null)
   }
 
-  const handleEditIndex = (oldIdx: number, newIdx: number) => {
-    const allIndices = new Set(groups.flatMap((g) => g.indices))
-    const ungrouped = Object.keys(labels).map(Number).filter((i) => !allIndices.has(i))
-    const allUsed = new Set([...allIndices, ...ungrouped])
-    if (newIdx === oldIdx || allUsed.has(newIdx)) {
-      setEditingIndex(null)
-      return
-    }
-    setGroups((prev) =>
-      prev.map((g) => ({
-        ...g,
-        indices: g.indices.map((i) => (i === oldIdx ? newIdx : i)),
-      })),
-    )
-    setLabels((prev) => {
-      const next = { ...prev }
-      const label = next[String(oldIdx)]
-      if (label !== undefined) {
-        delete next[String(oldIdx)]
-        next[String(newIdx)] = label
-      }
-      return next
-    })
+  const handleEditIndex = (jointId: string, newIdx: number) => {
+    setJoints((prev) => ({ ...prev, [jointId]: { ...prev[jointId], index: newIdx } }))
     setEditingIndex(null)
   }
 
   const handleSave = () => {
-    onSave({ groups, labels })
+    if (hasDuplicateIndices) {
+      return
+    }
+
+    onSave(buildPersistedConfig(groups, joints))
   }
 
   const handleCancel = () => {
@@ -255,12 +340,14 @@ export function JointConfigDefaultsEditor({
   }
 
   const handleReset = () => {
-    setGroups(JOINT_GROUPS.map((g) => ({ ...g, indices: [...g.indices] })))
-    const builtInLabels: Record<string, string> = {}
-    for (const [k, v] of Object.entries(OBSERVATION_LABELS)) {
-      builtInLabels[String(k)] = v
-    }
-    setLabels(builtInLabels)
+    const nextDraftState = createDraftState(JOINT_GROUPS, createBuiltInLabels())
+    setGroups(nextDraftState.groups)
+    setJoints(nextDraftState.joints)
+    setEditingJoint(null)
+    setEditingGroup(null)
+    setAssigningJoint(null)
+    setMovingJoint(null)
+    setEditingIndex(null)
   }
 
   return (
@@ -276,10 +363,30 @@ export function JointConfigDefaultsEditor({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 pr-4">
-          <div className="flex flex-col gap-4 py-2">
+        {hasDuplicateIndices && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              One or more joint labels now share the same index. Fix duplicate indices before saving.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <ScrollArea data-testid="joint-config-scroll-area" className="flex-1 min-h-0">
+          <div className="flex flex-col gap-4 py-2 pr-4">
             {groups.map((group) => (
-              <div key={group.id} className="rounded-lg border p-3">
+              <div
+                key={group.id}
+                ref={(element) => {
+                  if (element) {
+                    groupRefs.current.set(group.id, element)
+                    return
+                  }
+
+                  groupRefs.current.delete(group.id)
+                }}
+                className="rounded-lg border p-3"
+              >
                 <div className="flex items-center justify-between mb-2">
                   {editingGroup === group.id ? (
                     <InlineEditField
@@ -313,16 +420,18 @@ export function JointConfigDefaultsEditor({
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {group.indices.map((idx) => (
+                  {group.jointIds.map((jointId) => {
+                    const joint = joints[jointId]
+                    return (
                     <div
-                      key={idx}
+                      key={jointId}
                       className="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 text-xs rounded border border-current/20 group/chip"
-                      style={{ color: getJointColor(idx, colors) }}
+                      style={{ color: getJointColor(joint.index, colors) }}
                     >
-                      {editingIndex === idx ? (
+                      {editingIndex === jointId ? (
                         <IndexEditField
-                          value={idx}
-                          onCommit={(val) => handleEditIndex(idx, val)}
+                          value={joint.index}
+                          onCommit={(val) => handleEditIndex(jointId, val)}
                           onCancel={() => setEditingIndex(null)}
                         />
                       ) : (
@@ -330,35 +439,35 @@ export function JointConfigDefaultsEditor({
                           data-testid="joint-index"
                           className="text-[10px] font-mono bg-current/10 rounded px-1 cursor-pointer hover:bg-current/20"
                           aria-label="Edit joint index"
-                          onClick={() => setEditingIndex(idx)}
+                          onClick={() => setEditingIndex(jointId)}
                         >
-                          {idx}
+                          {joint.index}
                         </button>
                       )}
                       <span
                         data-joint-color
                         className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: getJointColor(idx, colors) }}
+                        style={{ backgroundColor: getJointColor(joint.index, colors) }}
                       />
-                      {editingJoint === idx ? (
+                      {editingJoint === jointId ? (
                         <InlineEditField
-                          value={resolveLabel(idx)}
-                          onCommit={(val) => handleEditJointLabel(idx, val)}
+                          value={joint.label}
+                          onCommit={(val) => handleEditJointLabel(jointId, val)}
                           onCancel={() => setEditingJoint(null)}
                         />
                       ) : (
-                        <span>{resolveLabel(idx)}</span>
+                        <span>{joint.label}</span>
                       )}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-4 w-4 opacity-0 group-hover/chip:opacity-100 transition-opacity"
                         aria-label="Edit joint label"
-                        onClick={() => setEditingJoint(idx)}
+                        onClick={() => setEditingJoint(jointId)}
                       >
                         <Pencil className="h-2.5 w-2.5" />
                       </Button>
-                      {movingJoint === idx ? (
+                      {movingJoint === jointId ? (
                         <div data-testid="group-picker" className="flex gap-1">
                           {groups
                             .filter((g) => g.id !== group.id)
@@ -368,7 +477,7 @@ export function JointConfigDefaultsEditor({
                                 variant="outline"
                                 size="sm"
                                 className="h-5 text-[10px] px-1.5"
-                                onClick={() => handleMoveJoint(idx, g.id)}
+                                onClick={() => handleMoveJoint(jointId, g.id)}
                               >
                                 {g.label}
                               </Button>
@@ -388,7 +497,7 @@ export function JointConfigDefaultsEditor({
                           size="icon"
                           className="h-4 w-4 opacity-0 group-hover/chip:opacity-100 transition-opacity"
                           aria-label="Move to group"
-                          onClick={() => setMovingJoint(idx)}
+                          onClick={() => setMovingJoint(jointId)}
                         >
                           <ArrowRightLeft className="h-2.5 w-2.5" />
                         </Button>
@@ -398,20 +507,21 @@ export function JointConfigDefaultsEditor({
                         size="icon"
                         className="h-4 w-4 opacity-0 group-hover/chip:opacity-100 transition-opacity"
                         aria-label="Remove joint from group"
-                        onClick={() => handleUnassignJoint(idx)}
+                        onClick={() => handleUnassignJoint(jointId)}
                       >
                         <Trash2 className="h-2.5 w-2.5" />
                       </Button>
                     </div>
-                  ))}
-                  {group.indices.length === 0 && (
+                    )
+                  })}
+                  {group.jointIds.length === 0 && (
                     <span className="text-xs text-muted-foreground italic">No joints assigned</span>
                   )}
                 </div>
               </div>
             ))}
 
-            {ungroupedIndices.length > 0 && (
+            {ungroupedJointIds.length > 0 && (
               <>
                 <Separator />
                 <div data-testid="ungrouped-joints" className="rounded-lg border border-dashed p-3">
@@ -419,16 +529,18 @@ export function JointConfigDefaultsEditor({
                     Ungrouped Joints
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {ungroupedIndices.map((idx) => (
+                    {ungroupedJointIds.map((jointId) => {
+                      const joint = joints[jointId]
+                      return (
                       <div
-                        key={idx}
+                        key={jointId}
                         className="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 text-xs rounded border border-current/20 group/chip"
-                        style={{ color: getJointColor(idx, colors) }}
+                        style={{ color: getJointColor(joint.index, colors) }}
                       >
-                        {editingIndex === idx ? (
+                        {editingIndex === jointId ? (
                           <IndexEditField
-                            value={idx}
-                            onCommit={(val) => handleEditIndex(idx, val)}
+                            value={joint.index}
+                            onCommit={(val) => handleEditIndex(jointId, val)}
                             onCancel={() => setEditingIndex(null)}
                           />
                         ) : (
@@ -436,35 +548,35 @@ export function JointConfigDefaultsEditor({
                             data-testid="joint-index"
                             className="text-[10px] font-mono bg-current/10 rounded px-1 cursor-pointer hover:bg-current/20"
                             aria-label="Edit joint index"
-                            onClick={() => setEditingIndex(idx)}
+                            onClick={() => setEditingIndex(jointId)}
                           >
-                            {idx}
+                            {joint.index}
                           </button>
                         )}
                         <span
                           data-joint-color
                           className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: getJointColor(idx, colors) }}
+                          style={{ backgroundColor: getJointColor(joint.index, colors) }}
                         />
-                        {editingJoint === idx ? (
+                        {editingJoint === jointId ? (
                           <InlineEditField
-                            value={resolveLabel(idx)}
-                            onCommit={(val) => handleEditJointLabel(idx, val)}
+                            value={joint.label}
+                            onCommit={(val) => handleEditJointLabel(jointId, val)}
                             onCancel={() => setEditingJoint(null)}
                           />
                         ) : (
-                          <span>{resolveLabel(idx)}</span>
+                          <span>{joint.label}</span>
                         )}
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-4 w-4 opacity-0 group-hover/chip:opacity-100 transition-opacity"
                           aria-label="Edit joint label"
-                          onClick={() => setEditingJoint(idx)}
+                          onClick={() => setEditingJoint(jointId)}
                         >
                           <Pencil className="h-2.5 w-2.5" />
                         </Button>
-                        {assigningJoint === idx ? (
+                        {assigningJoint === jointId ? (
                           <div className="flex gap-1">
                             {groups.map((g) => (
                               <Button
@@ -472,7 +584,7 @@ export function JointConfigDefaultsEditor({
                                 variant="outline"
                                 size="sm"
                                 className="h-5 text-[10px] px-1.5"
-                                onClick={() => handleAssignJoint(idx, g.id)}
+                                onClick={() => handleAssignJoint(jointId, g.id)}
                               >
                                 {g.label}
                               </Button>
@@ -484,18 +596,20 @@ export function JointConfigDefaultsEditor({
                             size="icon"
                             className="h-4 w-4 opacity-0 group-hover/chip:opacity-100 transition-opacity"
                             aria-label="Assign to group"
-                            onClick={() => setAssigningJoint(idx)}
+                            onClick={() => setAssigningJoint(jointId)}
                           >
                             <Plus className="h-2.5 w-2.5" />
                           </Button>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </>
             )}
           </div>
+          <ScrollBar data-testid="joint-config-scrollbar" forceMount />
         </ScrollArea>
 
         <DialogFooter className="flex items-center justify-between gap-2 pt-4">
@@ -510,7 +624,7 @@ export function JointConfigDefaultsEditor({
             <Button variant="ghost" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+            <Button size="sm" onClick={handleSave} disabled={isSaving || hasDuplicateIndices}>
               {isSaving ? 'Saving…' : 'Save'}
             </Button>
           </div>

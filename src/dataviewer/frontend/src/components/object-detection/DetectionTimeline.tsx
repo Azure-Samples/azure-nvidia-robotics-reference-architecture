@@ -66,7 +66,7 @@ export function DetectionTimeline({
           const height = densityMap.maxCount > 0 ? (count / densityMap.maxCount) * 100 : 0;
           return (
             <div
-              key={i}
+              key={`density-${frameIdx}`}
               className="absolute bottom-0 bg-blue-500/50 hover:bg-blue-500/70 transition-colors"
               style={{
                 left: `${(frameIdx / totalFrames) * 100}%`,

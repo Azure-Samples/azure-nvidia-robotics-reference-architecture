@@ -11,6 +11,8 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   } as unknown as typeof ResizeObserver
+
+  Element.prototype.scrollIntoView = vi.fn()
 })
 
 afterEach(cleanup)
@@ -47,6 +49,13 @@ describe('JointConfigDefaultsEditor', () => {
   it('renders dialog when open', () => {
     render(<JointConfigDefaultsEditor {...baseProps} />)
     expect(screen.getByText('Joint Configuration Defaults')).toBeInTheDocument()
+  })
+
+  it('renders a dedicated scroll region for the dialog body', () => {
+    render(<JointConfigDefaultsEditor {...baseProps} />)
+    const scrollArea = screen.getByTestId('joint-config-scroll-area')
+    expect(scrollArea).toBeInTheDocument()
+    expect(scrollArea.querySelector('[data-radix-scroll-area-viewport]')).not.toBeNull()
   })
 
   it('does not render dialog content when closed', () => {
@@ -98,11 +107,15 @@ describe('JointConfigDefaultsEditor', () => {
     expect(screen.getByText('Custom Group')).toBeInTheDocument()
   })
 
-  it('allows adding a new group', async () => {
+  it('scrolls a new group into view and opens it for rename', async () => {
     const user = userEvent.setup()
+    const scrollIntoView = vi.mocked(Element.prototype.scrollIntoView)
     render(<JointConfigDefaultsEditor {...baseProps} />)
+
     await user.click(screen.getByText('Add Group'))
-    expect(screen.getByText('New Group')).toBeInTheDocument()
+
+    expect(screen.getByDisplayValue('New Group')).toBeInTheDocument()
+    expect(scrollIntoView).toHaveBeenCalled()
   })
 
   it('allows deleting a group', async () => {
@@ -222,15 +235,15 @@ describe('JointConfigDefaultsEditor', () => {
       expect(indexBadges[0].textContent).toBe('0')
     })
 
-    it('allows editing a joint index', async () => {
+    it('commits a joint index edit when the field loses focus after a valid change', async () => {
       const user = userEvent.setup()
       render(<JointConfigDefaultsEditor {...baseProps} />)
       const editIndexButtons = screen.getAllByLabelText('Edit joint index')
       await user.click(editIndexButtons[0])
       const input = screen.getByRole('spinbutton')
       await user.clear(input)
-      await user.type(input, '20{Enter}')
-      // Verify the index changed
+      await user.type(input, '20')
+      await user.tab()
       const indexBadges = screen.getAllByTestId('joint-index')
       expect(indexBadges[0].textContent).toBe('20')
     })
@@ -254,18 +267,34 @@ describe('JointConfigDefaultsEditor', () => {
       expect(savedConfig.labels['42']).toBe('Right X')
     })
 
-    it('prevents duplicate indices', async () => {
+    it('shows a blocking warning when duplicate indices are introduced', async () => {
       const user = userEvent.setup()
       render(<JointConfigDefaultsEditor {...baseProps} />)
-      // Try to change index 0 to 1 (already exists)
       const editIndexButtons = screen.getAllByLabelText('Edit joint index')
       await user.click(editIndexButtons[0])
       const input = screen.getByRole('spinbutton')
       await user.clear(input)
       await user.type(input, '1{Enter}')
-      // Should show error or revert — index 0 should remain
-      const indexBadges = screen.getAllByTestId('joint-index')
-      expect(indexBadges[0].textContent).toBe('0')
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'One or more joint labels now share the same index. Fix duplicate indices before saving.',
+      )
+      expect(screen.getByText('Save')).toBeDisabled()
+    })
+
+    it('does not save while duplicate indices remain', async () => {
+      const user = userEvent.setup()
+      const onSave = vi.fn()
+      render(<JointConfigDefaultsEditor {...baseProps} onSave={onSave} />)
+
+      const editIndexButtons = screen.getAllByLabelText('Edit joint index')
+      await user.click(editIndexButtons[0])
+      const input = screen.getByRole('spinbutton')
+      await user.clear(input)
+      await user.type(input, '1{Enter}')
+
+      await user.click(screen.getByText('Save'))
+      expect(onSave).not.toHaveBeenCalled()
     })
   })
 })

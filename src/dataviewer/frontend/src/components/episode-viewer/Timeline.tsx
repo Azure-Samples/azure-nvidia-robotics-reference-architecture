@@ -236,9 +236,9 @@ export function Timeline({ className }: TimelineProps) {
         onMouseMove={handleMouseMove}
       >
         {/* Removed frame ranges - shown as striped red overlay */}
-        {removedFrameRanges.map(([start, end], idx) => (
+        {removedFrameRanges.map(([start, end]) => (
           <div
-            key={`removed-${idx}`}
+            key={`removed-${start}-${end}`}
             className="absolute top-0 bottom-0 bg-red-500/20 border-l border-r border-red-500/40"
             style={{
               left: `${frameToPercent(start)}%`,
@@ -250,12 +250,12 @@ export function Timeline({ className }: TimelineProps) {
         ))}
 
         {/* Data quality issue ranges */}
-        {dataQualityIssues.map((issue, idx) => {
+        {dataQualityIssues.map((issue) => {
           if (!issue.affectedFrames) return null;
           const [start, end] = issue.affectedFrames;
           return (
             <div
-              key={`issue-${idx}`}
+              key={`issue-${issue.type}-${issue.severity}-${start}-${end}`}
               className={cn(
                 'absolute top-0 bottom-0 opacity-30',
                 issue.severity === 'critical'

@@ -54,7 +54,7 @@ export function IssueList({ issues, onRemove, onSeek }: IssueListProps) {
     <div className="space-y-2 max-h-48 overflow-y-auto">
       {issues.map((issue, index) => (
         <div
-          key={index}
+          key={`${issue.type}-${issue.severity}-${issue.affectedFrames?.join('-') ?? 'na'}-${issue.notes ?? 'no-notes'}`}
           className={cn(
             'flex items-start gap-2 p-2 rounded-md border',
             severityColors[issue.severity]

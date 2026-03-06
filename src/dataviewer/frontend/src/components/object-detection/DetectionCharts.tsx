@@ -98,8 +98,8 @@ export function DetectionCharts({ summary }: DetectionChartsProps) {
                   }
                   labelLine={false}
                 >
-                  {classData.map((_, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                  {classData.map((entry, index) => (
+                    <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
