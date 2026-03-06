@@ -97,6 +97,15 @@ export const useJointConfigStore = create<JointConfigStore>()(
       moveJoint: (jointIndex, fromGroupId, toGroupId, toPosition) => {
         const { config } = get()
         const groups = config.groups.map((g) => {
+          if (fromGroupId === toGroupId && g.id === fromGroupId) {
+            const oldPos = g.indices.indexOf(jointIndex)
+            if (oldPos === -1 || oldPos === toPosition) return g
+            const filtered = g.indices.filter((i) => i !== jointIndex)
+            // Adjust insert position: if dragged from before the target, target shifts down
+            const insertAt = oldPos < toPosition ? toPosition - 1 : toPosition
+            filtered.splice(insertAt, 0, jointIndex)
+            return { ...g, indices: filtered }
+          }
           if (g.id === fromGroupId) {
             return { ...g, indices: g.indices.filter((i) => i !== jointIndex) }
           }
