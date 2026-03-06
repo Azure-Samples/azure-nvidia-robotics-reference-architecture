@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ViewerDisplayControls } from '@/components/viewer-display';
-import { buildCssFilter } from '@/lib/css-filters';
+import { combineCssFilters } from '@/lib/css-filters';
 import { computeEffectiveFps, computeSyncAction } from '@/lib/playback-utils';
 import {
   useDatasetStore,
@@ -53,11 +53,15 @@ export function AnnotationWorkspace() {
   const { isDirty: hasEdits } = useEditDirtyState();
   const { currentFrame, isPlaying, playbackSpeed, setCurrentFrame, togglePlayback, setPlaybackSpeed } = usePlaybackControls();
   const { displayAdjustment, isActive: displayActive } = useViewerDisplay();
+  const globalTransform = useEditStore((state) => state.globalTransform);
 
-  // CSS filter for non-destructive viewer display adjustments
+  // Combined CSS filter: viewer display adjustments + edit color transforms
   const displayFilter = useMemo(
-    () => (displayActive ? buildCssFilter(displayAdjustment) : undefined),
-    [displayAdjustment, displayActive],
+    () => combineCssFilters(
+      displayAdjustment, displayActive,
+      globalTransform?.colorAdjustment, globalTransform?.colorFilter,
+    ),
+    [displayAdjustment, displayActive, globalTransform?.colorAdjustment, globalTransform?.colorFilter],
   );
 
   // Initialize edit store when dataset/episode changes
@@ -422,6 +426,13 @@ export function AnnotationWorkspace() {
                     {isInsertedFrame && (
                       <div className="absolute top-2 left-2 bg-blue-500/80 text-white text-xs px-2 py-1 rounded">
                         Interpolated Frame
+                      </div>
+                    )}
+
+                    {/* Resize output indicator */}
+                    {globalTransform?.resize && (
+                      <div className="absolute top-2 right-2 bg-green-600/80 text-white text-xs px-2 py-1 rounded">
+                        Output: {globalTransform.resize.width} × {globalTransform.resize.height}
                       </div>
                     )}
                   </div>
