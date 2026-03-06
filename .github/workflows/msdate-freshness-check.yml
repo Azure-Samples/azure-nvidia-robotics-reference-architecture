@@ -59,12 +59,23 @@ jobs:
         run: |
           Install-Module -Name PowerShell-Yaml -Force -Scope CurrentUser
 
+      - name: Check PowerShell Version
+        run: |
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Write-Host "OS: $($PSVersionTable.OS)"
+
       - name: Run ms.date Freshness Check
         run: |
-          $cmd = "& scripts/linting/Invoke-MsDateFreshnessCheck.ps1 -ThresholdDays ${{ inputs.staleness-threshold-days }}"
-          if ('${{ inputs.changed-files-only }}' -eq 'true') { $cmd += ' -ChangedFilesOnly' }
-          if ('${{ inputs.soft-fail }}' -eq 'true') { $cmd += ' -SoftFail' }
-          Invoke-Expression $cmd
+          $scriptArgs = @{
+            ThresholdDays = ${{ inputs.staleness-threshold-days }}
+          }
+          if ('${{ inputs.changed-files-only }}' -eq 'true') {
+            $scriptArgs['ChangedFilesOnly'] = $true
+          }
+          if ('${{ inputs.soft-fail }}' -eq 'true') {
+            $scriptArgs['SoftFail'] = $true
+          }
+          & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 @scriptArgs
 
       - name: Upload freshness check results
         if: always()
