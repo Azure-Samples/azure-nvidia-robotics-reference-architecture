@@ -1,154 +1,198 @@
 /**
  * Joint selector for trajectory visualization.
+ *
+ * Renders grouped toggle chips organized by actuator category,
+ * with per-group and global selection controls.
  */
 
-import { Check,ChevronDown } from 'lucide-react';
-import { useEffect,useRef, useState } from 'react';
+import { cn } from '@/lib/utils'
 
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-
-// Labels for bimanual task-space observations
-const OBSERVATION_LABELS: Record<number, string> = {
-  0: 'Right X',
-  1: 'Right Y',
-  2: 'Right Z',
-  3: 'Right Qx',
-  4: 'Right Qy',
-  5: 'Right Qz',
-  6: 'Right Qw',
-  7: 'Right Gripper',
-  8: 'Left X',
-  9: 'Left Y',
-  10: 'Left Z',
-  11: 'Left Qx',
-  12: 'Left Qy',
-  13: 'Left Qz',
-  14: 'Left Qw',
-  15: 'Left Gripper',
-};
+import {
+  getJointColor,
+  getJointLabel,
+  JOINT_GROUPS,
+  type JointGroup,
+} from './joint-constants'
 
 interface JointSelectorProps {
-  /** Total number of joints available */
-  jointCount: number;
-  /** Currently selected joint indices */
-  selectedJoints: number[];
-  /** Callback when selection changes */
-  onSelectJoints: (joints: number[]) => void;
-  /** Color palette for joints */
-  colors: string[];
+  jointCount: number
+  selectedJoints: number[]
+  onSelectJoints: (joints: number[]) => void
+  colors: string[]
+  groups?: JointGroup[]
 }
 
-/**
- * Multi-select dropdown for choosing which joints to display.
- */
 export function JointSelector({
   jointCount,
   selectedJoints,
   onSelectJoints,
   colors,
+  groups = JOINT_GROUPS,
 }: JointSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const toggleJoint = (jointIdx: number) => {
     if (selectedJoints.includes(jointIdx)) {
-      onSelectJoints(selectedJoints.filter((j) => j !== jointIdx));
+      onSelectJoints(selectedJoints.filter((j) => j !== jointIdx))
     } else {
-      onSelectJoints([...selectedJoints, jointIdx].sort((a, b) => a - b));
+      onSelectJoints([...selectedJoints, jointIdx].sort((a, b) => a - b))
     }
-  };
+  }
 
   const selectAll = () => {
-    onSelectJoints(Array.from({ length: jointCount }, (_, i) => i));
-  };
+    onSelectJoints(Array.from({ length: jointCount }, (_, i) => i))
+  }
 
   const clearAll = () => {
-    onSelectJoints([]);
-  };
+    onSelectJoints([])
+  }
+
+  const toggleGroup = (indices: number[]) => {
+    const valid = indices.filter((i) => i < jointCount)
+    const allSelected = valid.every((i) => selectedJoints.includes(i))
+    if (allSelected) {
+      onSelectJoints(selectedJoints.filter((j) => !valid.includes(j)))
+    } else {
+      const merged = new Set([...selectedJoints, ...valid])
+      onSelectJoints([...merged].sort((a, b) => a - b))
+    }
+  }
 
   if (jointCount === 0) {
     return (
       <span className="text-sm text-muted-foreground">No joints available</span>
-    );
+    )
   }
 
+  // Build visible groups filtered to valid indices
+  const allGroupedIndices = new Set(groups.flatMap((g) => g.indices))
+  const visibleGroups = groups
+    .map((g) => ({ ...g, indices: g.indices.filter((i) => i < jointCount) }))
+    .filter((g) => g.indices.length > 0)
+
+  // Collect ungrouped joints into an "Other" section
+  const otherIndices = Array.from({ length: jointCount }, (_, i) => i).filter(
+    (i) => !allGroupedIndices.has(i),
+  )
+
   return (
-    <div className="relative" ref={dropdownRef}>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2"
-      >
-        <span>
-          {selectedJoints.length} / {jointCount} Joints
-        </span>
-        <ChevronDown
+    <div className="flex flex-col gap-1">
+      {/* Global controls */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={selectAll}
           className={cn(
-            'h-4 w-4 transition-transform',
-            isOpen && 'rotate-180'
+            'px-2 py-0.5 text-xs rounded border transition-colors',
+            selectedJoints.length === jointCount
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-muted text-muted-foreground border-transparent hover:border-border',
           )}
-        />
-      </Button>
+        >
+          All
+        </button>
+        <button
+          onClick={clearAll}
+          className={cn(
+            'px-2 py-0.5 text-xs rounded border transition-colors',
+            selectedJoints.length === 0
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-muted text-muted-foreground border-transparent hover:border-border',
+          )}
+        >
+          None
+        </button>
+      </div>
 
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] bg-popover border rounded-md shadow-lg">
-          {/* Quick actions */}
-          <div className="flex gap-2 p-2 border-b">
-            <button
-              onClick={selectAll}
-              className="text-xs text-primary hover:underline"
+      {/* Grouped joint sections */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {visibleGroups.map((group) => {
+          const allActive = group.indices.every((i) => selectedJoints.includes(i))
+          return (
+            <div
+              key={group.id}
+              data-testid={`joint-group-${group.id}`}
+              className="flex items-center gap-1"
             >
-              Select All
-            </button>
-            <span className="text-muted-foreground">|</span>
-            <button
-              onClick={clearAll}
-              className="text-xs text-primary hover:underline"
-            >
-              Clear
-            </button>
-          </div>
-
-          {/* Joint list */}
-          <div className="max-h-48 overflow-y-auto">
-            {Array.from({ length: jointCount }, (_, idx) => (
               <button
-                key={idx}
-                onClick={() => toggleJoint(idx)}
-                className="w-full px-3 py-2 flex items-center gap-2 hover:bg-accent transition-colors"
-              >
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: colors[idx % colors.length] }}
-                />
-                <span className="flex-1 text-left text-sm">
-                  {OBSERVATION_LABELS[idx] || `Channel ${idx}`}
-                </span>
-                {selectedJoints.includes(idx) && (
-                  <Check className="h-4 w-4 text-primary" />
+                onClick={() => toggleGroup(group.indices)}
+                className={cn(
+                  'text-xs font-medium transition-colors whitespace-nowrap',
+                  allActive
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
                 )}
+              >
+                {group.label}
               </button>
-            ))}
+              {group.indices.map((idx) => {
+                const isSelected = selectedJoints.includes(idx)
+                const color = getJointColor(idx, colors)
+                return (
+                  <button
+                    key={idx}
+                    data-joint-chip
+                    onClick={() => toggleJoint(idx)}
+                    className={cn(
+                      'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-all',
+                      isSelected
+                        ? 'border-current font-medium'
+                        : 'border-transparent opacity-40 hover:opacity-70',
+                    )}
+                    style={{ color }}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    {getJointLabel(idx)}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
+
+        {otherIndices.length > 0 && (
+          <div
+            data-testid="joint-group-other"
+            className="flex items-center gap-1"
+          >
+            <button
+              onClick={() => toggleGroup(otherIndices)}
+              className={cn(
+                'text-xs font-medium transition-colors whitespace-nowrap',
+                otherIndices.every((i) => selectedJoints.includes(i))
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Other
+            </button>
+            {otherIndices.map((idx) => {
+              const isSelected = selectedJoints.includes(idx)
+              const color = getJointColor(idx, colors)
+              return (
+                <button
+                  key={idx}
+                  data-joint-chip
+                  onClick={() => toggleJoint(idx)}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-all',
+                    isSelected
+                      ? 'border-current font-medium'
+                      : 'border-transparent opacity-40 hover:opacity-70',
+                  )}
+                  style={{ color }}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                  />
+                  {getJointLabel(idx)}
+                </button>
+              )
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  );
+  )
 }

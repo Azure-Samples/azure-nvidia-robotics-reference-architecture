@@ -3,6 +3,14 @@
  */
 
 export { CameraSelector } from './CameraSelector';
+export {
+  getJointColor,
+  getJointLabel,
+  JOINT_COLORS,
+  JOINT_GROUPS,
+  type JointGroup,
+  OBSERVATION_LABELS,
+} from './joint-constants';
 export { JointSelector } from './JointSelector';
 export { PlaybackControls } from './PlaybackControls';
 export { Timeline } from './Timeline';
