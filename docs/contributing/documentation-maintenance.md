@@ -2,7 +2,7 @@
 title: Documentation Maintenance Policy
 description: Update triggers, ownership, review criteria, freshness policy, and release lifecycle for project documentation
 author: Microsoft Robotics-AI Team
-ms.date: 2026-03-05
+ms.date: 2026-03-06
 ms.topic: reference
 keywords:
   - documentation
@@ -71,7 +71,28 @@ Documentation freshness is tracked through the `ms.date` frontmatter field.
 * Report stale or inaccurate content using the [documentation issue template](https://github.com/Azure-Samples/azure-nvidia-robotics-reference-architecture/issues/new?template=05-documentation.yml). Include the file path and a description of the inaccuracy.
 
 > [!NOTE]
-> Automated `ms.date` freshness checking runs weekly via the [ms.date Freshness Check workflow](../../.github/workflows/msdate-freshness-check.yml). Files with `ms.date` older than 90 days are flagged in the workflow summary.
+> Automated `ms.date` freshness checking runs in three contexts:
+>
+> * **Weekly scans**: [weekly-validation.yml](../../.github/workflows/weekly-validation.yml) runs every Monday at 9 AM UTC, checking all markdown files and failing on stale documentation (90+ days since last update)
+> * **Pull request checks**: [pr-validation.yml](../../.github/workflows/pr-validation.yml) checks only modified files during PR review, providing warnings without blocking merges
+> * **Manual runs**: Trigger via GitHub Actions UI on weekly-validation.yml or pr-validation.yml workflows
+>
+> When stale files are detected:
+>
+> * Weekly runs trigger GitHub notifications and appear in the repository's Actions tab
+> * PR runs add warnings to the job summary visible in PR checks
+> * Download artifacts (msdate-freshness-results.json) or view job summaries for detailed file lists
+
+### Fixing Stale Documentation
+
+When files exceed the 90-day freshness threshold:
+
+1. Review the file content for accuracy and relevance
+2. Update any outdated information, links, or examples
+3. Update the `ms.date` field in frontmatter to today's date (YYYY-MM-DD format)
+4. Commit changes with a descriptive message referencing the content updates
+
+The `ms.date` field should be updated on every substantive content edit, not just when flagged by the freshness check. This tracking helps readers assess documentation currency.
 
 ## PR Documentation Requirements
 

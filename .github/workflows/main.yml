@@ -120,16 +120,6 @@ jobs:
       security-events: write
       actions: read
 
-  # Weekly ms.date freshness validation
-  msdate-freshness-weekly:
-    name: Weekly ms.date Freshness Check
-    uses: ./.github/workflows/msdate-freshness-check.yml
-    with:
-      staleness-threshold-days: 90
-      soft-fail: true
-    permissions:
-      contents: read
-
   # Automated release PR management via release-please
   release-please:
     needs:
