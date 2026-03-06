@@ -11,6 +11,7 @@ export {
   type JointGroup,
   OBSERVATION_LABELS,
 } from './joint-constants';
+export { JointConfigDefaultsEditor } from './JointConfigDefaultsEditor';
 export { JointSelector } from './JointSelector';
 export { PlaybackControls } from './PlaybackControls';
 export { Timeline } from './Timeline';

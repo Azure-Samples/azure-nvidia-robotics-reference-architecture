@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect } from 'react'
 
+import { mutationHeaders } from '@/lib/api-client'
 import { useDatasetStore } from '@/stores'
 import { type JointConfig, useJointConfigStore } from '@/stores/joint-config-store'
 
@@ -34,10 +35,10 @@ async function fetchJointConfig(datasetId: string): Promise<JointConfig> {
   return transformResponse(await res.json())
 }
 
-async function saveJointConfig(datasetId: string, config: JointConfig): Promise<JointConfig> {
+export async function saveJointConfigApi(datasetId: string, config: JointConfig): Promise<JointConfig> {
   const res = await fetch(`${API_BASE}/datasets/${datasetId}/joint-config`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await mutationHeaders()) },
     body: JSON.stringify(toApiPayload(config)),
   })
   if (!res.ok) throw new Error('Failed to save joint config')
@@ -50,10 +51,10 @@ async function fetchJointConfigDefaults(): Promise<JointConfig> {
   return transformResponse(await res.json())
 }
 
-async function saveJointConfigDefaults(config: JointConfig): Promise<JointConfig> {
+export async function saveJointConfigDefaultsApi(config: JointConfig): Promise<JointConfig> {
   const res = await fetch(`${API_BASE}/joint-config/defaults`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await mutationHeaders()) },
     body: JSON.stringify(toApiPayload(config)),
   })
   if (!res.ok) throw new Error('Failed to save joint config defaults')
@@ -94,7 +95,7 @@ export function useSaveJointConfig() {
   const mutation = useMutation({
     mutationFn: () => {
       if (!currentDataset) throw new Error('No dataset selected')
-      return saveJointConfig(currentDataset.id, config)
+      return saveJointConfigApi(currentDataset.id, config)
     },
     onSuccess: () => {
       if (currentDataset) {
@@ -124,7 +125,7 @@ export function useSaveJointConfigDefaults() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (config: JointConfig) => saveJointConfigDefaults(config),
+    mutationFn: (config: JointConfig) => saveJointConfigDefaultsApi(config),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jointConfigKeys.defaults() })
     },

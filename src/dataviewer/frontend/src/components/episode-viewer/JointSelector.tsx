@@ -20,6 +20,7 @@ import {
 import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import * as ContextMenu from '@radix-ui/react-context-menu'
+import { Settings } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ interface JointSelectorProps {
   onCreateGroup?: (label: string, jointIndices: number[]) => void
   onDeleteGroup?: (groupId: string) => void
   onMoveJoint?: (jointIndex: number, fromGroupId: string, toGroupId: string, toPosition: number) => void
+  onOpenDefaults?: () => void
 }
 
 function InlineEdit({
@@ -211,6 +213,7 @@ export function JointSelector({
   onCreateGroup,
   onDeleteGroup,
   onMoveJoint,
+  onOpenDefaults,
 }: JointSelectorProps) {
   const [editingJoint, setEditingJoint] = useState<number | null>(null)
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
@@ -426,9 +429,17 @@ export function JointSelector({
           >
             None
           </button>
+          {onOpenDefaults && (
+            <button
+              onClick={onOpenDefaults}
+              className="px-1.5 py-0.5 text-xs rounded border transition-colors bg-muted text-muted-foreground border-transparent hover:border-border"
+              aria-label="Edit joint defaults"
+              title="Edit joint defaults"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-
-        {/* Grouped joint sections — each group is a droppable container */}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           {visibleGroups.map((group) => (
             <DroppableGroup
