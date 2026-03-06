@@ -58,6 +58,24 @@ describe('joint-config-store', () => {
     expect(leftGroup.indices).toEqual([2, 3, 4, 5])
   })
 
+  it('reorders a joint within the same group', () => {
+    useJointConfigStore.getState().setConfig(defaultConfig)
+    // Move joint 0 to position 2 within right-pos [0,1,2] → [1,0,2]
+    useJointConfigStore.getState().moveJoint(0, 'right-pos', 'right-pos', 2)
+    const state = useJointConfigStore.getState().config
+    const rightGroup = state.groups.find((g) => g.id === 'right-pos')!
+    expect(rightGroup.indices).toEqual([1, 0, 2])
+  })
+
+  it('moves a joint to the end within the same group', () => {
+    useJointConfigStore.getState().setConfig(defaultConfig)
+    // Move joint 0 to the end within right-pos [0,1,2] → [1,2,0]
+    useJointConfigStore.getState().moveJoint(0, 'right-pos', 'right-pos', 3)
+    const state = useJointConfigStore.getState().config
+    const rightGroup = state.groups.find((g) => g.id === 'right-pos')!
+    expect(rightGroup.indices).toEqual([1, 2, 0])
+  })
+
   it('creates a new group and removes joints from existing groups', () => {
     useJointConfigStore.getState().setConfig(defaultConfig)
     useJointConfigStore.getState().createGroup('Custom Group', [1, 4])
