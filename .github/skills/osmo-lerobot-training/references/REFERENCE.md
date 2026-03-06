@@ -79,6 +79,7 @@ step:10000 smpl:320000 ep:5000 epch:78.12 loss:0.1234 grdn:1.5678 lr:1.0000e-04 
 ```
 
 Key fields to monitor:
+
 - `step` / total steps = completion percentage
 - `loss` trending downward = convergence
 - `lr` should be `1e-04` (not `1e-05`, which indicates the learning rate fix is missing)
@@ -138,6 +139,7 @@ python scripts/run-local-lerobot-inference.py \
 ```
 
 Local inference handles:
+
 - Auto-download from AzureML model registry via `--model-name`/`--model-version`
 - Stripping incompatible config fields (`use_peft`, `pretrained_path`) from older checkpoints
 - Loading normalizer stats from preprocessor safetensors files
@@ -147,6 +149,7 @@ Local inference handles:
 ### Inference Output
 
 Inference produces:
+
 - Per-episode `.npz` files with predicted/ground_truth/inference_times arrays
 - Per-episode trajectory plots (action deltas, summary panel)
 - Aggregate `eval_results.json` with MSE, MAE, throughput metrics
@@ -169,6 +172,7 @@ nohup scripts/poll-and-eval-checkpoints.sh \
 ```
 
 The poller:
+
 - Polls AzureML every `--poll-interval` seconds for new versions of `--model-name`
 - Submits `submit-osmo-lerobot-inference.sh` for each new version
 - Caps concurrent inference workflows at `--max-concurrent`
@@ -208,7 +212,7 @@ If the deep link does not load (portal prompts for sign-in), navigate to `https:
 
 ### Training Metrics Navigation
 
-```
+```text
 1. mcp_playwright_browser_navigate  → experiment page URL
 2. mcp_playwright_browser_snapshot  → locate run table; most recent run is first row
 3. mcp_playwright_browser_click     → click run name link (first row)
@@ -230,7 +234,7 @@ Expected metrics in the Metrics pane:
 
 ### Inference Job Plots Navigation
 
-```
+```text
 1. mcp_playwright_browser_navigate  → inference experiment page URL
 2. mcp_playwright_browser_snapshot  → locate run table; latest run = most recently submitted checkpoint eval
 3. mcp_playwright_browser_click     → click run name link (first row)
@@ -259,9 +263,11 @@ osmo workflow query <inference-workflow-id>
 When the checkpoint poller is active, new inference runs appear in AzureML after each `--save-freq` interval. Workflow to track progress:
 
 1. Check the poller log for newly submitted inference workflows:
+
    ```bash
    tail -n 30 /tmp/<model-name>-eval.log | grep -E "Submitting|Workflow ID|version"
    ```
+
 2. Refresh the inference experiment page by calling `mcp_playwright_browser_navigate` again with the same URL.
 3. The new run will appear at the top of the run table — click it → **Images** tab → screenshot.
 4. Repeat after each new checkpoint is registered (every `--save-freq` training steps).
@@ -345,6 +351,7 @@ The training wrapper (`train.py`) scans for new checkpoints every 60 seconds and
 ### Spot GPU Eviction
 
 Training on spot instances may be interrupted by VM eviction. The training pipeline is designed for resilience:
+
 - Checkpoints already registered to AzureML survive eviction
 - The latest registered model version is available for inference regardless of training completion
 - Resubmit the same job to continue from the next unregistered step
@@ -383,6 +390,7 @@ action_np = action.squeeze(0).cpu().numpy()
 ### Checkpoint Compatibility
 
 Older checkpoints may have incompatible `config.json` fields or missing normalizer buffers:
+
 - Strip `use_peft`, `pretrained_path`, `peft_config` from config.json before loading
 - Load normalizer stats from `policy_preprocessor_step_3_normalizer_processor.safetensors` into policy buffers
 - The local inference script handles both automatically

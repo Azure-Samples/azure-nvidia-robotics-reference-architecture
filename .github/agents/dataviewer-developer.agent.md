@@ -88,7 +88,7 @@ When the user asks to browse or inspect the app:
 
 For scrolling the episode sidebar:
 
-```
+```javascript
 browser_evaluate: () => {
   const list = document.querySelector('aside ul');
   if (list) { list.scrollTop = N; return 'Scrolled'; }
@@ -98,7 +98,7 @@ browser_evaluate: () => {
 
 For jumping to a specific frame via the slider:
 
-```
+```javascript
 browser_evaluate: () => {
   const slider = document.querySelector('input[type="range"]');
   const setter = Object.getOwnPropertyDescriptor(
@@ -112,7 +112,7 @@ browser_evaluate: () => {
 
 For scrolling to a specific section (e.g., Episode Labels):
 
-```
+```javascript
 browser_evaluate: () => {
   const h3 = Array.from(document.querySelectorAll('h3'))
     .find(el => el.textContent.includes('Episode Labels'));

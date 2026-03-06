@@ -21,8 +21,8 @@ The agent does NOT need to pass `--azure-subscription-id`, `--azure-resource-gro
 
 Datasets available in Azure Blob Storage for training and inference:
 
-| Dataset           | Blob Prefix       | Robot | Episodes | Frames | FPS | Action Dims | Camera Key                     |
-| ----------------- | ----------------- | ----- | -------- | ------ | --- | ----------- | ------------------------------ |
+| Dataset          | Blob Prefix      | Robot | Episodes | Frames | FPS | Action Dims | Camera Key                     |
+| ---------------- | ---------------- | ----- | -------- | ------ | --- | ----------- | ------------------------------ |
 | `ur10e_episodes` | `ur10e_episodes` | UR10e | 64       | 20,251 | 30  | 6           | `observation.images.il-camera` |
 
 When a user references a known dataset by name, auto-populate `--from-blob`, `--storage-account`, `--blob-prefix`, and `--no-val-split`.

@@ -113,7 +113,7 @@ After every successful training or inference submission, open the OSMO workflow 
 
 **Example — after training submission output:**
 
-```
+```text
 Workflow ID - lerobot-training-31
 Workflow Overview - http://10.0.5.7/workflows/lerobot-training-31
 ```
@@ -122,7 +122,7 @@ Open: `http://10.0.5.7/workflows/lerobot-training-31`
 
 **Example — after inference submission output:**
 
-```
+```text
 Workflow ID - lerobot-inference-20
 Workflow Overview - http://10.0.5.7/workflows/lerobot-inference-20
 ```
@@ -140,9 +140,11 @@ After submitting a training job, and whenever the background eval poller reports
 After the training job is submitted, navigate to the training experiment page and open the **Metrics** tab:
 
 1. Construct the experiment URL from Azure environment variables in `scripts/.env`:
-   ```
+
+   ```text
    https://ml.azure.com/experiments/{experiment_name}?wsid=/subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/{AZUREML_WORKSPACE_NAME}
    ```
+
 2. Call `mcp_playwright_browser_navigate` with that URL.
 3. Call `mcp_playwright_browser_snapshot` to confirm the page loaded and identify the latest run row in the table.
 4. Click the first (most recent) run link.
@@ -161,13 +163,17 @@ Refresh by calling `mcp_playwright_browser_navigate` again on the same URL at an
 While the background eval poller is running, monitor the poller log and navigate to Azure ML to view trajectory plots as each inference job completes:
 
 1. Tail the poller log to detect a new inference submission:
+
    ```bash
    tail -n 30 /tmp/<model-name>-eval.log | grep -E "Submitting|Workflow ID"
    ```
+
 2. Construct the inference experiment URL using the `--experiment-name` passed to the poller:
-   ```
+
+   ```text
    https://ml.azure.com/experiments/{inference_experiment_name}?wsid=/subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP}/providers/Microsoft.MachineLearningServices/workspaces/{AZUREML_WORKSPACE_NAME}
    ```
+
 3. Call `mcp_playwright_browser_navigate` with that URL.
 4. Call `mcp_playwright_browser_snapshot` to identify the latest run row (most recently submitted checkpoint eval).
 5. Click that run.
@@ -224,7 +230,6 @@ While the background eval poller is running, monitor the poller log and navigate
 | Max concurrent | `--max-concurrent` | `2` | Max simultaneous inference workflows |
 
 ### GPU Configuration Guidelines
-
 
 | GPU | VRAM | Recommended Batch Size | Notes |
 |-----|------|----------------------|-------|

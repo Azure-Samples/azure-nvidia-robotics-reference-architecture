@@ -37,7 +37,7 @@ cd src/dataviewer && HMI_DATA_PATH=/path/to/datasets ./start.sh
 
 After confirming both services are running (look for `[OK] Backend is healthy` in terminal output), open the frontend in VS Code's SimpleBrowser using the `open_browser_page` tool:
 
-```
+```text
 open_browser_page("http://localhost:5173")
 ```
 
@@ -66,7 +66,7 @@ Playwright runs in **headless mode** so it does not open a separate browser wind
 
 Before issuing any browser actions, always load the Playwright tools with:
 
-```
+```text
 tool_search_tool_regex("playwright|browser_snapshot|browser_navigate|browser_click|browser_type")
 ```
 

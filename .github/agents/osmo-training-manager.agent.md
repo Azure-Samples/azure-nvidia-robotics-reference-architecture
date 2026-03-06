@@ -59,12 +59,12 @@ Submit a LeRobot training workflow to OSMO using the submission script.
    - Learning rate: `1e-4`
    - Save frequency: `10000`
    - Validation split: disabled (`--no-val-split`) for blob datasets
-2. Generate unique, descriptive names using the dataset name and date:
+5. Generate unique, descriptive names using the dataset name and date:
    - Job name: `{dataset}-act-train-{MMDD}` (e.g., `my-robot-act-train-0303`)
    - Experiment name: `{dataset}-act-training-{MMDD}`
    - Model registration name: `{dataset}-act-model-{MMDD}`
-3. If the user specifies blob storage, confirm storage account and blob prefix.
-4. Present the configuration summary and confirm with the user before submission.
+6. If the user specifies blob storage, confirm storage account and blob prefix.
+7. Present the configuration summary and confirm with the user before submission.
 
 #### Step 3: Submit Workflow
 
@@ -84,12 +84,14 @@ Stream logs and check workflow status on demand.
 #### Step 1: Check Workflow Status
 
 Run `osmo workflow list` to find the workflow, then parse the status. Report:
+
 - Workflow status (pending, running, completed, failed, cancelled)
 - Time elapsed since submission
 
 #### Step 2: Tail Logs for Progress
 
 Run `osmo workflow logs <workflow-id> 2>&1 | tail -30` to get recent output. Parse for:
+
 - Current training step vs total steps → completion percentage
 - Loss value trend (should be decreasing)
 - Learning rate (verify `1e-04` not `1e-05`)
@@ -159,6 +161,7 @@ runs = mlflow.search_runs(
 ```
 
 Analyze for:
+
 - Final training loss and convergence trend
 - Learning rate confirmation (`1e-04` not `1e-05`)
 - System resource utilization patterns
@@ -176,7 +179,7 @@ osmo workflow logs <workflow-id> 2>&1 | grep -E "loss:|Registered|step:"
 
 Present a summary combining OSMO execution data and Azure ML metrics:
 
-**Training Summary**
+### Training Summary
 
 - **Job Details**: Workflow ID, dataset, policy type, duration, status
 - **Configuration**: Steps, batch size, learning rate, save frequency
@@ -235,12 +238,14 @@ Report the output directory with plots and metrics.
 #### Step 4: Interpret Results
 
 When inference completes, analyze the evaluation metrics:
+
 - MSE and MAE (lower is better; MSE < 0.001 indicates good fit for normalized actions)
 - Throughput (Hz) vs dataset FPS (must exceed FPS for real-time capability)
 - Per-dimension MAE distribution (identifies which action dimensions are hardest)
 - Compare across checkpoints if multiple versions were evaluated
 
 Suggest next steps:
+
 - If loss is still decreasing and metrics are mediocre → train longer
 - If metrics are good → model is ready for deployment
 - If specific dimensions have high error → dataset may need more demonstrations for those motions
