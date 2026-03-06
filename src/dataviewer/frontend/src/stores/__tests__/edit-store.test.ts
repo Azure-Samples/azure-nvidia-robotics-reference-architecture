@@ -285,6 +285,34 @@ describe('useEditStore', () => {
       expect(useEditStore.getState().removedFrames.size).toBe(0)
       expect(useEditStore.getState().isDirty).toBe(false)
     })
+
+    it('resetEdits clears subtasks, transforms, and trajectory adjustments', () => {
+      useEditStore.getState().initializeEdit('ds-1', 0)
+
+      useEditStore.getState().setGlobalTransform({
+        colorAdjustment: { brightness: 0.5 },
+      })
+      useEditStore.getState().addSubtaskFromRange(10, 50)
+      useEditStore.getState().insertFrame(3)
+      useEditStore.getState().setTrajectoryAdjustment(7, {
+        rightArmDelta: [0.1, 0, 0],
+      })
+
+      expect(useEditStore.getState().isDirty).toBe(true)
+      expect(useEditStore.getState().subtasks).toHaveLength(1)
+      expect(useEditStore.getState().globalTransform).not.toBeNull()
+      expect(useEditStore.getState().insertedFrames.size).toBe(1)
+      expect(useEditStore.getState().trajectoryAdjustments.size).toBe(1)
+
+      useEditStore.getState().resetEdits()
+
+      expect(useEditStore.getState().isDirty).toBe(false)
+      expect(useEditStore.getState().subtasks).toHaveLength(0)
+      expect(useEditStore.getState().globalTransform).toBeNull()
+      expect(useEditStore.getState().insertedFrames.size).toBe(0)
+      expect(useEditStore.getState().removedFrames.size).toBe(0)
+      expect(useEditStore.getState().trajectoryAdjustments.size).toBe(0)
+    })
   })
 
   describe('getEditOperations', () => {
