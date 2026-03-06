@@ -46,7 +46,7 @@ async function getCsrfToken(): Promise<string> {
   return _csrfTokenFetch;
 }
 
-async function mutationHeaders(): Promise<Record<string, string>> {
+export async function mutationHeaders(): Promise<Record<string, string>> {
   return { 'X-CSRF-Token': await getCsrfToken() };
 }
 

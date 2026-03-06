@@ -19,13 +19,14 @@ import {
   YAxis,
 } from 'recharts';
 
-import { useSaveJointConfig } from '@/hooks/use-joint-config'
+import { useJointConfigDefaults, useSaveJointConfig, useSaveJointConfigDefaults } from '@/hooks/use-joint-config'
 import { cn } from '@/lib/utils'
 import { useEpisodeStore } from '@/stores'
 import { useTrajectoryAdjustmentState } from '@/stores/edit-store'
 import { useJointConfigStore } from '@/stores/joint-config-store'
 
 import { getJointLabel, JOINT_COLORS } from './joint-constants'
+import { JointConfigDefaultsEditor } from './JointConfigDefaultsEditor'
 import { JointSelector } from './JointSelector'
 
 /**
@@ -74,9 +75,12 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
   const deleteGroup = useJointConfigStore((state) => state.deleteGroup);
   const moveJoint = useJointConfigStore((state) => state.moveJoint);
   const { save: saveJointConfig } = useSaveJointConfig();
+  const { data: defaults } = useJointConfigDefaults();
+  const saveDefaults = useSaveJointConfigDefaults();
 
   const [selectedJoints, setSelectedJoints] = useState<number[]>([0, 1, 2]);
   const [showVelocity, setShowVelocity] = useState(false);
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
 
   const withSave = useCallback(
     <T extends unknown[]>(fn: (...args: T) => void) =>
@@ -196,6 +200,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
           onCreateGroup={withSave(createGroup)}
           onDeleteGroup={withSave(deleteGroup)}
           onMoveJoint={withSave(moveJoint)}
+          onOpenDefaults={() => setDefaultsOpen(true)}
         />
         <div className="flex items-center gap-2">
           <button
@@ -277,6 +282,20 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      <JointConfigDefaultsEditor
+        open={defaultsOpen}
+        onOpenChange={setDefaultsOpen}
+        groups={defaults?.groups ?? jointConfig.groups}
+        labels={defaults?.labels ?? jointConfig.labels}
+        onSave={(config) => {
+          saveDefaults.mutate(
+            { datasetId: '_defaults', ...config },
+            { onSuccess: () => setDefaultsOpen(false) },
+          )
+        }}
+        isSaving={saveDefaults.isPending}
+      />
     </div>
   );
 });
