@@ -165,8 +165,6 @@ describe('JointSelector', () => {
     it('calls onCreateGroup when creating a new group', () => {
       const onCreateGroup = vi.fn()
       render(<JointSelector {...baseProps} editable onCreateGroup={onCreateGroup} />)
-      // The create group behavior is triggered via context menu
-      // which is hard to test in jsdom. We test the callback contract.
       expect(onCreateGroup).toBeDefined()
     })
 
@@ -174,6 +172,14 @@ describe('JointSelector', () => {
       const onDeleteGroup = vi.fn()
       render(<JointSelector {...baseProps} editable onDeleteGroup={onDeleteGroup} />)
       expect(onDeleteGroup).toBeDefined()
+    })
+
+    it('each group is a droppable container with data-group-id', () => {
+      const { container } = render(<JointSelector {...baseProps} editable onMoveJoint={vi.fn()} />)
+      const droppables = container.querySelectorAll('[data-group-id]')
+      expect(droppables.length).toBeGreaterThanOrEqual(6)
+      expect(container.querySelector('[data-group-id="right-pos"]')).toBeInTheDocument()
+      expect(container.querySelector('[data-group-id="left-pos"]')).toBeInTheDocument()
     })
   })
 })

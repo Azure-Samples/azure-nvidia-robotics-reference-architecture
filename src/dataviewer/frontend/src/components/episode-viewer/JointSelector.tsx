@@ -7,12 +7,13 @@
  */
 
 import {
-  closestCenter,
   DndContext,
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
   PointerSensor,
+  pointerWithin,
+  useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -169,6 +170,34 @@ function SortableChip({
   )
 }
 
+/** Droppable group container — each group is a separate drop target. */
+function DroppableGroup({
+  groupId,
+  children,
+  items,
+}: {
+  groupId: string
+  children: React.ReactNode
+  items: string[]
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `group-${groupId}` })
+
+  return (
+    <SortableContext items={items} strategy={horizontalListSortingStrategy}>
+      <div
+        ref={setNodeRef}
+        data-group-id={groupId}
+        className={cn(
+          'flex items-center gap-1 rounded px-0.5 transition-colors',
+          isOver && 'bg-accent/40',
+        )}
+      >
+        {children}
+      </div>
+    </SortableContext>
+  )
+}
+
 export function JointSelector({
   jointCount,
   selectedJoints,
@@ -232,21 +261,47 @@ export function JointSelector({
     setActiveId(event.active.id as string)
   }
 
+  const findGroupForJoint = useCallback(
+    (jointIdx: number): string | null => {
+      for (const g of groups) {
+        if (g.indices.includes(jointIdx)) return g.id
+      }
+      return null
+    },
+    [groups],
+  )
+
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null)
     const { active, over } = event
-    if (!over || active.id === over.id || !onMoveJoint) return
+    if (!over || !onMoveJoint) return
 
     const activeIdx = parseInt((active.id as string).replace('joint-', ''), 10)
-    const overIdx = parseInt((over.id as string).replace('joint-', ''), 10)
+    const overId = over.id as string
 
-    // Find source and target groups
-    const fromGroup = groups.find((g) => g.indices.includes(activeIdx))
-    const toGroup = groups.find((g) => g.indices.includes(overIdx))
-    if (!fromGroup || !toGroup) return
+    const fromGroupId = findGroupForJoint(activeIdx)
+    if (!fromGroupId) return
 
-    const toPosition = toGroup.indices.indexOf(overIdx)
-    onMoveJoint(activeIdx, fromGroup.id, toGroup.id, toPosition)
+    // Dropped on a group container
+    if (overId.startsWith('group-')) {
+      const toGroupId = overId.replace('group-', '')
+      if (fromGroupId === toGroupId) return
+      const toGroup = groups.find((g) => g.id === toGroupId)
+      onMoveJoint(activeIdx, fromGroupId, toGroupId, toGroup?.indices.length ?? 0)
+      return
+    }
+
+    // Dropped on another joint chip
+    if (overId.startsWith('joint-')) {
+      const overIdx = parseInt(overId.replace('joint-', ''), 10)
+      if (activeIdx === overIdx) return
+      const toGroupId = findGroupForJoint(overIdx)
+      if (!toGroupId) return
+      const toGroup = groups.find((g) => g.id === toGroupId)
+      if (!toGroup) return
+      const toPosition = toGroup.indices.indexOf(overIdx)
+      onMoveJoint(activeIdx, fromGroupId, toGroupId, toPosition)
+    }
   }
 
   if (jointCount === 0) {
@@ -261,11 +316,6 @@ export function JointSelector({
   const otherIndices = Array.from({ length: jointCount }, (_, i) => i).filter(
     (i) => !allGroupedIndices.has(i),
   )
-
-  const allSortableIds = visibleGroups
-    .flatMap((g) => g.indices)
-    .concat(otherIndices)
-    .map((i) => `joint-${i}`)
 
   const renderGroupLabel = (group: { id: string; label: string; indices: number[] }) => {
     const allActive = group.indices.every((i) => selectedJoints.includes(i))
@@ -349,7 +399,7 @@ export function JointSelector({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -380,17 +430,26 @@ export function JointSelector({
           </button>
         </div>
 
-        {/* Grouped joint sections */}
+        {/* Grouped joint sections — each group is a droppable container */}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <SortableContext items={allSortableIds} strategy={horizontalListSortingStrategy}>
-            {visibleGroups.map((group) => (
-              <div key={group.id} data-testid={`joint-group-${group.id}`} className="flex items-center gap-1">
+          {visibleGroups.map((group) => (
+            <DroppableGroup
+              key={group.id}
+              groupId={group.id}
+              items={group.indices.map((i) => `joint-${i}`)}
+            >
+              <div data-testid={`joint-group-${group.id}`} className="flex items-center gap-1">
                 {renderGroupLabel(group)}
                 {renderChips(group.indices)}
               </div>
-            ))}
+            </DroppableGroup>
+          ))}
 
-            {otherIndices.length > 0 && (
+          {otherIndices.length > 0 && (
+            <DroppableGroup
+              groupId="other"
+              items={otherIndices.map((i) => `joint-${i}`)}
+            >
               <div data-testid="joint-group-other" className="flex items-center gap-1">
                 <button
                   onClick={() => toggleGroup(otherIndices)}
@@ -405,8 +464,8 @@ export function JointSelector({
                 </button>
                 {renderChips(otherIndices)}
               </div>
-            )}
-          </SortableContext>
+            </DroppableGroup>
+          )}
         </div>
       </div>
 
