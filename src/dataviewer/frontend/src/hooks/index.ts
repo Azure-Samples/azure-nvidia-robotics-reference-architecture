@@ -7,7 +7,9 @@ export {
   useDataset,
   useEpisodes,
   useEpisode,
+  useCapabilities,
   datasetKeys,
+  capabilityKeys,
 } from './use-datasets';
 
 export {

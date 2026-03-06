@@ -1,9 +1,15 @@
 """Pytest configuration and shared fixtures for integration tests."""
 
 import os
+from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 from fastapi.testclient import TestClient
+
+# Load .env from the backend directory so TEST_DATASET_ID and other
+# settings can be configured without hardcoding.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 TEST_DATASET_PATH = os.environ.get(
     "TEST_DATASET_PATH",
@@ -24,10 +30,10 @@ def disable_auth_for_tests():
 @pytest.fixture(scope="session")
 def test_dataset_path():
     """Absolute path to the directory containing the test LeRobot dataset."""
-    assert os.path.isdir(TEST_DATASET_PATH), f"Dataset base path not found: {TEST_DATASET_PATH}"
-    assert os.path.isdir(os.path.join(TEST_DATASET_PATH, TEST_DATASET_ID)), (
-        f"LeRobot dataset not found at {TEST_DATASET_PATH}/{TEST_DATASET_ID}"
-    )
+    if not os.path.isdir(TEST_DATASET_PATH):
+        pytest.skip(f"Dataset base path not found: {TEST_DATASET_PATH}")
+    if not os.path.isdir(os.path.join(TEST_DATASET_PATH, TEST_DATASET_ID)):
+        pytest.skip(f"LeRobot dataset not found at {TEST_DATASET_PATH}/{TEST_DATASET_ID}")
     return TEST_DATASET_PATH
 
 
