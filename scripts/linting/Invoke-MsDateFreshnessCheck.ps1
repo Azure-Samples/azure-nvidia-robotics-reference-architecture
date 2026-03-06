@@ -35,7 +35,7 @@ param(
     [int]$ThresholdDays = 90,
 
     [Parameter()]
-    [string[]]$Paths = @("$PWD"),
+    [string[]]$Paths = '.',
 
     [Parameter()]
     [switch]$ChangedFilesOnly,
