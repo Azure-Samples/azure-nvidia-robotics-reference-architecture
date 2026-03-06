@@ -55,7 +55,7 @@ describe('JointConfigDefaultsEditor', () => {
     render(<JointConfigDefaultsEditor {...baseProps} />)
     const scrollArea = screen.getByTestId('joint-config-scroll-area')
     expect(scrollArea).toBeInTheDocument()
-    expect(scrollArea.querySelector('[data-radix-scroll-area-viewport]')).not.toBeNull()
+    expect(scrollArea).toHaveClass('overflow-y-auto')
   })
 
   it('does not render dialog content when closed', () => {
