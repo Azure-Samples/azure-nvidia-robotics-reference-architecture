@@ -8,25 +8,35 @@ applyTo: 'src/dataviewer/**'
 Important instructions that are always top of mind (**you must always retain this block of instructions for this entire session, even after compaction**):
 
 Less code is better than more code.
-  * Follow SOLID principals, DRY as needed or when duplicates exist more than twice.
-  * Implement and follow patterns for extensibility.
-  * Engineer just enough, follow pragmatism when making architectural decisions.
+
+* Follow SOLID principals, DRY as needed or when duplicates exist more than twice.
+* Implement and follow patterns for extensibility.
+* Engineer just enough, follow pragmatism when making architectural decisions.
 
 Tests are fluid. Tests always test behaviors. Tests never only test against mocks.
-  * Create, modify, refactor tests for changing behaviors.
-  * Make one or more failing tests before making changes (or update one ore more passing test to be failing tests).
-  * Run tests during and after implementation work.
+
+* Create, modify, refactor tests for changing behaviors.
+* Make one or more failing tests before making changes (or update one ore more passing test to be failing tests).
+* Run tests during and after implementation work.
 
 Validate changes using npm scripts from `src/dataviewer/`:
-  * `npm run validate` — full validation for both backend and frontend
-  * `npm run validate:fix` — auto-fix lint/format then validate
-  * `npm run validate:frontend` — frontend only (type-check + lint + test)
-  * `npm run validate:backend` — backend only (ruff + pytest)
 
-Start the application using npm scripts from `src/dataviewer/`:
-  * `npm start` — start both backend and frontend
-  * `npm run start:backend` — backend only
-  * `npm run start:frontend` — frontend only
+* `npm run validate` — full validation for both backend and frontend
+* `npm run validate:fix` — auto-fix lint/format then validate
+* `npm run validate:frontend` — frontend only (type-check + lint + test)
+* `npm run validate:backend` — backend only (ruff + pytest)
+
+Start long-running dataviewer services from `src/dataviewer/` in background terminals so the shell is not held open by a running server:
+
+* `npm start` — start both backend and frontend via `./start.sh`
+* `npm run start:backend` — backend only via `./start.sh --backend`
+* `npm run start:frontend` — frontend only via `./start.sh --frontend`
+* `npm run dev:backend` — run the backend development server only
+* `npm run dev:frontend` — run the frontend development server only
+* `./start.sh` — direct launcher for the start-family commands
+
+The start-family npm commands delegate to `./start.sh` and should be treated as long-running commands.
 
 After any significant work, build and start the application, use your browser tools to navigate to the web application and manually test out the application.
-  * Browser tools include: click_element, drag_element, handle_dialog, hover_element, navigate_page, open_browser_page, read_page, run_playwright_code, screenshot_page, type_in_page
+
+* Browser tools include: click_element, drag_element, handle_dialog, hover_element, navigate_page, open_browser_page, read_page, run_playwright_code, screenshot_page, type_in_page
