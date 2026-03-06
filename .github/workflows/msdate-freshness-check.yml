@@ -18,10 +18,6 @@ on:
         required: false
         type: boolean
         default: false
-  pull_request:
-    paths:
-      - '.github/workflows/msdate-freshness-check.yml'
-      - 'scripts/linting/Invoke-MsDateFreshnessCheck.ps1'
   schedule:
     - cron: '0 9 * * 1'
 
