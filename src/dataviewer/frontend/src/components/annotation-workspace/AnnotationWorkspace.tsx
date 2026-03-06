@@ -398,7 +398,7 @@ export function AnnotationWorkspace() {
                     <Button
                       size="sm"
                       onClick={togglePlayback}
-                      className="gap-1"
+                      className="gap-1 min-w-[5rem]"
                     >
                       {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       {isPlaying ? 'Pause' : 'Play'}
@@ -553,18 +553,12 @@ export function AnnotationWorkspace() {
                   <Separator />
 
                   {/* Frame Removal Section */}
-                  <div>
-                    <h3 className="text-sm font-medium mb-3">Frame Removal</h3>
-                    <FrameRemovalToolbar />
-                  </div>
+                  <FrameRemovalToolbar />
 
                   <Separator />
 
                   {/* Frame Insertion Section */}
-                  <div>
-                    <h3 className="text-sm font-medium mb-3">Frame Insertion</h3>
-                    <FrameInsertionToolbar />
-                  </div>
+                  <FrameInsertionToolbar />
 
                   <Separator />
 
@@ -577,10 +571,7 @@ export function AnnotationWorkspace() {
                   <Separator />
 
                   {/* Color Adjustment Section */}
-                  <div>
-                    <h3 className="text-sm font-medium mb-3">Color Adjustments</h3>
-                    <ColorAdjustmentControls />
-                  </div>
+                  <ColorAdjustmentControls />
 
                   <Separator />
 

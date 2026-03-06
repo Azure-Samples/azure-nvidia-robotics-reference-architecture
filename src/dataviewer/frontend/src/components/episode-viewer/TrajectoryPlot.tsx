@@ -1,6 +1,6 @@
 /**
  * Trajectory visualization component showing joint positions over time.
- * 
+ *
  * Performance optimizations:
  * - CurrentFrameMarker is isolated to prevent full chart re-renders on frame changes
  * - Chart data is memoized based on trajectory data and velocity toggle
@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
  */
 const CurrentFrameMarker = memo(function CurrentFrameMarker() {
   const currentFrame = useEpisodeStore((state) => state.currentFrame);
-  
+
   return (
     <ReferenceLine
       x={currentFrame}
@@ -80,7 +80,7 @@ const JOINT_COLORS = [
 
 /**
  * Line chart showing joint positions over time with current frame marker.
- * 
+ *
  * Performance: Uses isolated CurrentFrameMarker to prevent full chart re-renders
  * when scrubbing through frames.
  *
@@ -185,8 +185,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      {/* Controls */}
-      <div className="flex items-center justify-between">
+      {/* Controls — z-10 establishes a stacking context above the chart SVG */}
+      <div className="relative z-10 flex items-center justify-between">
         <JointSelector
           jointCount={jointCount}
           selectedJoints={selectedJoints}
