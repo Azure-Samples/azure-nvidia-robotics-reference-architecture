@@ -188,9 +188,9 @@ For manual evaluation of specific checkpoints without the poller:
 | Mid-training (e.g., step 50,000) | ~50% completion                    | Convergence check — loss should be declining     |
 | Final (last registered version)  | After training completes           | Full evaluation — compare to earlier checkpoints |
 
-## AzureML Portal Navigation (Playwright)
+## AzureML Portal Navigation
 
-Step-by-step Playwright navigation for the Azure ML portal. Use these patterns to open training metrics and inference trajectory plots during active workflows.
+Step-by-step browser navigation for the Azure ML portal. Use these patterns to open training metrics and inference trajectory plots during active workflows.
 
 ### URL Construction
 
@@ -213,13 +213,13 @@ If the deep link does not load (portal prompts for sign-in), navigate to `https:
 ### Training Metrics Navigation
 
 ```text
-1. mcp_playwright_browser_navigate  → experiment page URL
-2. mcp_playwright_browser_snapshot  → locate run table; most recent run is first row
-3. mcp_playwright_browser_click     → click run name link (first row)
-4. mcp_playwright_browser_snapshot  → confirm run detail page (look for "Job detail" heading or run ID)
-5. mcp_playwright_browser_click     → click "Metrics" tab
-6. mcp_playwright_browser_snapshot  → confirm metric charts loaded (train/loss chart visible)
-7. mcp_playwright_browser_take_screenshot → show training curves to user
+1. navigate_page          → experiment page URL
+2. read_page              → locate run table; most recent run is first row
+3. click_element          → click run name link (first row)
+4. read_page              → confirm run detail page (look for "Job detail" heading or run ID)
+5. click_element          → click "Metrics" tab
+6. read_page              → confirm metric charts loaded (train/loss chart visible)
+7. screenshot_page        → show training curves to user
 ```
 
 Expected metrics in the Metrics pane:
@@ -235,13 +235,13 @@ Expected metrics in the Metrics pane:
 ### Inference Job Plots Navigation
 
 ```text
-1. mcp_playwright_browser_navigate  → inference experiment page URL
-2. mcp_playwright_browser_snapshot  → locate run table; latest run = most recently submitted checkpoint eval
-3. mcp_playwright_browser_click     → click run name link (first row)
-4. mcp_playwright_browser_snapshot  → confirm run detail page loaded
-5. mcp_playwright_browser_click     → click "Images" tab
-6. mcp_playwright_browser_snapshot  → confirm trajectory plot images have loaded
-7. mcp_playwright_browser_take_screenshot → show plots to user
+1. navigate_page          → inference experiment page URL
+2. read_page              → locate run table; latest run = most recently submitted checkpoint eval
+3. click_element          → click run name link (first row)
+4. read_page              → confirm run detail page loaded
+5. click_element          → click "Images" tab
+6. read_page              → confirm trajectory plot images have loaded
+7. screenshot_page        → show plots to user
 ```
 
 Expected images in the Images pane:
@@ -268,8 +268,8 @@ When the checkpoint poller is active, new inference runs appear in AzureML after
    tail -n 30 /tmp/<model-name>-eval.log | grep -E "Submitting|Workflow ID|version"
    ```
 
-2. Refresh the inference experiment page by calling `mcp_playwright_browser_navigate` again with the same URL.
-3. The new run will appear at the top of the run table — click it → **Images** tab → screenshot.
+2. Refresh the inference experiment page by calling `navigate_page` again with the same URL.
+3. The new run will appear at the top of the run table — click it with `click_element` → **Images** tab → `screenshot_page`.
 4. Repeat after each new checkpoint is registered (every `--save-freq` training steps).
 
 ## Azure ML Metric Retrieval

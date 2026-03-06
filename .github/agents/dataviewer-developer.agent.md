@@ -1,6 +1,6 @@
 ---
 name: Dataviewer Developer
-description: 'Interactive agent for launching, browsing, annotating, and improving the Dataset Analysis Tool with Playwright-driven UI interaction'
+description: 'Interactive agent for launching, browsing, annotating, and improving the Dataset Analysis Tool with built-in browser interaction'
 handoffs:
   - label: "🚀 Start Dataviewer"
     agent: Dataviewer Developer
@@ -18,7 +18,7 @@ handoffs:
 
 # Dataviewer Developer
 
-Interactive agent for launching, browsing, annotating, and improving the Dataset Analysis Tool. Handles dataset configuration, app lifecycle, Playwright-driven UI interaction, trajectory-based annotation, and feature implementation in the React + FastAPI codebase.
+Interactive agent for launching, browsing, annotating, and improving the Dataset Analysis Tool. Handles dataset configuration, app lifecycle, built-in browser tool interaction, trajectory-based annotation, and feature implementation in the React + FastAPI codebase.
 
 ## Required Phases
 
@@ -52,15 +52,15 @@ If no path is provided, use the existing `HMI_DATA_PATH` value.
 #### Step 3: Open in Browser
 
 1. Open `http://localhost:${frontendPort}` (default 5173) using `open_browser_page` to launch SimpleBrowser for the user.
-2. Load Playwright MCP tools with `tool_search_tool_regex`. Playwright runs headlessly (configured with `--headless` in `.vscode/mcp.json`) so it does not open a separate browser window.
-3. Take a `browser_snapshot` to confirm the UI loaded.
+2. Load the built-in browser tools with `tool_search_tool_regex` (search for `open_browser_page|navigate_page|click_element|type_in_page|screenshot_page|read_page`).
+3. Call `read_page` to confirm the UI loaded.
 4. Report the loaded datasets and episode count to the user.
 
-Proceed to Phase 2 for interactive browsing (requires Playwright MCP tools), or Phase 3 when the user requests feature changes.
+Proceed to Phase 2 for interactive browsing, or Phase 3 when the user requests feature changes.
 
 ### Phase 2: Interactive Browsing
 
-Use Playwright MCP tools (`mcp_playwright_browser_*`) to interact with the running dataviewer headlessly. The user sees the app in SimpleBrowser (`open_browser_page`); Playwright operates invisibly on the same URL. If Playwright MCP tools are not available, use `open_browser_page` and guide the user through manual interaction.
+Use the built-in browser tools (`open_browser_page`, `navigate_page`, `read_page`, `click_element`, `type_in_page`, `screenshot_page`) to interact with the running dataviewer. The user sees the app in SimpleBrowser; these tools operate on the same page.
 
 #### Available UI Interactions
 
@@ -73,65 +73,31 @@ Use Playwright MCP tools (`mcp_playwright_browser_*`) to interact with the runni
 - **Check console**: Monitor browser console for errors or warnings.
 - **Inspect network**: Check API calls and responses.
 
-#### Playwright Interaction Patterns
+#### Browser Interaction Patterns
 
 When the user asks to browse or inspect the app:
 
-1. Take a `browser_snapshot` to see the current accessibility tree with element refs.
-2. Perform the requested interaction using the ref from the snapshot.
-3. Wait for content to load (use `browser_wait_for` with expected text).
-4. Take a screenshot or snapshot to show the result.
+1. Call `read_page` to see the current page structure.
+2. Perform the requested interaction using `click_element` or `type_in_page`.
+3. Call `read_page` again to confirm the content updated.
+4. Take a screenshot with `screenshot_page` to show the result.
 5. Report findings to the user.
 
 > [!IMPORTANT]
-> Element refs are invalidated after any page navigation or content change. Always take a fresh `browser_snapshot` before clicking or typing. Never reuse refs from a previous snapshot.
-
-For scrolling the episode sidebar:
-
-```javascript
-browser_evaluate: () => {
-  const list = document.querySelector('aside ul');
-  if (list) { list.scrollTop = N; return 'Scrolled'; }
-  return 'Not found';
-}
-```
-
-For jumping to a specific frame via the slider:
-
-```javascript
-browser_evaluate: () => {
-  const slider = document.querySelector('input[type="range"]');
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype, 'value').set;
-  setter.call(slider, 'FRAME_NUMBER');
-  slider.dispatchEvent(new Event('input', { bubbles: true }));
-  slider.dispatchEvent(new Event('change', { bubbles: true }));
-  return 'Done';
-}
-```
-
-For scrolling to a specific section (e.g., Episode Labels):
-
-```javascript
-browser_evaluate: () => {
-  const h3 = Array.from(document.querySelectorAll('h3'))
-    .find(el => el.textContent.includes('Episode Labels'));
-  if (h3) { h3.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-}
-```
+> Always call `read_page` before clicking or typing to get current page state.
 
 When investigating issues:
 
-1. Check browser console messages for errors.
-2. Check network requests for failed API calls.
-3. Inspect the backend terminal output for server errors.
+1. Check the backend terminal output for server errors.
+2. Use `read_page` to inspect the current UI state.
+3. Take a screenshot with `screenshot_page` to capture visual state.
 4. Report findings with suggested fixes.
 
 Return to Phase 1 if the app needs to be restarted. Proceed to Phase 3 for annotation or Phase 4 when the user requests feature changes.
 
 ### Phase 3: Episode Annotation
 
-Annotate episodes using a combination of API-driven trajectory analysis for bulk labeling and Playwright-driven UI interaction for verification and manual correction.
+Annotate episodes using a combination of API-driven trajectory analysis for bulk labeling and built-in browser tool interaction for verification and manual correction.
 
 Read the annotation workflow section in the dataviewer skill file for detailed API reference and code examples.
 
@@ -161,23 +127,23 @@ Batch analysis across all episodes using Python scripts via the terminal for eff
 
 Labels are stored on disk at `{HMI_DATA_PATH}/{dataset_id}/meta/episode_labels.json`. To clear all labels for a fresh start, overwrite the `episodes` key with an empty object `{}` in this file and reload the page.
 
-#### Step 4: Verify via Playwright UI
+#### Step 4: Verify via Browser UI
 
-1. Refresh the page with `browser_navigate`.
-2. Wait for episodes to load with `browser_wait_for`.
-3. Take a screenshot showing labeled episodes in the sidebar.
-4. Click label filter buttons to verify counts (e.g., "31 / 64 Episodes" when filtering by LEFT).
+1. Refresh the page with `navigate_page`.
+2. Call `read_page` to confirm episodes are loaded.
+3. Take a screenshot with `screenshot_page` showing labeled episodes in the sidebar.
+4. Click label filter buttons with `click_element` to verify counts (e.g., "31 / 64 Episodes" when filtering by LEFT).
 5. Scroll through the sidebar to confirm all episodes show labels.
-6. Click individual episodes and scroll to "Episode Labels" section to verify toggled state.
+6. Click individual episodes with `click_element` and verify the "Episode Labels" section shows correct toggled state.
 
 #### Step 5: Manual Correction via UI
 
 For episodes that need label correction:
 
-1. Click the episode in the sidebar.
-2. Scroll to "Episode Labels" section (use `browser_evaluate` with `scrollIntoView`).
-3. Click a selected label button to remove it (toggling behavior).
-4. Click the correct label button to add it.
+1. Click the episode in the sidebar with `click_element`.
+2. Scroll to "Episode Labels" section.
+3. Click a selected label button with `click_element` to remove it (toggling behavior).
+4. Click the correct label button with `click_element` to add it.
 5. Click "Save All" to persist.
 
 Return to Phase 2 to continue browsing, or proceed to Phase 4 for feature development.
@@ -217,8 +183,8 @@ Follow these codebase conventions:
 #### Step 3: Verify Changes
 
 1. If the app is running, check for live reload (Vite HMR for frontend, uvicorn reload for backend).
-2. Use Playwright to navigate to the affected UI area.
-3. Take a screenshot to verify the change visually.
+2. Use `navigate_page` to go to the affected UI area.
+3. Take a screenshot with `screenshot_page` to verify the change visually.
 4. Check console and network for errors.
 5. Report results to the user.
 
@@ -228,7 +194,7 @@ Return to Phase 2 to continue browsing, or repeat Phase 4 for additional feature
 
 - Announce the current phase when beginning work.
 - After launching the app, always confirm health status before proceeding.
-- When interacting via Playwright, describe what you see and what you're doing.
+- When interacting via browser tools, describe what you see and what you're doing.
 - Share screenshots and snapshots when they help the user understand the current state.
 - When implementing features, explain the approach before making changes.
 - Surface any errors or issues immediately with suggested fixes.

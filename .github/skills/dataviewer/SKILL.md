@@ -41,52 +41,33 @@ After confirming both services are running (look for `[OK] Backend is healthy` i
 open_browser_page("http://localhost:5173")
 ```
 
-SimpleBrowser is the primary visual interface for the user. All Playwright automation operates headlessly in the background — the user sees results in SimpleBrowser.
+SimpleBrowser is the primary visual interface for the user. The built-in browser tools operate on the same page the user sees.
 
 If a non-default `FRONTEND_PORT` was set, substitute that port instead of `5173`.
 
-### Step 3 — Load the Playwright MCP tools
+### Step 3 — Load the built-in browser tools
 
-Playwright runs in **headless mode** so it does not open a separate browser window. All visual feedback goes through SimpleBrowser (Step 2). The Playwright MCP server must be declared in `.vscode/mcp.json` with the `--headless` flag:
-
-```json
-// .vscode/mcp.json
-{
-  "servers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest", "--headless"]
-    }
-  }
-}
-```
-
-> [!IMPORTANT]
-> The `--headless` flag is required. Without it, Playwright opens a separate Chromium window instead of working invisibly behind SimpleBrowser.
-
-Before issuing any browser actions, always load the Playwright tools with:
+Before issuing any browser actions, load the built-in browser tools with:
 
 ```text
-tool_search_tool_regex("playwright|browser_snapshot|browser_navigate|browser_click|browser_type")
+tool_search_tool_regex("open_browser_page|navigate_page|click_element|type_in_page|screenshot_page|read_page")
 ```
 
-If the search returns no results the MCP server has not started. Ask the user to open the VS Code Command Palette and run **MCP: Start Server** → **playwright**, then retry the search.
+### Step 4 — Interact via built-in browser tools
 
-### Step 4 — Interact via Playwright MCP
+The built-in browser tools operate on the SimpleBrowser page. API-driven changes (labels, annotations) appear immediately on refresh.
 
-Playwright operates headlessly on the same URL as SimpleBrowser. Both see the same backend state, so API-driven changes (labels, annotations) appear in both.
+Use the following tools for all UI interaction:
 
-Once the tools are available, use the following patterns for all UI interaction:
+| Action                | Built-in Tool     | Notes                                        |
+|-----------------------|-------------------|----------------------------------------------|
+| Capture page state    | `read_page`       | Call first before any click/type to orient   |
+| Navigate to URL       | `navigate_page`   | Use to reload or go to a route               |
+| Click an element      | `click_element`   | Target `aside li button` for episodes        |
+| Type into input       | `type_in_page`    | For search or label inputs                   |
+| Take a screenshot     | `screenshot_page` | Use to verify visual state                   |
 
-| Action | Playwright MCP Tool | Notes |
-|--------|-------------------|-------|
-| Capture page state | `browser_snapshot` | Call first before any click/type to orient |
-| Navigate to URL | `browser_navigate` | Use to reload or go to a route |
-| Click an element | `browser_click` | Target `aside li button` for episodes |
-| Type into input | `browser_type` | For search or label inputs |
-| Take a screenshot | `browser_take_screenshot` | Use to verify visual state |
-
-Always call `browser_snapshot` first to inspect the current DOM before issuing click or type actions. Reference the selector patterns in the [Frontend UI Structure](#frontend-ui-structure) section below.
+Always call `read_page` first to inspect the current DOM before issuing click or type actions. Reference the selector patterns in the [Frontend UI Structure](#frontend-ui-structure) section below.
 
 ## Quick Start
 
@@ -220,7 +201,7 @@ src/dataviewer/
 
 ## Annotation Workflow
 
-Annotation combines API calls for efficiency with Playwright UI interaction for verification. Use the API for bulk operations and the UI for visual review and spot-checking.
+Annotation combines API calls for efficiency with built-in browser tool interaction for verification. Use the API for bulk operations and the UI for visual review and spot-checking.
 
 ### Step 1 — Analyze trajectory data
 
@@ -337,28 +318,28 @@ To clear all labels for a fresh start, overwrite the file with an empty `episode
 
 After editing the file on disk, restart the backend or reload the page for changes to take effect.
 
-### Step 5 — Verify in UI with Playwright
+### Step 5 — Verify in UI with built-in browser tools
 
-After applying labels via API, refresh the browser and verify using Playwright:
+After applying labels via API, refresh the browser and verify:
 
-1. Navigate to the app: `browser_navigate` to `http://localhost:5173`.
-2. Wait for episode list to load: `browser_wait_for` with text like `"64 Episodes"`.
-3. Take a screenshot to confirm labels appear in the sidebar.
-4. Use label filter buttons in the sidebar to verify counts match expectations.
-5. Click individual episodes and scroll to the "Episode Labels" section to verify correct labels are applied.
+1. Navigate to the app: `navigate_page` to `http://localhost:5173`.
+2. Read the page with `read_page` and confirm episodes are loaded.
+3. Take a screenshot with `screenshot_page` to confirm labels appear in the sidebar.
+4. Use `click_element` on label filter buttons in the sidebar to verify counts match expectations.
+5. Click individual episodes with `click_element` and verify the "Episode Labels" section shows correct labels.
 
 ### Step 6 — Interactive annotation via UI
 
 For individual episode review or correction:
 
 1. Click an episode in the sidebar (`aside li button` elements).
-2. Scroll to the "Edit Tools" / "Episode Labels" section using `browser_evaluate` with `scrollIntoView`.
-3. Toggle label buttons (SUCCESS, FAILURE, PARTIAL, or custom labels) — clicking a selected label removes it.
+2. Scroll to the "Edit Tools" / "Episode Labels" section.
+3. Toggle label buttons (SUCCESS, FAILURE, PARTIAL, or custom labels) with `click_element` — clicking a selected label removes it.
 4. Click "Save All" to persist.
 
 ## Frontend UI Structure
 
-The React app has these key areas for Playwright interaction:
+The React app has these key areas for browser interaction:
 
 | Area | Selector Pattern | Description |
 |------|-----------------|-------------|
@@ -379,9 +360,8 @@ The React app has these key areas for Playwright interaction:
 | Port conflict | Set `BACKEND_PORT` or `FRONTEND_PORT` environment variables |
 | CORS errors | Backend allows localhost ports 5173-5177; check the frontend port is in range |
 | Labels not persisted after restart | Call `POST /api/datasets/{id}/labels/save` after API-based annotation |
-| Playwright opens separate Chrome window | Ensure `--headless` is in the Playwright MCP args in `.vscode/mcp.json`; restart the MCP server after changing |
-| Snapshot refs stale after navigation | Always take a fresh `browser_snapshot` before clicking; refs change on page updates |
-| Slider not responding to Playwright | Use `browser_evaluate` with native input value setter and dispatch `input` + `change` events |
-| Sidebar not scrolling | Scroll the `aside ul` element directly via `browser_evaluate` with `element.scrollTop = N` |
+| Page state stale after navigation | Always call `read_page` before clicking; page state changes on updates |
+| Slider not responding | Use `click_element` on the slider or `type_in_page` for the frame input |
+| Sidebar not scrolling | Click episode items near the bottom to auto-scroll the sidebar |
 
 > Brought to you by azure-nvidia-robotics-reference-architecture
