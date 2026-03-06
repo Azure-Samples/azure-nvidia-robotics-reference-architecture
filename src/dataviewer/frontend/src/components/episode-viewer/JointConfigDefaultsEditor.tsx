@@ -5,7 +5,7 @@
  * persisted when the user explicitly clicks Save.
  */
 
-import { Pencil, Plus, Settings, Trash2 } from 'lucide-react'
+import { ArrowRightLeft, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -83,6 +83,49 @@ function InlineEditField({
   )
 }
 
+function IndexEditField({
+  value,
+  onCommit,
+  onCancel,
+}: {
+  value: number
+  onCommit: (val: number) => void
+  onCancel: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [num, setNum] = useState(String(value))
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const parsed = parseInt(num, 10)
+      if (!isNaN(parsed) && parsed >= 0) onCommit(parsed)
+      else onCancel()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      onCancel()
+    }
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="number"
+      min={0}
+      value={num}
+      onChange={(e) => setNum(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onBlur={onCancel}
+      className="bg-transparent border-b border-primary text-[10px] outline-none w-10 text-center"
+    />
+  )
+}
+
 let _groupCounter = 0
 
 export function JointConfigDefaultsEditor({
@@ -99,6 +142,8 @@ export function JointConfigDefaultsEditor({
   const [editingJoint, setEditingJoint] = useState<number | null>(null)
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
   const [assigningJoint, setAssigningJoint] = useState<number | null>(null)
+  const [movingJoint, setMovingJoint] = useState<number | null>(null)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   // Reset local state when dialog opens with new props
   useEffect(() => {
@@ -108,6 +153,8 @@ export function JointConfigDefaultsEditor({
       setEditingJoint(null)
       setEditingGroup(null)
       setAssigningJoint(null)
+      setMovingJoint(null)
+      setEditingIndex(null)
     }
   }, [open, initialGroups, initialLabels])
 
@@ -161,6 +208,42 @@ export function JointConfigDefaultsEditor({
         indices: g.indices.filter((i) => i !== jointIdx),
       })),
     )
+  }
+
+  const handleMoveJoint = (jointIdx: number, toGroupId: string) => {
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id === toGroupId) return { ...g, indices: [...g.indices, jointIdx] }
+        return { ...g, indices: g.indices.filter((i) => i !== jointIdx) }
+      }),
+    )
+    setMovingJoint(null)
+  }
+
+  const handleEditIndex = (oldIdx: number, newIdx: number) => {
+    const allIndices = new Set(groups.flatMap((g) => g.indices))
+    const ungrouped = Object.keys(labels).map(Number).filter((i) => !allIndices.has(i))
+    const allUsed = new Set([...allIndices, ...ungrouped])
+    if (newIdx === oldIdx || allUsed.has(newIdx)) {
+      setEditingIndex(null)
+      return
+    }
+    setGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        indices: g.indices.map((i) => (i === oldIdx ? newIdx : i)),
+      })),
+    )
+    setLabels((prev) => {
+      const next = { ...prev }
+      const label = next[String(oldIdx)]
+      if (label !== undefined) {
+        delete next[String(oldIdx)]
+        next[String(newIdx)] = label
+      }
+      return next
+    })
+    setEditingIndex(null)
   }
 
   const handleSave = () => {
@@ -236,6 +319,22 @@ export function JointConfigDefaultsEditor({
                       className="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 text-xs rounded border border-current/20 group/chip"
                       style={{ color: getJointColor(idx, colors) }}
                     >
+                      {editingIndex === idx ? (
+                        <IndexEditField
+                          value={idx}
+                          onCommit={(val) => handleEditIndex(idx, val)}
+                          onCancel={() => setEditingIndex(null)}
+                        />
+                      ) : (
+                        <button
+                          data-testid="joint-index"
+                          className="text-[10px] font-mono bg-current/10 rounded px-1 cursor-pointer hover:bg-current/20"
+                          aria-label="Edit joint index"
+                          onClick={() => setEditingIndex(idx)}
+                        >
+                          {idx}
+                        </button>
+                      )}
                       <span
                         data-joint-color
                         className="w-2 h-2 rounded-full flex-shrink-0"
@@ -259,6 +358,41 @@ export function JointConfigDefaultsEditor({
                       >
                         <Pencil className="h-2.5 w-2.5" />
                       </Button>
+                      {movingJoint === idx ? (
+                        <div data-testid="group-picker" className="flex gap-1">
+                          {groups
+                            .filter((g) => g.id !== group.id)
+                            .map((g) => (
+                              <Button
+                                key={g.id}
+                                variant="outline"
+                                size="sm"
+                                className="h-5 text-[10px] px-1.5"
+                                onClick={() => handleMoveJoint(idx, g.id)}
+                              >
+                                {g.label}
+                              </Button>
+                            ))}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 text-[10px] px-1"
+                            onClick={() => setMovingJoint(null)}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 opacity-0 group-hover/chip:opacity-100 transition-opacity"
+                          aria-label="Move to group"
+                          onClick={() => setMovingJoint(idx)}
+                        >
+                          <ArrowRightLeft className="h-2.5 w-2.5" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -291,6 +425,22 @@ export function JointConfigDefaultsEditor({
                         className="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 text-xs rounded border border-current/20 group/chip"
                         style={{ color: getJointColor(idx, colors) }}
                       >
+                        {editingIndex === idx ? (
+                          <IndexEditField
+                            value={idx}
+                            onCommit={(val) => handleEditIndex(idx, val)}
+                            onCancel={() => setEditingIndex(null)}
+                          />
+                        ) : (
+                          <button
+                            data-testid="joint-index"
+                            className="text-[10px] font-mono bg-current/10 rounded px-1 cursor-pointer hover:bg-current/20"
+                            aria-label="Edit joint index"
+                            onClick={() => setEditingIndex(idx)}
+                          >
+                            {idx}
+                          </button>
+                        )}
                         <span
                           data-joint-color
                           className="w-2 h-2 rounded-full flex-shrink-0"
