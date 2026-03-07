@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# SPDX-License-Identifier: MIT
+
 name: Gitleaks Secret Scan
 
 on:
@@ -67,6 +70,9 @@ jobs:
       - name: Run gitleaks scan
         id: gitleaks
         shell: bash
+        env:
+          LOG_OPTS: ${{ inputs.log-opts }}
+          SOFT_FAIL: ${{ inputs.soft-fail }}
         run: |
           set -euo pipefail
 
@@ -80,7 +86,6 @@ jobs:
             "--log-level" "info"
           )
 
-          LOG_OPTS="${{ inputs.log-opts }}"
           if [ -n "$LOG_OPTS" ]; then
             SCAN_ARGS+=("--log-opts=$LOG_OPTS")
             echo "Scoping scan with log-opts: $LOG_OPTS"
@@ -101,7 +106,7 @@ jobs:
           elif [ "$EXIT_CODE" -eq 1 ]; then
             echo "::warning::Gitleaks detected secrets in the repository."
             echo "leaks-found=true" >> "$GITHUB_OUTPUT"
-            if [ "${{ inputs.soft-fail }}" != "true" ]; then
+            if [ "$SOFT_FAIL" != "true" ]; then
               echo "::error::Secret scanning failed. Review detected secrets in logs/gitleaks-results.sarif"
               exit 1
             fi
@@ -129,8 +134,9 @@ jobs:
       - name: Add job summary
         if: always()
         shell: bash
+        env:
+          LEAKS_FOUND: ${{ steps.gitleaks.outputs.leaks-found }}
         run: |
-          LEAKS_FOUND="${{ steps.gitleaks.outputs.leaks-found }}"
           if [ "$LEAKS_FOUND" = "true" ]; then
             STATUS="⚠️ Secrets Detected"
           else

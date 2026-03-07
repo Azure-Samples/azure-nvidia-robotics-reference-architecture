@@ -65,7 +65,10 @@ param(
     [switch]$FailOnViolation,
 
     [Parameter(Mandatory = $false)]
-    [string]$ExcludePaths = 'copilot-setup-steps.yml'
+    [string]$ExcludePaths = 'copilot-setup-steps.yml',
+
+    [Parameter(Mandatory = $false)]
+    [string[]]$AdditionalFormats = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -191,7 +194,10 @@ function Invoke-WorkflowPermissionsCheck {
         [switch]$FailOnViolation,
 
         [Parameter(Mandatory = $false)]
-        [string]$ExcludePaths = 'copilot-setup-steps.yml'
+        [string]$ExcludePaths = 'copilot-setup-steps.yml',
+
+        [Parameter(Mandatory = $false)]
+        [string[]]$AdditionalFormats = @()
     )
 
     Write-SecurityLog "Starting workflow permissions validation" -Level Info -CIAnnotation
@@ -282,6 +288,17 @@ function Invoke-WorkflowPermissionsCheck {
 
     $output | Out-File -FilePath $OutputPath -Encoding utf8 -Force
     Write-SecurityLog "Results written to: $OutputPath" -Level Info
+
+    # Write additional format outputs
+    foreach ($extra in $AdditionalFormats) {
+        $extraOutput = switch ($extra) {
+            'sarif' { (ConvertTo-PermissionsSarif -Violations $report.Violations) | ConvertTo-Json -Depth 10 }
+            'json'  { $report.ToHashtable() | ConvertTo-Json -Depth 10 }
+        }
+        $extraPath = [System.IO.Path]::ChangeExtension($OutputPath, ".$extra")
+        $extraOutput | Out-File -FilePath $extraPath -Encoding utf8 -Force
+        Write-SecurityLog "Additional format written to: $extraPath" -Level Info
+    }
 
     # Generate step summary
     $summaryLines = @(
