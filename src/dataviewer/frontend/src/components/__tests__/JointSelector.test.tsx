@@ -112,52 +112,79 @@ describe('JointSelector', () => {
   })
 
   describe('inline editing', () => {
-    it('double-clicking a joint label enters edit mode', async () => {
+    it('double-clicking a joint label does not enter edit mode', async () => {
       const user = userEvent.setup()
       const onEditLabel = vi.fn()
       render(<JointSelector {...baseProps} editable onEditJointLabel={onEditLabel} />)
       await user.dblClick(screen.getByText('Right X'))
-      expect(screen.getByRole('textbox')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     })
 
-    it('pressing Enter commits a joint label edit', async () => {
-      const user = userEvent.setup()
+    it('right-clicking a joint label exposes the edit action', async () => {
       const onEditLabel = vi.fn()
       render(<JointSelector {...baseProps} editable onEditJointLabel={onEditLabel} />)
-      await user.dblClick(screen.getByText('Right X'))
-      const input = screen.getByRole('textbox')
-      await user.clear(input)
-      await user.type(input, 'Custom Name{Enter}')
-      expect(onEditLabel).toHaveBeenCalledWith(0, 'Custom Name')
+
+      fireEvent.contextMenu(screen.getByText('Right X'))
+      expect(await screen.findByText('Edit Name')).toBeInTheDocument()
     })
 
-    it('pressing Escape cancels a joint label edit', async () => {
+    it('right-click editing a joint label focuses the input immediately', async () => {
       const user = userEvent.setup()
-      const onEditLabel = vi.fn()
-      render(<JointSelector {...baseProps} editable onEditJointLabel={onEditLabel} />)
-      await user.dblClick(screen.getByText('Right X'))
-      await user.type(screen.getByRole('textbox'), 'Cancelled{Escape}')
-      expect(onEditLabel).not.toHaveBeenCalled()
-      expect(screen.getByText('Right X')).toBeInTheDocument()
+      render(<JointSelector {...baseProps} editable onEditJointLabel={vi.fn()} />)
+
+      fireEvent.contextMenu(screen.getByText('Right X'))
+      await user.click(await screen.findByText('Edit Name'))
+
+      expect(await screen.findByRole('textbox')).toHaveFocus()
     })
 
-    it('double-clicking a group label enters edit mode for the group', async () => {
+    it('typing spaces while editing a joint label does not toggle selection', async () => {
+      const user = userEvent.setup()
+      const onSelectJoints = vi.fn()
+      render(
+        <JointSelector
+          {...baseProps}
+          editable
+          onEditJointLabel={vi.fn()}
+          onSelectJoints={onSelectJoints}
+        />,
+      )
+
+      fireEvent.contextMenu(screen.getByText('Right X'))
+      await user.click(await screen.findByText('Edit Name'))
+
+      const input = await screen.findByRole('textbox')
+      await user.type(input, ' A B')
+
+      expect(input).toHaveValue('Right X A B')
+      expect(input).toHaveFocus()
+      expect(onSelectJoints).not.toHaveBeenCalled()
+    })
+
+    it('double-clicking a group label does not enter edit mode', async () => {
       const user = userEvent.setup()
       const onEditGroupLabel = vi.fn()
       render(<JointSelector {...baseProps} editable onEditGroupLabel={onEditGroupLabel} />)
       await user.dblClick(screen.getByText('Right Arm'))
-      expect(screen.getByRole('textbox')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     })
 
-    it('pressing Enter commits a group label edit', async () => {
-      const user = userEvent.setup()
+    it('right-clicking a group label exposes the edit action', async () => {
       const onEditGroupLabel = vi.fn()
       render(<JointSelector {...baseProps} editable onEditGroupLabel={onEditGroupLabel} />)
-      await user.dblClick(screen.getByText('Right Arm'))
-      const input = screen.getByRole('textbox')
-      await user.clear(input)
-      await user.type(input, 'Arm Right{Enter}')
-      expect(onEditGroupLabel).toHaveBeenCalledWith('right-pos', 'Arm Right')
+
+      fireEvent.contextMenu(screen.getByText('Right Arm'))
+      expect(await screen.findByText('Edit Name')).toBeInTheDocument()
+    })
+
+    it('right-click editing a group label focuses the input immediately', async () => {
+      const user = userEvent.setup()
+      render(<JointSelector {...baseProps} editable onEditGroupLabel={vi.fn()} />)
+
+      fireEvent.contextMenu(screen.getByText('Right Arm'))
+      await user.click(await screen.findByText('Edit Name'))
+
+      expect(await screen.findByRole('textbox')).toHaveFocus()
     })
   })
 
