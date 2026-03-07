@@ -1,5 +1,23 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="responsive-container">{children}</div>
+  ),
+  LineChart: ({ children, data }: { children: React.ReactNode; data: unknown }) => (
+    <div data-testid="line-chart">
+      <pre data-testid="line-chart-data">{JSON.stringify(data)}</pre>
+      {children}
+    </div>
+  ),
+  CartesianGrid: () => null,
+  Line: ({ dataKey }: { dataKey: string }) => <div data-testid={`line-${dataKey}`} />,
+  ReferenceLine: () => null,
+  Tooltip: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+}))
 
 import { TrajectoryPlot } from '@/components/episode-viewer/TrajectoryPlot'
 import { useEditStore, useEpisodeStore } from '@/stores'
@@ -65,5 +83,53 @@ describe('TrajectoryPlot', () => {
     expect(scrollRegion).toHaveClass('max-h-32')
     expect(screen.getByRole('button', { name: 'Position' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Velocity' })).toBeInTheDocument()
+  })
+
+  it('defaults normalization on and lets the chart switch back to raw position values', () => {
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot className="h-full" />
+      </div>,
+    )
+
+    const normalizeButton = screen.getByRole('button', { name: 'Normalize' })
+
+    expect(normalizeButton).toHaveAttribute('aria-pressed', 'true')
+
+    const normalizedData = JSON.parse(screen.getByTestId('line-chart-data').textContent ?? '[]') as Array<Record<string, number>>
+
+    expect(normalizedData[0]?.joint_0).toBe(0)
+    expect(normalizedData[0]?.joint_1).toBe(0)
+    expect(normalizedData[1]?.joint_0).toBe(1)
+    expect(normalizedData[1]?.joint_1).toBe(1)
+
+    fireEvent.click(normalizeButton)
+
+    const rawData = JSON.parse(screen.getByTestId('line-chart-data').textContent ?? '[]') as Array<Record<string, number>>
+
+    expect(rawData[0]?.joint_0).toBe(0)
+    expect(rawData[0]?.joint_1).toBe(1)
+    expect(rawData[1]?.joint_0).toBe(1)
+    expect(rawData[1]?.joint_1).toBe(2)
+  })
+
+  it('keeps velocity mode raw and disables the normalize control while active', () => {
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot className="h-full" />
+      </div>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Velocity' }))
+
+    const normalizeButton = screen.getByRole('button', { name: 'Normalize' })
+    const velocityData = JSON.parse(screen.getByTestId('line-chart-data').textContent ?? '[]') as Array<Record<string, number>>
+
+    expect(normalizeButton).toBeDisabled()
+    expect(normalizeButton).toHaveAttribute('aria-disabled', 'true')
+    expect(velocityData[0]?.joint_0).toBe(0)
+    expect(velocityData[0]?.joint_1).toBe(0.1)
+    expect(velocityData[1]?.joint_0).toBe(0.1)
+    expect(velocityData[1]?.joint_1).toBe(0.2)
   })
 })

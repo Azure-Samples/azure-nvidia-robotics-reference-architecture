@@ -7,7 +7,7 @@
  * - Reference line position updates without re-rendering chart lines
  */
 
-import { memo, useCallback,useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { useEpisodeStore } from '@/stores'
 import { useTrajectoryAdjustmentState } from '@/stores/edit-store'
 import { useJointConfigStore } from '@/stores/joint-config-store'
+import type { TrajectoryAdjustment } from '@/types/episode-edit'
 
 import { getJointLabel, JOINT_COLORS } from './joint-constants'
 import { JointConfigDefaultsEditor } from './JointConfigDefaultsEditor'
@@ -49,6 +50,44 @@ const CurrentFrameMarker = memo(function CurrentFrameMarker() {
 interface TrajectoryPlotProps {
   /** Additional CSS classes */
   className?: string;
+}
+
+function applyTrajectoryAdjustment(
+  value: number,
+  jointIndex: number,
+  adjustment: TrajectoryAdjustment | undefined,
+) {
+  let adjusted = value;
+
+  if (!adjustment) {
+    return adjusted;
+  }
+
+  if (adjustment.rightArmDelta && jointIndex >= 0 && jointIndex <= 2) {
+    adjusted += adjustment.rightArmDelta[jointIndex];
+  }
+
+  if (adjustment.leftArmDelta && jointIndex >= 8 && jointIndex <= 10) {
+    adjusted += adjustment.leftArmDelta[jointIndex - 8];
+  }
+
+  if (jointIndex === 7 && adjustment.rightGripperOverride !== undefined) {
+    adjusted = adjustment.rightGripperOverride;
+  }
+
+  if (jointIndex === 15 && adjustment.leftGripperOverride !== undefined) {
+    adjusted = adjustment.leftGripperOverride;
+  }
+
+  return adjusted;
+}
+
+function normalizeSeries(value: number, min: number, max: number) {
+  if (max === min) {
+    return 0;
+  }
+
+  return (value - min) / (max - min);
 }
 
 
@@ -80,6 +119,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
 
   const [selectedJoints, setSelectedJoints] = useState<number[]>([0, 1, 2]);
   const [showVelocity, setShowVelocity] = useState(false);
+  const [showNormalized, setShowNormalized] = useState(true);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
 
   const withSave = useCallback(
@@ -102,7 +142,29 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
   const chartData = useMemo(() => {
     if (!currentEpisode?.trajectoryData) return [];
 
-    return currentEpisode.trajectoryData.map((point) => {
+    const seriesValues = currentEpisode.trajectoryData.map((point) => {
+      const adjustment = trajectoryAdjustments.get(point.frame);
+
+      return showVelocity
+        ? point.jointVelocities
+        : point.jointPositions.map((position, jointIndex) =>
+            applyTrajectoryAdjustment(position, jointIndex, adjustment),
+          );
+    });
+
+    const shouldNormalizePositions = showNormalized && !showVelocity;
+    const normalizedRanges = shouldNormalizePositions
+      ? seriesValues[0]?.map((_, jointIndex) => {
+          const values = seriesValues.map((pointValues) => pointValues[jointIndex]);
+
+          return {
+            min: Math.min(...values),
+            max: Math.max(...values),
+          };
+        }) ?? []
+      : [];
+
+    return currentEpisode.trajectoryData.map((point, pointIndex) => {
       const adjustment = trajectoryAdjustments.get(point.frame);
       const data: Record<string, number | boolean> = {
         frame: point.frame,
@@ -111,37 +173,24 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
       };
 
       // Add selected joint data with adjustments applied
-      if (showVelocity) {
-        point.jointVelocities.forEach((vel, idx) => {
-          data[`joint_${idx}`] = vel;
-        });
-      } else {
-        point.jointPositions.forEach((pos, idx) => {
-          let adjusted = pos;
-          if (adjustment) {
-            // Apply right arm delta (indices 0, 1, 2)
-            if (adjustment.rightArmDelta && idx >= 0 && idx <= 2) {
-              adjusted += adjustment.rightArmDelta[idx];
-            }
-            // Apply left arm delta (indices 8, 9, 10)
-            if (adjustment.leftArmDelta && idx >= 8 && idx <= 10) {
-              adjusted += adjustment.leftArmDelta[idx - 8];
-            }
-            // Apply gripper overrides
-            if (idx === 7 && adjustment.rightGripperOverride !== undefined) {
-              adjusted = adjustment.rightGripperOverride;
-            }
-            if (idx === 15 && adjustment.leftGripperOverride !== undefined) {
-              adjusted = adjustment.leftGripperOverride;
-            }
-          }
-          data[`joint_${idx}`] = adjusted;
-        });
-      }
+      const pointValues = seriesValues[pointIndex] ?? (showVelocity ? point.jointVelocities : point.jointPositions);
+
+      pointValues.forEach((value, jointIndex) => {
+        if (shouldNormalizePositions) {
+          const range = normalizedRanges[jointIndex];
+
+          data[`joint_${jointIndex}`] = range
+            ? normalizeSeries(value, range.min, range.max)
+            : value;
+          return;
+        }
+
+        data[`joint_${jointIndex}`] = value;
+      });
 
       return data;
     });
-  }, [currentEpisode?.trajectoryData, showVelocity, trajectoryAdjustments]);
+  }, [currentEpisode?.trajectoryData, showNormalized, showVelocity, trajectoryAdjustments]);
 
   // Get joint count - memoized
   const jointCount = useMemo(() => {
@@ -207,7 +256,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
             onOpenDefaults={() => setDefaultsOpen(true)}
           />
         </div>
-        <div className="flex shrink-0 items-center gap-2 self-start">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-start">
           <button
             onClick={() => setShowVelocity(false)}
             className={cn(
@@ -230,6 +279,23 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
           >
             Velocity
           </button>
+          <button
+            type="button"
+            aria-pressed={showNormalized}
+            aria-disabled={showVelocity}
+            disabled={showVelocity}
+            onClick={() => setShowNormalized((current) => !current)}
+            className={cn(
+              'px-2 py-1 text-xs rounded border transition-colors',
+              showVelocity
+                ? 'cursor-not-allowed border-transparent bg-muted text-muted-foreground/60'
+                : showNormalized
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-transparent bg-muted text-muted-foreground hover:border-border'
+            )}
+          >
+            Normalize
+          </button>
         </div>
       </div>
 
@@ -247,7 +313,11 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
               stroke="hsl(var(--muted-foreground))"
               fontSize={12}
             />
-            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <YAxis
+              stroke="hsl(var(--muted-foreground))"
+              fontSize={12}
+              domain={showNormalized && !showVelocity ? [0, 1] : ['auto', 'auto']}
+            />
             <Tooltip
               contentStyle={{
                 backgroundColor: 'hsl(var(--popover))',
