@@ -180,20 +180,26 @@ export function useRemoveLabelOption() {
 export function useCurrentEpisodeLabels(episodeIndex: number) {
     const episodeLabels = useLabelStore((state) => state.episodeLabels);
     const toggleLabel = useLabelStore((state) => state.toggleLabel);
+    const setEpisodeLabels = useLabelStore((state) => state.setEpisodeLabels);
     const saveLabels = useSaveEpisodeLabels();
 
     const currentLabels = episodeLabels[episodeIndex] || [];
 
     const toggle = useCallback(
-        (label: string) => {
+        async (label: string) => {
             toggleLabel(episodeIndex, label);
             const current = episodeLabels[episodeIndex] || [];
             const updated = current.includes(label)
                 ? current.filter((l) => l !== label)
                 : [...current, label];
-            saveLabels.mutate({ episodeIdx: episodeIndex, labels: updated });
+            try {
+                await saveLabels.mutateAsync({ episodeIdx: episodeIndex, labels: updated });
+            } catch (error) {
+                setEpisodeLabels(episodeIndex, current);
+                throw error;
+            }
         },
-        [episodeIndex, episodeLabels, toggleLabel, saveLabels],
+        [episodeIndex, episodeLabels, saveLabels, setEpisodeLabels, toggleLabel],
     );
 
     return { currentLabels, toggle };

@@ -51,3 +51,11 @@ def test_delete_label_option_removes_assignments(client):
     assert labels["available_labels"] == ["SUCCESS", "FAILURE", "PARTIAL"]
     assert labels["episodes"]["1"] == ["SUCCESS"]
     assert labels["episodes"]["2"] == []
+
+
+def test_delete_default_label_option_rejected(client):
+    """Built-in labels should not be deletable."""
+    response = client.delete("/api/datasets/test-dataset/labels/options/success")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Built-in labels cannot be deleted"

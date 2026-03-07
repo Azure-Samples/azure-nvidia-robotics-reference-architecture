@@ -7,7 +7,7 @@
  * - Reference line position updates without re-rendering chart lines
  */
 
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 
 import { useJointConfigDefaults, useSaveJointConfig, useSaveJointConfigDefaults } from '@/hooks/use-joint-config'
+import { getAutoSelectedJointsForEpisode } from '@/lib/joint-significance'
 import { cn } from '@/lib/utils'
 import { useEpisodeStore } from '@/stores'
 import { useTrajectoryAdjustmentState } from '@/stores/edit-store'
@@ -50,6 +51,8 @@ const CurrentFrameMarker = memo(function CurrentFrameMarker() {
 interface TrajectoryPlotProps {
   /** Additional CSS classes */
   className?: string;
+  /** Callback invoked after a successful save */
+  onSaved?: () => void;
 }
 
 function applyTrajectoryAdjustment(
@@ -103,7 +106,7 @@ function normalizeSeries(value: number, min: number, max: number) {
  * <TrajectoryPlot className="h-64" />
  * ```
  */
-export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: TrajectoryPlotProps) {
+export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved }: TrajectoryPlotProps) {
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
   const setCurrentFrame = useEpisodeStore((state) => state.setCurrentFrame);
   const { trajectoryAdjustments } = useTrajectoryAdjustmentState();
@@ -117,7 +120,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
   const { data: defaults } = useJointConfigDefaults();
   const saveDefaults = useSaveJointConfigDefaults();
 
-  const [selectedJoints, setSelectedJoints] = useState<number[]>([0, 1, 2]);
+  const [selectedJoints, setSelectedJoints] = useState<number[]>([]);
   const [showVelocity, setShowVelocity] = useState(false);
   const [showNormalized, setShowNormalized] = useState(true);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
@@ -127,9 +130,9 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
       (...args: T) => {
         fn(...args)
         // Defer save to allow store update to complete
-        queueMicrotask(saveJointConfig)
+        queueMicrotask(() => saveJointConfig(onSaved))
       },
-    [saveJointConfig],
+    [onSaved, saveJointConfig],
   );
 
   const resolveLabel = useCallback(
@@ -197,6 +200,15 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
     if (!currentEpisode?.trajectoryData?.[0]) return 0;
     return currentEpisode.trajectoryData[0].jointPositions.length;
   }, [currentEpisode?.trajectoryData]);
+
+  const autoSelectedJoints = useMemo(
+    () => getAutoSelectedJointsForEpisode(currentEpisode?.trajectoryData ?? [], jointConfig.groups, jointCount),
+    [currentEpisode?.trajectoryData, jointConfig.groups, jointCount],
+  )
+
+  useEffect(() => {
+    setSelectedJoints(autoSelectedJoints)
+  }, [autoSelectedJoints])
 
   // Handle chart click to seek - memoized callback
   const handleChartClick = useCallback((data: unknown) => {
@@ -366,7 +378,12 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className }: Trajec
         onSave={(config) => {
           saveDefaults.mutate(
             { datasetId: '_defaults', ...config },
-            { onSuccess: () => setDefaultsOpen(false) },
+            {
+              onSuccess: () => {
+                setDefaultsOpen(false)
+                onSaved?.()
+              },
+            },
           )
         }}
         isSaving={saveDefaults.isPending}

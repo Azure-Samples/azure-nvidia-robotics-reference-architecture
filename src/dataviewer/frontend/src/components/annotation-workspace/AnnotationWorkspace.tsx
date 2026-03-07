@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ViewerDisplayControls } from '@/components/viewer-display';
+import { useSaveEpisodeLabels } from '@/hooks/use-labels';
 import { combineCssFilters } from '@/lib/css-filters';
 import { computeEffectiveFps, computeSyncAction } from '@/lib/playback-utils';
 import {
@@ -29,6 +30,9 @@ import {
   getOriginalIndex,
   useFrameInsertionState,
 } from '@/stores/edit-store';
+import { useLabelStore } from '@/stores/label-store';
+
+const EMPTY_LABELS: string[] = [];
 
 /**
  * Unified annotation workspace integrating episode viewing, editing, and export.
@@ -38,15 +42,20 @@ import {
  */
 export function AnnotationWorkspace() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [showSaveStatus, setShowSaveStatus] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentFrameRef = useRef(0);
   const originalFrameIndexRef = useRef<number | null>(null);
+  const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
+  const labelDataLoaded = useLabelStore((state) => state.isLoaded);
+  const availableLabels = useLabelStore((state) => state.availableLabels);
+  const episodeLabels = useLabelStore((state) => state.episodeLabels);
   const removedFrames = useEditStore((state) => state.removedFrames);
   const initializeEdit = useEditStore((state) => state.initializeEdit);
   const clearTransforms = useEditStore((state) => state.clearTransforms);
@@ -58,6 +67,84 @@ export function AnnotationWorkspace() {
   const { displayAdjustment, isActive: displayActive } = useViewerDisplay();
   const { autoPlay, autoLoop, setAutoPlay, setAutoLoop } = usePlaybackSettings();
   const globalTransform = useEditStore((state) => state.globalTransform);
+  const saveEpisodeLabels = useSaveEpisodeLabels();
+  const initialEpisodeLabelsRef = useRef<string[]>([]);
+  const initialEpisodeLabelKeyRef = useRef<string | null>(null);
+  const currentEpisodeLabels = useMemo(() => {
+    if (!currentEpisode) {
+      return EMPTY_LABELS;
+    }
+
+    return episodeLabels[currentEpisode.meta.index] ?? EMPTY_LABELS;
+  }, [currentEpisode, episodeLabels]);
+
+  const announceSave = useCallback(() => {
+    setShowSaveStatus(true);
+
+    if (saveStatusTimeoutRef.current) {
+      clearTimeout(saveStatusTimeoutRef.current);
+    }
+
+    saveStatusTimeoutRef.current = setTimeout(() => {
+      setShowSaveStatus(false);
+      saveStatusTimeoutRef.current = null;
+    }, 2400);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (saveStatusTimeoutRef.current) {
+        clearTimeout(saveStatusTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentDataset || !currentEpisode || !labelDataLoaded) {
+      return;
+    }
+
+    const snapshotKey = `${currentDataset.id}:${currentEpisode.meta.index}`;
+    if (initialEpisodeLabelKeyRef.current === snapshotKey) {
+      return;
+    }
+
+    initialEpisodeLabelsRef.current = [...currentEpisodeLabels];
+    initialEpisodeLabelKeyRef.current = snapshotKey;
+  }, [currentDataset, currentEpisode, currentEpisodeLabels, labelDataLoaded]);
+
+  const hasLabelChanges = useMemo(() => {
+    if (!currentEpisode || !labelDataLoaded) {
+      return false;
+    }
+
+    const current = [...currentEpisodeLabels].sort();
+    const initial = [...initialEpisodeLabelsRef.current].sort();
+
+    if (current.length !== initial.length) {
+      return true;
+    }
+
+    return current.some((label, index) => label !== initial[index]);
+  }, [currentEpisode, currentEpisodeLabels, labelDataLoaded]);
+
+  const handleResetAll = useCallback(async () => {
+    resetEdits();
+
+    if (!currentEpisode || !currentDataset || !hasLabelChanges) {
+      return;
+    }
+
+    const nextLabels = initialEpisodeLabelsRef.current.filter((label) =>
+      availableLabels.includes(label),
+    );
+
+    await saveEpisodeLabels.mutateAsync({
+      episodeIdx: currentEpisode.meta.index,
+      labels: nextLabels,
+    });
+    announceSave();
+  }, [announceSave, availableLabels, currentDataset, currentEpisode, hasLabelChanges, resetEdits, saveEpisodeLabels]);
 
   // Combined CSS filter: viewer display adjustments + edit color transforms
   const displayFilter = useMemo(
@@ -345,22 +432,31 @@ export function AnnotationWorkspace() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={resetEdits}
-            disabled={!hasEdits}
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset All
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setExportDialogOpen(true)}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+        <div className="flex flex-col items-end gap-1" data-testid="workspace-header-actions">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void handleResetAll()}
+              disabled={!hasEdits && !hasLabelChanges}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset All
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
+          <div className="min-h-[1rem]" data-testid="workspace-save-status-slot">
+            {showSaveStatus && (
+              <p data-testid="workspace-save-status" className="text-xs text-muted-foreground">
+                Changes save automatically.
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -530,7 +626,7 @@ export function AnnotationWorkspace() {
               {/* Trajectory & Subtasks */}
               <Card className="h-[300px] flex-shrink-0">
                 <CardContent className="p-4 h-full flex flex-col gap-2">
-                  <TrajectoryPlot className="flex-1 min-h-0" />
+                  <TrajectoryPlot className="flex-1 min-h-0" onSaved={announceSave} />
                   <div className="flex-shrink-0">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-muted-foreground">Subtasks</span>
@@ -550,7 +646,7 @@ export function AnnotationWorkspace() {
                 </CardHeader>
                 <CardContent className="p-4 pt-0 space-y-6">
                   {/* Episode Labels */}
-                  <LabelPanel episodeIndex={currentEpisode.meta.index} />
+                  <LabelPanel episodeIndex={currentEpisode.meta.index} onSaved={announceSave} />
 
                   <Separator />
 
