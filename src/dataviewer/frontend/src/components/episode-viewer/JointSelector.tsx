@@ -19,10 +19,15 @@ import {
 } from '@dnd-kit/core'
 import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import * as ContextMenu from '@radix-ui/react-context-menu'
 import { Settings } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
 
 import { getJointColor, getJointLabel, JOINT_GROUPS, type JointGroup } from './joint-constants'
@@ -165,30 +170,19 @@ function SortableChip({
   if (!editable) return chip
 
   return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>{chip}</ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content
-          className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-          onCloseAutoFocus={(event) => event.preventDefault()}
-        >
-          <ContextMenu.Item
-            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
-            onSelect={onStartEdit}
-          >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{chip}</ContextMenuTrigger>
+      <ContextMenuContent className="min-w-[140px]" onCloseAutoFocus={(event) => event.preventDefault()}>
+          <ContextMenuItem className="text-xs" onSelect={onStartEdit}>
             Edit Name
-          </ContextMenu.Item>
+          </ContextMenuItem>
           {onCreateGroup && (
-            <ContextMenu.Item
-              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
-              onSelect={() => onCreateGroup(idx)}
-            >
+            <ContextMenuItem className="text-xs" onSelect={() => onCreateGroup(idx)}>
               New Grouping
-            </ContextMenu.Item>
+            </ContextMenuItem>
           )}
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 
@@ -369,30 +363,19 @@ export function JointSelector({
     if (!editable) return labelButton
 
     return (
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{labelButton}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content
-            className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            onCloseAutoFocus={(event) => event.preventDefault()}
-          >
-            <ContextMenu.Item
-              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
-              onSelect={() => setEditingGroup(group.id)}
-            >
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{labelButton}</ContextMenuTrigger>
+        <ContextMenuContent className="min-w-[140px]" onCloseAutoFocus={(event) => event.preventDefault()}>
+            <ContextMenuItem className="text-xs" onSelect={() => setEditingGroup(group.id)}>
               Edit Name
-            </ContextMenu.Item>
+            </ContextMenuItem>
             {onDeleteGroup && (
-              <ContextMenu.Item
-                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent text-destructive"
-                onSelect={() => onDeleteGroup(group.id)}
-              >
+              <ContextMenuItem className="text-xs text-destructive focus:text-destructive" onSelect={() => onDeleteGroup(group.id)}>
                 Delete Grouping
-              </ContextMenu.Item>
+              </ContextMenuItem>
             )}
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
-      </ContextMenu.Root>
+        </ContextMenuContent>
+      </ContextMenu>
     )
   }
 

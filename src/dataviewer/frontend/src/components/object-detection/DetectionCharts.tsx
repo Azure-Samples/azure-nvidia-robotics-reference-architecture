@@ -16,6 +16,14 @@ import {
   YAxis,
 } from 'recharts';
 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { EpisodeDetectionSummary } from '@/types/detection';
 
 interface DetectionChartsProps {
@@ -183,35 +191,35 @@ export function DetectionCharts({ summary }: DetectionChartsProps) {
       {classData.length > 0 && (
         <div>
           <h4 className="text-sm font-medium mb-2">Class Breakdown</h4>
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="text-left p-2">Class</th>
-                  <th className="text-right p-2">Count</th>
-                  <th className="text-right p-2">%</th>
-                  <th className="text-right p-2">Avg Conf</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="rounded-lg border overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted">
+                <TableRow>
+                  <TableHead>Class</TableHead>
+                  <TableHead className="text-right">Count</TableHead>
+                  <TableHead className="text-right">%</TableHead>
+                  <TableHead className="text-right">Avg Conf</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {classData.slice(0, 8).map((cls, i) => (
-                  <tr key={cls.name} className="border-t">
-                    <td className="p-2 flex items-center gap-2">
+                  <TableRow key={cls.name}>
+                    <TableCell className="flex items-center gap-2">
                       <span
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: COLORS[i % COLORS.length] }}
                       />
                       {cls.name}
-                    </td>
-                    <td className="text-right p-2">{cls.count}</td>
-                    <td className="text-right p-2">{cls.percentage.toFixed(1)}%</td>
-                    <td className="text-right p-2">
+                    </TableCell>
+                    <TableCell className="text-right">{cls.count}</TableCell>
+                    <TableCell className="text-right">{cls.percentage.toFixed(1)}%</TableCell>
+                    <TableCell className="text-right">
                       {(cls.avgConfidence * 100).toFixed(0)}%
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}

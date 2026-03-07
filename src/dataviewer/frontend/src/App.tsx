@@ -6,14 +6,20 @@ import { LabelFilter } from '@/components/annotation-panel';
 import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useCapabilities,useDatasets, useEpisode, useEpisodes } from '@/hooks/use-datasets';
 import { useJointConfig } from '@/hooks/use-joint-config';
 import { useDatasetLabels } from '@/hooks/use-labels';
 import { queryClient } from '@/lib/query-client';
-import { cn } from '@/lib/utils';
 import { useDatasetStore,useEpisodeStore } from '@/stores';
 import { useLabelStore } from '@/stores/label-store';
 import type { DatasetInfo, EpisodeMeta } from '@/types';
@@ -228,65 +234,56 @@ function DatasetSelector({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="end">
-        <div className="space-y-2">
-          <Input
+        <Command shouldFilter={false}>
+          <CommandInput
             ref={filterInputRef}
             value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
+            onValueChange={setFilterText}
             placeholder="Filter datasets"
             aria-label="Filter datasets"
-            className="h-9"
           />
-          <div
+          <CommandList
             id="dataset-selector-listbox"
             role="listbox"
             aria-label="Available datasets"
-            className="max-h-60 overflow-y-auto"
+            className="max-h-60"
           >
-            {filteredDatasets.length > 0 ? (
-              <div className="space-y-1">
-                {filteredDatasets.map((dataset) => {
-                  const isSelected = dataset.id === datasetId;
+            <CommandEmpty>No datasets match the current filter.</CommandEmpty>
+            <CommandGroup>
+              {filteredDatasets.map((dataset) => {
+                const isSelected = dataset.id === datasetId;
 
-                  return (
-                    <button
-                      key={dataset.id}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      onClick={() => {
-                        onSelectDataset(dataset.id);
-                        setIsOpen(false);
-                        setFilterText('');
-                      }}
-                      className={cn(
-                        'flex w-full items-start justify-between rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-                        isSelected ? 'bg-accent text-accent-foreground' : 'text-foreground'
+                return (
+                  <CommandItem
+                    key={dataset.id}
+                    value={dataset.id}
+                    keywords={[dataset.name]}
+                    role="option"
+                    aria-selected={isSelected}
+                    onSelect={() => {
+                      onSelectDataset(dataset.id);
+                      setIsOpen(false);
+                      setFilterText('');
+                    }}
+                    className="items-start justify-between gap-2 px-3 py-2 text-left"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{dataset.id}</span>
+                      {dataset.name !== dataset.id && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {dataset.name}
+                        </span>
                       )}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{dataset.id}</span>
-                        {dataset.name !== dataset.id && (
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {dataset.name}
-                          </span>
-                        )}
-                      </span>
-                      <Check
-                        className={cn(
-                          'ml-2 mt-0.5 h-4 w-4 shrink-0',
-                          isSelected ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="px-3 py-2 text-sm text-muted-foreground">No datasets match the current filter.</div>
-            )}
-          </div>
-        </div>
+                    </span>
+                    <Check
+                      className={isSelected ? 'ml-2 mt-0.5 h-4 w-4 shrink-0 opacity-100' : 'ml-2 mt-0.5 h-4 w-4 shrink-0 opacity-0'}
+                    />
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
       </PopoverContent>
     </Popover>
   );

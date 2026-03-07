@@ -1,12 +1,12 @@
 /**
  * Subtask segment slider with dual thumbs for range editing.
  *
- * Uses Radix UI Slider for accessible range selection.
+ * Uses the shared slider wrapper for accessible range selection.
  */
 
-import * as Slider from '@radix-ui/react-slider';
 import { useCallback } from 'react';
 
+import { Slider, SliderRange, SliderThumb, SliderTrack } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import type { SubtaskSegment } from '@/types/episode-edit';
 
@@ -52,7 +52,7 @@ export function SubtaskSegmentSlider({
   );
 
   return (
-    <Slider.Root
+    <Slider
       className={cn(
         'absolute top-1 bottom-1 touch-none select-none',
         className
@@ -68,18 +68,18 @@ export function SubtaskSegmentSlider({
       step={1}
       minStepsBetweenThumbs={1}
     >
-      <Slider.Track className="relative h-full w-full">
-        <Slider.Range
+      <SliderTrack className="h-full w-full rounded-sm bg-transparent">
+        <SliderRange
           className="absolute h-full rounded-sm cursor-pointer transition-opacity hover:opacity-90"
           style={{ backgroundColor: segment.color }}
           onClick={onClick}
         />
-      </Slider.Track>
+      </SliderTrack>
 
       {/* Start thumb */}
-      <Slider.Thumb
+      <SliderThumb
         className={cn(
-          'block h-4 w-2 rounded-sm bg-background border-2 shadow-sm',
+          'h-4 w-2 rounded-sm border-2 shadow-sm',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
           'hover:scale-110 transition-transform cursor-ew-resize'
         )}
@@ -88,15 +88,15 @@ export function SubtaskSegmentSlider({
       />
 
       {/* End thumb */}
-      <Slider.Thumb
+      <SliderThumb
         className={cn(
-          'block h-4 w-2 rounded-sm bg-background border-2 shadow-sm',
+          'h-4 w-2 rounded-sm border-2 shadow-sm',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
           'hover:scale-110 transition-transform cursor-ew-resize'
         )}
         style={{ borderColor: segment.color }}
         aria-label={`${segment.label} end frame`}
       />
-    </Slider.Root>
+    </Slider>
   );
 }
