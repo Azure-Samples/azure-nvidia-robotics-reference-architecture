@@ -116,7 +116,10 @@ param(
     [int]$Threshold = 95,
 
     [Parameter(Mandatory = $false)]
-    [switch]$Remediate
+    [switch]$Remediate,
+
+    [Parameter(Mandatory = $false)]
+    [string[]]$AdditionalFormats = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -845,6 +848,13 @@ try {
 
         # Export report
         Export-ComplianceReport -Report $report -Format $Format -OutputPath $OutputPath
+
+        # Export additional formats if requested
+        foreach ($extra in $AdditionalFormats) {
+            $extraPath = [System.IO.Path]::ChangeExtension($OutputPath, ".$extra")
+            Export-ComplianceReport -Report $report -Format $extra -OutputPath $extraPath
+            Write-PinningLog "Additional format exported: $extraPath" -Level Info
+        }
 
         # Export CI/CD artifacts
         Export-CICDArtifact -Report $report -ReportPath $OutputPath
