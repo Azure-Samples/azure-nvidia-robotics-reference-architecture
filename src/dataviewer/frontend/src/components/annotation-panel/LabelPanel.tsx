@@ -1,21 +1,21 @@
 /**
  * LabelPanel - multi-select label tagging for episodes.
  *
- * Displays available labels as toggleable badges, allows adding custom labels,
+ * Displays available labels as toggleable chips, allows adding custom labels,
  * and auto-saves on toggle.
  */
 
-import { Check,Plus, Save } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 import { useCallback,useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     useAddLabelOption,
     useCurrentEpisodeLabels,
-    useSaveAllLabels,
+    useRemoveLabelOption,
 } from '@/hooks/use-labels';
+import { cn } from '@/lib/utils';
 import { useLabelStore } from '@/stores/label-store';
 
 interface LabelPanelProps {
@@ -27,7 +27,7 @@ export function LabelPanel({ episodeIndex }: LabelPanelProps) {
     const availableLabels = useLabelStore((state) => state.availableLabels);
     const { currentLabels, toggle } = useCurrentEpisodeLabels(episodeIndex);
     const addOption = useAddLabelOption();
-    const saveAll = useSaveAllLabels();
+    const removeOption = useRemoveLabelOption();
 
     const handleAddLabel = useCallback(() => {
         const normalized = newLabel.trim().toUpperCase();
@@ -46,21 +46,18 @@ export function LabelPanel({ episodeIndex }: LabelPanelProps) {
         [handleAddLabel],
     );
 
+    const handleDeleteLabel = useCallback(
+        (label: string) => {
+            removeOption.mutate(label);
+        },
+        [removeOption],
+    );
+
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-medium">Episode Labels</h3>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => saveAll.mutate()}
-                    disabled={saveAll.isPending}
-                    title="Save all labels to metadata"
-                    className="h-7 px-2 gap-1 text-xs"
-                >
-                    {saveAll.isSuccess ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
-                    {saveAll.isPending ? 'Saving...' : 'Save All'}
-                </Button>
+                <p className="text-xs text-muted-foreground">Changes save automatically.</p>
             </div>
 
             {/* Label toggles */}
@@ -68,22 +65,39 @@ export function LabelPanel({ episodeIndex }: LabelPanelProps) {
                 {availableLabels.map((label) => {
                     const isSelected = currentLabels.includes(label);
                     return (
-                        <button
+                        <div
                             key={label}
-                            onClick={() => toggle(label)}
-                            className="focus:outline-none"
+                            className={cn(
+                                'inline-flex items-center rounded-full border transition-all',
+                                isSelected
+                                    ? 'border-transparent bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-foreground hover:bg-accent',
+                            )}
                         >
-                            <Badge
-                                variant={isSelected ? 'default' : 'outline'}
-                                className={`cursor-pointer select-none transition-all ${isSelected
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'hover:bg-accent'
-                                    }`}
+                            <button
+                                type="button"
+                                onClick={() => toggle(label)}
+                                className="inline-flex items-center gap-1 rounded-l-full px-2.5 py-0.5 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             >
                                 {isSelected && <Check className="h-3 w-3 mr-1" />}
                                 {label}
-                            </Badge>
-                        </button>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDeleteLabel(label)}
+                                aria-label={`Delete label ${label}`}
+                                title={`Delete label ${label}`}
+                                disabled={removeOption.isPending}
+                                className={cn(
+                                    'mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                                    isSelected
+                                        ? 'hover:bg-primary-foreground/15'
+                                        : 'hover:bg-accent-foreground/10',
+                                )}
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </div>
                     );
                 })}
             </div>

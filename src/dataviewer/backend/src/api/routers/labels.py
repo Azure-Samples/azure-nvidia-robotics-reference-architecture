@@ -50,6 +50,10 @@ class AddLabelOption(BaseModel):
     label: str = Field(min_length=1, max_length=100)
 
 
+def _normalize_label(label: str) -> str:
+    return label.strip().upper()
+
+
 def _get_base_path() -> str:
     return os.environ.get("HMI_DATA_PATH", "./data")
 
@@ -110,12 +114,38 @@ async def get_label_options(dataset_id: str = Depends(validated_dataset_id)) -> 
 async def add_label_option(dataset_id: str = Depends(validated_dataset_id), body: AddLabelOption = ...) -> list[str]:
     """Add a new label option to the available set."""
     labels_file = await _load_labels(dataset_id)
-    normalized = body.label.strip().upper()
+    normalized = _normalize_label(body.label)
     if not normalized:
         raise HTTPException(status_code=400, detail="Label cannot be empty")
     if normalized not in labels_file.available_labels:
         labels_file.available_labels.append(normalized)
         await _save_labels(dataset_id, labels_file)
+    return labels_file.available_labels
+
+
+@router.delete(
+    "/{dataset_id}/labels/options/{label}",
+    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+)
+async def delete_label_option(
+    dataset_id: str = Depends(validated_dataset_id),
+    label: str = ...,
+) -> list[str]:
+    """Delete a label option and remove it from all episode assignments."""
+    labels_file = await _load_labels(dataset_id)
+    normalized = _normalize_label(label)
+
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Label cannot be empty")
+
+    labels_file.available_labels = [existing for existing in labels_file.available_labels if existing != normalized]
+
+    labels_file.episodes = {
+        episode_idx: [existing for existing in labels if existing != normalized]
+        for episode_idx, labels in labels_file.episodes.items()
+    }
+
+    await _save_labels(dataset_id, labels_file)
     return labels_file.available_labels
 
 
@@ -145,11 +175,11 @@ async def set_episode_labels(
 
     # Auto-add any new labels to available options
     for label in body.labels:
-        normalized = label.strip().upper()
+        normalized = _normalize_label(label)
         if normalized and normalized not in labels_file.available_labels:
             labels_file.available_labels.append(normalized)
 
-    labels_file.episodes[key] = [label.strip().upper() for label in body.labels if label.strip()]
+    labels_file.episodes[key] = [normalized for label in body.labels if (normalized := _normalize_label(label))]
     await _save_labels(dataset_id, labels_file)
 
     return EpisodeLabels(

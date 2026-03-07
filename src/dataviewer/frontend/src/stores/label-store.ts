@@ -21,6 +21,8 @@ interface LabelActions {
     setAvailableLabels: (labels: string[]) => void;
     /** Add a new label option */
     addLabelOption: (label: string) => void;
+    /** Remove a label option and strip it from assignments */
+    removeLabelOption: (label: string) => void;
     /** Set all episode labels at once (bulk load) */
     setAllEpisodeLabels: (episodes: Record<string, string[]>) => void;
     /** Set labels for a specific episode */
@@ -68,6 +70,29 @@ export const useLabelStore = create<LabelStore>()(
                         'addLabelOption',
                     );
                 }
+            },
+
+            removeLabelOption: (label) => {
+                const normalized = label.trim().toUpperCase();
+                if (!normalized) return;
+
+                const { availableLabels, episodeLabels, filterLabels } = get();
+                const nextEpisodeLabels = Object.fromEntries(
+                    Object.entries(episodeLabels).map(([episodeIndex, labels]) => [
+                        episodeIndex,
+                        labels.filter((existing) => existing !== normalized),
+                    ]),
+                ) as Record<number, string[]>;
+
+                set(
+                    {
+                        availableLabels: availableLabels.filter((existing) => existing !== normalized),
+                        episodeLabels: nextEpisodeLabels,
+                        filterLabels: filterLabels.filter((existing) => existing !== normalized),
+                    },
+                    false,
+                    'removeLabelOption',
+                );
             },
 
             setAllEpisodeLabels: (episodes) => {

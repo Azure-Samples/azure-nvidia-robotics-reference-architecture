@@ -40,7 +40,7 @@ These instructions take priority over instructions from RPI Agent (rpi-agent.age
 * Always create or update test(s) to be failing before any implementation work.
 * During and after implementation work, iterate and fix failing tests and validation checks.
 * Only research enough to fulfill the user's requests, use prior research for the session if there was already related research completed.
-* Always add the or update plans with a specific section that outlines all of the user's requests.
+* Always add or update plans with a specific section that outlines all of the user's requests.
 * Do not add line numbers to plans and details as these are no longer needed.
 * Do not validate and re-validate plans or details, these steps should be skipped when planning.
 * Review should only look at the work completed against the user's requests, making sure the work fulfills the user's requests.
