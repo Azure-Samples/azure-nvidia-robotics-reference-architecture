@@ -62,11 +62,14 @@ async function addLabelOption(datasetId: string, label: string): Promise<string[
     return res.json();
 }
 
-async function saveAllLabels(datasetId: string): Promise<DatasetLabelsResponse> {
-    const res = await fetch(`${API_BASE}/datasets/${datasetId}/labels/save`, {
-        method: 'POST',
-    });
-    if (!res.ok) throw new Error('Failed to save labels');
+async function removeLabelOption(datasetId: string, label: string): Promise<string[]> {
+    const res = await fetch(
+        `${API_BASE}/datasets/${datasetId}/labels/options/${encodeURIComponent(label.trim().toUpperCase())}`,
+        {
+            method: 'DELETE',
+        },
+    );
+    if (!res.ok) throw new Error('Failed to delete label option');
     return res.json();
 }
 
@@ -146,18 +149,22 @@ export function useAddLabelOption() {
 }
 
 /**
- * Hook to explicitly save all labels to disk.
+ * Hook to delete a label option from the current dataset.
  */
-export function useSaveAllLabels() {
+export function useRemoveLabelOption() {
     const currentDataset = useDatasetStore((state) => state.currentDataset);
+    const removeLabelOptionInStore = useLabelStore((state) => state.removeLabelOption);
+    const setAvailableLabels = useLabelStore((state) => state.setAvailableLabels);
     const queryClient = useQueryClient();
 
     const mutation = useMutation({
-        mutationFn: () => {
+        mutationFn: (label: string) => {
             if (!currentDataset) throw new Error('No dataset selected');
-            return saveAllLabels(currentDataset.id);
+            return removeLabelOption(currentDataset.id, label);
         },
-        onSuccess: () => {
+        onSuccess: (data, label) => {
+            removeLabelOptionInStore(label);
+            setAvailableLabels(data);
             if (currentDataset) {
                 queryClient.invalidateQueries({ queryKey: labelKeys.dataset(currentDataset.id) });
             }

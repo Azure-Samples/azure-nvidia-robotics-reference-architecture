@@ -70,7 +70,7 @@ export {
   useAddLabelOption,
   useCurrentEpisodeLabels,
   useDatasetLabels,
-  useSaveAllLabels,
+  useRemoveLabelOption,
   useSaveEpisodeLabels,
 } from './use-labels';
 export {

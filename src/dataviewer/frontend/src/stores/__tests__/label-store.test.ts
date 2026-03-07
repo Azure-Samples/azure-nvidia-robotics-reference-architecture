@@ -39,6 +39,25 @@ describe('useLabelStore', () => {
     })
   })
 
+  describe('removeLabelOption', () => {
+    it('removes a label from options, episode assignments, and filters', () => {
+      const store = useLabelStore.getState()
+
+      store.setAvailableLabels(['SUCCESS', 'REVIEW'])
+      store.setEpisodeLabels(1, ['SUCCESS', 'REVIEW'])
+      store.setEpisodeLabels(2, ['REVIEW'])
+      store.setFilterLabels(['REVIEW'])
+
+      store.removeLabelOption('review')
+
+      const state = useLabelStore.getState()
+      expect(state.availableLabels).toEqual(['SUCCESS'])
+      expect(state.episodeLabels[1]).toEqual(['SUCCESS'])
+      expect(state.episodeLabels[2]).toEqual([])
+      expect(state.filterLabels).toEqual([])
+    })
+  })
+
   describe('setAllEpisodeLabels', () => {
     it('parses string keys to numeric indices', () => {
       useLabelStore
