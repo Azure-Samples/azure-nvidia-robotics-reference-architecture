@@ -69,6 +69,59 @@ beforeEach(() => {
 })
 
 describe('TrajectoryPlot', () => {
+  it('auto-selects the most significant joint groups for the episode telemetry', () => {
+    useEpisodeStore.getState().setCurrentEpisode({
+      meta: { index: 0, length: 4, taskIndex: 0, hasAnnotations: false },
+      videoUrls: {},
+      trajectoryData: [
+        {
+          frame: 0,
+          timestamp: 0,
+          jointPositions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+          jointVelocities: Array.from({ length: 17 }, () => 0),
+          endEffectorPose: [],
+          gripperState: 0,
+        },
+        {
+          frame: 1,
+          timestamp: 0.1,
+          jointPositions: [0, 0, 0, 0, 0, 0, 0, 0, 0.8, 1.2, 0.9, 0.2, 0.4, 0.3, 0.8, 0.6, 0],
+          jointVelocities: Array.from({ length: 17 }, () => 0),
+          endEffectorPose: [],
+          gripperState: 0.6,
+        },
+        {
+          frame: 2,
+          timestamp: 0.2,
+          jointPositions: [0, 0, 0, 0, 0, 0, 0, 0, 1.4, 2.1, 1.5, 0.5, 0.9, 0.7, 0.1, 1, 0],
+          jointVelocities: Array.from({ length: 17 }, () => 0),
+          endEffectorPose: [],
+          gripperState: 1,
+        },
+        {
+          frame: 3,
+          timestamp: 0.3,
+          jointPositions: [0, 0, 0, 0, 0, 0, 0, 0, 1.8, 2.8, 2.2, 0.9, 1.2, 1.1, -0.4, 0.2, 0],
+          jointVelocities: Array.from({ length: 17 }, () => 0),
+          endEffectorPose: [],
+          gripperState: 0.2,
+        },
+      ],
+    })
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot className="h-full" />
+      </div>,
+    )
+
+    expect(screen.getByTestId('line-joint_8')).toBeInTheDocument()
+    expect(screen.getByTestId('line-joint_11')).toBeInTheDocument()
+    expect(screen.getByTestId('line-joint_15')).toBeInTheDocument()
+    expect(screen.queryByTestId('line-joint_0')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('line-joint_7')).not.toBeInTheDocument()
+  })
+
   it('renders the joint selector inside a dedicated scroll region', () => {
     render(
       <div style={{ width: 600, height: 300 }}>

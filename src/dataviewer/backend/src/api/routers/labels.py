@@ -21,6 +21,7 @@ from ..validation import validate_path_containment, validated_dataset_id
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+DEFAULT_LABELS = ["SUCCESS", "FAILURE", "PARTIAL"]
 
 
 class EpisodeLabels(BaseModel):
@@ -34,7 +35,7 @@ class DatasetLabelsFile(BaseModel):
     """All episode labels and available options for a dataset."""
 
     dataset_id: str
-    available_labels: list[str] = Field(default_factory=lambda: ["SUCCESS", "FAILURE", "PARTIAL"])
+    available_labels: list[str] = Field(default_factory=lambda: DEFAULT_LABELS.copy())
     episodes: dict[str, list[str]] = Field(default_factory=dict)
 
 
@@ -137,6 +138,9 @@ async def delete_label_option(
 
     if not normalized:
         raise HTTPException(status_code=400, detail="Label cannot be empty")
+
+    if normalized in DEFAULT_LABELS:
+        raise HTTPException(status_code=400, detail="Built-in labels cannot be deleted")
 
     labels_file.available_labels = [existing for existing in labels_file.available_labels if existing != normalized]
 

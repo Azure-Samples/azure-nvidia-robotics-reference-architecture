@@ -41,7 +41,7 @@ interface LabelActions {
 
 type LabelStore = LabelState & LabelActions;
 
-const DEFAULT_LABELS = ['SUCCESS', 'FAILURE', 'PARTIAL'];
+export const DEFAULT_LABELS: string[] = ['SUCCESS', 'FAILURE', 'PARTIAL'];
 
 const initialState: LabelState = {
     availableLabels: DEFAULT_LABELS,

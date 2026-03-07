@@ -106,9 +106,18 @@ export function useSaveJointConfig() {
     },
   })
 
-  const save = useCallback(() => {
-    if (currentDataset) mutation.mutate()
-  }, [currentDataset, mutation])
+  const save = useCallback(
+    (onSuccess?: () => void) => {
+      if (!currentDataset) return
+
+      mutation.mutate(undefined, {
+        onSuccess: () => {
+          onSuccess?.()
+        },
+      })
+    },
+    [currentDataset, mutation],
+  )
 
   return { save, ...mutation }
 }

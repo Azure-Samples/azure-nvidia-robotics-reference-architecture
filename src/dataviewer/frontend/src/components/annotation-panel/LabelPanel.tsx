@@ -6,9 +6,17 @@
  */
 
 import { Check, Plus, X } from 'lucide-react';
-import { useCallback,useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     useAddLabelOption,
@@ -16,25 +24,35 @@ import {
     useRemoveLabelOption,
 } from '@/hooks/use-labels';
 import { cn } from '@/lib/utils';
-import { useLabelStore } from '@/stores/label-store';
+import { DEFAULT_LABELS, useLabelStore } from '@/stores/label-store';
 
 interface LabelPanelProps {
     episodeIndex: number;
+    onSaved?: () => void;
 }
 
-export function LabelPanel({ episodeIndex }: LabelPanelProps) {
+export function LabelPanel({ episodeIndex, onSaved }: LabelPanelProps) {
     const [newLabel, setNewLabel] = useState('');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [pendingDeleteLabel, setPendingDeleteLabel] = useState<string | null>(null);
     const availableLabels = useLabelStore((state) => state.availableLabels);
     const { currentLabels, toggle } = useCurrentEpisodeLabels(episodeIndex);
     const addOption = useAddLabelOption();
     const removeOption = useRemoveLabelOption();
 
-    const handleAddLabel = useCallback(() => {
+    const handleAddLabel = useCallback(async () => {
         const normalized = newLabel.trim().toUpperCase();
         if (!normalized) return;
-        addOption.mutate(normalized);
-        setNewLabel('');
-    }, [newLabel, addOption]);
+        try {
+            await addOption.mutateAsync(normalized);
+            setNewLabel('');
+            setErrorMessage(null);
+            onSaved?.();
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : 'Unknown error';
+            setErrorMessage(`Failed to add label: ${detail}`);
+        }
+    }, [newLabel, addOption, onSaved]);
 
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
@@ -48,22 +66,52 @@ export function LabelPanel({ episodeIndex }: LabelPanelProps) {
 
     const handleDeleteLabel = useCallback(
         (label: string) => {
-            removeOption.mutate(label);
+            setPendingDeleteLabel(label);
         },
-        [removeOption],
+        [],
     );
+
+    const handleToggleLabel = useCallback(
+        async (label: string) => {
+            try {
+                await toggle(label);
+                setErrorMessage(null);
+                onSaved?.();
+            } catch (error) {
+                const detail = error instanceof Error ? error.message : 'Unknown error';
+                setErrorMessage(`Failed to update labels: ${detail}`);
+            }
+        },
+        [onSaved, toggle],
+    );
+
+    const confirmDeleteLabel = useCallback(async () => {
+        if (!pendingDeleteLabel) return;
+
+        try {
+            await removeOption.mutateAsync(pendingDeleteLabel);
+            setErrorMessage(null);
+            setPendingDeleteLabel(null);
+            onSaved?.();
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : 'Unknown error';
+            setErrorMessage(`Failed to delete label: ${detail}`);
+        }
+    }, [onSaved, pendingDeleteLabel, removeOption]);
 
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-medium">Episode Labels</h3>
-                <p className="text-xs text-muted-foreground">Changes save automatically.</p>
             </div>
+
+            {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
 
             {/* Label toggles */}
             <div className="flex flex-wrap gap-2">
                 {availableLabels.map((label) => {
                     const isSelected = currentLabels.includes(label);
+                    const isProtected = DEFAULT_LABELS.includes(label);
                     return (
                         <div
                             key={label}
@@ -76,31 +124,35 @@ export function LabelPanel({ episodeIndex }: LabelPanelProps) {
                         >
                             <button
                                 type="button"
-                                onClick={() => toggle(label)}
+                                onClick={() => void handleToggleLabel(label)}
                                 className="inline-flex items-center gap-1 rounded-l-full px-2.5 py-0.5 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             >
                                 {isSelected && <Check className="h-3 w-3 mr-1" />}
                                 {label}
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => handleDeleteLabel(label)}
-                                aria-label={`Delete label ${label}`}
-                                title={`Delete label ${label}`}
-                                disabled={removeOption.isPending}
-                                className={cn(
-                                    'mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                                    isSelected
-                                        ? 'hover:bg-primary-foreground/15'
-                                        : 'hover:bg-accent-foreground/10',
-                                )}
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
+                            {!isProtected && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteLabel(label)}
+                                    aria-label={`Delete label ${label}`}
+                                    title={`Delete label ${label}`}
+                                    disabled={removeOption.isPending}
+                                    className={cn(
+                                        'mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                                        isSelected
+                                            ? 'hover:bg-primary-foreground/15'
+                                            : 'hover:bg-accent-foreground/10',
+                                    )}
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
                         </div>
                     );
                 })}
             </div>
+
+            <p className="text-xs text-muted-foreground">Built-in labels stay available. Custom labels require confirmation before deletion.</p>
 
             {/* Add custom label */}
             <div className="flex gap-2">
@@ -114,7 +166,7 @@ export function LabelPanel({ episodeIndex }: LabelPanelProps) {
                 <Button
                     size="sm"
                     variant="outline"
-                    onClick={handleAddLabel}
+                    onClick={() => void handleAddLabel()}
                     disabled={!newLabel.trim() || addOption.isPending}
                     className="h-8 px-3 gap-1"
                 >
@@ -129,6 +181,27 @@ export function LabelPanel({ episodeIndex }: LabelPanelProps) {
                     Applied: {currentLabels.join(', ')}
                 </div>
             )}
+
+            <Dialog open={pendingDeleteLabel !== null} onOpenChange={(open) => !open && setPendingDeleteLabel(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Label</DialogTitle>
+                        <DialogDescription>
+                            {pendingDeleteLabel
+                                ? `Delete ${pendingDeleteLabel} from the dataset label list and remove it from every episode assignment?`
+                                : 'Delete this label from the dataset.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setPendingDeleteLabel(null)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" variant="destructive" onClick={() => void confirmDeleteLabel()}>
+                            Delete Label
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
