@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
 import { useOfflineAnnotations } from '@/hooks/use-offline-annotations';
+import { getSemanticToneClasses, getSyncStatusTone } from '@/lib/semantic-state';
 import { cn } from '@/lib/utils';
 
 export interface OfflineIndicatorProps {
@@ -47,6 +48,7 @@ export function OfflineIndicator({ className }: OfflineIndicatorProps) {
   // Determine status
   const hasErrors = lastSyncResult?.failedCount && lastSyncResult.failedCount > 0;
   const hasPending = pendingCount > 0;
+  const pendingTone = getSyncStatusTone('pending');
 
   return (
     <Popover>
@@ -58,30 +60,35 @@ export function OfflineIndicator({ className }: OfflineIndicatorProps) {
         >
           {!isOnline ? (
             <>
-              <WifiOff className="h-4 w-4 text-red-500" />
-              <span className="text-red-500">Offline</span>
+              <WifiOff className={cn('h-4 w-4', getSemanticToneClasses('icon', 'danger'))} />
+              <span className={getSemanticToneClasses('text', 'danger')}>Offline</span>
             </>
           ) : isSyncing ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <span className="text-blue-500">Syncing...</span>
+              <Loader2
+                className={cn(
+                  'h-4 w-4 animate-spin',
+                  getSemanticToneClasses('icon', pendingTone)
+                )}
+              />
+              <span className={getSemanticToneClasses('text', pendingTone)}>Syncing...</span>
             </>
           ) : hasPending ? (
             <>
-              <Cloud className="h-4 w-4 text-yellow-500" />
-              <Badge variant="secondary" className="h-5 px-1.5">
+              <Cloud className={cn('h-4 w-4', getSemanticToneClasses('icon', pendingTone))} />
+              <Badge variant="status" tone={pendingTone} className="h-5 px-1.5">
                 {pendingCount}
               </Badge>
             </>
           ) : hasErrors ? (
             <>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-              <span className="text-orange-500">Sync errors</span>
+              <AlertTriangle className={cn('h-4 w-4', getSemanticToneClasses('icon', 'warning'))} />
+              <span className={getSemanticToneClasses('text', 'warning')}>Sync errors</span>
             </>
           ) : (
             <>
-              <Wifi className="h-4 w-4 text-green-500" />
-              <Check className="h-3 w-3 text-green-500" />
+              <Wifi className={cn('h-4 w-4', getSemanticToneClasses('icon', 'success'))} />
+              <Check className={cn('h-3 w-3', getSemanticToneClasses('icon', 'success'))} />
             </>
           )}
         </Button>
@@ -91,7 +98,7 @@ export function OfflineIndicator({ className }: OfflineIndicatorProps) {
           {/* Connection status */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Connection Status</span>
-            <Badge variant={isOnline ? 'default' : 'destructive'}>
+            <Badge variant="status" tone={isOnline ? 'success' : 'danger'}>
               {isOnline ? (
                 <>
                   <Wifi className="h-3 w-3 mr-1" />
@@ -123,15 +130,21 @@ export function OfflineIndicator({ className }: OfflineIndicatorProps) {
               <p>
                 Last sync: {lastSyncResult.syncedCount} synced
                 {lastSyncResult.failedCount > 0 && (
-                  <span className="text-red-500">
+                  <span className={getSemanticToneClasses('text', 'danger')}>
                     , {lastSyncResult.failedCount} failed
                   </span>
                 )}
               </p>
               {lastSyncResult.errors.length > 0 && (
-                <div className="max-h-20 overflow-auto rounded bg-red-50 p-2">
+                <div
+                  className={cn(
+                    'max-h-20 overflow-auto rounded border p-2',
+                    getSemanticToneClasses('surface', 'danger'),
+                    'text-xs'
+                  )}
+                >
                   {lastSyncResult.errors.slice(0, 3).map((err) => (
-                    <p key={err.id} className="text-red-600 truncate">
+                    <p key={err.id} className="truncate">
                       {err.error}
                     </p>
                   ))}

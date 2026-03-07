@@ -109,4 +109,21 @@ describe('AppContent', () => {
     expect(screen.getByPlaceholderText('Filter datasets')).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'hexagon_lerobot' })).toBeInTheDocument()
   })
+
+  it('supports keyboard selection from the dataset dropdown results', async () => {
+    const user = userEvent.setup()
+
+    render(<AppContent />)
+
+    const trigger = await screen.findByRole('combobox', { name: 'Dataset' })
+    expect(trigger).toHaveTextContent('houston_lerobot_fixed')
+
+    await user.click(trigger)
+    await user.type(screen.getByPlaceholderText('Filter datasets'), 'hex')
+    await user.keyboard('{ArrowDown}{Enter}')
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('hexagon_lerobot')
+    })
+  })
 })
