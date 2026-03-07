@@ -8,9 +8,20 @@
  * - Filters and charts
  */
 
-import { AlertTriangle, BarChart3, Eye, Filter, Loader2, Pause, Play, RotateCcw,Scan } from 'lucide-react';
-import { useEffect,useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  BarChart3,
+  Eye,
+  Filter,
+  Loader2,
+  Pause,
+  Play,
+  RotateCcw,
+  Scan,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
+import { PlaybackControlStrip } from '@/components/playback/PlaybackControlStrip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -198,40 +209,45 @@ export function DetectionPanel() {
                 </div>
 
                 {/* Playback Controls for Detection */}
-                <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
-                  <Button size="sm" onClick={togglePlayback} className="gap-1">
-                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    {isPlaying ? 'Pause' : 'Play'}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setCurrentFrame(0)}>
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Speed:</span>
-                    {[0.5, 1, 2].map((speed) => (
-                      <Button
-                        key={speed}
-                        size="sm"
-                        variant={playbackSpeed === speed ? 'default' : 'outline'}
-                        onClick={() => setPlaybackSpeed(speed)}
-                        className="px-2"
-                      >
-                        {speed}x
+                <PlaybackControlStrip
+                  currentFrame={currentFrame}
+                  totalFrames={totalFrames}
+                  controls={
+                    <>
+                      <Button size="sm" onClick={togglePlayback} className="gap-1">
+                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        {isPlaying ? 'Pause' : 'Play'}
                       </Button>
-                    ))}
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={totalFrames - 1}
-                    value={currentFrame}
-                    onChange={(e) => setCurrentFrame(parseInt(e.target.value, 10))}
-                    className="flex-1"
-                  />
-                  <span className="text-sm text-muted-foreground w-24 text-right">
-                    {currentFrame + 1} / {totalFrames}
-                  </span>
-                </div>
+                      <Button size="sm" variant="outline" onClick={() => setCurrentFrame(0)}>
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm">Speed:</span>
+                        {[0.5, 1, 2].map((speed) => (
+                          <Button
+                            key={speed}
+                            size="sm"
+                            variant={playbackSpeed === speed ? 'default' : 'outline'}
+                            onClick={() => setPlaybackSpeed(speed)}
+                            className="px-2"
+                          >
+                            {speed}x
+                          </Button>
+                        ))}
+                      </div>
+                    </>
+                  }
+                  slider={
+                    <input
+                      type="range"
+                      min={0}
+                      max={totalFrames - 1}
+                      value={currentFrame}
+                      onChange={(e) => setCurrentFrame(parseInt(e.target.value, 10))}
+                      className="w-full"
+                    />
+                  }
+                />
               </>
             )}
           </CardContent>

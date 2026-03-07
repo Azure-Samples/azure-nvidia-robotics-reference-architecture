@@ -6,6 +6,7 @@ import { TrajectoryPlot } from '@/components/episode-viewer';
 import { ExportDialog } from '@/components/export';
 import { ColorAdjustmentControls,FrameInsertionToolbar, FrameRemovalToolbar, TrajectoryEditor, TransformControls } from '@/components/frame-editor';
 import { DetectionPanel } from '@/components/object-detection';
+import { PlaybackControlStrip } from '@/components/playback/PlaybackControlStrip';
 import { SubtaskTimelineTrack, SubtaskToolbar } from '@/components/subtask-timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -435,88 +436,94 @@ export function AnnotationWorkspace() {
                   </div>
 
                   {/* Playback Controls */}
-                  <div className="mt-3 flex items-center gap-4 p-3 bg-muted rounded-lg">
-                    <Button
-                      size="sm"
-                      onClick={togglePlayback}
-                      className="gap-1 min-w-[5rem]"
-                    >
-                      {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      {isPlaying ? 'Pause' : 'Play'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => stepFrame(-1)}
-                      disabled={isPlaying}
-                      title="Previous frame"
-                    >
-                      <SkipBack className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => stepFrame(1)}
-                      disabled={isPlaying}
-                      title="Next frame"
-                    >
-                      <SkipForward className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setCurrentFrame(0)}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Speed:</span>
-                      {[0.5, 1, 2].map((speed) => (
+                  <PlaybackControlStrip
+                    currentFrame={currentFrame}
+                    totalFrames={totalFrames}
+                    className="mt-3"
+                    controls={
+                      <>
                         <Button
-                          key={speed}
                           size="sm"
-                          variant={playbackSpeed === speed ? 'default' : 'outline'}
-                          onClick={() => setPlaybackSpeed(speed)}
-                          className="px-2"
+                          onClick={togglePlayback}
+                          className="gap-1 min-w-[5rem]"
                         >
-                          {speed}x
+                          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          {isPlaying ? 'Pause' : 'Play'}
                         </Button>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant={autoPlay ? 'default' : 'outline'}
-                        onClick={() => setAutoPlay(!autoPlay)}
-                        className="px-2"
-                        title={autoPlay ? 'Auto-play on (click to disable)' : 'Auto-play off (click to enable)'}
-                      >
-                        <Play className="h-3 w-3 mr-1" />
-                        Auto
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={autoLoop ? 'default' : 'outline'}
-                        onClick={() => setAutoLoop(!autoLoop)}
-                        className="px-2"
-                        title={autoLoop ? 'Loop on (click to disable)' : 'Loop off (click to enable)'}
-                      >
-                        <Repeat className="h-3 w-3 mr-1" />
-                        Loop
-                      </Button>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={totalFrames - 1}
-                      value={currentFrame}
-                      onChange={(e) => setCurrentFrame(parseInt(e.target.value, 10))}
-                      className="flex-1"
-                    />
-                    <span className="text-sm text-muted-foreground w-24 text-right">
-                      {currentFrame + 1} / {totalFrames}
-                    </span>
-                  </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => stepFrame(-1)}
+                          disabled={isPlaying}
+                          title="Previous frame"
+                        >
+                          <SkipBack className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => stepFrame(1)}
+                          disabled={isPlaying}
+                          title="Next frame"
+                        >
+                          <SkipForward className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCurrentFrame(0)}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm">Speed:</span>
+                          {[0.5, 1, 2].map((speed) => (
+                            <Button
+                              key={speed}
+                              size="sm"
+                              variant={playbackSpeed === speed ? 'default' : 'outline'}
+                              onClick={() => setPlaybackSpeed(speed)}
+                              className="px-2"
+                            >
+                              {speed}x
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant={autoPlay ? 'default' : 'outline'}
+                            onClick={() => setAutoPlay(!autoPlay)}
+                            className="px-2"
+                            title={autoPlay ? 'Auto-play on (click to disable)' : 'Auto-play off (click to enable)'}
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            Auto
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={autoLoop ? 'default' : 'outline'}
+                            onClick={() => setAutoLoop(!autoLoop)}
+                            className="px-2"
+                            title={autoLoop ? 'Loop on (click to disable)' : 'Loop off (click to enable)'}
+                          >
+                            <Repeat className="h-3 w-3 mr-1" />
+                            Loop
+                          </Button>
+                        </div>
+                      </>
+                    }
+                    slider={
+                      <input
+                        type="range"
+                        min={0}
+                        max={totalFrames - 1}
+                        value={currentFrame}
+                        onChange={(e) => setCurrentFrame(parseInt(e.target.value, 10))}
+                        className="w-full"
+                      />
+                    }
+                  />
                 </CardContent>
               </Card>
 
