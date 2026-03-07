@@ -189,13 +189,14 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           uv lock
-          if git diff --quiet -- uv.lock; then
-            echo "uv.lock is already up to date"
+          git diff --quiet -- uv.lock
+          if ($LASTEXITCODE -eq 0) {
+            Write-Output "uv.lock is already up to date"
             exit 0
-          fi
+          }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote set-url origin "https://x-access-token:$($env:GH_TOKEN)@github.com/$($env:GITHUB_REPOSITORY).git"
           git add uv.lock
           git commit -m "chore: regenerate uv.lock"
           git push
