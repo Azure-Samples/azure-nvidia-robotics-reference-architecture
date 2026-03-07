@@ -1,4 +1,15 @@
-# Support
+---
+title: Support
+description: How to get help, report issues, and find resources for the Azure NVIDIA Robotics Reference Architecture
+author: Microsoft Robotics-AI Team
+ms.date: 2026-03-06
+ms.topic: reference
+keywords:
+  - support
+  - help
+  - issues
+  - troubleshooting
+---
 
 Thank you for using the Azure NVIDIA Robotics Reference Architecture! This document explains how to get help with issues, questions, and contributions.
 
@@ -60,3 +71,10 @@ For enterprise support related to Azure services, please contact [Azure Support]
 This project follows the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 
 For questions, see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com).
+
+---
+
+<!-- markdownlint-disable MD036 -->
+*🤖 Crafted with precision by ✨Copilot following brilliant human instruction,
+then carefully refined by our team of discerning human reviewers.*
+<!-- markdownlint-enable MD036 -->
