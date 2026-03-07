@@ -1,17 +1,22 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { memo,useCallback, useEffect, useState } from 'react';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { LabelFilter } from '@/components/annotation-panel';
 import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useCapabilities,useDatasets, useEpisode, useEpisodes } from '@/hooks/use-datasets';
 import { useJointConfig } from '@/hooks/use-joint-config';
 import { useDatasetLabels } from '@/hooks/use-labels';
 import { queryClient } from '@/lib/query-client';
+import { cn } from '@/lib/utils';
 import { useDatasetStore,useEpisodeStore } from '@/stores';
 import { useLabelStore } from '@/stores/label-store';
-import type { EpisodeMeta } from '@/types';
+import type { DatasetInfo, EpisodeMeta } from '@/types';
 
 /**
  * Memoized episode list item to prevent re-renders on sibling selection changes.
@@ -169,6 +174,124 @@ function EpisodeViewer({ datasetId, episodeIndex }: { datasetId: string; episode
   return <AnnotationWorkspace />;
 }
 
+function DatasetSelector({
+  datasetId,
+  datasets,
+  onSelectDataset,
+}: {
+  datasetId: string;
+  datasets: DatasetInfo[];
+  onSelectDataset: (datasetId: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const filterInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedDataset = datasets.find((dataset) => dataset.id === datasetId) ?? null;
+  const normalizedFilter = filterText.trim().toLowerCase();
+  const filteredDatasets = normalizedFilter
+    ? datasets.filter((dataset) => {
+      const searchableText = `${dataset.id} ${dataset.name}`.toLowerCase();
+      return searchableText.includes(normalizedFilter);
+    })
+    : datasets;
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+
+    if (!open) {
+      setFilterText('');
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      filterInputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  return (
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          id="dataset-selector"
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-label="Dataset"
+          aria-expanded={isOpen}
+          aria-controls="dataset-selector-listbox"
+          className="w-72 justify-between font-normal"
+        >
+          <span className="truncate text-left">{selectedDataset?.id || 'Select a dataset'}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-2" align="end">
+        <div className="space-y-2">
+          <Input
+            ref={filterInputRef}
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            placeholder="Filter datasets"
+            aria-label="Filter datasets"
+            className="h-9"
+          />
+          <div
+            id="dataset-selector-listbox"
+            role="listbox"
+            aria-label="Available datasets"
+            className="max-h-60 overflow-y-auto"
+          >
+            {filteredDatasets.length > 0 ? (
+              <div className="space-y-1">
+                {filteredDatasets.map((dataset) => {
+                  const isSelected = dataset.id === datasetId;
+
+                  return (
+                    <button
+                      key={dataset.id}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => {
+                        onSelectDataset(dataset.id);
+                        setIsOpen(false);
+                        setFilterText('');
+                      }}
+                      className={cn(
+                        'flex w-full items-start justify-between rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                        isSelected ? 'bg-accent text-accent-foreground' : 'text-foreground'
+                      )}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{dataset.id}</span>
+                        {dataset.name !== dataset.id && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {dataset.name}
+                          </span>
+                        )}
+                      </span>
+                      <Check
+                        className={cn(
+                          'ml-2 mt-0.5 h-4 w-4 shrink-0',
+                          isSelected ? 'opacity-100' : 'opacity-0'
+                        )}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-3 py-2 text-sm text-muted-foreground">No datasets match the current filter.</div>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function AppContent() {
   const [datasetId, setDatasetId] = useState('');
   const [selectedEpisode, setSelectedEpisode] = useState<number>(0);
@@ -211,26 +334,14 @@ export function AppContent() {
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="dataset-selector" className="text-sm">Dataset:</label>
-          {datasets && datasets.length > 1 ? (
-            <select
-              id="dataset-selector"
-              value={datasetId}
-              onChange={(e) => { setDatasetId(e.target.value); setSelectedEpisode(0); }}
-              className="px-3 py-1 border rounded text-sm w-64"
-            >
-              {datasets.map((ds) => (
-                <option key={ds.id} value={ds.id}>{ds.name}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type="text"
-              value={datasetId}
-              onChange={(e) => setDatasetId(e.target.value)}
-              className="px-3 py-1 border rounded text-sm w-64"
-              placeholder="Dataset ID"
-            />
-          )}
+          <DatasetSelector
+            datasetId={datasetId}
+            datasets={datasets ?? []}
+            onSelectDataset={(nextDatasetId) => {
+              setDatasetId(nextDatasetId);
+              setSelectedEpisode(0);
+            }}
+          />
           {capabilities?.isLerobotDataset && (
             <Badge variant="secondary">LeRobot</Badge>
           )}

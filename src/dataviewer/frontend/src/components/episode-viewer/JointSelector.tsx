@@ -56,7 +56,12 @@ function InlineEdit({
   const [text, setText] = useState(value)
 
   useEffect(() => {
-    inputRef.current?.focus()
+    const timeoutId = window.setTimeout(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -110,7 +115,7 @@ function SortableChip({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `joint-${idx}`,
-    disabled: !editable,
+    disabled: !editable || editingJoint === idx,
   })
 
   const style = {
@@ -120,28 +125,40 @@ function SortableChip({
     opacity: isDragging ? 0.5 : undefined,
   }
 
+  const chipClasses = cn(
+    'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-all',
+    isSelected
+      ? 'border-current font-medium'
+      : 'border-transparent opacity-40 hover:opacity-70',
+  )
+
+  if (editingJoint === idx) {
+    return (
+      <div
+        ref={setNodeRef}
+        data-joint-chip
+        className={chipClasses}
+        style={style}
+      >
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+        <InlineEdit value={label} onCommit={onCommitEdit} onCancel={onCancelEdit} />
+      </div>
+    )
+  }
+
   const chip = (
     <button
       ref={setNodeRef}
+      type="button"
       data-joint-chip
       onClick={onToggle}
-      onDoubleClick={editable ? onStartEdit : undefined}
-      className={cn(
-        'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border transition-all',
-        isSelected
-          ? 'border-current font-medium'
-          : 'border-transparent opacity-40 hover:opacity-70',
-      )}
+      className={chipClasses}
       style={style}
       {...attributes}
       {...listeners}
     >
       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-      {editingJoint === idx ? (
-        <InlineEdit value={label} onCommit={onCommitEdit} onCancel={onCancelEdit} />
-      ) : (
-        label
-      )}
+      {label}
     </button>
   )
 
@@ -151,7 +168,10 @@ function SortableChip({
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>{chip}</ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+        <ContextMenu.Content
+          className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
           <ContextMenu.Item
             className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
             onSelect={onStartEdit}
@@ -337,7 +357,6 @@ export function JointSelector({
     const labelButton = (
       <button
         onClick={() => toggleGroup(group.indices)}
-        onDoubleClick={editable ? () => setEditingGroup(group.id) : undefined}
         className={cn(
           'text-xs font-medium transition-colors whitespace-nowrap',
           allActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
@@ -353,7 +372,10 @@ export function JointSelector({
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{labelButton}</ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+          <ContextMenu.Content
+            className="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            onCloseAutoFocus={(event) => event.preventDefault()}
+          >
             <ContextMenu.Item
               className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent"
               onSelect={() => setEditingGroup(group.id)}

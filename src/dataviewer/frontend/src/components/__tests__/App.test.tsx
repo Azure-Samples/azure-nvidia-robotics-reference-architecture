@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppContent } from '@/App'
@@ -62,7 +63,7 @@ describe('AppContent', () => {
     const { rerender } = render(<AppContent />)
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toHaveValue('houston_lerobot_fixed')
+      expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('houston_lerobot_fixed')
     })
 
     mockDatasets = [
@@ -79,7 +80,33 @@ describe('AppContent', () => {
     rerender(<AppContent />)
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('hexagon_lerobot')).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('hexagon_lerobot')
     })
+  })
+
+  it('renders a filterable dataset dropdown even when only one dataset is available', async () => {
+    mockDatasets = [
+      {
+        id: 'hexagon_lerobot',
+        name: 'hexagon_lerobot',
+        totalEpisodes: 64,
+        fps: 30,
+        features: {},
+        tasks: [],
+      },
+    ]
+
+    const user = userEvent.setup()
+
+    render(<AppContent />)
+
+    const trigger = await screen.findByRole('combobox', { name: 'Dataset' })
+    expect(trigger).toHaveTextContent('hexagon_lerobot')
+    expect(screen.queryByPlaceholderText('Dataset ID')).not.toBeInTheDocument()
+
+    await user.click(trigger)
+
+    expect(screen.getByPlaceholderText('Filter datasets')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'hexagon_lerobot' })).toBeInTheDocument()
   })
 })
