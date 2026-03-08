@@ -55,6 +55,8 @@ interface EditState {
   isDirty: boolean;
   /** Validation errors */
   validationErrors: string[];
+  /** Saved draft operations keyed by dataset and episode */
+  savedEpisodeDrafts: Record<string, EpisodeEditOperations>;
 }
 
 interface EditActions {
@@ -116,6 +118,8 @@ interface EditActions {
   // State management
   /** Get the current edit operations for export */
   getEditOperations: () => EpisodeEditOperations | null;
+  /** Commit the current episode edits as the saved draft baseline */
+  saveEpisodeDraft: () => void;
   /** Mark current state as saved */
   markSaved: () => void;
   /** Reset to original state */
@@ -138,7 +142,64 @@ const initialState: EditState = {
   originalState: null,
   isDirty: false,
   validationErrors: [],
+  savedEpisodeDrafts: {},
 };
+
+function getEpisodeDraftKey(datasetId: string, episodeIndex: number) {
+  return `${datasetId}:${episodeIndex}`;
+}
+
+function buildOriginalState(state: Pick<EditState, 'globalTransform' | 'cameraTransforms' | 'removedFrames' | 'insertedFrames' | 'subtasks' | 'trajectoryAdjustments'>) {
+  return {
+    globalTransform: state.globalTransform,
+    cameraTransforms: structuredClone(state.cameraTransforms),
+    removedFrames: new Set(state.removedFrames),
+    insertedFrames: new Map(state.insertedFrames),
+    subtasks: structuredClone(state.subtasks),
+    trajectoryAdjustments: new Map(state.trajectoryAdjustments),
+  };
+}
+
+function buildEditOperations(state: EditState): EpisodeEditOperations | null {
+  if (!state.datasetId || state.episodeIndex === null) {
+    return null;
+  }
+
+  return {
+    datasetId: state.datasetId,
+    episodeIndex: state.episodeIndex,
+    globalTransform: state.globalTransform ?? undefined,
+    cameraTransforms:
+      Object.keys(state.cameraTransforms).length > 0
+        ? state.cameraTransforms
+        : undefined,
+    removedFrames:
+      state.removedFrames.size > 0
+        ? Array.from(state.removedFrames).sort((a, b) => a - b)
+        : undefined,
+    insertedFrames:
+      state.insertedFrames.size > 0
+        ? Array.from(state.insertedFrames.values())
+            .sort((a, b) => a.afterFrameIndex - b.afterFrameIndex)
+        : undefined,
+    subtasks: state.subtasks.length > 0 ? state.subtasks : undefined,
+    trajectoryAdjustments:
+      state.trajectoryAdjustments.size > 0
+        ? Array.from(state.trajectoryAdjustments.values())
+        : undefined,
+  };
+}
+
+function hasEditContent(operations: EpisodeEditOperations) {
+  return !!(
+    operations.globalTransform ||
+    operations.cameraTransforms ||
+    operations.removedFrames ||
+    operations.insertedFrames ||
+    operations.subtasks ||
+    operations.trajectoryAdjustments
+  );
+}
 
 /** Check if state has changed from original */
 function computeDirty(state: EditState): boolean {
@@ -328,6 +389,13 @@ export const useEditStore = create<EditStore>()(
       ...initialState,
 
       initializeEdit: (datasetId, episodeIndex) => {
+        const savedDraft = get().savedEpisodeDrafts[getEpisodeDraftKey(datasetId, episodeIndex)];
+
+        if (savedDraft) {
+          get().loadEditOperations(savedDraft);
+          return;
+        }
+
         const newState = {
           datasetId,
           episodeIndex,
@@ -342,14 +410,7 @@ export const useEditStore = create<EditStore>()(
         set(
           {
             ...newState,
-            originalState: {
-              globalTransform: null,
-              cameraTransforms: {},
-              removedFrames: new Set(),
-              insertedFrames: new Map(),
-              subtasks: [],
-              trajectoryAdjustments: new Map(),
-            },
+            originalState: buildOriginalState(newState),
             isDirty: false,
             validationErrors: [],
           },
@@ -380,14 +441,14 @@ export const useEditStore = create<EditStore>()(
             insertedFrames: insertedMap,
             subtasks,
             trajectoryAdjustments,
-            originalState: {
+            originalState: buildOriginalState({
               globalTransform: ops.globalTransform ?? null,
-              cameraTransforms: structuredClone(ops.cameraTransforms ?? {}),
-              removedFrames: new Set(removedSet),
-              insertedFrames: new Map(insertedMap),
-              subtasks: structuredClone(subtasks),
-              trajectoryAdjustments: new Map(trajectoryAdjustments),
-            },
+              cameraTransforms: ops.cameraTransforms ?? {},
+              removedFrames: removedSet,
+              insertedFrames: insertedMap,
+              subtasks,
+              trajectoryAdjustments,
+            }),
             isDirty: false,
             validationErrors: validateSegments(subtasks),
           },
@@ -664,47 +725,42 @@ export const useEditStore = create<EditStore>()(
       },
 
       getEditOperations: () => {
-        const state = get();
-        if (!state.datasetId || state.episodeIndex === null) {
-          return null;
-        }
+        return buildEditOperations(get());
+      },
 
-        return {
-          datasetId: state.datasetId,
-          episodeIndex: state.episodeIndex,
-          globalTransform: state.globalTransform ?? undefined,
-          cameraTransforms:
-            Object.keys(state.cameraTransforms).length > 0
-              ? state.cameraTransforms
-              : undefined,
-          removedFrames:
-            state.removedFrames.size > 0
-              ? Array.from(state.removedFrames).sort((a, b) => a - b)
-              : undefined,
-          insertedFrames:
-            state.insertedFrames.size > 0
-              ? Array.from(state.insertedFrames.values())
-                  .sort((a, b) => a.afterFrameIndex - b.afterFrameIndex)
-              : undefined,
-          subtasks: state.subtasks.length > 0 ? state.subtasks : undefined,
-          trajectoryAdjustments:
-            state.trajectoryAdjustments.size > 0
-              ? Array.from(state.trajectoryAdjustments.values())
-              : undefined,
-        };
+      saveEpisodeDraft: () => {
+        set(
+          (state) => {
+            const operations = buildEditOperations(state);
+
+            if (!operations || !state.datasetId || state.episodeIndex === null) {
+              return state;
+            }
+
+            const draftKey = getEpisodeDraftKey(state.datasetId, state.episodeIndex);
+            const nextSavedEpisodeDrafts = { ...state.savedEpisodeDrafts };
+
+            if (hasEditContent(operations)) {
+              nextSavedEpisodeDrafts[draftKey] = operations;
+            } else {
+              delete nextSavedEpisodeDrafts[draftKey];
+            }
+
+            return {
+              savedEpisodeDrafts: nextSavedEpisodeDrafts,
+              originalState: buildOriginalState(state),
+              isDirty: false,
+            };
+          },
+          false,
+          'saveEpisodeDraft'
+        );
       },
 
       markSaved: () => {
         set(
           (state) => ({
-            originalState: {
-              globalTransform: state.globalTransform,
-              cameraTransforms: structuredClone(state.cameraTransforms),
-              removedFrames: new Set(state.removedFrames),
-              insertedFrames: new Map(state.insertedFrames),
-              subtasks: structuredClone(state.subtasks),
-              trajectoryAdjustments: new Map(state.trajectoryAdjustments),
-            },
+            originalState: buildOriginalState(state),
             isDirty: false,
           }),
           false,

@@ -1,4 +1,4 @@
-import { Download, Pause, Play, Repeat, RotateCcw, Scan, SkipBack, SkipForward, Video } from 'lucide-react';
+import { Activity, Download, Pause, Play, Repeat, RotateCcw, Scan, SkipBack, SkipForward, Video } from 'lucide-react';
 import { type SyntheticEvent,useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { LabelPanel } from '@/components/annotation-panel';
@@ -56,7 +56,7 @@ export function AnnotationWorkspace({
   onSaveAndNextEpisode,
 }: AnnotationWorkspaceProps) {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [showSaveStatus, setShowSaveStatus] = useState(false);
+  const [showSavedStatus, setShowSavedStatus] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentFrameRef = useRef(0);
@@ -70,9 +70,12 @@ export function AnnotationWorkspace({
   const labelDataLoaded = useLabelStore((state) => state.isLoaded);
   const availableLabels = useLabelStore((state) => state.availableLabels);
   const episodeLabels = useLabelStore((state) => state.episodeLabels);
+  const savedEpisodeLabels = useLabelStore((state) => state.savedEpisodeLabels);
+  const setEpisodeLabelsInStore = useLabelStore((state) => state.setEpisodeLabels);
   const removedFrames = useEditStore((state) => state.removedFrames);
   const initializeEdit = useEditStore((state) => state.initializeEdit);
   const clearTransforms = useEditStore((state) => state.clearTransforms);
+  const saveEpisodeDraft = useEditStore((state) => state.saveEpisodeDraft);
   const editDatasetId = useEditStore((state) => state.datasetId);
   const editEpisodeIndex = useEditStore((state) => state.episodeIndex);
   const { insertedFrames } = useFrameInsertionState();
@@ -82,8 +85,6 @@ export function AnnotationWorkspace({
   const { autoPlay, autoLoop, setAutoPlay, setAutoLoop } = usePlaybackSettings();
   const globalTransform = useEditStore((state) => state.globalTransform);
   const saveEpisodeLabels = useSaveEpisodeLabels();
-  const initialEpisodeLabelsRef = useRef<string[]>([]);
-  const initialEpisodeLabelKeyRef = useRef<string | null>(null);
   const currentEpisodeLabels = useMemo(() => {
     if (!currentEpisode) {
       return EMPTY_LABELS;
@@ -91,16 +92,23 @@ export function AnnotationWorkspace({
 
     return episodeLabels[currentEpisode.meta.index] ?? EMPTY_LABELS;
   }, [currentEpisode, episodeLabels]);
+  const savedLabelsForCurrentEpisode = useMemo(() => {
+    if (!currentEpisode) {
+      return EMPTY_LABELS;
+    }
+
+    return savedEpisodeLabels[currentEpisode.meta.index] ?? EMPTY_LABELS;
+  }, [currentEpisode, savedEpisodeLabels]);
 
   const announceSave = useCallback(() => {
-    setShowSaveStatus(true);
+    setShowSavedStatus(true);
 
     if (saveStatusTimeoutRef.current) {
       clearTimeout(saveStatusTimeoutRef.current);
     }
 
     saveStatusTimeoutRef.current = setTimeout(() => {
-      setShowSaveStatus(false);
+      setShowSavedStatus(false);
       saveStatusTimeoutRef.current = null;
     }, 2400);
   }, []);
@@ -113,52 +121,41 @@ export function AnnotationWorkspace({
     };
   }, []);
 
-  useEffect(() => {
-    if (!currentDataset || !currentEpisode || !labelDataLoaded) {
-      return;
-    }
-
-    const snapshotKey = `${currentDataset.id}:${currentEpisode.meta.index}`;
-    if (initialEpisodeLabelKeyRef.current === snapshotKey) {
-      return;
-    }
-
-    initialEpisodeLabelsRef.current = [...currentEpisodeLabels];
-    initialEpisodeLabelKeyRef.current = snapshotKey;
-  }, [currentDataset, currentEpisode, currentEpisodeLabels, labelDataLoaded]);
-
   const hasLabelChanges = useMemo(() => {
     if (!currentEpisode || !labelDataLoaded) {
       return false;
     }
 
     const current = [...currentEpisodeLabels].sort();
-    const initial = [...initialEpisodeLabelsRef.current].sort();
+    const initial = [...savedLabelsForCurrentEpisode].sort();
 
     if (current.length !== initial.length) {
       return true;
     }
 
     return current.some((label, index) => label !== initial[index]);
-  }, [currentEpisode, currentEpisodeLabels, labelDataLoaded]);
+  }, [currentEpisode, currentEpisodeLabels, labelDataLoaded, savedLabelsForCurrentEpisode]);
+
+  const hasPendingEpisodeChanges = hasLabelChanges || hasEdits;
+  const saveStatusMessage = hasPendingEpisodeChanges
+    ? 'Unsaved episode changes.'
+    : showSavedStatus
+      ? 'Episode changes saved.'
+      : null;
 
   const handleResetAll = useCallback(async () => {
     resetEdits();
 
-    if (!currentEpisode || !currentDataset || !hasLabelChanges) {
+    if (!currentEpisode || !hasLabelChanges) {
       return;
     }
 
-    const nextLabels = initialEpisodeLabelsRef.current.filter((label) =>
+    const nextLabels = savedLabelsForCurrentEpisode.filter((label) =>
       availableLabels.includes(label),
     );
 
-    await saveEpisodeLabels.mutateAsync({
-      episodeIdx: currentEpisode.meta.index,
-      labels: nextLabels,
-    });
-    announceSave();
-  }, [announceSave, availableLabels, currentDataset, currentEpisode, hasLabelChanges, resetEdits, saveEpisodeLabels]);
+    setEpisodeLabelsInStore(currentEpisode.meta.index, nextLabels);
+  }, [availableLabels, currentEpisode, hasLabelChanges, resetEdits, savedLabelsForCurrentEpisode, setEpisodeLabelsInStore]);
 
   const handleSaveAndNextEpisode = useCallback(async () => {
     const advanceToNextEpisode = onSaveAndNextEpisode ?? onNextEpisode;
@@ -172,11 +169,18 @@ export function AnnotationWorkspace({
         episodeIdx: currentEpisode.meta.index,
         labels: currentEpisodeLabels,
       });
+    }
+
+    if (hasEdits) {
+      saveEpisodeDraft();
+    }
+
+    if (hasPendingEpisodeChanges) {
       announceSave();
     }
 
     advanceToNextEpisode();
-  }, [announceSave, canGoNextEpisode, currentDataset, currentEpisode, currentEpisodeLabels, hasLabelChanges, onNextEpisode, onSaveAndNextEpisode, saveEpisodeLabels]);
+  }, [announceSave, canGoNextEpisode, currentDataset, currentEpisode, currentEpisodeLabels, hasEdits, hasLabelChanges, hasPendingEpisodeChanges, onNextEpisode, onSaveAndNextEpisode, saveEpisodeDraft, saveEpisodeLabels]);
 
   // Combined CSS filter: viewer display adjustments + edit color transforms
   const displayFilter = useMemo(
@@ -433,6 +437,255 @@ export function AnnotationWorkspace({
     [currentFrame, totalFrames, setCurrentFrame],
   );
 
+  const renderPlaybackCard = useCallback((compact = false) => (
+    <Card className={compact ? 'h-full min-h-0' : 'flex-shrink-0'}>
+      <CardContent className={compact ? 'flex h-full min-h-0 flex-col p-3' : 'p-4'}>
+        <ViewerDisplayControls />
+        <div
+          className={compact
+            ? 'mt-2 aspect-[4/3] min-h-0 rounded-lg bg-black relative flex items-center justify-center overflow-hidden'
+            : 'mt-2 aspect-video rounded-lg bg-black relative flex items-center justify-center overflow-hidden'}
+        >
+          <canvas ref={canvasRef} className="hidden" />
+
+          {videoSrc ? (
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              onEnded={handleVideoEnded}
+              onLoadedMetadata={handleLoadedMetadata}
+              muted
+              playsInline
+              preload="auto"
+              className="max-w-full max-h-full object-contain"
+              style={displayFilter ? { filter: displayFilter } : undefined}
+            />
+          ) : isInsertedFrame && interpolatedImageUrl ? (
+            <img
+              src={interpolatedImageUrl}
+              alt={`Interpolated frame ${currentFrame}`}
+              className="max-w-full max-h-full object-contain"
+              style={displayFilter ? { filter: displayFilter } : undefined}
+            />
+          ) : frameImageUrl ? (
+            <img
+              src={frameImageUrl}
+              alt={`Frame ${currentFrame}`}
+              className="max-w-full max-h-full object-contain"
+              style={displayFilter ? { filter: displayFilter } : undefined}
+            />
+          ) : (
+            <span className="text-white">Frame {currentFrame + 1} of {totalFrames}</span>
+          )}
+
+          {isInsertedFrame && (
+            <div className="absolute top-2 left-2 rounded bg-blue-500/80 px-2 py-1 text-xs text-white">
+              Interpolated Frame
+            </div>
+          )}
+
+          {globalTransform?.resize && (
+            <div className="absolute top-2 right-2 rounded bg-green-600/80 px-2 py-1 text-xs text-white">
+              Output: {globalTransform.resize.width} × {globalTransform.resize.height}
+            </div>
+          )}
+        </div>
+
+        <PlaybackControlStrip
+          currentFrame={currentFrame}
+          totalFrames={totalFrames}
+          className={compact ? 'mt-2' : 'mt-3'}
+          controls={
+            compact ? (
+              <div data-testid="trajectory-compact-controls" className="flex w-full items-center justify-between gap-2">
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    size="icon"
+                    onClick={togglePlayback}
+                    aria-label={isPlaying ? 'Pause playback' : 'Play playback'}
+                    title={isPlaying ? 'Pause playback' : 'Play playback'}
+                    className="h-8 w-8"
+                  >
+                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => stepFrame(-1)}
+                    disabled={isPlaying}
+                    aria-label="Previous frame"
+                    title="Previous frame"
+                    className="h-8 w-8"
+                  >
+                    <SkipBack className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => stepFrame(1)}
+                    disabled={isPlaying}
+                    aria-label="Next frame"
+                    title="Next frame"
+                    className="h-8 w-8"
+                  >
+                    <SkipForward className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setCurrentFrame(0)}
+                    aria-label="Reset playback"
+                    title="Reset playback"
+                    className="h-8 w-8"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {[0.5, 1, 2].map((speed) => (
+                    <Button
+                      key={speed}
+                      size="sm"
+                      variant={playbackSpeed === speed ? 'default' : 'outline'}
+                      onClick={() => setPlaybackSpeed(speed)}
+                      aria-label={`Set playback speed to ${speed}x`}
+                      className="h-8 min-w-[2.5rem] px-1.5 text-xs"
+                    >
+                      {speed}x
+                    </Button>
+                  ))}
+                  <Button
+                    size="icon"
+                    variant={autoPlay ? 'default' : 'outline'}
+                    onClick={() => setAutoPlay(!autoPlay)}
+                    aria-label="Toggle auto-play"
+                    title={autoPlay ? 'Auto-play on (click to disable)' : 'Auto-play off (click to enable)'}
+                    className="h-8 w-8"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={autoLoop ? 'default' : 'outline'}
+                    onClick={() => setAutoLoop(!autoLoop)}
+                    aria-label="Toggle loop playback"
+                    title={autoLoop ? 'Loop on (click to disable)' : 'Loop off (click to enable)'}
+                    className="h-8 w-8"
+                  >
+                    <Repeat className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  onClick={togglePlayback}
+                  className="gap-1 min-w-[5rem]"
+                >
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {isPlaying ? 'Pause' : 'Play'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => stepFrame(-1)}
+                  disabled={isPlaying}
+                  title="Previous frame"
+                >
+                  <SkipBack className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => stepFrame(1)}
+                  disabled={isPlaying}
+                  title="Next frame"
+                >
+                  <SkipForward className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentFrame(0)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm">Speed:</span>
+                  {[0.5, 1, 2].map((speed) => (
+                    <Button
+                      key={speed}
+                      size="sm"
+                      variant={playbackSpeed === speed ? 'default' : 'outline'}
+                      onClick={() => setPlaybackSpeed(speed)}
+                      className="px-2"
+                    >
+                      {speed}x
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant={autoPlay ? 'default' : 'outline'}
+                    onClick={() => setAutoPlay(!autoPlay)}
+                    className="px-2"
+                    title={autoPlay ? 'Auto-play on (click to disable)' : 'Auto-play off (click to enable)'}
+                  >
+                    <Play className="mr-1 h-3 w-3" />
+                    Auto
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={autoLoop ? 'default' : 'outline'}
+                    onClick={() => setAutoLoop(!autoLoop)}
+                    className="px-2"
+                    title={autoLoop ? 'Loop on (click to disable)' : 'Loop off (click to enable)'}
+                  >
+                    <Repeat className="mr-1 h-3 w-3" />
+                    Loop
+                  </Button>
+                </div>
+              </>
+            )
+          }
+          slider={
+            <input
+              type="range"
+              min={0}
+              max={totalFrames - 1}
+              value={currentFrame}
+              onChange={(e) => setCurrentFrame(parseInt(e.target.value, 10))}
+              className="w-full"
+            />
+          }
+        />
+      </CardContent>
+    </Card>
+  ), [
+    autoLoop,
+    autoPlay,
+    currentFrame,
+    displayFilter,
+    frameImageUrl,
+    globalTransform?.resize,
+    handleLoadedMetadata,
+    handleVideoEnded,
+    interpolatedImageUrl,
+    isInsertedFrame,
+    isPlaying,
+    playbackSpeed,
+    setAutoLoop,
+    setAutoPlay,
+    setCurrentFrame,
+    setPlaybackSpeed,
+    stepFrame,
+    togglePlayback,
+    totalFrames,
+    videoSrc,
+  ]);
+
   if (!currentDataset || !currentEpisode) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -460,16 +713,15 @@ export function AnnotationWorkspace({
               <h2 className="text-lg font-semibold leading-none">
                 Episode {currentEpisode.meta.index}
               </h2>
-              {hasEdits && (
-                <span className="text-xs text-orange-500 font-medium">
-                  (has edits)
-                </span>
-              )}
             </div>
             <TabsList className="h-10 w-fit shrink-0">
               <TabsTrigger value="episode" className="gap-2">
                 <Video className="h-4 w-4" />
                 Episode Viewer
+              </TabsTrigger>
+              <TabsTrigger value="trajectory" className="gap-2">
+                <Activity className="h-4 w-4" />
+                Trajectory Viewer
               </TabsTrigger>
               <TabsTrigger value="detection" className="gap-2">
                 <Scan className="h-4 w-4" />
@@ -492,7 +744,7 @@ export function AnnotationWorkspace({
               <Button
                 variant="outline"
                 onClick={() => void handleResetAll()}
-                disabled={!hasEdits && !hasLabelChanges}
+                disabled={!hasPendingEpisodeChanges}
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset All
@@ -513,9 +765,9 @@ export function AnnotationWorkspace({
               </Button>
             </div>
             <div className="min-h-[1rem]" data-testid="workspace-save-status-slot">
-              {showSaveStatus && (
+              {saveStatusMessage && (
                 <p data-testid="workspace-save-status" className="text-xs text-muted-foreground">
-                  Changes save automatically.
+                  {saveStatusMessage}
                 </p>
               )}
             </div>
@@ -526,162 +778,16 @@ export function AnnotationWorkspace({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             {/* Left panel: Video and timeline */}
             <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto">
-              {/* Frame display with playback controls */}
-              <Card className="flex-shrink-0">
-                <CardContent className="p-4">
-                  <ViewerDisplayControls />
-                  <div className="mt-2 aspect-video bg-black rounded-lg flex items-center justify-center overflow-hidden relative">
-                    {/* Hidden canvas for image blending */}
-                    <canvas ref={canvasRef} className="hidden" />
+              {renderPlaybackCard()}
 
-                    {videoSrc ? (
-                      <video
-                        ref={videoRef}
-                        src={videoSrc}
-                        onEnded={handleVideoEnded}
-                        onLoadedMetadata={handleLoadedMetadata}
-                        muted
-                        playsInline
-                        preload="auto"
-                        className="max-w-full max-h-full object-contain"
-                        style={displayFilter ? { filter: displayFilter } : undefined}
-                      />
-                    ) : isInsertedFrame && interpolatedImageUrl ? (
-                      <img
-                        src={interpolatedImageUrl}
-                        alt={`Interpolated frame ${currentFrame}`}
-                        className="max-w-full max-h-full object-contain"
-                        style={displayFilter ? { filter: displayFilter } : undefined}
-                      />
-                    ) : frameImageUrl ? (
-                      <img
-                        src={frameImageUrl}
-                        alt={`Frame ${currentFrame}`}
-                        className="max-w-full max-h-full object-contain"
-                        style={displayFilter ? { filter: displayFilter } : undefined}
-                      />
-                    ) : (
-                      <span className="text-white">Frame {currentFrame + 1} of {totalFrames}</span>
-                    )}
-
-                    {/* Inserted frame indicator */}
-                    {isInsertedFrame && (
-                      <div className="absolute top-2 left-2 bg-blue-500/80 text-white text-xs px-2 py-1 rounded">
-                        Interpolated Frame
-                      </div>
-                    )}
-
-                    {/* Resize output indicator */}
-                    {globalTransform?.resize && (
-                      <div className="absolute top-2 right-2 bg-green-600/80 text-white text-xs px-2 py-1 rounded">
-                        Output: {globalTransform.resize.width} × {globalTransform.resize.height}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Playback Controls */}
-                  <PlaybackControlStrip
-                    currentFrame={currentFrame}
-                    totalFrames={totalFrames}
-                    className="mt-3"
-                    controls={
-                      <>
-                        <Button
-                          size="sm"
-                          onClick={togglePlayback}
-                          className="gap-1 min-w-[5rem]"
-                        >
-                          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                          {isPlaying ? 'Pause' : 'Play'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => stepFrame(-1)}
-                          disabled={isPlaying}
-                          title="Previous frame"
-                        >
-                          <SkipBack className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => stepFrame(1)}
-                          disabled={isPlaying}
-                          title="Next frame"
-                        >
-                          <SkipForward className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setCurrentFrame(0)}
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm">Speed:</span>
-                          {[0.5, 1, 2].map((speed) => (
-                            <Button
-                              key={speed}
-                              size="sm"
-                              variant={playbackSpeed === speed ? 'default' : 'outline'}
-                              onClick={() => setPlaybackSpeed(speed)}
-                              className="px-2"
-                            >
-                              {speed}x
-                            </Button>
-                          ))}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant={autoPlay ? 'default' : 'outline'}
-                            onClick={() => setAutoPlay(!autoPlay)}
-                            className="px-2"
-                            title={autoPlay ? 'Auto-play on (click to disable)' : 'Auto-play off (click to enable)'}
-                          >
-                            <Play className="h-3 w-3 mr-1" />
-                            Auto
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={autoLoop ? 'default' : 'outline'}
-                            onClick={() => setAutoLoop(!autoLoop)}
-                            className="px-2"
-                            title={autoLoop ? 'Loop on (click to disable)' : 'Loop off (click to enable)'}
-                          >
-                            <Repeat className="h-3 w-3 mr-1" />
-                            Loop
-                          </Button>
-                        </div>
-                      </>
-                    }
-                    slider={
-                      <input
-                        type="range"
-                        min={0}
-                        max={totalFrames - 1}
-                        value={currentFrame}
-                        onChange={(e) => setCurrentFrame(parseInt(e.target.value, 10))}
-                        className="w-full"
-                      />
-                    }
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Trajectory & Subtasks */}
-              <Card className="h-[300px] flex-shrink-0">
+              {/* Subtasks */}
+              <Card className="min-h-[220px] flex-1">
                 <CardContent className="p-4 h-full flex flex-col gap-2">
-                  <TrajectoryPlot className="flex-1 min-h-0" onSaved={announceSave} />
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">Subtasks</span>
-                      <SubtaskToolbar />
-                    </div>
-                    <SubtaskTimelineTrack totalFrames={totalFrames} editable />
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">Subtasks</span>
+                    <SubtaskToolbar />
                   </div>
+                  <SubtaskTimelineTrack totalFrames={totalFrames} editable />
                 </CardContent>
               </Card>
             </div>
@@ -694,7 +800,7 @@ export function AnnotationWorkspace({
                 </CardHeader>
                 <CardContent className="p-4 pt-0 space-y-6">
                   {/* Episode Labels */}
-                  <LabelPanel episodeIndex={currentEpisode.meta.index} onSaved={announceSave} />
+                  <LabelPanel episodeIndex={currentEpisode.meta.index} />
 
                   <Separator />
 
@@ -743,6 +849,25 @@ export function AnnotationWorkspace({
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="trajectory" className="mt-2.5 flex-1 min-h-0">
+          <div className="grid h-full grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+            <div className="min-h-[320px] xl:min-h-0">
+              {renderPlaybackCard(true)}
+            </div>
+            <Card className="min-h-[340px] xl:min-h-0">
+              <CardContent className="flex h-full min-h-0 flex-col gap-3 p-4">
+                <div>
+                  <h3 className="text-sm font-medium">Trajectory Graph</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Review joint motion, filters, and frame alignment alongside a compact episode player.
+                  </p>
+                </div>
+                <TrajectoryPlot className="flex-1 min-h-[280px]" />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

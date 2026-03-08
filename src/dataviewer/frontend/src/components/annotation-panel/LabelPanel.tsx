@@ -1,8 +1,7 @@
 /**
  * LabelPanel - multi-select label tagging for episodes.
  *
- * Displays available labels as toggleable chips, allows adding custom labels,
- * and auto-saves on toggle.
+ * Displays available labels as toggleable chips and allows adding custom labels.
  */
 
 import { Check, Plus, X } from 'lucide-react';
@@ -28,10 +27,9 @@ import { DEFAULT_LABELS, useLabelStore } from '@/stores/label-store';
 
 interface LabelPanelProps {
     episodeIndex: number;
-    onSaved?: () => void;
 }
 
-export function LabelPanel({ episodeIndex, onSaved }: LabelPanelProps) {
+export function LabelPanel({ episodeIndex }: LabelPanelProps) {
     const [newLabel, setNewLabel] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [pendingDeleteLabel, setPendingDeleteLabel] = useState<string | null>(null);
@@ -47,12 +45,11 @@ export function LabelPanel({ episodeIndex, onSaved }: LabelPanelProps) {
             await addOption.mutateAsync(normalized);
             setNewLabel('');
             setErrorMessage(null);
-            onSaved?.();
         } catch (error) {
             const detail = error instanceof Error ? error.message : 'Unknown error';
             setErrorMessage(`Failed to add label: ${detail}`);
         }
-    }, [newLabel, addOption, onSaved]);
+    }, [newLabel, addOption]);
 
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
@@ -76,13 +73,12 @@ export function LabelPanel({ episodeIndex, onSaved }: LabelPanelProps) {
             try {
                 await toggle(label);
                 setErrorMessage(null);
-                onSaved?.();
             } catch (error) {
                 const detail = error instanceof Error ? error.message : 'Unknown error';
                 setErrorMessage(`Failed to update labels: ${detail}`);
             }
         },
-        [onSaved, toggle],
+        [toggle],
     );
 
     const confirmDeleteLabel = useCallback(async () => {
@@ -92,12 +88,11 @@ export function LabelPanel({ episodeIndex, onSaved }: LabelPanelProps) {
             await removeOption.mutateAsync(pendingDeleteLabel);
             setErrorMessage(null);
             setPendingDeleteLabel(null);
-            onSaved?.();
         } catch (error) {
             const detail = error instanceof Error ? error.message : 'Unknown error';
             setErrorMessage(`Failed to delete label: ${detail}`);
         }
-    }, [onSaved, pendingDeleteLabel, removeOption]);
+    }, [pendingDeleteLabel, removeOption]);
 
     return (
         <div className="space-y-3">

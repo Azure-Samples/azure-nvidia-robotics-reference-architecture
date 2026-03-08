@@ -10,6 +10,8 @@ interface LabelState {
     availableLabels: string[];
     /** Labels per episode: episode index -> label list */
     episodeLabels: Record<number, string[]>;
+    /** Saved labels per episode from the last persisted dataset state */
+    savedEpisodeLabels: Record<number, string[]>;
     /** Whether the label data has been loaded */
     isLoaded: boolean;
     /** Label filter: only show episodes with these labels (empty = show all) */
@@ -27,6 +29,8 @@ interface LabelActions {
     setAllEpisodeLabels: (episodes: Record<string, string[]>) => void;
     /** Set labels for a specific episode */
     setEpisodeLabels: (episodeIndex: number, labels: string[]) => void;
+    /** Commit the saved baseline for a specific episode */
+    commitEpisodeLabels: (episodeIndex: number, labels?: string[]) => void;
     /** Toggle a label on/off for an episode */
     toggleLabel: (episodeIndex: number, label: string) => void;
     /** Set filter labels */
@@ -46,6 +50,7 @@ export const DEFAULT_LABELS: string[] = ['SUCCESS', 'FAILURE', 'PARTIAL'];
 const initialState: LabelState = {
     availableLabels: DEFAULT_LABELS,
     episodeLabels: {},
+    savedEpisodeLabels: {},
     isLoaded: false,
     filterLabels: [],
 };
@@ -76,9 +81,15 @@ export const useLabelStore = create<LabelStore>()(
                 const normalized = label.trim().toUpperCase();
                 if (!normalized) return;
 
-                const { availableLabels, episodeLabels, filterLabels } = get();
+                const { availableLabels, episodeLabels, savedEpisodeLabels, filterLabels } = get();
                 const nextEpisodeLabels = Object.fromEntries(
                     Object.entries(episodeLabels).map(([episodeIndex, labels]) => [
+                        episodeIndex,
+                        labels.filter((existing) => existing !== normalized),
+                    ]),
+                ) as Record<number, string[]>;
+                const nextSavedEpisodeLabels = Object.fromEntries(
+                    Object.entries(savedEpisodeLabels).map(([episodeIndex, labels]) => [
                         episodeIndex,
                         labels.filter((existing) => existing !== normalized),
                     ]),
@@ -88,6 +99,7 @@ export const useLabelStore = create<LabelStore>()(
                     {
                         availableLabels: availableLabels.filter((existing) => existing !== normalized),
                         episodeLabels: nextEpisodeLabels,
+                        savedEpisodeLabels: nextSavedEpisodeLabels,
                         filterLabels: filterLabels.filter((existing) => existing !== normalized),
                     },
                     false,
@@ -100,7 +112,7 @@ export const useLabelStore = create<LabelStore>()(
                 for (const [key, labels] of Object.entries(episodes)) {
                     parsed[Number(key)] = labels;
                 }
-                set({ episodeLabels: parsed }, false, 'setAllEpisodeLabels');
+                set({ episodeLabels: parsed, savedEpisodeLabels: parsed }, false, 'setAllEpisodeLabels');
             },
 
             setEpisodeLabels: (episodeIndex, labels) => {
@@ -109,6 +121,20 @@ export const useLabelStore = create<LabelStore>()(
                     { episodeLabels: { ...episodeLabels, [episodeIndex]: labels } },
                     false,
                     'setEpisodeLabels',
+                );
+            },
+
+            commitEpisodeLabels: (episodeIndex, labels) => {
+                const { episodeLabels, savedEpisodeLabels } = get();
+                const nextLabels = labels ?? episodeLabels[episodeIndex] ?? [];
+
+                set(
+                    {
+                        episodeLabels: { ...episodeLabels, [episodeIndex]: nextLabels },
+                        savedEpisodeLabels: { ...savedEpisodeLabels, [episodeIndex]: nextLabels },
+                    },
+                    false,
+                    'commitEpisodeLabels',
                 );
             },
 

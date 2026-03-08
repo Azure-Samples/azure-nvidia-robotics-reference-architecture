@@ -286,6 +286,19 @@ describe('useEditStore', () => {
       expect(useEditStore.getState().isDirty).toBe(false)
     })
 
+    it('reloads saved edits when returning to an episode', () => {
+      useEditStore.getState().initializeEdit('ds-1', 0)
+      useEditStore.getState().toggleFrameRemoval(5)
+      useEditStore.getState().saveEpisodeDraft()
+
+      useEditStore.getState().initializeEdit('ds-1', 1)
+      expect(useEditStore.getState().removedFrames.size).toBe(0)
+
+      useEditStore.getState().initializeEdit('ds-1', 0)
+      expect(useEditStore.getState().removedFrames.has(5)).toBe(true)
+      expect(useEditStore.getState().isDirty).toBe(false)
+    })
+
     it('resetEdits clears subtasks, transforms, and trajectory adjustments', () => {
       useEditStore.getState().initializeEdit('ds-1', 0)
 

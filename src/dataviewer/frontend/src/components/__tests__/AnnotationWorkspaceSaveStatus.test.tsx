@@ -3,11 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace'
 
-let mockEpisodeLabels = { 0: ['SUCCESS'] }
+let mockEpisodeLabels: Record<number, string[]> = { 0: ['SUCCESS'] }
+let mockSavedEpisodeLabels: Record<number, string[]> = { 0: ['SUCCESS'] }
 let mockAvailableLabels = ['SUCCESS', 'FAILURE', 'PARTIAL']
 let mockLabelsLoaded = true
+let mockEpisodeIndex = 0
+let mockHasEdits = false
 const mockInitializeEdit = vi.fn()
 const mockResetEdits = vi.fn()
+const mockSaveEpisodeDraft = vi.fn()
 const mockSetCurrentFrame = vi.fn()
 const mockTogglePlayback = vi.fn()
 const mockSetPlaybackSpeed = vi.fn()
@@ -16,25 +20,20 @@ const mockSetAutoLoop = vi.fn()
 const mockSaveEpisodeLabels = vi.fn()
 
 vi.mock('@/components/annotation-panel', () => ({
-  LabelPanel: ({ onSaved }: { onSaved?: () => void }) => (
+  LabelPanel: () => (
     <button
       type="button"
       onClick={() => {
         mockEpisodeLabels = { 0: ['FAILURE'] }
-        onSaved?.()
       }}
     >
-      Trigger Label Save
+      Toggle Label Draft
     </button>
   ),
 }))
 
 vi.mock('@/components/episode-viewer', () => ({
-  TrajectoryPlot: ({ onSaved }: { onSaved?: () => void }) => (
-    <button type="button" onClick={onSaved}>
-      Trigger Trajectory Save
-    </button>
-  ),
+  TrajectoryPlot: () => <div>Trajectory Plot</div>,
 }))
 
 vi.mock('@/components/export', () => ({
@@ -93,6 +92,15 @@ vi.mock('@/stores/label-store', () => ({
       isLoaded: mockLabelsLoaded,
       availableLabels: mockAvailableLabels,
       episodeLabels: mockEpisodeLabels,
+      savedEpisodeLabels: mockSavedEpisodeLabels,
+      setEpisodeLabels: (episodeIndex: number, labels: string[]) => {
+        mockEpisodeLabels = { ...mockEpisodeLabels, [episodeIndex]: labels }
+      },
+      commitEpisodeLabels: (episodeIndex: number, labels?: string[]) => {
+        const nextLabels = labels ?? mockEpisodeLabels[episodeIndex] ?? []
+        mockEpisodeLabels = { ...mockEpisodeLabels, [episodeIndex]: nextLabels }
+        mockSavedEpisodeLabels = { ...mockSavedEpisodeLabels, [episodeIndex]: nextLabels }
+      },
     }),
 }))
 
@@ -102,7 +110,7 @@ vi.mock('@/stores', () => ({
       currentDataset: { id: 'dataset-1', fps: 30 },
     }),
   useEditDirtyState: () => ({
-    isDirty: false,
+    isDirty: mockHasEdits,
     resetEdits: mockResetEdits,
   }),
   useEditStore: (selector: (state: unknown) => unknown) =>
@@ -110,6 +118,7 @@ vi.mock('@/stores', () => ({
       removedFrames: new Set<number>(),
       initializeEdit: mockInitializeEdit,
       clearTransforms: vi.fn(),
+      saveEpisodeDraft: mockSaveEpisodeDraft,
       datasetId: null,
       episodeIndex: null,
       globalTransform: null,
@@ -117,7 +126,7 @@ vi.mock('@/stores', () => ({
   useEpisodeStore: (selector: (state: unknown) => unknown) =>
     selector({
       currentEpisode: {
-        meta: { index: 0, length: 12 },
+        meta: { index: mockEpisodeIndex, length: 12 },
         videoUrls: undefined,
         trajectoryData: undefined,
       },
@@ -152,10 +161,21 @@ describe('AnnotationWorkspace save status', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockEpisodeLabels = { 0: ['SUCCESS'] }
+    mockSavedEpisodeLabels = { 0: ['SUCCESS'] }
     mockAvailableLabels = ['SUCCESS', 'FAILURE', 'PARTIAL']
     mockLabelsLoaded = true
+    mockEpisodeIndex = 0
+    mockHasEdits = false
     mockSaveEpisodeLabels.mockReset()
-    mockSaveEpisodeLabels.mockResolvedValue(undefined)
+    mockSaveEpisodeLabels.mockImplementation(async ({ episodeIdx, labels }: { episodeIdx: number; labels: string[] }) => {
+      mockEpisodeLabels = { ...mockEpisodeLabels, [episodeIdx]: labels }
+      mockSavedEpisodeLabels = { ...mockSavedEpisodeLabels, [episodeIdx]: labels }
+      return undefined
+    })
+    mockSaveEpisodeDraft.mockReset()
+    mockSaveEpisodeDraft.mockImplementation(() => {
+      mockHasEdits = false
+    })
     mockResetEdits.mockReset()
   })
 
@@ -171,29 +191,78 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.queryByText(/changes save automatically/i)).not.toBeInTheDocument()
   })
 
-  it('shows the save status beneath the Reset All and Export actions after a label save', async () => {
-    render(<AnnotationWorkspace />)
+  it('shows pending episode changes instead of auto-save copy after labels change locally', () => {
+    const { rerender } = render(<AnnotationWorkspace />)
 
-    fireEvent.click(screen.getByRole('button', { name: /trigger label save/i }))
+    fireEvent.click(screen.getByRole('button', { name: /toggle label draft/i }))
+    rerender(<AnnotationWorkspace />)
 
     const actions = screen.getByTestId('workspace-header-actions')
-    expect(within(actions).getByRole('button', { name: /reset all/i })).toBeInTheDocument()
-    expect(within(actions).getByRole('button', { name: /export/i })).toBeInTheDocument()
-    expect(within(actions).getByText(/changes save automatically/i)).toBeInTheDocument()
+    expect(within(actions).getByText(/unsaved episode changes/i)).toBeInTheDocument()
+    expect(screen.queryByText(/changes save automatically/i)).not.toBeInTheDocument()
+    expect(mockSaveEpisodeLabels).not.toHaveBeenCalled()
   })
 
-  it('shows the save status for other saves and hides it after a short delay', async () => {
-    render(<AnnotationWorkspace />)
+  it('shows a saved message after Save & Next Episode and hides it after a short delay', async () => {
+    const handleSaveAndNextEpisode = vi.fn()
+    const { rerender } = render(
+      <AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />,
+    )
 
-    fireEvent.click(screen.getByRole('button', { name: /trigger trajectory save/i }))
+    mockEpisodeLabels = { 0: ['FAILURE'] }
+    rerender(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
 
-    expect(screen.getByText(/changes save automatically/i)).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /save\s*&\s*next episode/i }))
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText(/episode changes saved/i)).toBeInTheDocument()
 
     act(() => {
       vi.advanceTimersByTime(2500)
     })
 
-    expect(screen.queryByText(/changes save automatically/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/episode changes saved/i)).not.toBeInTheDocument()
+  })
+
+  it('does not show stale unsaved episode changes after Save & Next Episode advances to the next episode', async () => {
+    const handleSaveAndNextEpisode = vi.fn(() => {
+      mockEpisodeIndex = 1
+      mockEpisodeLabels = {
+        ...mockEpisodeLabels,
+        1: [],
+      }
+      mockSavedEpisodeLabels = {
+        ...mockSavedEpisodeLabels,
+        1: [],
+      }
+    })
+    const { rerender } = render(
+      <AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />,
+    )
+
+    mockEpisodeLabels = { 0: ['FAILURE'], 1: [] }
+    mockSavedEpisodeLabels = { 0: ['SUCCESS'], 1: [] }
+    rerender(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /save\s*&\s*next episode/i }))
+      await Promise.resolve()
+    })
+
+    rerender(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
+
+    expect(screen.queryByText(/unsaved episode changes/i)).not.toBeInTheDocument()
+  })
+
+  it('uses the save-status slot as the only pending-change indicator', () => {
+    mockHasEdits = true
+
+    render(<AnnotationWorkspace />)
+
+    expect(screen.queryByText(/\(has edits\)/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/unsaved episode changes/i)).toBeInTheDocument()
   })
 
   it('reserves header space so the save status does not shift other controls', () => {
@@ -212,6 +281,41 @@ describe('AnnotationWorkspace save status', () => {
     expect(topBar.className).toContain('items-center')
     expect(topBar.className).toContain('justify-between')
     expect(topBar.className).not.toContain('flex-wrap')
+  })
+
+  it('adds a dedicated trajectory viewer tab alongside the existing workspace tabs', () => {
+    render(<AnnotationWorkspace />)
+
+    expect(screen.getByRole('tab', { name: /episode viewer/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /trajectory viewer/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /object detection/i })).toBeInTheDocument()
+  })
+
+  it('keeps the trajectory plot out of the default episode viewer tab', () => {
+    render(<AnnotationWorkspace />)
+
+    expect(screen.queryByText('Trajectory Plot')).not.toBeInTheDocument()
+  })
+
+  it('renders the trajectory plot after switching to the trajectory viewer tab', () => {
+    render(<AnnotationWorkspace />)
+
+    const trajectoryTab = screen.getByRole('tab', { name: /trajectory viewer/i })
+
+    fireEvent.mouseDown(trajectoryTab, { button: 0, ctrlKey: false })
+
+    expect(screen.getByText('Trajectory Plot')).toBeInTheDocument()
+  })
+
+  it('uses compact playback controls in the trajectory viewer tab', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    expect(screen.getByRole('button', { name: /play playback/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /toggle auto-play/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /toggle loop playback/i })).toBeInTheDocument()
+    expect(screen.queryByText(/^Speed:$/)).not.toBeInTheDocument()
   })
 
   it('renders a Previous Episode action in the workspace header when navigation is available', () => {
@@ -268,7 +372,7 @@ describe('AnnotationWorkspace save status', () => {
     expect(handleSaveAndNextEpisode).toHaveBeenCalledTimes(1)
   })
 
-  it('resets labels back to the original episode labels when Reset All is clicked', async () => {
+  it('resets labels back to the original episode labels without saving when Reset All is clicked', async () => {
     const { rerender } = render(<AnnotationWorkspace />)
 
     mockEpisodeLabels = { 0: ['FAILURE'] }
@@ -281,10 +385,10 @@ describe('AnnotationWorkspace save status', () => {
       await Promise.resolve()
     })
 
+    rerender(<AnnotationWorkspace />)
+
     expect(mockResetEdits).toHaveBeenCalled()
-    expect(mockSaveEpisodeLabels).toHaveBeenCalledWith({
-      episodeIdx: 0,
-      labels: ['SUCCESS'],
-    })
+    expect(mockSaveEpisodeLabels).not.toHaveBeenCalled()
+    expect(screen.queryByText(/unsaved episode changes/i)).not.toBeInTheDocument()
   })
 })

@@ -105,7 +105,7 @@ export function useDatasetLabels() {
  */
 export function useSaveEpisodeLabels() {
     const currentDataset = useDatasetStore((state) => state.currentDataset);
-    const setEpisodeLabelsInStore = useLabelStore((state) => state.setEpisodeLabels);
+    const commitEpisodeLabels = useLabelStore((state) => state.commitEpisodeLabels);
     const queryClient = useQueryClient();
 
     const mutation = useMutation({
@@ -114,7 +114,7 @@ export function useSaveEpisodeLabels() {
             return setEpisodeLabels(currentDataset.id, episodeIdx, labels);
         },
         onSuccess: (data) => {
-            setEpisodeLabelsInStore(data.episode_index, data.labels);
+            commitEpisodeLabels(data.episode_index, data.labels);
             if (currentDataset) {
                 queryClient.invalidateQueries({ queryKey: labelKeys.dataset(currentDataset.id) });
             }
@@ -180,26 +180,14 @@ export function useRemoveLabelOption() {
 export function useCurrentEpisodeLabels(episodeIndex: number) {
     const episodeLabels = useLabelStore((state) => state.episodeLabels);
     const toggleLabel = useLabelStore((state) => state.toggleLabel);
-    const setEpisodeLabels = useLabelStore((state) => state.setEpisodeLabels);
-    const saveLabels = useSaveEpisodeLabels();
 
     const currentLabels = episodeLabels[episodeIndex] || [];
 
     const toggle = useCallback(
         async (label: string) => {
             toggleLabel(episodeIndex, label);
-            const current = episodeLabels[episodeIndex] || [];
-            const updated = current.includes(label)
-                ? current.filter((l) => l !== label)
-                : [...current, label];
-            try {
-                await saveLabels.mutateAsync({ episodeIdx: episodeIndex, labels: updated });
-            } catch (error) {
-                setEpisodeLabels(episodeIndex, current);
-                throw error;
-            }
         },
-        [episodeIndex, episodeLabels, saveLabels, setEpisodeLabels, toggleLabel],
+        [episodeIndex, toggleLabel],
     );
 
     return { currentLabels, toggle };
