@@ -2,8 +2,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="responsive-container">{children}</div>
+  ResponsiveContainer: ({ children, ...props }: { children: React.ReactNode } & Record<string, unknown>) => (
+    <div data-testid="responsive-container">
+      <pre data-testid="responsive-container-props">{JSON.stringify(props)}</pre>
+      {children}
+    </div>
   ),
   LineChart: ({ children, data }: { children: React.ReactNode; data: unknown }) => (
     <div data-testid="line-chart">
@@ -14,7 +17,9 @@ vi.mock('recharts', () => ({
   CartesianGrid: () => null,
   Line: ({ dataKey }: { dataKey: string }) => <div data-testid={`line-${dataKey}`} />,
   ReferenceLine: () => null,
-  Tooltip: () => null,
+  Tooltip: (props: Record<string, unknown>) => (
+    <div data-testid="trajectory-tooltip-props">{JSON.stringify(props)}</div>
+  ),
   XAxis: () => null,
   YAxis: () => null,
 }))
@@ -184,5 +189,41 @@ describe('TrajectoryPlot', () => {
     expect(velocityData[0]?.joint_1).toBe(0.1)
     expect(velocityData[1]?.joint_0).toBe(0.1)
     expect(velocityData[1]?.joint_1).toBe(0.2)
+  })
+
+  it('configures the tooltip to stay on a stable side of the cursor without animation lag', () => {
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot className="h-full" />
+      </div>,
+    )
+
+    const tooltipProps = JSON.parse(screen.getByTestId('trajectory-tooltip-props').textContent ?? '{}') as {
+      allowEscapeViewBox?: { x?: boolean; y?: boolean }
+      isAnimationActive?: boolean
+      offset?: { x?: number; y?: number }
+      reverseDirection?: { x?: boolean; y?: boolean }
+    }
+
+    expect(tooltipProps.isAnimationActive).toBe(false)
+    expect(tooltipProps.allowEscapeViewBox).toEqual({ x: true, y: true })
+    expect(tooltipProps.reverseDirection).toEqual({ x: false, y: true })
+    expect(tooltipProps.offset).toEqual({ x: 16, y: 12 })
+  })
+
+  it('provides a positive startup size for the responsive chart container', () => {
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot className="h-full" />
+      </div>,
+    )
+
+    const containerProps = JSON.parse(screen.getByTestId('responsive-container-props').textContent ?? '{}') as {
+      minHeight?: number
+      initialDimension?: { width?: number; height?: number }
+    }
+
+    expect(containerProps.minHeight).toBe(60)
+    expect(containerProps.initialDimension).toEqual({ width: 320, height: 60 })
   })
 })

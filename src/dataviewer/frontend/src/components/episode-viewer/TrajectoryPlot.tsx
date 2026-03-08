@@ -93,6 +93,9 @@ function normalizeSeries(value: number, min: number, max: number) {
   return (value - min) / (max - min);
 }
 
+const TRAJECTORY_CHART_MIN_HEIGHT = 60
+const TRAJECTORY_CHART_INITIAL_DIMENSION = { width: 320, height: TRAJECTORY_CHART_MIN_HEIGHT }
+
 
 
 /**
@@ -313,7 +316,12 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved 
 
       {/* Chart */}
       <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          minHeight={TRAJECTORY_CHART_MIN_HEIGHT}
+          initialDimension={TRAJECTORY_CHART_INITIAL_DIMENSION}
+        >
           <LineChart
             data={chartData}
             onClick={handleChartClick}
@@ -331,6 +339,10 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved 
               domain={showNormalized && !showVelocity ? [0, 1] : ['auto', 'auto']}
             />
             <Tooltip
+              allowEscapeViewBox={{ x: true, y: true }}
+              reverseDirection={{ x: false, y: true }}
+              offset={{ x: 16, y: 12 }}
+              isAnimationActive={false}
               contentStyle={{
                 backgroundColor: 'hsl(var(--popover))',
                 border: '1px solid hsl(var(--border))',

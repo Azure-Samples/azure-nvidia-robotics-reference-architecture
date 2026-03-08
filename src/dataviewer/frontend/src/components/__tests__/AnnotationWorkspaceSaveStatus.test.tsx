@@ -202,6 +202,34 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.getByTestId('workspace-save-status-slot')).toBeInTheDocument()
   })
 
+  it('keeps the episode title, tabs, and top actions in a single compact toolbar', () => {
+    render(<AnnotationWorkspace />)
+
+    const topBar = screen.getByTestId('workspace-top-bar')
+
+    expect(topBar).toContainElement(screen.getByRole('tablist'))
+    expect(topBar).toContainElement(screen.getByTestId('workspace-header-actions'))
+    expect(topBar.className).toContain('items-center')
+    expect(topBar.className).toContain('justify-between')
+    expect(topBar.className).not.toContain('flex-wrap')
+  })
+
+  it('renders a Next Episode action in the workspace header when navigation is available', () => {
+    const handleNextEpisode = vi.fn()
+
+    render(<AnnotationWorkspace canGoNextEpisode onNextEpisode={handleNextEpisode} />)
+
+    const nextEpisodeButton = within(screen.getByTestId('workspace-header-actions')).getByRole('button', {
+      name: /next episode/i,
+    })
+
+    expect(nextEpisodeButton).toBeEnabled()
+
+    fireEvent.click(nextEpisodeButton)
+
+    expect(handleNextEpisode).toHaveBeenCalledTimes(1)
+  })
+
   it('resets labels back to the original episode labels when Reset All is clicked', async () => {
     const { rerender } = render(<AnnotationWorkspace />)
 

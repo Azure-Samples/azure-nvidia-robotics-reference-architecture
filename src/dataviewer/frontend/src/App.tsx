@@ -126,25 +126,19 @@ function EpisodeList({
   );
 }
 
-function EpisodeViewer({ datasetId, episodeIndex }: { datasetId: string; episodeIndex: number }) {
+function EpisodeViewer({
+  datasetId,
+  episodeIndex,
+  canGoNextEpisode,
+  onNextEpisode,
+}: {
+  datasetId: string
+  episodeIndex: number
+  canGoNextEpisode: boolean
+  onNextEpisode: () => void
+}) {
   const { data: episode, isLoading, error } = useEpisode(datasetId, episodeIndex);
   const setCurrentEpisode = useEpisodeStore((state) => state.setCurrentEpisode);
-  const setDatasets = useDatasetStore((state) => state.setDatasets);
-  const selectDataset = useDatasetStore((state) => state.selectDataset);
-
-  // Sync dataset and episode to stores for AnnotationWorkspace
-  useEffect(() => {
-    // Create a minimal dataset info object for the store
-    setDatasets([{
-      id: datasetId,
-      name: datasetId,
-      totalEpisodes: 0,
-      fps: 15,
-      features: {},
-      tasks: []
-    }]);
-    selectDataset(datasetId);
-  }, [datasetId, setDatasets, selectDataset]);
 
   useEffect(() => {
     if (episode) {
@@ -177,7 +171,12 @@ function EpisodeViewer({ datasetId, episodeIndex }: { datasetId: string; episode
   }
 
   // Render the new AnnotationWorkspace with all features
-  return <AnnotationWorkspace />;
+  return (
+    <AnnotationWorkspace
+      canGoNextEpisode={canGoNextEpisode}
+      onNextEpisode={onNextEpisode}
+    />
+  );
 }
 
 function DatasetSelector({
@@ -294,6 +293,9 @@ export function AppContent() {
   const [selectedEpisode, setSelectedEpisode] = useState<number>(0);
   const { data: datasets } = useDatasets();
   const { data: capabilities } = useCapabilities(datasetId || undefined);
+  const { data: episodes } = useEpisodes(datasetId, { limit: 100 });
+  const setDatasets = useDatasetStore((state) => state.setDatasets)
+  const selectDataset = useDatasetStore((state) => state.selectDataset)
 
   // Load labels for the selected dataset
   useDatasetLabels();
@@ -319,32 +321,59 @@ export function AppContent() {
     }
   }, [datasets, datasetId]);
 
+  useEffect(() => {
+    if (!datasets || datasets.length === 0) {
+      setDatasets([])
+      return
+    }
+
+    setDatasets(datasets)
+
+    if (datasetId) {
+      selectDataset(datasetId)
+    }
+  }, [datasetId, datasets, selectDataset, setDatasets])
+
+  const selectedDataset = datasets?.find((dataset) => dataset.id === datasetId) ?? null
+  const totalEpisodes = episodes?.length ?? selectedDataset?.totalEpisodes ?? 0
+  const canGoNextEpisode = totalEpisodes > 0 && selectedEpisode < totalEpisodes - 1
+
+  const handleNextEpisode = useCallback(() => {
+    if (totalEpisodes === 0) {
+      return
+    }
+
+    setSelectedEpisode((currentEpisode) => Math.min(currentEpisode + 1, totalEpisodes - 1))
+  }, [totalEpisodes])
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <header className="bg-card border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Robotic Training Data Analysis</h1>
-          <p className="text-sm text-muted-foreground">
-            Episode annotation system for robot demonstration datasets
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="dataset-selector" className="text-sm">Dataset:</label>
-          <DatasetSelector
-            datasetId={datasetId}
-            datasets={datasets ?? []}
-            onSelectDataset={(nextDatasetId) => {
-              setDatasetId(nextDatasetId);
-              setSelectedEpisode(0);
-            }}
-          />
-          {capabilities?.isLerobotDataset && (
-            <Badge variant="secondary">LeRobot</Badge>
-          )}
-          {capabilities?.hasHdf5Files && !capabilities?.isLerobotDataset && (
-            <Badge variant="outline">HDF5</Badge>
-          )}
+      <header className="bg-card border-b px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex items-baseline gap-2">
+            <h1 className="truncate text-xl font-semibold leading-none">Robotic Training Data Analysis</h1>
+            <p className="hidden text-sm text-muted-foreground lg:block">
+              Episode annotation system for robot demonstration datasets
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label htmlFor="dataset-selector" className="text-sm">Dataset:</label>
+            <DatasetSelector
+              datasetId={datasetId}
+              datasets={datasets ?? []}
+              onSelectDataset={(nextDatasetId) => {
+                setDatasetId(nextDatasetId);
+                setSelectedEpisode(0);
+              }}
+            />
+            {capabilities?.isLerobotDataset && (
+              <Badge variant="secondary">LeRobot</Badge>
+            )}
+            {capabilities?.hasHdf5Files && !capabilities?.isLerobotDataset && (
+              <Badge variant="outline">HDF5</Badge>
+            )}
+          </div>
         </div>
       </header>
 
@@ -361,7 +390,12 @@ export function AppContent() {
 
         {/* Episode Viewer */}
         <main className="flex-1 overflow-hidden bg-background">
-          <EpisodeViewer datasetId={datasetId} episodeIndex={selectedEpisode} />
+          <EpisodeViewer
+            datasetId={datasetId}
+            episodeIndex={selectedEpisode}
+            canGoNextEpisode={canGoNextEpisode}
+            onNextEpisode={handleNextEpisode}
+          />
         </main>
       </div>
     </div>

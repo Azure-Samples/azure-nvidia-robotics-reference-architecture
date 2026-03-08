@@ -1,4 +1,4 @@
-import { Download, Pause, Play, Repeat, RotateCcw, Scan, SkipBack,SkipForward, Video } from 'lucide-react';
+import { Download, Pause, Play, Repeat, RotateCcw, Scan, SkipBack, SkipForward, Video } from 'lucide-react';
 import { type SyntheticEvent,useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { LabelPanel } from '@/components/annotation-panel';
@@ -34,13 +34,21 @@ import { useLabelStore } from '@/stores/label-store';
 
 const EMPTY_LABELS: string[] = [];
 
+interface AnnotationWorkspaceProps {
+  canGoNextEpisode?: boolean;
+  onNextEpisode?: () => void;
+}
+
 /**
  * Unified annotation workspace integrating episode viewing, editing, and export.
  *
  * Uses native <video> for smooth playback and per-frame <img> for
  * frame-accurate scrubbing when paused.
  */
-export function AnnotationWorkspace() {
+export function AnnotationWorkspace({
+  canGoNextEpisode = false,
+  onNextEpisode,
+}: AnnotationWorkspaceProps) {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [showSaveStatus, setShowSaveStatus] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -419,62 +427,68 @@ export function AnnotationWorkspace() {
   }
 
   return (
-    <div className="flex flex-col h-full gap-4 p-4">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">
-            Episode {currentEpisode.meta.index}
-          </h2>
-          {hasEdits && (
-            <span className="text-xs text-orange-500 font-medium">
-              (has edits)
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-1" data-testid="workspace-header-actions">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => void handleResetAll()}
-              disabled={!hasEdits && !hasLabelChanges}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset All
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setExportDialogOpen(true)}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </div>
-          <div className="min-h-[1rem]" data-testid="workspace-save-status-slot">
-            {showSaveStatus && (
-              <p data-testid="workspace-save-status" className="text-xs text-muted-foreground">
-                Changes save automatically.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
+    <div className="flex h-full flex-col gap-2.5 px-3 py-2">
       {/* Main tabbed content area */}
       <Tabs defaultValue="episode" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="w-fit">
-          <TabsTrigger value="episode" className="gap-2">
-            <Video className="h-4 w-4" />
-            Episode Viewer
-          </TabsTrigger>
-          <TabsTrigger value="detection" className="gap-2">
-            <Scan className="h-4 w-4" />
-            Object Detection
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-3" data-testid="workspace-top-bar">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="text-lg font-semibold leading-none">
+                Episode {currentEpisode.meta.index}
+              </h2>
+              {hasEdits && (
+                <span className="text-xs text-orange-500 font-medium">
+                  (has edits)
+                </span>
+              )}
+            </div>
+            <TabsList className="h-10 w-fit shrink-0">
+              <TabsTrigger value="episode" className="gap-2">
+                <Video className="h-4 w-4" />
+                Episode Viewer
+              </TabsTrigger>
+              <TabsTrigger value="detection" className="gap-2">
+                <Scan className="h-4 w-4" />
+                Object Detection
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <div className="flex shrink-0 flex-col items-end justify-center gap-1" data-testid="workspace-header-actions">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void handleResetAll()}
+                disabled={!hasEdits && !hasLabelChanges}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset All
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setExportDialogOpen(true)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button
+                onClick={onNextEpisode}
+                disabled={!canGoNextEpisode || !onNextEpisode}
+              >
+                <SkipForward className="h-4 w-4 mr-2" />
+                Next Episode
+              </Button>
+            </div>
+            <div className="min-h-[1rem]" data-testid="workspace-save-status-slot">
+              {showSaveStatus && (
+                <p data-testid="workspace-save-status" className="text-xs text-muted-foreground">
+                  Changes save automatically.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
-        {/* Tab 1: Episode Viewer */}
-        <TabsContent value="episode" className="flex-1 mt-4 min-h-0">
+        <TabsContent value="episode" className="mt-2.5 flex-1 min-h-0">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             {/* Left panel: Video and timeline */}
             <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto">
@@ -699,7 +713,7 @@ export function AnnotationWorkspace() {
         </TabsContent>
 
         {/* Tab 2: Object Detection */}
-        <TabsContent value="detection" className="flex-1 mt-4 min-h-0">
+        <TabsContent value="detection" className="mt-2.5 flex-1 min-h-0">
           <DetectionPanel />
         </TabsContent>
       </Tabs>

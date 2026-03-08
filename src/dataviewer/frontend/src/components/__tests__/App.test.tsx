@@ -12,8 +12,24 @@ let mockDatasets: DatasetInfo[] = []
 vi.mock('@/hooks/use-datasets', () => ({
   useDatasets: () => ({ data: mockDatasets }),
   useCapabilities: () => ({ data: undefined }),
-  useEpisodes: () => ({ data: [], isLoading: false, error: null }),
-  useEpisode: () => ({ data: null, isLoading: false, error: null }),
+  useEpisodes: () => ({
+    data: [
+      { index: 0, length: 12, taskIndex: 0, hasAnnotations: false },
+      { index: 1, length: 10, taskIndex: 0, hasAnnotations: false },
+      { index: 2, length: 8, taskIndex: 0, hasAnnotations: false },
+    ],
+    isLoading: false,
+    error: null,
+  }),
+  useEpisode: (_datasetId: string, episodeIndex: number) => ({
+    data: {
+      meta: { index: episodeIndex, length: 12 },
+      videoUrls: undefined,
+      trajectoryData: undefined,
+    },
+    isLoading: false,
+    error: null,
+  }),
 }))
 
 vi.mock('@/hooks/use-joint-config', () => ({
@@ -29,7 +45,20 @@ vi.mock('@/components/annotation-panel', () => ({
 }))
 
 vi.mock('@/components/annotation-workspace/AnnotationWorkspace', () => ({
-  AnnotationWorkspace: () => <div>Annotation Workspace</div>,
+  AnnotationWorkspace: ({
+    canGoNextEpisode,
+    onNextEpisode,
+  }: {
+    canGoNextEpisode?: boolean
+    onNextEpisode?: () => void
+  }) => (
+    <div>
+      <div>Annotation Workspace</div>
+      <button type="button" disabled={!canGoNextEpisode} onClick={onNextEpisode}>
+        Next Episode
+      </button>
+    </div>
+  ),
 }))
 
 describe('AppContent', () => {
@@ -124,6 +153,31 @@ describe('AppContent', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('hexagon_lerobot')
+    })
+  })
+
+  it('uses a compact shell header so the workspace starts higher on the page', async () => {
+    render(<AppContent />)
+
+    const banner = await screen.findByRole('banner')
+
+    expect(banner.className).toContain('py-2.5')
+    expect(banner.className).toContain('px-4')
+    expect(banner.className).not.toContain('py-4')
+    expect(banner.className).not.toContain('px-6')
+  })
+
+  it('advances to the next episode from the workspace top bar action', async () => {
+    const user = userEvent.setup()
+
+    render(<AppContent />)
+
+    await screen.findByText('Annotation Workspace')
+
+    await user.click(screen.getByRole('button', { name: /next episode/i }))
+
+    await waitFor(() => {
+      expect(useEpisodeStore.getState().currentEpisode?.meta.index).toBe(1)
     })
   })
 })
