@@ -7,7 +7,7 @@ import { ExportDialog } from '@/components/export';
 import { ColorAdjustmentControls,FrameInsertionToolbar, FrameRemovalToolbar, TrajectoryEditor, TransformControls } from '@/components/frame-editor';
 import { DetectionPanel } from '@/components/object-detection';
 import { PlaybackControlStrip } from '@/components/playback/PlaybackControlStrip';
-import { SubtaskTimelineTrack, SubtaskToolbar } from '@/components/subtask-timeline';
+import { SubtaskList, SubtaskTimelineTrack, SubtaskToolbar } from '@/components/subtask-timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -15,7 +15,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ViewerDisplayControls } from '@/components/viewer-display';
 import { useSaveEpisodeLabels } from '@/hooks/use-labels';
 import { combineCssFilters } from '@/lib/css-filters';
-import { computeEffectiveFps, computeSyncAction } from '@/lib/playback-utils';
+import {
+  clampFrameToPlaybackRange,
+  computeEffectiveFps,
+  computeSyncAction,
+  resolvePlaybackRange,
+  resolvePlaybackTick,
+} from '@/lib/playback-utils';
 import {
   useDatasetStore,
   useEditDirtyState,
@@ -31,6 +37,7 @@ import {
   useFrameInsertionState,
 } from '@/stores/edit-store';
 import { useLabelStore } from '@/stores/label-store';
+import { createDefaultSubtask } from '@/types/episode-edit';
 
 const EMPTY_LABELS: string[] = [];
 
@@ -64,6 +71,8 @@ export function AnnotationWorkspace({
   const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
+  const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
@@ -85,6 +94,8 @@ export function AnnotationWorkspace({
   const { autoPlay, autoLoop, setAutoPlay, setAutoLoop } = usePlaybackSettings();
   const globalTransform = useEditStore((state) => state.globalTransform);
   const saveEpisodeLabels = useSaveEpisodeLabels();
+  const subtasks = useEditStore((state) => state.subtasks);
+  const addSubtask = useEditStore((state) => state.addSubtask);
   const currentEpisodeLabels = useMemo(() => {
     if (!currentEpisode) {
       return EMPTY_LABELS;
@@ -265,6 +276,49 @@ export function AnnotationWorkspace({
   // Derive effective fps from the video's actual duration to avoid
   // mismatches between dataset metadata fps and video encoding fps.
   const fps = computeEffectiveFps(totalFrames, videoDuration, datasetFps);
+  const activeSubtask = useMemo(
+    () => subtasks.find((segment) => segment.id === selectedSubtaskId) ?? null,
+    [selectedSubtaskId, subtasks],
+  );
+  const activePlaybackRange = activeSubtask?.frameRange ?? selectedRange;
+  const playbackRange = useMemo(
+    () => resolvePlaybackRange(totalFrames, activePlaybackRange),
+    [activePlaybackRange, totalFrames],
+  );
+  const playbackRangeStart = playbackRange[0];
+  const playbackRangeEnd = playbackRange[1];
+
+  const setFrameWithinPlaybackRange = useCallback((frame: number) => {
+    setCurrentFrame(clampFrameToPlaybackRange(frame, totalFrames, activePlaybackRange));
+  }, [activePlaybackRange, setCurrentFrame, totalFrames]);
+
+  const clearPlaybackSelection = useCallback(() => {
+    setSelectedSubtaskId(null);
+    setSelectedRange(null);
+  }, []);
+
+  const handleSubtaskSelectionChange = useCallback((id: string | null) => {
+    setSelectedSubtaskId(id);
+
+    if (!id) {
+      return;
+    }
+
+    setSelectedRange(null);
+    const nextSegment = subtasks.find((segment) => segment.id === id);
+
+    if (nextSegment) {
+      setCurrentFrame(nextSegment.frameRange[0]);
+    }
+  }, [setCurrentFrame, subtasks]);
+
+  const handleCreateSubtaskFromRange = useCallback((range: [number, number]) => {
+    const nextSegment = createDefaultSubtask(range, subtasks);
+    addSubtask(nextSegment);
+    setSelectedRange(null);
+    setSelectedSubtaskId(nextSegment.id);
+    setCurrentFrame(nextSegment.frameRange[0]);
+  }, [addSubtask, setCurrentFrame, subtasks]);
 
   // Resolve the first available camera from episode video URLs
   const cameraName = useMemo(() => {
@@ -278,6 +332,29 @@ export function AnnotationWorkspace({
     if (!currentEpisode?.videoUrls || !cameraName) return null;
     return currentEpisode.videoUrls[cameraName];
   }, [currentEpisode?.videoUrls, cameraName]);
+
+  useEffect(() => {
+    setSelectedSubtaskId(null);
+    setSelectedRange(null);
+  }, [currentDataset?.id, currentEpisode?.meta.index]);
+
+  useEffect(() => {
+    if (selectedSubtaskId && !activeSubtask) {
+      setSelectedSubtaskId(null);
+    }
+  }, [activeSubtask, selectedSubtaskId]);
+
+  useEffect(() => {
+    if (!activePlaybackRange) {
+      return;
+    }
+
+    const clampedFrame = clampFrameToPlaybackRange(currentFrame, totalFrames, activePlaybackRange);
+
+    if (clampedFrame !== currentFrame) {
+      setCurrentFrame(clampedFrame);
+    }
+  }, [activePlaybackRange, currentFrame, setCurrentFrame, totalFrames]);
 
   // Build frame image URL (only used when paused for frame-accurate view)
   const frameImageUrl = useMemo(() => {
@@ -357,13 +434,15 @@ export function AnnotationWorkspace({
       isPlaying, playbackSpeed,
       currentFrameRef.current, totalFrames, originalFrameIndexRef.current,
       fps, video.currentTime,
+      playbackRangeStart,
+      playbackRangeEnd,
     );
 
     switch (action.kind) {
       case 'restart':
         video.playbackRate = action.playbackRate;
-        setCurrentFrame(0);
-        video.currentTime = 0;
+        setFrameWithinPlaybackRange(playbackRangeStart);
+        video.currentTime = playbackRangeStart / fps;
         video.play().catch(() => { /* autoplay may be blocked */ });
         break;
       case 'seek-and-play':
@@ -379,7 +458,7 @@ export function AnnotationWorkspace({
         video.pause();
         break;
     }
-  }, [isPlaying, playbackSpeed, videoSrc, fps, totalFrames, setCurrentFrame]);
+  }, [fps, isPlaying, playbackRangeEnd, playbackRangeStart, playbackSpeed, setFrameWithinPlaybackRange, totalFrames, videoSrc]);
 
   // During playback, drive frame counter from video.currentTime via rAF
   useEffect(() => {
@@ -389,17 +468,31 @@ export function AnnotationWorkspace({
     const tick = () => {
       const video = videoRef.current;
       if (video) {
-        const frame = Math.round(video.currentTime * fps);
-        if (frame !== lastFrame) {
-          lastFrame = frame;
-          setCurrentFrame(frame);
+        const nextFrame = Math.round(video.currentTime * fps);
+        const resolved = resolvePlaybackTick(nextFrame, totalFrames, activePlaybackRange, autoLoop);
+
+        if (resolved.frame !== lastFrame) {
+          lastFrame = resolved.frame;
+          setCurrentFrame(resolved.frame);
+        }
+
+        if (resolved.shouldStop) {
+          if (isPlaying) {
+            togglePlayback();
+          }
+          video.pause();
+          return;
+        }
+
+        if (resolved.frame !== nextFrame) {
+          video.currentTime = resolved.frame / fps;
         }
       }
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, fps, setCurrentFrame]);
+  }, [activePlaybackRange, autoLoop, fps, isPlaying, setCurrentFrame, togglePlayback, totalFrames]);
 
   // When paused, seek video to match store frame (slider scrub / step buttons)
   useEffect(() => {
@@ -417,25 +510,35 @@ export function AnnotationWorkspace({
       // Restart directly — the sync effect won't re-trigger since isPlaying
       // hasn't changed, so we must seek and play the video element ourselves.
       const video = videoRef.current;
-      setCurrentFrame(0);
+      setFrameWithinPlaybackRange(playbackRangeStart);
       if (video) {
-        video.currentTime = 0;
+        video.currentTime = playbackRangeStart / fps;
         video.play().catch(() => { /* autoplay may be blocked */ });
       }
     } else {
       if (isPlaying) togglePlayback();
-      setCurrentFrame(totalFrames - 1);
+      setFrameWithinPlaybackRange(playbackRangeEnd);
     }
-  }, [autoLoop, isPlaying, togglePlayback, setCurrentFrame, totalFrames]);
+  }, [autoLoop, fps, isPlaying, playbackRangeEnd, playbackRangeStart, setFrameWithinPlaybackRange, togglePlayback]);
 
   // Step forward / backward one frame (when paused)
   const stepFrame = useCallback(
     (delta: number) => {
-      const next = Math.max(0, Math.min(totalFrames - 1, currentFrame + delta));
-      setCurrentFrame(next);
+      setFrameWithinPlaybackRange(currentFrame + delta);
     },
-    [currentFrame, totalFrames, setCurrentFrame],
+    [currentFrame, setFrameWithinPlaybackRange],
   );
+
+  const renderSubtaskListCard = useCallback((compact = false) => (
+    <Card className={compact ? 'min-h-[220px]' : 'mt-4'}>
+      <CardContent className={compact ? 'p-3' : 'p-4'}>
+        <SubtaskList
+          selectedSubtaskId={selectedSubtaskId}
+          onSelectionChange={handleSubtaskSelectionChange}
+        />
+      </CardContent>
+    </Card>
+  ), [handleSubtaskSelectionChange, selectedSubtaskId]);
 
   const renderPlaybackCard = useCallback((compact = false) => (
     <Card className={compact ? 'h-full min-h-0' : 'flex-shrink-0'}>
@@ -533,7 +636,7 @@ export function AnnotationWorkspace({
                   <Button
                     size="icon"
                     variant="outline"
-                    onClick={() => setCurrentFrame(0)}
+                    onClick={() => setFrameWithinPlaybackRange(playbackRangeStart)}
                     aria-label="Reset playback"
                     title="Reset playback"
                     className="h-8 w-8"
@@ -607,7 +710,7 @@ export function AnnotationWorkspace({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setCurrentFrame(0)}
+                  onClick={() => setFrameWithinPlaybackRange(playbackRangeStart)}
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
@@ -653,10 +756,10 @@ export function AnnotationWorkspace({
           slider={
             <input
               type="range"
-              min={0}
-              max={totalFrames - 1}
+              min={playbackRangeStart}
+              max={playbackRangeEnd}
               value={currentFrame}
-              onChange={(e) => setCurrentFrame(parseInt(e.target.value, 10))}
+              onChange={(e) => setFrameWithinPlaybackRange(parseInt(e.target.value, 10))}
               className="w-full"
             />
           }
@@ -678,8 +781,10 @@ export function AnnotationWorkspace({
     playbackSpeed,
     setAutoLoop,
     setAutoPlay,
-    setCurrentFrame,
+    playbackRangeEnd,
+    playbackRangeStart,
     setPlaybackSpeed,
+    setFrameWithinPlaybackRange,
     stepFrame,
     togglePlayback,
     totalFrames,
@@ -779,6 +884,7 @@ export function AnnotationWorkspace({
             {/* Left panel: Video and timeline */}
             <div className="lg:col-span-2 min-h-0 overflow-y-auto">
               {renderPlaybackCard()}
+              {renderSubtaskListCard()}
             </div>
 
             {/* Right panel: Annotation/edit tools */}
@@ -843,18 +949,38 @@ export function AnnotationWorkspace({
 
         <TabsContent value="trajectory" className="mt-2.5 flex-1 min-h-0">
           <div className="grid h-full grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
-            <div className="min-h-[320px] xl:min-h-0">
+            <div className="flex min-h-[320px] flex-col gap-4 xl:min-h-0">
               {renderPlaybackCard(true)}
+              {renderSubtaskListCard(true)}
             </div>
             <Card className="min-h-[340px] xl:min-h-0">
               <CardContent className="flex h-full min-h-0 flex-col gap-3 p-4">
-                <div>
-                  <h3 className="text-sm font-medium">Trajectory Graph</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Review joint motion, filters, and subtask boundaries alongside a compact episode player.
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-medium">Trajectory Graph</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Review joint motion, filters, and subtask boundaries alongside a compact episode player.
+                    </p>
+                  </div>
+                  {(selectedRange || selectedSubtaskId) && (
+                    <Button size="sm" variant="outline" onClick={clearPlaybackSelection}>
+                      Clear Selection
+                    </Button>
+                  )}
                 </div>
-                <TrajectoryPlot className="flex-1 min-h-[280px]" />
+                <TrajectoryPlot
+                  className="flex-1 min-h-[280px]"
+                  selectedRange={selectedRange}
+                  onSelectedRangeChange={(range) => {
+                    setSelectedSubtaskId(null);
+                    setSelectedRange(range);
+
+                    if (range) {
+                      setCurrentFrame(range[0]);
+                    }
+                  }}
+                  onCreateSubtaskFromRange={handleCreateSubtaskFromRange}
+                />
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
@@ -863,9 +989,18 @@ export function AnnotationWorkspace({
                         Compare subtask ranges directly against trajectory changes on the same frame timeline.
                       </p>
                     </div>
-                    <SubtaskToolbar />
                   </div>
-                  <SubtaskTimelineTrack totalFrames={totalFrames} editable />
+                  <div className="flex items-center gap-2">
+                    <SubtaskToolbar
+                      selectedSegmentId={selectedSubtaskId}
+                      onSelectionChange={handleSubtaskSelectionChange}
+                    />
+                  </div>
+                  <SubtaskTimelineTrack
+                    totalFrames={totalFrames}
+                    editable
+                    onSegmentClick={(segment) => handleSubtaskSelectionChange(segment.id)}
+                  />
                 </div>
               </CardContent>
             </Card>

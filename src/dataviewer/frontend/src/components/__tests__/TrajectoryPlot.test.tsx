@@ -226,4 +226,130 @@ describe('TrajectoryPlot', () => {
     expect(containerProps.minHeight).toBe(60)
     expect(containerProps.initialDimension).toEqual({ width: 320, height: 60 })
   })
+
+  it('supports dragging on the graph to select a frame range', () => {
+    const handleRangeSelectionChange = vi.fn()
+
+    useEpisodeStore.getState().setCurrentEpisode({
+      meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
+      videoUrls: {},
+      trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
+        frame,
+        timestamp: frame / 10,
+        jointPositions: Array.from({ length: 17 }, (_, index) => index + frame),
+        jointVelocities: Array.from({ length: 17 }, (_, index) => (index + frame) / 10),
+        endEffectorPose: [],
+        gripperState: 0,
+      })),
+    })
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot
+          className="h-full"
+          selectedRange={null}
+          onSelectedRangeChange={handleRangeSelectionChange}
+        />
+      </div>,
+    )
+
+    const selectionSurface = screen.getByTestId('trajectory-selection-surface')
+
+    Object.defineProperty(selectionSurface, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 0, width: 300, top: 0, height: 120, right: 300, bottom: 120 }),
+    })
+
+    fireEvent.pointerDown(selectionSurface, { button: 0, clientX: 30, clientY: 20 })
+    fireEvent.pointerMove(selectionSurface, { clientX: 210, clientY: 20 })
+    fireEvent.pointerUp(selectionSurface, { clientX: 210, clientY: 20 })
+
+    expect(handleRangeSelectionChange).toHaveBeenLastCalledWith([1, 6])
+  })
+
+  it('offers a create subtask action from the selected graph range context menu', () => {
+    const handleCreateSubtask = vi.fn()
+
+    useEpisodeStore.getState().setCurrentEpisode({
+      meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
+      videoUrls: {},
+      trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
+        frame,
+        timestamp: frame / 10,
+        jointPositions: Array.from({ length: 17 }, (_, index) => index + frame),
+        jointVelocities: Array.from({ length: 17 }, (_, index) => (index + frame) / 10),
+        endEffectorPose: [],
+        gripperState: 0,
+      })),
+    })
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot
+          className="h-full"
+          selectedRange={[2, 6]}
+          onSelectedRangeChange={vi.fn()}
+          onCreateSubtaskFromRange={handleCreateSubtask}
+        />
+      </div>,
+    )
+
+    const selectionSurface = screen.getByTestId('trajectory-selection-surface')
+
+    Object.defineProperty(selectionSurface, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 0, width: 300, top: 0, height: 120, right: 300, bottom: 120 }),
+    })
+
+    fireEvent.contextMenu(selectionSurface, { clientX: 120, clientY: 24 })
+    fireEvent.click(screen.getByRole('button', { name: /create subtask/i }))
+
+    expect(handleCreateSubtask).toHaveBeenCalledWith([2, 6])
+  })
+
+  it('keeps graph pointer handlers from swallowing a context-menu create click', () => {
+    const handleCreateSubtask = vi.fn()
+
+    useEpisodeStore.getState().setCurrentEpisode({
+      meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
+      videoUrls: {},
+      trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
+        frame,
+        timestamp: frame / 10,
+        jointPositions: Array.from({ length: 17 }, (_, index) => index + frame),
+        jointVelocities: Array.from({ length: 17 }, (_, index) => (index + frame) / 10),
+        endEffectorPose: [],
+        gripperState: 0,
+      })),
+    })
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot
+          className="h-full"
+          selectedRange={[2, 6]}
+          onSelectedRangeChange={vi.fn()}
+          onCreateSubtaskFromRange={handleCreateSubtask}
+        />
+      </div>,
+    )
+
+    const selectionSurface = screen.getByTestId('trajectory-selection-surface')
+
+    Object.defineProperty(selectionSurface, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 0, width: 300, top: 0, height: 120, right: 300, bottom: 120 }),
+    })
+
+    fireEvent.contextMenu(selectionSurface, { clientX: 120, clientY: 24 })
+
+    const createButton = screen.getByRole('button', { name: /create subtask/i })
+
+    fireEvent.pointerDown(createButton, { button: 0, clientX: 120, clientY: 24 })
+    fireEvent.pointerUp(createButton, { button: 0, clientX: 120, clientY: 24 })
+    fireEvent.click(createButton, { button: 0, clientX: 120, clientY: 24 })
+
+    expect(handleCreateSubtask).toHaveBeenCalledTimes(1)
+    expect(handleCreateSubtask).toHaveBeenCalledWith([2, 6])
+  })
 })

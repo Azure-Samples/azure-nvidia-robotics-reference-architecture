@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  clampFrameToPlaybackRange,
   computeEffectiveFps,
   computePlaybackTarget,
   computeSyncAction,
   needsSeekBeforePlay,
+  resolvePlaybackTick,
 } from '../playback-utils'
 
 describe('computeEffectiveFps', () => {
@@ -216,5 +218,33 @@ describe('computeSyncAction', () => {
     if (action.kind === 'seek-and-play') {
       expect(action.seekTo).toBeCloseTo(150 / fps, 5)
     }
+  })
+})
+
+describe('clampFrameToPlaybackRange', () => {
+  it('returns the current frame when no playback range is active', () => {
+    expect(clampFrameToPlaybackRange(42, 120, null)).toBe(42)
+  })
+
+  it('clamps the frame to the selected range bounds', () => {
+    expect(clampFrameToPlaybackRange(5, 120, [10, 40])).toBe(10)
+    expect(clampFrameToPlaybackRange(24, 120, [10, 40])).toBe(24)
+    expect(clampFrameToPlaybackRange(55, 120, [10, 40])).toBe(40)
+  })
+})
+
+describe('resolvePlaybackTick', () => {
+  it('loops back to the active range start when playback runs past the end and autoLoop is enabled', () => {
+    expect(resolvePlaybackTick(41, 120, [10, 40], true)).toEqual({
+      frame: 10,
+      shouldStop: false,
+    })
+  })
+
+  it('stops at the active range end when playback runs past the end and autoLoop is disabled', () => {
+    expect(resolvePlaybackTick(41, 120, [10, 40], false)).toEqual({
+      frame: 40,
+      shouldStop: true,
+    })
   })
 })

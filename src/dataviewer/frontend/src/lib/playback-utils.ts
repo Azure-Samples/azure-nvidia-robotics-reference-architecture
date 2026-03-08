@@ -5,6 +5,57 @@
  * extracted from AnnotationWorkspace for testability.
  */
 
+export type PlaybackRange = [number, number]
+
+export function resolvePlaybackRange(
+  totalFrames: number,
+  range: PlaybackRange | null,
+): PlaybackRange {
+  const episodeEnd = Math.max(totalFrames - 1, 0)
+
+  if (!range) {
+    return [0, episodeEnd]
+  }
+
+  const [rawStart, rawEnd] = range[0] <= range[1] ? range : [range[1], range[0]]
+  const start = Math.max(0, Math.min(rawStart, episodeEnd))
+  const end = Math.max(start, Math.min(rawEnd, episodeEnd))
+
+  return [start, end]
+}
+
+export function clampFrameToPlaybackRange(
+  frame: number,
+  totalFrames: number,
+  range: PlaybackRange | null,
+): number {
+  const [start, end] = resolvePlaybackRange(totalFrames, range)
+
+  return Math.max(start, Math.min(frame, end))
+}
+
+export function resolvePlaybackTick(
+  frame: number,
+  totalFrames: number,
+  range: PlaybackRange | null,
+  autoLoop: boolean,
+): { frame: number; shouldStop: boolean } {
+  const [start, end] = resolvePlaybackRange(totalFrames, range)
+
+  if (frame <= end) {
+    return {
+      frame: Math.max(start, frame),
+      shouldStop: false,
+    }
+  }
+
+  if (autoLoop) {
+    return { frame: start, shouldStop: false }
+  }
+
+  return { frame: end, shouldStop: true }
+}
+
 /**
  * Derive effective fps from the video element's actual duration.
  *
@@ -33,12 +84,14 @@ export function computePlaybackTarget(
   totalFrames: number,
   originalFrameIndex: number | null,
   fps: number,
+  playbackRangeStart = 0,
+  playbackRangeEnd = totalFrames - 1,
 ): { targetTime: number; shouldRestart: boolean } {
-  if (currentFrame >= totalFrames - 1) {
-    return { targetTime: 0, shouldRestart: true };
+  if (currentFrame >= playbackRangeEnd) {
+    return { targetTime: playbackRangeStart / fps, shouldRestart: true };
   }
 
-  const frameForTime = originalFrameIndex ?? currentFrame;
+  const frameForTime = originalFrameIndex ?? Math.max(playbackRangeStart, currentFrame);
   return { targetTime: frameForTime / fps, shouldRestart: false };
 }
 
@@ -77,11 +130,18 @@ export function computeSyncAction(
   originalFrameIndex: number | null,
   fps: number,
   videoCurrentTime: number,
+  playbackRangeStart = 0,
+  playbackRangeEnd = totalFrames - 1,
 ): SyncAction {
   if (!isPlaying) return { kind: 'pause' };
 
   const { targetTime, shouldRestart } = computePlaybackTarget(
-    currentFrame, totalFrames, originalFrameIndex, fps,
+    currentFrame,
+    totalFrames,
+    originalFrameIndex,
+    fps,
+    playbackRangeStart,
+    playbackRangeEnd,
   );
 
   if (shouldRestart) {

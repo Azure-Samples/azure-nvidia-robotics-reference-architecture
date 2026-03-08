@@ -62,6 +62,7 @@ vi.mock('@/components/playback/PlaybackControlStrip', () => ({
 }))
 
 vi.mock('@/components/subtask-timeline', () => ({
+  SubtaskList: () => <div>Subtask List</div>,
   SubtaskTimelineTrack: () => <div>Subtask Timeline Track</div>,
   SubtaskToolbar: () => <div>Subtask Toolbar</div>,
 }))
@@ -75,8 +76,11 @@ vi.mock('@/lib/css-filters', () => ({
 }))
 
 vi.mock('@/lib/playback-utils', () => ({
+  clampFrameToPlaybackRange: (frame: number) => frame,
   computeEffectiveFps: () => 30,
   computeSyncAction: () => ({ kind: 'pause' }),
+  resolvePlaybackRange: (totalFrames: number) => [0, totalFrames - 1],
+  resolvePlaybackTick: (frame: number) => ({ frame, shouldStop: false }),
 }))
 
 vi.mock('@/hooks/use-labels', () => ({
@@ -115,6 +119,8 @@ vi.mock('@/stores', () => ({
   }),
   useEditStore: (selector: (state: unknown) => unknown) =>
     selector({
+      subtasks: [],
+      addSubtask: vi.fn(),
       removedFrames: new Set<number>(),
       initializeEdit: mockInitializeEdit,
       clearTransforms: vi.fn(),
@@ -304,6 +310,12 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.queryByText('Subtask Timeline Track')).not.toBeInTheDocument()
   })
 
+  it('renders the shared subtask list in the default episode viewer', () => {
+    render(<AnnotationWorkspace />)
+
+    expect(screen.getByText('Subtask List')).toBeInTheDocument()
+  })
+
   it('renders the trajectory plot after switching to the trajectory viewer tab', () => {
     render(<AnnotationWorkspace />)
 
@@ -321,6 +333,14 @@ describe('AnnotationWorkspace save status', () => {
 
     expect(screen.getByText('Subtask Toolbar')).toBeInTheDocument()
     expect(screen.getByText('Subtask Timeline Track')).toBeInTheDocument()
+  })
+
+  it('renders the same subtask list in the trajectory viewer under the compact video panel', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    expect(screen.getByText('Subtask List')).toBeInTheDocument()
   })
 
   it('uses compact playback controls in the trajectory viewer tab', () => {

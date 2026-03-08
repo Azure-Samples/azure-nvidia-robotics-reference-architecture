@@ -7,7 +7,7 @@
  * - Reference line position updates without re-rendering chart lines
  */
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -19,6 +19,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { Button } from '@/components/ui/button'
 import { useJointConfigDefaults, useSaveJointConfig, useSaveJointConfigDefaults } from '@/hooks/use-joint-config'
 import { getAutoSelectedJointsForEpisode } from '@/lib/joint-significance'
 import { cn } from '@/lib/utils'
@@ -53,6 +54,12 @@ interface TrajectoryPlotProps {
   className?: string;
   /** Callback invoked after a successful save */
   onSaved?: () => void;
+  /** Active graph selection range */
+  selectedRange?: [number, number] | null;
+  /** Called when the graph selection changes */
+  onSelectedRangeChange?: (range: [number, number] | null) => void;
+  /** Called when the user creates a subtask from the selected range */
+  onCreateSubtaskFromRange?: (range: [number, number]) => void;
 }
 
 function applyTrajectoryAdjustment(
@@ -109,7 +116,13 @@ const TRAJECTORY_CHART_INITIAL_DIMENSION = { width: 320, height: TRAJECTORY_CHAR
  * <TrajectoryPlot className="h-64" />
  * ```
  */
-export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved }: TrajectoryPlotProps) {
+export const TrajectoryPlot = memo(function TrajectoryPlot({
+  className,
+  onSaved,
+  selectedRange = null,
+  onSelectedRangeChange,
+  onCreateSubtaskFromRange,
+}: TrajectoryPlotProps) {
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
   const setCurrentFrame = useEpisodeStore((state) => state.setCurrentFrame);
   const { trajectoryAdjustments } = useTrajectoryAdjustmentState();
@@ -127,6 +140,10 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved 
   const [showVelocity, setShowVelocity] = useState(false);
   const [showNormalized, setShowNormalized] = useState(true);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [selectionAnchorFrame, setSelectionAnchorFrame] = useState<number | null>(null);
+  const [selectionAnchorX, setSelectionAnchorX] = useState<number | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const selectionSurfaceRef = useRef<HTMLDivElement>(null);
 
   const withSave = useCallback(
     <T extends unknown[]>(fn: (...args: T) => void) =>
@@ -213,6 +230,109 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved 
     setSelectedJoints(autoSelectedJoints)
   }, [autoSelectedJoints])
 
+  useEffect(() => {
+    if (!selectedRange) {
+      setContextMenuPosition(null)
+    }
+  }, [selectedRange])
+
+  const frameFromClientX = useCallback((clientX: number) => {
+    const bounds = selectionSurfaceRef.current?.getBoundingClientRect()
+
+    if (!bounds || bounds.width <= 0) {
+      return 0
+    }
+
+    const relativeX = Math.max(0, Math.min(clientX - bounds.left, bounds.width))
+    const ratio = bounds.width === 0 ? 0 : relativeX / bounds.width
+
+    return Math.round(ratio * Math.max((currentEpisode?.meta.length ?? 1) - 1, 0))
+  }, [currentEpisode?.meta.length])
+
+  const updateSelectedRange = useCallback((startFrame: number, endFrame: number) => {
+    onSelectedRangeChange?.([
+      Math.min(startFrame, endFrame),
+      Math.max(startFrame, endFrame),
+    ])
+  }, [onSelectedRangeChange])
+
+  const handleSelectionPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return
+    }
+
+    setContextMenuPosition(null)
+    setSelectionAnchorX(event.clientX)
+    setSelectionAnchorFrame(frameFromClientX(event.clientX))
+  }, [frameFromClientX])
+
+  const handleSelectionPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (selectionAnchorFrame === null || selectionAnchorX === null) {
+      return
+    }
+
+    if (Math.abs(event.clientX - selectionAnchorX) < 4) {
+      return
+    }
+
+    updateSelectedRange(selectionAnchorFrame, frameFromClientX(event.clientX))
+  }, [frameFromClientX, selectionAnchorFrame, selectionAnchorX, updateSelectedRange])
+
+  const handleSelectionPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (selectionAnchorFrame === null) {
+      return
+    }
+
+    const pointerFrame = frameFromClientX(event.clientX)
+    const pointerDistance = selectionAnchorX === null ? 0 : Math.abs(event.clientX - selectionAnchorX)
+
+    if (pointerDistance < 4) {
+      setCurrentFrame(pointerFrame)
+    } else {
+      updateSelectedRange(selectionAnchorFrame, pointerFrame)
+    }
+
+    setSelectionAnchorFrame(null)
+    setSelectionAnchorX(null)
+  }, [frameFromClientX, selectionAnchorFrame, selectionAnchorX, setCurrentFrame, updateSelectedRange])
+
+  const handleSelectionContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!selectedRange || !selectionSurfaceRef.current) {
+      return
+    }
+
+    const frame = frameFromClientX(event.clientX)
+
+    if (frame < selectedRange[0] || frame > selectedRange[1]) {
+      return
+    }
+
+    const bounds = selectionSurfaceRef.current.getBoundingClientRect()
+    event.preventDefault()
+    setContextMenuPosition({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    })
+  }, [frameFromClientX, selectedRange])
+
+  const selectionHighlight = useMemo(() => {
+    if (!selectedRange || (currentEpisode?.meta.length ?? 0) <= 1) {
+      return null
+    }
+
+    const [start, end] = selectedRange[0] <= selectedRange[1]
+      ? selectedRange
+      : [selectedRange[1], selectedRange[0]]
+    const total = Math.max((currentEpisode?.meta.length ?? 1) - 1, 1)
+    const left = (start / total) * 100
+    const width = ((Math.max(end - start, 0) + 1) / (total + 1)) * 100
+
+    return {
+      left: `${left}%`,
+      width: `${Math.max(width, 0.5)}%`,
+    }
+  }, [currentEpisode?.meta.length, selectedRange])
+
   // Handle chart click to seek - memoized callback
   const handleChartClick = useCallback((data: unknown) => {
     const chartData = data as { activePayload?: { payload?: { frame: number } }[] };
@@ -272,6 +392,16 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved 
           />
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-start">
+          {selectedRange && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onSelectedRangeChange?.(null)}
+            >
+              Clear Selection
+            </Button>
+          )}
           <button
             onClick={() => setShowVelocity(false)}
             className={cn(
@@ -315,7 +445,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved 
       </div>
 
       {/* Chart */}
-      <div className="flex-1 min-h-0">
+      <div className="relative flex-1 min-h-0">
         <ResponsiveContainer
           width="100%"
           height="100%"
@@ -380,6 +510,44 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({ className, onSaved 
             ))}
           </LineChart>
         </ResponsiveContainer>
+        <div
+          ref={selectionSurfaceRef}
+          data-testid="trajectory-selection-surface"
+          className="absolute inset-0 z-10 cursor-crosshair"
+          onContextMenu={handleSelectionContextMenu}
+          onPointerDown={handleSelectionPointerDown}
+          onPointerMove={handleSelectionPointerMove}
+          onPointerUp={handleSelectionPointerUp}
+        >
+          {selectionHighlight && (
+            <div
+              className="absolute bottom-2 top-2 rounded-md border border-primary/60 bg-primary/10"
+              style={selectionHighlight}
+            />
+          )}
+          {contextMenuPosition && selectedRange && (
+            <div
+              className="absolute z-20 rounded-md border bg-popover p-1 shadow-md"
+              style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
+              onContextMenu={(event) => event.preventDefault()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onCreateSubtaskFromRange?.(selectedRange)
+                  setContextMenuPosition(null)
+                }}
+              >
+                Create Subtask
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <JointConfigDefaultsEditor
