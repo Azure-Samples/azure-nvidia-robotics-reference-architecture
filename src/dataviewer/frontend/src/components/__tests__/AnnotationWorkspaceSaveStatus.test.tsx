@@ -297,6 +297,13 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.queryByText('Trajectory Plot')).not.toBeInTheDocument()
   })
 
+  it('keeps subtask controls out of the default episode viewer tab', () => {
+    render(<AnnotationWorkspace />)
+
+    expect(screen.queryByText('Subtask Toolbar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Subtask Timeline Track')).not.toBeInTheDocument()
+  })
+
   it('renders the trajectory plot after switching to the trajectory viewer tab', () => {
     render(<AnnotationWorkspace />)
 
@@ -305,6 +312,15 @@ describe('AnnotationWorkspace save status', () => {
     fireEvent.mouseDown(trajectoryTab, { button: 0, ctrlKey: false })
 
     expect(screen.getByText('Trajectory Plot')).toBeInTheDocument()
+  })
+
+  it('renders subtask controls alongside the trajectory graph in the trajectory viewer tab', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    expect(screen.getByText('Subtask Toolbar')).toBeInTheDocument()
+    expect(screen.getByText('Subtask Timeline Track')).toBeInTheDocument()
   })
 
   it('uses compact playback controls in the trajectory viewer tab', () => {

@@ -777,19 +777,8 @@ export function AnnotationWorkspace({
         <TabsContent value="episode" className="mt-2.5 flex-1 min-h-0">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             {/* Left panel: Video and timeline */}
-            <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto">
+            <div className="lg:col-span-2 min-h-0 overflow-y-auto">
               {renderPlaybackCard()}
-
-              {/* Subtasks */}
-              <Card className="min-h-[220px] flex-1">
-                <CardContent className="p-4 h-full flex flex-col gap-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-muted-foreground">Subtasks</span>
-                    <SubtaskToolbar />
-                  </div>
-                  <SubtaskTimelineTrack totalFrames={totalFrames} editable />
-                </CardContent>
-              </Card>
             </div>
 
             {/* Right panel: Annotation/edit tools */}
@@ -862,10 +851,22 @@ export function AnnotationWorkspace({
                 <div>
                   <h3 className="text-sm font-medium">Trajectory Graph</h3>
                   <p className="text-xs text-muted-foreground">
-                    Review joint motion, filters, and frame alignment alongside a compact episode player.
+                    Review joint motion, filters, and subtask boundaries alongside a compact episode player.
                   </p>
                 </div>
                 <TrajectoryPlot className="flex-1 min-h-[280px]" />
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-medium">Subtask Timeline</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Compare subtask ranges directly against trajectory changes on the same frame timeline.
+                      </p>
+                    </div>
+                    <SubtaskToolbar />
+                  </div>
+                  <SubtaskTimelineTrack totalFrames={totalFrames} editable />
+                </div>
               </CardContent>
             </Card>
           </div>
