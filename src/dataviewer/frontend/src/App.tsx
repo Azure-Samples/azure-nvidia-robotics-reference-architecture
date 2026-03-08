@@ -107,9 +107,16 @@ function EpisodeList({
 
   return (
     <div className="overflow-y-auto h-full flex flex-col">
-      <LabelFilter />
-      <div className="p-2 text-sm font-medium text-muted-foreground border-b">
-        {filteredEpisodes.length}{filterLabels.length > 0 ? ` / ${episodes.length}` : ''} Episodes
+      <div
+        className="flex items-start justify-between gap-2 border-b px-2 py-1.5"
+        data-testid="episode-list-toolbar"
+      >
+        <div className="min-w-0 flex-1">
+          <LabelFilter compact />
+        </div>
+        <div className="shrink-0 pt-0.5 text-xs font-medium text-muted-foreground">
+          {filteredEpisodes.length}{filterLabels.length > 0 ? ` / ${episodes.length}` : ''} Episodes
+        </div>
       </div>
       <ul className="divide-y flex-1 overflow-y-auto">
         {filteredEpisodes.map((episode: EpisodeMeta) => (
@@ -129,13 +136,19 @@ function EpisodeList({
 function EpisodeViewer({
   datasetId,
   episodeIndex,
+  canGoPreviousEpisode,
+  onPreviousEpisode,
   canGoNextEpisode,
   onNextEpisode,
+  onSaveAndNextEpisode,
 }: {
   datasetId: string
   episodeIndex: number
+  canGoPreviousEpisode: boolean
+  onPreviousEpisode: () => void
   canGoNextEpisode: boolean
   onNextEpisode: () => void
+  onSaveAndNextEpisode: () => void
 }) {
   const { data: episode, isLoading, error } = useEpisode(datasetId, episodeIndex);
   const setCurrentEpisode = useEpisodeStore((state) => state.setCurrentEpisode);
@@ -173,8 +186,11 @@ function EpisodeViewer({
   // Render the new AnnotationWorkspace with all features
   return (
     <AnnotationWorkspace
+      canGoPreviousEpisode={canGoPreviousEpisode}
+      onPreviousEpisode={onPreviousEpisode}
       canGoNextEpisode={canGoNextEpisode}
       onNextEpisode={onNextEpisode}
+      onSaveAndNextEpisode={onSaveAndNextEpisode}
     />
   );
 }
@@ -336,7 +352,12 @@ export function AppContent() {
 
   const selectedDataset = datasets?.find((dataset) => dataset.id === datasetId) ?? null
   const totalEpisodes = episodes?.length ?? selectedDataset?.totalEpisodes ?? 0
+  const canGoPreviousEpisode = selectedEpisode > 0
   const canGoNextEpisode = totalEpisodes > 0 && selectedEpisode < totalEpisodes - 1
+
+  const handlePreviousEpisode = useCallback(() => {
+    setSelectedEpisode((currentEpisode) => Math.max(currentEpisode - 1, 0))
+  }, [])
 
   const handleNextEpisode = useCallback(() => {
     if (totalEpisodes === 0) {
@@ -393,8 +414,11 @@ export function AppContent() {
           <EpisodeViewer
             datasetId={datasetId}
             episodeIndex={selectedEpisode}
+            canGoPreviousEpisode={canGoPreviousEpisode}
+            onPreviousEpisode={handlePreviousEpisode}
             canGoNextEpisode={canGoNextEpisode}
             onNextEpisode={handleNextEpisode}
+            onSaveAndNextEpisode={handleNextEpisode}
           />
         </main>
       </div>

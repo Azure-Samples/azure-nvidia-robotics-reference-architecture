@@ -35,8 +35,11 @@ import { useLabelStore } from '@/stores/label-store';
 const EMPTY_LABELS: string[] = [];
 
 interface AnnotationWorkspaceProps {
+  canGoPreviousEpisode?: boolean;
+  onPreviousEpisode?: () => void;
   canGoNextEpisode?: boolean;
   onNextEpisode?: () => void;
+  onSaveAndNextEpisode?: () => void;
 }
 
 /**
@@ -46,8 +49,11 @@ interface AnnotationWorkspaceProps {
  * frame-accurate scrubbing when paused.
  */
 export function AnnotationWorkspace({
+  canGoPreviousEpisode = false,
+  onPreviousEpisode,
   canGoNextEpisode = false,
   onNextEpisode,
+  onSaveAndNextEpisode,
 }: AnnotationWorkspaceProps) {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [showSaveStatus, setShowSaveStatus] = useState(false);
@@ -153,6 +159,24 @@ export function AnnotationWorkspace({
     });
     announceSave();
   }, [announceSave, availableLabels, currentDataset, currentEpisode, hasLabelChanges, resetEdits, saveEpisodeLabels]);
+
+  const handleSaveAndNextEpisode = useCallback(async () => {
+    const advanceToNextEpisode = onSaveAndNextEpisode ?? onNextEpisode;
+
+    if (!canGoNextEpisode || !advanceToNextEpisode) {
+      return;
+    }
+
+    if (currentEpisode && currentDataset && hasLabelChanges) {
+      await saveEpisodeLabels.mutateAsync({
+        episodeIdx: currentEpisode.meta.index,
+        labels: currentEpisodeLabels,
+      });
+      announceSave();
+    }
+
+    advanceToNextEpisode();
+  }, [announceSave, canGoNextEpisode, currentDataset, currentEpisode, currentEpisodeLabels, hasLabelChanges, onNextEpisode, onSaveAndNextEpisode, saveEpisodeLabels]);
 
   // Combined CSS filter: viewer display adjustments + edit color transforms
   const displayFilter = useMemo(
@@ -457,6 +481,16 @@ export function AnnotationWorkspace({
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
+                size="icon"
+                onClick={onPreviousEpisode}
+                disabled={!canGoPreviousEpisode || !onPreviousEpisode}
+                aria-label="Previous Episode"
+                title="Previous Episode"
+              >
+                <SkipBack className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => void handleResetAll()}
                 disabled={!hasEdits && !hasLabelChanges}
               >
@@ -471,11 +505,11 @@ export function AnnotationWorkspace({
                 Export
               </Button>
               <Button
-                onClick={onNextEpisode}
-                disabled={!canGoNextEpisode || !onNextEpisode}
+                onClick={() => void handleSaveAndNextEpisode()}
+                disabled={!canGoNextEpisode || !onSaveAndNextEpisode || saveEpisodeLabels.isPending}
               >
                 <SkipForward className="h-4 w-4 mr-2" />
-                Next Episode
+                Save & Next Episode
               </Button>
             </div>
             <div className="min-h-[1rem]" data-testid="workspace-save-status-slot">

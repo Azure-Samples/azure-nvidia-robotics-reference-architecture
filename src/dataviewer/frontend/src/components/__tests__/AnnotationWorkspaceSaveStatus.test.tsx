@@ -214,20 +214,58 @@ describe('AnnotationWorkspace save status', () => {
     expect(topBar.className).not.toContain('flex-wrap')
   })
 
-  it('renders a Next Episode action in the workspace header when navigation is available', () => {
-    const handleNextEpisode = vi.fn()
+  it('renders a Previous Episode action in the workspace header when navigation is available', () => {
+    const handlePreviousEpisode = vi.fn()
 
-    render(<AnnotationWorkspace canGoNextEpisode onNextEpisode={handleNextEpisode} />)
+    render(<AnnotationWorkspace canGoPreviousEpisode onPreviousEpisode={handlePreviousEpisode} />)
 
-    const nextEpisodeButton = within(screen.getByTestId('workspace-header-actions')).getByRole('button', {
-      name: /next episode/i,
+    const previousEpisodeButton = screen.getByRole('button', { name: /previous episode/i })
+
+    expect(previousEpisodeButton).toBeEnabled()
+
+    fireEvent.click(previousEpisodeButton)
+
+    expect(handlePreviousEpisode).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders a Save & Next Episode action in the workspace header when navigation is available', async () => {
+    const handleSaveAndNextEpisode = vi.fn()
+
+    render(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
+
+    const saveAndNextButton = within(screen.getByTestId('workspace-header-actions')).getByRole('button', {
+      name: /save\s*&\s*next episode/i,
     })
 
-    expect(nextEpisodeButton).toBeEnabled()
+    expect(saveAndNextButton).toBeEnabled()
 
-    fireEvent.click(nextEpisodeButton)
+    await act(async () => {
+      fireEvent.click(saveAndNextButton)
+      await Promise.resolve()
+    })
 
-    expect(handleNextEpisode).toHaveBeenCalledTimes(1)
+    expect(handleSaveAndNextEpisode).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves labels and advances when Save & Next Episode is clicked', async () => {
+    const handleSaveAndNextEpisode = vi.fn()
+    const { rerender } = render(
+      <AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />,
+    )
+
+    mockEpisodeLabels = { 0: ['FAILURE'] }
+    rerender(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /save\s*&\s*next episode/i }))
+      await Promise.resolve()
+    })
+
+    expect(mockSaveEpisodeLabels).toHaveBeenCalledWith({
+      episodeIdx: 0,
+      labels: ['FAILURE'],
+    })
+    expect(handleSaveAndNextEpisode).toHaveBeenCalledTimes(1)
   })
 
   it('resets labels back to the original episode labels when Reset All is clicked', async () => {

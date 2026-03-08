@@ -46,16 +46,28 @@ vi.mock('@/components/annotation-panel', () => ({
 
 vi.mock('@/components/annotation-workspace/AnnotationWorkspace', () => ({
   AnnotationWorkspace: ({
+    canGoPreviousEpisode,
+    onPreviousEpisode,
     canGoNextEpisode,
     onNextEpisode,
+    onSaveAndNextEpisode,
   }: {
+    canGoPreviousEpisode?: boolean
+    onPreviousEpisode?: () => void
     canGoNextEpisode?: boolean
     onNextEpisode?: () => void
+    onSaveAndNextEpisode?: () => void
   }) => (
     <div>
       <div>Annotation Workspace</div>
+      <button type="button" disabled={!canGoPreviousEpisode} onClick={onPreviousEpisode}>
+        Previous Episode
+      </button>
       <button type="button" disabled={!canGoNextEpisode} onClick={onNextEpisode}>
         Next Episode
+      </button>
+      <button type="button" disabled={!canGoNextEpisode} onClick={onSaveAndNextEpisode}>
+        Save and Next Episode
       </button>
     </div>
   ),
@@ -174,10 +186,50 @@ describe('AppContent', () => {
 
     await screen.findByText('Annotation Workspace')
 
-    await user.click(screen.getByRole('button', { name: /next episode/i }))
+    await user.click(screen.getByRole('button', { name: /^next episode$/i }))
 
     await waitFor(() => {
       expect(useEpisodeStore.getState().currentEpisode?.meta.index).toBe(1)
     })
+  })
+
+  it('moves back to the previous episode from the workspace top bar action', async () => {
+    const user = userEvent.setup()
+
+    render(<AppContent />)
+
+    await screen.findByText('Annotation Workspace')
+
+    await user.click(screen.getByRole('button', { name: /^next episode$/i }))
+    await user.click(screen.getByRole('button', { name: /previous episode/i }))
+
+    await waitFor(() => {
+      expect(useEpisodeStore.getState().currentEpisode?.meta.index).toBe(0)
+    })
+  })
+
+  it('advances from the workspace save-and-next action', async () => {
+    const user = userEvent.setup()
+
+    render(<AppContent />)
+
+    await screen.findByText('Annotation Workspace')
+
+    await user.click(screen.getByRole('button', { name: /save and next episode/i }))
+
+    await waitFor(() => {
+      expect(useEpisodeStore.getState().currentEpisode?.meta.index).toBe(1)
+    })
+  })
+
+  it('uses a single compact sidebar toolbar for filters and episode count', async () => {
+    render(<AppContent />)
+
+    const sidebarToolbar = await screen.findByTestId('episode-list-toolbar')
+
+    expect(sidebarToolbar).toHaveTextContent('Label Filter')
+    expect(sidebarToolbar).toHaveTextContent('3 Episodes')
+    expect(sidebarToolbar.className).toContain('border-b')
+    expect(sidebarToolbar.className).toContain('py-1.5')
   })
 })
