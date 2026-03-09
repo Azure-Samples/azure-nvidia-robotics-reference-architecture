@@ -9,6 +9,7 @@
 #
 
 #Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 <#
 .SYNOPSIS

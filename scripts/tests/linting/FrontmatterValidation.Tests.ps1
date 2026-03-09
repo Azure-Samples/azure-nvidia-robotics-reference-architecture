@@ -1311,6 +1311,56 @@ Describe 'Test-SingleFileFrontmatter footer integration' -Tag 'Unit' {
         }
     }
 
+    Context 'FrontmatterExcludePaths parameter' {
+        It 'skips frontmatter validation for excluded file' {
+            $filePath = Join-Path $script:FixtureDir 'no-frontmatter-with-footer.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'README.md' -FrontmatterExcludePaths @('README.md')
+            $frontmatterIssues = $result.Issues | Where-Object { $_.Field -ne 'footer' }
+            $frontmatterIssues | Should -HaveCount 0
+        }
+
+        It 'still validates footer for excluded file' {
+            $filePath = Join-Path $script:FixtureDir 'no-frontmatter-with-footer.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'README.md' -FrontmatterExcludePaths @('README.md')
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 0
+        }
+
+        It 'reports missing footer for excluded file without footer' {
+            $filePath = Join-Path $script:FixtureDir 'missing-frontmatter.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'README.md' -FrontmatterExcludePaths @('README.md')
+            $footerIssues = $result.Issues | Where-Object { $_.Field -eq 'footer' }
+            $footerIssues | Should -HaveCount 1
+            $footerIssues[0].Type | Should -Be 'Error'
+        }
+
+        It 'does not exclude non-matching files' {
+            $filePath = Join-Path $script:FixtureDir 'missing-frontmatter.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/missing-frontmatter.md' -FrontmatterExcludePaths @('README.md')
+            $result.HasErrors | Should -BeTrue
+        }
+
+        It 'handles wildcard patterns' {
+            $filePath = Join-Path $script:FixtureDir 'no-frontmatter-with-footer.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'README.md' -FrontmatterExcludePaths @('*.md')
+            $frontmatterIssues = $result.Issues | Where-Object { $_.Field -ne 'footer' }
+            $frontmatterIssues | Should -HaveCount 0
+        }
+
+        It 'normalizes backslash separators in paths' {
+            $filePath = Join-Path $script:FixtureDir 'no-frontmatter-with-footer.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs\README.md' -FrontmatterExcludePaths @('docs/README.md')
+            $frontmatterIssues = $result.Issues | Where-Object { $_.Field -ne 'footer' }
+            $frontmatterIssues | Should -HaveCount 0
+        }
+
+        It 'accepts empty exclusion array' {
+            $filePath = Join-Path $script:FixtureDir 'missing-frontmatter.md'
+            $result = Test-SingleFileFrontmatter -FilePath $filePath -RelativePath 'docs/missing-frontmatter.md' -FrontmatterExcludePaths @()
+            $result.HasErrors | Should -BeTrue
+        }
+    }
+
     Context 'Non-requiring file types skip footer' {
         It 'does not validate footer for non-matching paths' {
             $content = "# Test`nSome content"

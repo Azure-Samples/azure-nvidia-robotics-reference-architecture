@@ -647,6 +647,10 @@ function Test-SingleFileFrontmatter {
         Array of wildcard patterns for files to exclude from footer validation.
         Uses PowerShell -like operator for matching against relative paths.
         Path separators are normalized to forward slashes for cross-platform support.
+    .PARAMETER FrontmatterExcludePaths
+        Array of wildcard patterns for files to exclude from frontmatter validation.
+        Matched files skip frontmatter presence and field checks but still undergo
+        footer validation. Uses PowerShell -like operator against relative paths.
     .PARAMETER SkipFooterValidation
         When set, skips footer validation entirely.
     .OUTPUTS
@@ -662,47 +666,62 @@ function Test-SingleFileFrontmatter {
 
         [string[]]$FooterExcludePaths = @(),
 
+        [string[]]$FrontmatterExcludePaths = @(),
+
         [switch]$SkipFooterValidation
     )
 
     $result = [FileValidationResult]::new($FilePath, $RelativePath)
     $fileType = Get-FileTypeInfo -RelativePath $RelativePath
 
+    # Check if frontmatter validation is excluded for this file
+    $skipFrontmatterForFile = $false
+    $normalizedRelPath = $RelativePath -replace '\\', '/'
+    foreach ($pattern in $FrontmatterExcludePaths) {
+        $normalizedPattern = $pattern -replace '\\', '/'
+        if ($normalizedRelPath -like $normalizedPattern) {
+            $skipFrontmatterForFile = $true
+            break
+        }
+    }
+
     if (-not $fileType.RequiresFrontmatter) {
         return $result
     }
 
-    # Check frontmatter presence
-    $presenceIssues = Test-FrontmatterPresence -FilePath $FilePath -FileTypeInfo $fileType
-    foreach ($issue in $presenceIssues) {
-        $result.AddIssue($issue)
-    }
+    if (-not $skipFrontmatterForFile) {
+        # Check frontmatter presence
+        $presenceIssues = Test-FrontmatterPresence -FilePath $FilePath -FileTypeInfo $fileType
+        foreach ($issue in $presenceIssues) {
+            $result.AddIssue($issue)
+        }
 
-    if ($result.HasErrors) {
-        return $result
-    }
+        if ($result.HasErrors) {
+            return $result
+        }
 
-    # Parse frontmatter
-    $frontmatter = Get-FrontmatterFromFile -FilePath $FilePath
-    if ($null -eq $frontmatter) {
-        $result.AddError('frontmatter', 'Failed to parse YAML frontmatter')
-        return $result
-    }
+        # Parse frontmatter
+        $frontmatter = Get-FrontmatterFromFile -FilePath $FilePath
+        if ($null -eq $frontmatter) {
+            $result.AddError('frontmatter', 'Failed to parse YAML frontmatter')
+            return $result
+        }
 
-    # Content-type validation
-    if ($fileType.IsDocumentation) {
-        $fieldIssues = Test-DocumentationFileFields -Frontmatter $frontmatter
-        foreach ($issue in $fieldIssues) { $result.AddIssue($issue) }
-    }
+        # Content-type validation
+        if ($fileType.IsDocumentation) {
+            $fieldIssues = Test-DocumentationFileFields -Frontmatter $frontmatter
+            foreach ($issue in $fieldIssues) { $result.AddIssue($issue) }
+        }
 
-    if ($fileType.IsInstruction -or $fileType.IsPrompt) {
-        $fieldIssues = Test-GitHubResourceFileFields -Frontmatter $frontmatter -FileTypeInfo $fileType
-        foreach ($issue in $fieldIssues) { $result.AddIssue($issue) }
-    }
+        if ($fileType.IsInstruction -or $fileType.IsPrompt) {
+            $fieldIssues = Test-GitHubResourceFileFields -Frontmatter $frontmatter -FileTypeInfo $fileType
+            foreach ($issue in $fieldIssues) { $result.AddIssue($issue) }
+        }
 
-    if ($fileType.IsRootCommunity) {
-        $fieldIssues = Test-RootCommunityFileFields -Frontmatter $frontmatter
-        foreach ($issue in $fieldIssues) { $result.AddIssue($issue) }
+        if ($fileType.IsRootCommunity) {
+            $fieldIssues = Test-RootCommunityFileFields -Frontmatter $frontmatter
+            foreach ($issue in $fieldIssues) { $result.AddIssue($issue) }
+        }
     }
 
     # Footer validation

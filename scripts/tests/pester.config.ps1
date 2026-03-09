@@ -8,6 +8,9 @@
 # Author: Robotics-AI Team
 #
 
+#Requires -Version 7.0
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
+
 [CmdletBinding()]
 param(
     [Parameter()]
