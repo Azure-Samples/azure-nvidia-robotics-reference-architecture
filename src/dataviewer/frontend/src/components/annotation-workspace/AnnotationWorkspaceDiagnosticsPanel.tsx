@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCacheStats } from '@/hooks/use-datasets'
 
 import type {
   RecentDiagnosticEvent,
@@ -35,6 +36,8 @@ export function AnnotationWorkspaceDiagnosticsPanel({
   playbackRangeEnd,
   shouldLoopPlaybackRange,
 }: AnnotationWorkspaceDiagnosticsPanelProps) {
+  const { data: cacheStats } = useCacheStats(true);
+
   return (
     <Card className="shrink-0" data-testid="dataviewer-diagnostics-panel">
       <CardHeader className="px-4 py-3">
@@ -62,6 +65,24 @@ export function AnnotationWorkspaceDiagnosticsPanel({
               </div>
             ))}
           </div>
+          {cacheStats && (
+            <>
+              <h4 className="mt-3 text-sm font-medium">Episode Cache</h4>
+              <div className="mt-2 grid gap-1 text-xs">
+                {[
+                  { label: 'Capacity', value: String(cacheStats.capacity) },
+                  { label: 'Cached Episodes', value: String(cacheStats.size) },
+                  { label: 'Hits / Misses', value: `${cacheStats.hits} / ${cacheStats.misses}` },
+                  { label: 'Hit Rate', value: `${(cacheStats.hitRate * 100).toFixed(1)}%` },
+                ].map((entry) => (
+                  <div key={entry.label} className="flex items-center justify-between gap-3 border-b border-border/50 py-1 last:border-b-0">
+                    <span className="text-muted-foreground">{entry.label}</span>
+                    <span>{entry.value}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <div className="rounded-lg border bg-muted/20 p-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { warmCache } from '@/lib/api-client';
 import { disableDiagnostics, enableDiagnostics, isDiagnosticsEnabled } from '@/lib/playback-diagnostics';
 import { useDatasetStore } from '@/stores';
 import type { DatasetInfo, EpisodeMeta } from '@/types';
@@ -18,6 +19,7 @@ export function useDataviewerShellState({
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(() => isDiagnosticsEnabled());
   const setDatasets = useDatasetStore((state) => state.setDatasets);
   const selectDataset = useDatasetStore((state) => state.selectDataset);
+  const warmedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!datasets || datasets.length === 0) {
@@ -31,8 +33,14 @@ export function useDataviewerShellState({
     const hasSelectedDataset = datasets.some((dataset) => dataset.id === datasetIdState);
 
     if (!datasetIdState || !hasSelectedDataset) {
-      setDatasetIdState(datasets[0].id);
+      const autoId = datasets[0].id;
+      setDatasetIdState(autoId);
       setSelectedEpisode(0);
+
+      if (autoId !== warmedRef.current) {
+        warmedRef.current = autoId;
+        void warmCache(autoId, 5);
+      }
     }
   }, [datasets, datasetIdState]);
 
@@ -60,6 +68,11 @@ export function useDataviewerShellState({
   const setDatasetId = useCallback((nextDatasetId: string) => {
     setDatasetIdState(nextDatasetId);
     setSelectedEpisode(0);
+
+    if (nextDatasetId && nextDatasetId !== warmedRef.current) {
+      warmedRef.current = nextDatasetId;
+      void warmCache(nextDatasetId, 5);
+    }
   }, []);
 
   const handlePreviousEpisode = useCallback(() => {

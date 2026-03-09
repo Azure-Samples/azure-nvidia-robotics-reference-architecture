@@ -309,3 +309,30 @@ async def get_cache_stats(
         misses=stats.misses,
         hit_rate=stats.hit_rate,
     )
+
+
+@router.post("/{dataset_id}/cache/warm")
+async def warm_cache(
+    count: int = Query(5, ge=1, le=20, description="Number of episodes to preload"),
+    dataset_id: str = Depends(validated_dataset_id),
+    service: DatasetService = Depends(get_dataset_service),
+) -> dict:
+    """
+    Preload the first N episodes into the LRU cache.
+
+    Designed to be called on dataset selection so the initial episode
+    loads are instant. Runs synchronously to give the caller confidence
+    that warm-up is complete before navigating.
+    """
+    dataset = await service.get_dataset(dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
+
+    loaded = 0
+    total = min(count, dataset.total_episodes)
+    for idx in range(total):
+        episode = await service.get_episode(dataset_id, idx)
+        if episode is not None:
+            loaded += 1
+
+    return {"dataset_id": dataset_id, "loaded": loaded, "requested": total}

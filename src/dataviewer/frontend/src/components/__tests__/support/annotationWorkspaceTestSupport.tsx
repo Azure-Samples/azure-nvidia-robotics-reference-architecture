@@ -229,6 +229,10 @@ vi.mock('@/hooks/use-labels', () => ({
   }),
 }))
 
+vi.mock('@/hooks/use-datasets', () => ({
+  useCacheStats: () => ({ data: undefined }),
+}))
+
 vi.mock('@/stores/label-store', () => ({
   useLabelStore: (selector: (state: unknown) => unknown) =>
     selector({

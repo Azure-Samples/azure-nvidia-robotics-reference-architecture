@@ -5,7 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import { fetchCapabilities,fetchDataset, fetchDatasets, fetchEpisode, fetchEpisodes } from '@/lib/api-client';
+import { fetchCacheStats, fetchCapabilities,fetchDataset, fetchDatasets, fetchEpisode, fetchEpisodes } from '@/lib/api-client';
 import { useDatasetStore } from '@/stores';
 
 /**
@@ -158,5 +158,23 @@ export function useCapabilities(datasetId: string | undefined) {
     queryFn: () => fetchCapabilities(datasetId!),
     enabled: !!datasetId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export const cacheStatsKeys = {
+  all: ['cache-stats'] as const,
+};
+
+/**
+ * Hook to fetch episode cache performance stats.
+ * Polls every 10 seconds when diagnostics are visible.
+ */
+export function useCacheStats(enabled: boolean) {
+  return useQuery({
+    queryKey: cacheStatsKeys.all,
+    queryFn: fetchCacheStats,
+    enabled,
+    staleTime: 5 * 1000,
+    refetchInterval: 10 * 1000,
   });
 }

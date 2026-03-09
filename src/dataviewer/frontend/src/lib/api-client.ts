@@ -283,3 +283,33 @@ export async function fetchAnnotationSummary(
   );
   return handleResponse<AnnotationSummary>(response);
 }
+
+// ============================================================================
+// Cache Stats API
+// ============================================================================
+
+export interface CacheStats {
+  capacity: number;
+  size: number;
+  hits: number;
+  misses: number;
+  hitRate: number;
+}
+
+/**
+ * Fetch episode cache performance metrics.
+ */
+export async function fetchCacheStats(): Promise<CacheStats> {
+  const response = await fetch(`${API_BASE}/datasets/cache/stats`);
+  const data = await handleResponse<unknown>(response);
+  return transformKeys<CacheStats>(data);
+}
+
+/**
+ * Warm the episode cache for a dataset by preloading the first N episodes.
+ */
+export async function warmCache(datasetId: string, count = 5): Promise<void> {
+  await fetch(`${API_BASE}/datasets/${datasetId}/cache/warm?count=${count}`, {
+    method: 'POST',
+  });
+}

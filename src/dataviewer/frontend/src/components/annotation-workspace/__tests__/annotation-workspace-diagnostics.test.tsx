@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +10,11 @@ import {
   type WorkspaceDiagnosticsSummaryInput,
 } from '@/components/annotation-workspace/annotation-workspace-diagnostics'
 import { AnnotationWorkspaceDiagnosticsPanel } from '@/components/annotation-workspace/AnnotationWorkspaceDiagnosticsPanel'
+
+function renderWithQuery(ui: React.ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+}
 
 const baseEvents = [
   {
@@ -81,7 +87,7 @@ describe('annotation workspace diagnostics helpers', () => {
 
 describe('AnnotationWorkspaceDiagnosticsPanel', () => {
   it('renders summary rows and recent diagnostic events', () => {
-    render(
+    renderWithQuery(
       <AnnotationWorkspaceDiagnosticsPanel
         diagnosticsStateSummary={[
           { label: 'Dataset', value: 'dataset-1' },
@@ -113,7 +119,7 @@ describe('AnnotationWorkspaceDiagnosticsPanel', () => {
     const handleCopy = vi.fn()
     const handleDownload = vi.fn()
 
-    render(
+    renderWithQuery(
       <AnnotationWorkspaceDiagnosticsPanel
         diagnosticsStateSummary={[{ label: 'Dataset', value: 'dataset-1' }]}
         availableDiagnosticsChannels={['all', 'workspace', 'playback']}

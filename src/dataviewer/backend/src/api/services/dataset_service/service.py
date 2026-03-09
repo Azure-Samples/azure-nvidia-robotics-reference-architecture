@@ -476,6 +476,13 @@ class DatasetService:
                 if self._episode_cache.get(dataset_id, idx) is not None:
                     continue
                 handler = self._resolve_handler(dataset_id)
+
+                # For blob datasets, ensure data files are synced locally first
+                if handler is None and dataset_id in self._blob_dataset_ids and LEROBOT_AVAILABLE:
+                    synced_path = await self._ensure_blob_synced(dataset_id)
+                    if synced_path is not None and self._lerobot_handler.get_loader(dataset_id, synced_path):
+                        handler = self._lerobot_handler
+
                 if handler is None:
                     break
                 episode = handler.load_episode(dataset_id, idx, dataset_info=dataset)
