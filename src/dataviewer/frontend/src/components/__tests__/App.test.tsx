@@ -7,6 +7,12 @@ import { useDatasetStore, useEpisodeStore } from '@/stores'
 import { useLabelStore } from '@/stores/label-store'
 import type { DatasetInfo } from '@/types'
 
+const { mockIsDiagnosticsEnabled, mockEnableDiagnostics, mockDisableDiagnostics } = vi.hoisted(() => ({
+  mockIsDiagnosticsEnabled: vi.fn(() => false),
+  mockEnableDiagnostics: vi.fn(),
+  mockDisableDiagnostics: vi.fn(),
+}))
+
 let mockDatasets: DatasetInfo[] = []
 
 vi.mock('@/hooks/use-datasets', () => ({
@@ -38,6 +44,12 @@ vi.mock('@/hooks/use-joint-config', () => ({
 
 vi.mock('@/hooks/use-labels', () => ({
   useDatasetLabels: () => undefined,
+}))
+
+vi.mock('@/lib/playback-diagnostics', () => ({
+  disableDiagnostics: mockDisableDiagnostics,
+  enableDiagnostics: mockEnableDiagnostics,
+  isDiagnosticsEnabled: mockIsDiagnosticsEnabled,
 }))
 
 vi.mock('@/components/annotation-panel', () => ({
@@ -99,6 +111,12 @@ describe('AppContent', () => {
   })
 
   afterEach(cleanup)
+
+  beforeEach(() => {
+    mockIsDiagnosticsEnabled.mockReturnValue(false)
+    mockEnableDiagnostics.mockClear()
+    mockDisableDiagnostics.mockClear()
+  })
 
   it('switches away from a removed selected dataset when the dataset list refreshes', async () => {
     const { rerender } = render(<AppContent />)
@@ -177,6 +195,19 @@ describe('AppContent', () => {
     expect(banner.className).toContain('px-4')
     expect(banner.className).not.toContain('py-4')
     expect(banner.className).not.toContain('px-6')
+  })
+
+  it('renders a compact diagnostics button next to the dataset picker in the shell header', async () => {
+    render(<AppContent />)
+
+    const banner = await screen.findByRole('banner')
+    const diagnosticsButton = screen.getByRole('button', { name: /toggle diagnostics/i })
+    const datasetPicker = screen.getByRole('combobox', { name: 'Dataset' })
+
+    expect(banner).toContainElement(diagnosticsButton)
+    expect(diagnosticsButton.className).toContain('h-8')
+    expect(diagnosticsButton.className).toContain('px-3')
+    expect(datasetPicker.parentElement).toContainElement(diagnosticsButton)
   })
 
   it('advances to the next episode from the workspace top bar action', async () => {

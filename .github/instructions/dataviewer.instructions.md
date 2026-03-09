@@ -34,6 +34,7 @@ Browser tools include: click_element, drag_element, handle_dialog, hover_element
 
 * Make sure the changes you make look correct and work correct in the UI, elements shouldn't be bleeding outside of other elements, elements that require scrollbars should have scrollbars added, elements should avoid shifting other elements when they appear on the screen or when they change dynamically.
 * Elements may make better sense being placed in other places than initially planned, make sure where they're placed and how they're placed makes the most sense.
+* Update events captured and viewable by Diagnostics viewer as-needed and as new functionality is added or refactored. When more diagnostics would be better for solving a problem then add it to the Diagnostics viewer.
 
 ## RPI Agent High Priority Instructions
 

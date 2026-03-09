@@ -97,4 +97,16 @@ describe('playback diagnostics', () => {
 
     expect(readDiagnosticEvents()).toHaveLength(2)
   })
+
+  it('clears only the requested diagnostics channel', () => {
+    enableDiagnostics(['all'])
+
+    recordDiagnosticEvent('labels', 'draft-change', { labels: ['FAILURE'] })
+    recordDiagnosticEvent('playback', 'sync-action', { action: 'play' })
+
+    clearDiagnosticEvents('labels')
+
+    expect(readDiagnosticEvents('labels')).toEqual([])
+    expect(readDiagnosticEvents('playback')).toHaveLength(1)
+  })
 })

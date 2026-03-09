@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Activity, Check, ChevronsUpDown } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { LabelFilter } from '@/components/annotation-panel';
@@ -19,6 +19,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useCapabilities,useDatasets, useEpisode, useEpisodes } from '@/hooks/use-datasets';
 import { useJointConfig } from '@/hooks/use-joint-config';
 import { useDatasetLabels } from '@/hooks/use-labels';
+import { disableDiagnostics, enableDiagnostics, isDiagnosticsEnabled } from '@/lib/playback-diagnostics';
 import { queryClient } from '@/lib/query-client';
 import { useDatasetStore,useEpisodeStore } from '@/stores';
 import { useLabelStore } from '@/stores/label-store';
@@ -136,6 +137,7 @@ function EpisodeList({
 function EpisodeViewer({
   datasetId,
   episodeIndex,
+  diagnosticsVisible,
   canGoPreviousEpisode,
   onPreviousEpisode,
   canGoNextEpisode,
@@ -144,6 +146,7 @@ function EpisodeViewer({
 }: {
   datasetId: string
   episodeIndex: number
+  diagnosticsVisible: boolean
   canGoPreviousEpisode: boolean
   onPreviousEpisode: () => void
   canGoNextEpisode: boolean
@@ -186,6 +189,7 @@ function EpisodeViewer({
   // Render the new AnnotationWorkspace with all features
   return (
     <AnnotationWorkspace
+      diagnosticsVisible={diagnosticsVisible}
       canGoPreviousEpisode={canGoPreviousEpisode}
       onPreviousEpisode={onPreviousEpisode}
       canGoNextEpisode={canGoNextEpisode}
@@ -307,6 +311,7 @@ function DatasetSelector({
 export function AppContent() {
   const [datasetId, setDatasetId] = useState('');
   const [selectedEpisode, setSelectedEpisode] = useState<number>(0);
+  const [diagnosticsVisible, setDiagnosticsVisible] = useState(() => isDiagnosticsEnabled());
   const { data: datasets } = useDatasets();
   const { data: capabilities } = useCapabilities(datasetId || undefined);
   const { data: episodes } = useEpisodes(datasetId, { limit: 100 });
@@ -367,6 +372,17 @@ export function AppContent() {
     setSelectedEpisode((currentEpisode) => Math.min(currentEpisode + 1, totalEpisodes - 1))
   }, [totalEpisodes])
 
+  const handleDiagnosticsToggle = useCallback(() => {
+    if (diagnosticsVisible) {
+      disableDiagnostics()
+      setDiagnosticsVisible(false)
+      return
+    }
+
+    enableDiagnostics()
+    setDiagnosticsVisible(true)
+  }, [diagnosticsVisible])
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
@@ -388,6 +404,16 @@ export function AppContent() {
                 setSelectedEpisode(0);
               }}
             />
+            <Button
+              variant={diagnosticsVisible ? 'default' : 'outline'}
+              size="sm"
+              onClick={handleDiagnosticsToggle}
+              aria-label="Toggle Diagnostics"
+              title={diagnosticsVisible ? 'Diagnostics on (click to hide)' : 'Diagnostics off (click to show)'}
+            >
+              <Activity className="mr-1.5 h-3.5 w-3.5" />
+              Diagnostics
+            </Button>
             {capabilities?.isLerobotDataset && (
               <Badge variant="secondary">LeRobot</Badge>
             )}
@@ -414,6 +440,7 @@ export function AppContent() {
           <EpisodeViewer
             datasetId={datasetId}
             episodeIndex={selectedEpisode}
+            diagnosticsVisible={diagnosticsVisible}
             canGoPreviousEpisode={canGoPreviousEpisode}
             onPreviousEpisode={handlePreviousEpisode}
             canGoNextEpisode={canGoNextEpisode}

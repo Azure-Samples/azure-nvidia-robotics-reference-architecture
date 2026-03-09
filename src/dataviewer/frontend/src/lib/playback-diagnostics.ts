@@ -1,6 +1,17 @@
 export const DIAGNOSTICS_STORAGE_KEY = 'dataviewer:diagnostics'
 export const DIAGNOSTICS_EVENT_NAME = 'dataviewer:diagnostics'
 export const DEFAULT_DIAGNOSTICS_CHANNELS = ['all'] as const
+export const DIAGNOSTIC_CHANNEL_OPTIONS = [
+  'all',
+  'workspace',
+  'playback',
+  'labels',
+  'subtasks',
+  'persistence',
+  'export',
+  'navigation',
+  'detection',
+] as const
 
 const MAX_DIAGNOSTIC_EVENTS = 200
 
@@ -155,6 +166,10 @@ export function clearDiagnosticEvents(channel?: string) {
   }
 
   window.__dataviewerDiagnostics__ = window.__dataviewerDiagnostics__.filter((event) => event.channel !== channel)
+}
+
+export function stringifyDiagnosticEvents(events: readonly DataviewerDiagnosticEvent[]) {
+  return JSON.stringify(events, null, 2)
 }
 
 export function recordDiagnosticEvent(channel: string, type: string, data?: Record<string, unknown>) {

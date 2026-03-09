@@ -16,13 +16,14 @@ import { ViewerDisplayControls } from '@/components/viewer-display';
 import { useSaveEpisodeLabels } from '@/hooks/use-labels';
 import { combineCssFilters } from '@/lib/css-filters';
 import {
+  clearDiagnosticEvents,
+  DIAGNOSTIC_CHANNEL_OPTIONS,
   DIAGNOSTICS_EVENT_NAME,
-  disableDiagnostics,
-  enableDiagnostics,
   getEnabledDiagnosticsChannels,
   isDiagnosticsEnabled,
   readDiagnosticEvents,
   recordDiagnosticEvent,
+  stringifyDiagnosticEvents,
 } from '@/lib/playback-diagnostics';
 import {
   clampFrameToPlaybackRange,
@@ -55,6 +56,7 @@ const EMPTY_LABELS: string[] = [];
 const PLAYBACK_RECOVERY_COOLDOWN_MS = 300;
 
 interface AnnotationWorkspaceProps {
+  diagnosticsVisible?: boolean;
   canGoPreviousEpisode?: boolean;
   onPreviousEpisode?: () => void;
   canGoNextEpisode?: boolean;
@@ -69,6 +71,7 @@ interface AnnotationWorkspaceProps {
  * frame-accurate scrubbing when paused.
  */
 export function AnnotationWorkspace({
+  diagnosticsVisible = isDiagnosticsEnabled(),
   canGoPreviousEpisode = false,
   onPreviousEpisode,
   canGoNextEpisode = false,
@@ -92,10 +95,14 @@ export function AnnotationWorkspace({
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState('episode');
-  const [diagnosticsVisible, setDiagnosticsVisible] = useState(() => isDiagnosticsEnabled());
   const [diagnosticEvents, setDiagnosticEvents] = useState(() =>
-    isDiagnosticsEnabled() ? readDiagnosticEvents() : [],
+    diagnosticsVisible && isDiagnosticsEnabled() ? readDiagnosticEvents() : [],
   );
+  const [selectedDiagnosticsChannel, setSelectedDiagnosticsChannel] = useState('all');
+  const [diagnosticsClipboardStatus, setDiagnosticsClipboardStatus] = useState<string | null>(null);
+  const lastLabelSignatureRef = useRef<string | null>(null);
+  const lastEpisodeContextRef = useRef<string | null>(null);
+  const wasDiagnosticsEnabledRef = useRef(diagnosticsVisible && isDiagnosticsEnabled());
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
@@ -133,6 +140,10 @@ export function AnnotationWorkspace({
 
     return savedEpisodeLabels[currentEpisode.meta.index] ?? EMPTY_LABELS;
   }, [currentEpisode, savedEpisodeLabels]);
+  const labelSignature = useMemo(
+    () => JSON.stringify([...currentEpisodeLabels].sort()),
+    [currentEpisodeLabels],
+  );
 
   const announceSave = useCallback(() => {
     setShowSavedStatus(true);
@@ -179,6 +190,31 @@ export function AnnotationWorkspace({
   const diagnosticsEnabled = diagnosticsVisible && isDiagnosticsEnabled();
   const diagnosticsChannels = getEnabledDiagnosticsChannels();
 
+  useEffect(() => {
+    if (diagnosticsEnabled && !wasDiagnosticsEnabledRef.current) {
+      recordDiagnosticEvent('workspace', 'diagnostics-enabled', {
+        activeTab,
+        episodeIndex: currentEpisode?.meta.index ?? null,
+      });
+      setDiagnosticEvents(readDiagnosticEvents());
+    }
+
+    if (!diagnosticsEnabled && wasDiagnosticsEnabledRef.current) {
+      setDiagnosticEvents([]);
+    }
+
+    wasDiagnosticsEnabledRef.current = diagnosticsEnabled;
+  }, [activeTab, currentEpisode?.meta.index, diagnosticsEnabled]);
+
+  useEffect(() => {
+    if (diagnosticsEnabled) {
+      return;
+    }
+
+    setSelectedDiagnosticsChannel('all');
+    setDiagnosticsClipboardStatus(null);
+  }, [diagnosticsEnabled]);
+
   const hasLabelChanges = useMemo(() => {
     if (!currentEpisode || !labelDataLoaded) {
       return false;
@@ -200,6 +236,56 @@ export function AnnotationWorkspace({
     : showSavedStatus
       ? 'Episode changes saved.'
       : null;
+
+  useEffect(() => {
+    if (!currentEpisode) {
+      lastLabelSignatureRef.current = null;
+      return;
+    }
+
+    if (
+      diagnosticsEnabled
+      && lastLabelSignatureRef.current !== null
+      && lastLabelSignatureRef.current !== labelSignature
+    ) {
+      recordDiagnosticEvent('labels', 'draft-change', {
+        episodeIndex: currentEpisode.meta.index,
+        labelCount: currentEpisodeLabels.length,
+        labels: [...currentEpisodeLabels],
+        hasLabelChanges,
+      });
+    }
+
+    lastLabelSignatureRef.current = labelSignature;
+  }, [currentEpisode, currentEpisodeLabels, diagnosticsEnabled, hasLabelChanges, labelSignature]);
+
+  useEffect(() => {
+    const nextContext = currentDataset && currentEpisode
+      ? `${currentDataset.id}:${currentEpisode.meta.index}`
+      : null;
+
+    if (!nextContext) {
+      lastEpisodeContextRef.current = null;
+      return;
+    }
+
+    if (
+      diagnosticsEnabled
+      && lastEpisodeContextRef.current !== null
+      && lastEpisodeContextRef.current !== nextContext
+    ) {
+      const [previousDatasetId, previousEpisodeIndex] = lastEpisodeContextRef.current.split(':');
+
+      recordDiagnosticEvent('navigation', 'episode-context-change', {
+        previousDatasetId,
+        previousEpisodeIndex: Number(previousEpisodeIndex),
+        datasetId: currentDataset?.id ?? null,
+        episodeIndex: currentEpisode?.meta.index ?? null,
+      });
+    }
+
+    lastEpisodeContextRef.current = nextContext;
+  }, [currentDataset, currentEpisode, diagnosticsEnabled]);
 
   const handleResetAll = useCallback(async () => {
     resetEdits();
@@ -227,10 +313,20 @@ export function AnnotationWorkspace({
         episodeIdx: currentEpisode.meta.index,
         labels: currentEpisodeLabels,
       });
+
+      recordDiagnosticEvent('labels', 'saved', {
+        datasetId: currentDataset.id,
+        episodeIndex: currentEpisode.meta.index,
+        labelCount: currentEpisodeLabels.length,
+      });
     }
 
     if (hasEdits) {
       saveEpisodeDraft();
+      recordDiagnosticEvent('persistence', 'draft-saved', {
+        datasetId: currentDataset?.id ?? null,
+        episodeIndex: currentEpisode?.meta.index ?? null,
+      });
     }
 
     if (hasPendingEpisodeChanges) {
@@ -423,30 +519,20 @@ export function AnnotationWorkspace({
     seekVideoFrame(frame, null, false);
   }, [seekVideoFrame]);
 
-  const handleDiagnosticsToggle = useCallback(() => {
-    if (diagnosticsEnabled) {
-      disableDiagnostics();
-      setDiagnosticEvents([]);
-      setDiagnosticsVisible(false);
-      return;
-    }
-
-    enableDiagnostics();
-    setDiagnosticsVisible(true);
-    recordDiagnosticEvent('workspace', 'diagnostics-enabled', {
-      activeTab,
-      episodeIndex: currentEpisode?.meta.index ?? null,
-    });
-    setDiagnosticEvents(readDiagnosticEvents());
-  }, [activeTab, currentEpisode?.meta.index, diagnosticsEnabled]);
-
   const handleTabChange = useCallback((nextTab: string) => {
     setActiveTab(nextTab);
     recordDiagnosticEvent('workspace', 'tab-change', {
       previousTab: activeTab,
       nextTab,
     });
-  }, [activeTab]);
+
+    if (nextTab === 'detection') {
+      recordDiagnosticEvent('detection', 'tab-viewed', {
+        previousTab: activeTab,
+        episodeIndex: currentEpisode?.meta.index ?? null,
+      });
+    }
+  }, [activeTab, currentEpisode?.meta.index]);
 
   const clearPlaybackSelection = useCallback(() => {
     shouldResumeAfterSelectionRef.current = false;
@@ -458,7 +544,7 @@ export function AnnotationWorkspace({
   const handleSubtaskSelectionChange = useCallback((id: string | null) => {
     setSelectedSubtaskId(id);
     shouldResumeAfterSelectionRef.current = false;
-    recordDiagnosticEvent('playback', 'subtask-select', { id });
+    recordDiagnosticEvent('subtasks', 'select', { id });
 
     if (!id) {
       setSelectedRange(null);
@@ -480,7 +566,7 @@ export function AnnotationWorkspace({
     setSelectedRange(null);
     setSelectedSubtaskId(nextSegment.id);
     setFrameWithinPlaybackRange(nextSegment.frameRange[0], nextSegment.frameRange);
-    recordDiagnosticEvent('playback', 'subtask-create', {
+    recordDiagnosticEvent('subtasks', 'create', {
       id: nextSegment.id,
       rangeStart: nextSegment.frameRange[0],
       rangeEnd: nextSegment.frameRange[1],
@@ -857,7 +943,7 @@ export function AnnotationWorkspace({
 
   const handleOpenExportDialog = useCallback(() => {
     setExportDialogOpen(true);
-    recordDiagnosticEvent('workspace', 'export-open', {
+    recordDiagnosticEvent('export', 'dialog-open', {
       activeTab,
       episodeIndex: currentEpisode?.meta.index ?? null,
     });
@@ -881,6 +967,85 @@ export function AnnotationWorkspace({
     { label: 'Selection', value: selectedSubtaskId ? `subtask:${selectedSubtaskId}` : selectedRange ? `${selectedRange[0]}-${selectedRange[1]}` : 'none' },
     { label: 'Channels', value: diagnosticsChannels.length > 0 ? diagnosticsChannels.join(', ') : 'none' },
   ]), [activeTab, currentDataset?.id, currentEpisode, currentFrame, diagnosticsChannels, isPlaying, selectedRange, selectedSubtaskId, totalFrames]);
+
+  const availableDiagnosticsChannels = useMemo(() => {
+    const configuredChannels = new Set(diagnosticsChannels.filter((channel) => channel !== 'all'));
+    const eventChannels = new Set(diagnosticEvents.map((event) => event.channel));
+    const channels = DIAGNOSTIC_CHANNEL_OPTIONS.filter((channel) => {
+      if (channel === 'all') {
+        return true;
+      }
+
+      return configuredChannels.has(channel) || eventChannels.has(channel);
+    });
+
+    return channels.length > 0 ? channels : ['all'];
+  }, [diagnosticEvents, diagnosticsChannels]);
+
+  const visibleDiagnosticEvents = useMemo(() => {
+    if (selectedDiagnosticsChannel === 'all') {
+      return diagnosticEvents;
+    }
+
+    return diagnosticEvents.filter((event) => event.channel === selectedDiagnosticsChannel);
+  }, [diagnosticEvents, selectedDiagnosticsChannel]);
+  const recentDiagnosticEvents = useMemo(() => {
+    const keyCounts = new Map<string, number>();
+
+    return visibleDiagnosticEvents.slice(-12).map((event) => {
+      const baseKey = `${event.timestamp}-${event.channel}-${event.type}-${JSON.stringify(event.data ?? {})}`;
+      const nextCount = (keyCounts.get(baseKey) ?? 0) + 1;
+
+      keyCounts.set(baseKey, nextCount);
+
+      return {
+        ...event,
+        uniqueKey: `${baseKey}-${nextCount}`,
+      };
+    });
+  }, [visibleDiagnosticEvents]);
+
+  const serializedDiagnosticEvents = useMemo(
+    () => stringifyDiagnosticEvents(visibleDiagnosticEvents),
+    [visibleDiagnosticEvents],
+  );
+
+  const handleClearVisibleDiagnostics = useCallback(() => {
+    if (selectedDiagnosticsChannel === 'all') {
+      clearDiagnosticEvents();
+    } else {
+      clearDiagnosticEvents(selectedDiagnosticsChannel);
+    }
+
+    setDiagnosticEvents(readDiagnosticEvents());
+  }, [selectedDiagnosticsChannel]);
+
+  const handleCopyDiagnostics = useCallback(async () => {
+    if (!navigator.clipboard?.writeText) {
+      setDiagnosticsClipboardStatus('Clipboard access is unavailable.');
+      return;
+    }
+
+    await navigator.clipboard.writeText(serializedDiagnosticEvents);
+    setDiagnosticsClipboardStatus('Copied diagnostics JSON.');
+  }, [serializedDiagnosticEvents]);
+
+  const handleDownloadDiagnostics = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const blob = new Blob([serializedDiagnosticEvents], { type: 'application/json' });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const channelLabel = selectedDiagnosticsChannel === 'all' ? 'all' : selectedDiagnosticsChannel;
+
+    link.href = objectUrl;
+    link.download = `dataviewer-diagnostics-${channelLabel}.json`;
+    link.click();
+    window.URL.revokeObjectURL(objectUrl);
+    setDiagnosticsClipboardStatus('Downloaded diagnostics JSON.');
+  }, [selectedDiagnosticsChannel, serializedDiagnosticEvents]);
 
   const renderSubtaskListCard = useCallback((compact = false) => (
     <Card className={compact ? 'min-h-[220px]' : 'mt-4'}>
@@ -1233,15 +1398,6 @@ export function AnnotationWorkspace({
                 Reset All
               </Button>
               <Button
-                variant={diagnosticsEnabled ? 'default' : 'outline'}
-                onClick={handleDiagnosticsToggle}
-                aria-label="Toggle Diagnostics"
-                title={diagnosticsEnabled ? 'Diagnostics on (click to hide)' : 'Diagnostics off (click to show)'}
-              >
-                <Activity className="h-4 w-4 mr-2" />
-                Diagnostics
-              </Button>
-              <Button
                 variant="outline"
                 onClick={handleOpenExportDialog}
               >
@@ -1427,13 +1583,51 @@ export function AnnotationWorkspace({
               </div>
             </div>
             <div className="rounded-lg border bg-muted/20 p-3">
-              <h4 className="text-sm font-medium">Recent Events</h4>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h4 className="text-sm font-medium">Recent Events</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Filter, clear, copy, or download the visible diagnostics stream.
+                  </p>
+                </div>
+                <div className="flex flex-col items-stretch gap-2 sm:min-w-[240px] sm:items-end">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Filter Events</span>
+                    <select
+                      aria-label="Filter Events"
+                      className="h-8 rounded-md border bg-background px-2 text-xs text-foreground"
+                      value={selectedDiagnosticsChannel}
+                      onChange={(event) => setSelectedDiagnosticsChannel(event.target.value)}
+                    >
+                      {availableDiagnosticsChannels.map((channel) => (
+                        <option key={channel} value={channel}>
+                          {channel}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="flex flex-wrap gap-2 sm:justify-end">
+                    <Button size="sm" variant="outline" onClick={handleClearVisibleDiagnostics}>
+                      Clear Visible Events
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void handleCopyDiagnostics()}>
+                      Copy JSON
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleDownloadDiagnostics}>
+                      Download JSON
+                    </Button>
+                  </div>
+                  {diagnosticsClipboardStatus && (
+                    <p className="text-right text-xs text-muted-foreground">{diagnosticsClipboardStatus}</p>
+                  )}
+                </div>
+              </div>
               <div className="mt-2 max-h-48 overflow-y-auto rounded border bg-background/80 p-2 font-mono text-[11px]">
-                {diagnosticEvents.length === 0 ? (
+                {recentDiagnosticEvents.length === 0 ? (
                   <div className="text-muted-foreground">No diagnostics events recorded yet.</div>
                 ) : (
-                  diagnosticEvents.slice(-12).map((event) => (
-                    <div key={`${event.timestamp}-${event.channel}-${event.type}-${JSON.stringify(event.data ?? {})}`} className="border-b border-border/50 py-1 last:border-b-0">
+                  recentDiagnosticEvents.map((event) => (
+                    <div key={event.uniqueKey} className="border-b border-border/50 py-1 last:border-b-0">
                       <div>{event.channel}</div>
                       <div>{event.type}</div>
                       <div className="text-muted-foreground">{JSON.stringify(event.data ?? {})}</div>

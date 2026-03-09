@@ -9,12 +9,14 @@ const { mockComputeSyncAction } = vi.hoisted(() => ({
 
 const {
   mockDiagnosticsState,
+  mockClearDiagnosticEvents,
   mockDisableDiagnostics,
   mockEnableDiagnostics,
   mockRecordDiagnosticEvent,
 } = vi.hoisted(() => {
   const state = {
     enabled: false,
+    channels: [] as string[],
     events: [] as Array<{
       channel: string
       type: string
@@ -25,11 +27,27 @@ const {
 
   return {
     mockDiagnosticsState: state,
+    mockClearDiagnosticEvents: vi.fn((channel?: string) => {
+      if (!channel) {
+        state.events = []
+        return
+      }
+
+      state.events = state.events.filter((event) => event.channel !== channel)
+    }),
     mockDisableDiagnostics: vi.fn(() => {
       state.enabled = false
+      state.channels = []
     }),
-    mockEnableDiagnostics: vi.fn(() => {
+    mockEnableDiagnostics: vi.fn((channels?: string[] | string) => {
       state.enabled = true
+
+      if (!channels) {
+        state.channels = ['all']
+        return
+      }
+
+      state.channels = Array.isArray(channels) ? channels : [channels]
     }),
     mockRecordDiagnosticEvent: vi.fn((channel: string, type: string, data?: Record<string, unknown>) => {
       if (!state.enabled) {
@@ -80,6 +98,7 @@ vi.mock('@/components/episode-viewer', () => ({
     const plotProps = props as {
       selectedRange?: [number, number] | null
       onSelectedRangeChange?: (range: [number, number] | null) => void
+      onCreateSubtaskFromRange?: (range: [number, number]) => void
       onSelectionStart?: () => void
       onSelectionComplete?: (range: [number, number]) => void
     }
@@ -109,6 +128,9 @@ vi.mock('@/components/episode-viewer', () => ({
           }}
         >
           Finish Range Drag
+        </button>
+        <button type="button" onClick={() => plotProps.onCreateSubtaskFromRange?.([2, 6])}>
+          Create Subtask
         </button>
       </div>
     )
@@ -155,10 +177,12 @@ vi.mock('@/lib/css-filters', () => ({
 }))
 
 vi.mock('@/lib/playback-diagnostics', () => ({
+  DIAGNOSTIC_CHANNEL_OPTIONS: ['all', 'workspace', 'playback', 'labels', 'subtasks', 'persistence', 'export', 'navigation', 'detection'],
   DIAGNOSTICS_EVENT_NAME: 'dataviewer:diagnostics',
+  clearDiagnosticEvents: mockClearDiagnosticEvents,
   disableDiagnostics: mockDisableDiagnostics,
   enableDiagnostics: mockEnableDiagnostics,
-  getEnabledDiagnosticsChannels: () => (mockDiagnosticsState.enabled ? ['all'] : []),
+  getEnabledDiagnosticsChannels: () => (mockDiagnosticsState.enabled ? mockDiagnosticsState.channels : []),
   isDiagnosticsEnabled: () => mockDiagnosticsState.enabled,
   isDiagnosticsChannelEnabled: () => mockDiagnosticsState.enabled,
   readDiagnosticEvents: (channel?: string) => {
@@ -169,6 +193,7 @@ vi.mock('@/lib/playback-diagnostics', () => ({
     return mockDiagnosticsState.events.filter((event) => event.channel === channel)
   },
   recordDiagnosticEvent: mockRecordDiagnosticEvent,
+  stringifyDiagnosticEvents: (events: unknown[]) => JSON.stringify(events, null, 2),
 }))
 
 vi.mock('@/lib/playback-utils', () => ({
@@ -293,7 +318,9 @@ describe('AnnotationWorkspace save status', () => {
     })
     mockResetEdits.mockReset()
     mockDiagnosticsState.enabled = false
+    mockDiagnosticsState.channels = []
     mockDiagnosticsState.events = []
+    mockClearDiagnosticEvents.mockClear()
     mockEnableDiagnostics.mockClear()
     mockDisableDiagnostics.mockClear()
     mockRecordDiagnosticEvent.mockClear()
@@ -419,22 +446,24 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.queryByTestId('dataviewer-diagnostics-panel')).not.toBeInTheDocument()
   })
 
-  it('toggles a whole-dataviewer diagnostics panel from the workspace header', () => {
+  it('shows a whole-dataviewer diagnostics panel when diagnostics are enabled from the shell', () => {
+    mockDiagnosticsState.enabled = true
+    mockDiagnosticsState.channels = ['all']
+
+    render(<AnnotationWorkspace diagnosticsVisible />)
+
+    expect(screen.getByTestId('dataviewer-diagnostics-panel')).toBeInTheDocument()
+  })
+
+  it('keeps the workspace header actions free of the diagnostics toggle', () => {
     render(<AnnotationWorkspace />)
 
-    fireEvent.click(screen.getByRole('button', { name: /toggle diagnostics/i }))
-
-    expect(mockEnableDiagnostics).toHaveBeenCalledTimes(1)
-    expect(screen.getByTestId('dataviewer-diagnostics-panel')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /toggle diagnostics/i }))
-
-    expect(mockDisableDiagnostics).toHaveBeenCalledTimes(1)
-    expect(screen.queryByTestId('dataviewer-diagnostics-panel')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('workspace-header-actions')).queryByRole('button', { name: /toggle diagnostics/i })).not.toBeInTheDocument()
   })
 
   it('renders diagnostics in a shared bottom panel outside the trajectory tab', () => {
     mockDiagnosticsState.enabled = true
+    mockDiagnosticsState.channels = ['all', 'workspace', 'playback']
     mockDiagnosticsState.events = [
       { channel: 'workspace', type: 'tab-change', data: { nextTab: 'episode' }, timestamp: '2026-03-08T00:00:00.000Z' },
       { channel: 'playback', type: 'sync-action', data: { action: 'play' }, timestamp: '2026-03-08T00:00:01.000Z' },
@@ -449,6 +478,90 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.getByText(/workspace state/i)).toBeInTheDocument()
     expect(within(diagnosticsPanel).getByText(/sync-action/i)).toBeInTheDocument()
     expect(screen.queryByTestId('playback-diagnostics-panel')).not.toBeInTheDocument()
+  })
+
+  it('filters diagnostics events by channel and clears only the visible channel history', () => {
+    mockDiagnosticsState.enabled = true
+    mockDiagnosticsState.channels = ['all', 'labels', 'playback']
+    mockDiagnosticsState.events = [
+      { channel: 'labels', type: 'draft-change', data: { labels: ['FAILURE'] }, timestamp: '2026-03-08T00:00:00.000Z' },
+      { channel: 'playback', type: 'sync-action', data: { action: 'play' }, timestamp: '2026-03-08T00:00:01.000Z' },
+    ]
+
+    render(<AnnotationWorkspace />)
+
+    const diagnosticsPanel = screen.getByTestId('dataviewer-diagnostics-panel')
+
+    fireEvent.change(within(diagnosticsPanel).getByLabelText(/filter events/i), {
+      target: { value: 'labels' },
+    })
+
+    expect(within(diagnosticsPanel).getByText(/draft-change/i)).toBeInTheDocument()
+    expect(within(diagnosticsPanel).queryByText(/sync-action/i)).not.toBeInTheDocument()
+
+    fireEvent.click(within(diagnosticsPanel).getByRole('button', { name: /clear visible events/i }))
+
+    expect(mockClearDiagnosticEvents).toHaveBeenCalledWith('labels')
+    expect(within(diagnosticsPanel).queryByText(/draft-change/i)).not.toBeInTheDocument()
+    expect(within(diagnosticsPanel).getByText(/no diagnostics events recorded yet/i)).toBeInTheDocument()
+  })
+
+  it('copies the visible diagnostics events as json from the shared panel', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    mockDiagnosticsState.enabled = true
+    mockDiagnosticsState.channels = ['all', 'export']
+    mockDiagnosticsState.events = [
+      { channel: 'export', type: 'dialog-open', data: { activeTab: 'episode' }, timestamp: '2026-03-08T00:00:00.000Z' },
+    ]
+
+    render(<AnnotationWorkspace />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /copy json/i }))
+      await Promise.resolve()
+    })
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"channel": "export"'))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"type": "dialog-open"'))
+  })
+
+  it('records expanded diagnostics channels for labels, subtasks, export, detection, and persistence actions', async () => {
+    const handleSaveAndNextEpisode = vi.fn()
+    mockDiagnosticsState.enabled = true
+    mockDiagnosticsState.channels = ['all']
+    mockHasEdits = true
+
+    const { rerender } = render(
+      <AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />,
+    )
+
+    mockRecordDiagnosticEvent.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: /toggle label draft/i }))
+    rerender(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /export/i }))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: /create subtask/i }))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /object detection/i }), { button: 0, ctrlKey: false })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /save\s*&\s*next episode/i }))
+      await Promise.resolve()
+    })
+
+    expect(mockRecordDiagnosticEvent.mock.calls).toEqual(expect.arrayContaining([
+      ['labels', 'draft-change', expect.objectContaining({ episodeIndex: 0, labelCount: 1 })],
+      ['export', 'dialog-open', expect.objectContaining({ activeTab: 'episode' })],
+      ['subtasks', 'create', expect.objectContaining({ rangeStart: 2, rangeEnd: 6 })],
+      ['detection', 'tab-viewed', expect.objectContaining({ previousTab: 'trajectory' })],
+      ['persistence', 'draft-saved', expect.objectContaining({ episodeIndex: 0 })],
+    ]))
   })
 
   it('keeps the trajectory plot out of the default episode viewer tab', () => {
