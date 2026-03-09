@@ -130,7 +130,6 @@ import contextlib
 import statistics
 
 import gymnasium as gym
-import isaaclab_tasks  # noqa: F401
 import omni
 import torch
 from isaaclab.envs import (
