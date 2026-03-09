@@ -17,9 +17,12 @@ vi.mock('recharts', () => ({
   CartesianGrid: () => null,
   Line: ({ dataKey }: { dataKey: string }) => <div data-testid={`line-${dataKey}`} />,
   ReferenceLine: () => null,
-  Tooltip: (props: Record<string, unknown>) => (
-    <div data-testid="trajectory-tooltip-props">{JSON.stringify(props)}</div>
-  ),
+  Tooltip: (props: Record<string, unknown>) => {
+    const serializable = Object.fromEntries(
+      Object.entries(props).map(([k, v]) => [k, typeof v === 'object' && v !== null && !Array.isArray(v) && '$$typeof' in v ? '<ReactElement>' : v]),
+    )
+    return <div data-testid="trajectory-tooltip-props">{JSON.stringify(serializable)}</div>
+  },
   XAxis: () => null,
   YAxis: () => null,
 }))
@@ -191,7 +194,7 @@ describe('TrajectoryPlot', () => {
     expect(velocityData[1]?.joint_1).toBe(0.2)
   })
 
-  it('configures the tooltip to stay on a stable side of the cursor without animation lag', () => {
+  it('renders the trajectory tooltip as a portal to escape overflow clipping', () => {
     render(
       <div style={{ width: 600, height: 300 }}>
         <TrajectoryPlot className="h-full" />
@@ -199,16 +202,14 @@ describe('TrajectoryPlot', () => {
     )
 
     const tooltipProps = JSON.parse(screen.getByTestId('trajectory-tooltip-props').textContent ?? '{}') as {
-      allowEscapeViewBox?: { x?: boolean; y?: boolean }
       isAnimationActive?: boolean
-      offset?: { x?: number; y?: number }
-      reverseDirection?: { x?: boolean; y?: boolean }
+      content?: unknown
+      wrapperStyle?: { display?: string }
     }
 
     expect(tooltipProps.isAnimationActive).toBe(false)
-    expect(tooltipProps.allowEscapeViewBox).toEqual({ x: true, y: true })
-    expect(tooltipProps.reverseDirection).toEqual({ x: false, y: true })
-    expect(tooltipProps.offset).toEqual({ x: 16, y: 12 })
+    expect(tooltipProps.content).toBeDefined()
+    expect(tooltipProps.wrapperStyle).toEqual({ display: 'none' })
   })
 
   it('provides a positive startup size for the responsive chart container', () => {

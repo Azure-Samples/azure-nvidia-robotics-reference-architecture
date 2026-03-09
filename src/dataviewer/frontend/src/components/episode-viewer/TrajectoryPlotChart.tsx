@@ -1,4 +1,6 @@
 import type React from 'react'
+import { useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   CartesianGrid,
   Line,
@@ -15,6 +17,52 @@ import { TrajectoryPlotSelectionOverlay } from './TrajectoryPlotSelectionOverlay
 
 const TRAJECTORY_CHART_MIN_HEIGHT = 60
 const TRAJECTORY_CHART_INITIAL_DIMENSION = { width: 320, height: TRAJECTORY_CHART_MIN_HEIGHT }
+const TOOLTIP_OFFSET = 12
+
+function TrajectoryTooltipPortal({ active, payload, label, mousePosition }: {
+  active?: boolean
+  payload?: Array<{ name: string; value: number; color: string }>
+  label?: number
+  mousePosition: { x: number; y: number }
+}) {
+  const tooltipRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    const rect = node.getBoundingClientRect()
+    const viewportH = window.innerHeight
+    const viewportW = window.innerWidth
+
+    let top = mousePosition.y + TOOLTIP_OFFSET
+    let left = mousePosition.x + TOOLTIP_OFFSET
+
+    if (top + rect.height > viewportH) {
+      top = mousePosition.y - rect.height - TOOLTIP_OFFSET
+    }
+    if (left + rect.width > viewportW) {
+      left = mousePosition.x - rect.width - TOOLTIP_OFFSET
+    }
+
+    node.style.top = `${top}px`
+    node.style.left = `${left}px`
+  }, [mousePosition])
+
+  if (!active || !payload?.length) return null
+
+  return createPortal(
+    <div
+      ref={tooltipRef}
+      className="pointer-events-none fixed z-50 rounded-md border bg-popover p-2.5 text-sm shadow-md"
+      style={{ left: mousePosition.x + TOOLTIP_OFFSET, top: mousePosition.y + TOOLTIP_OFFSET }}
+    >
+      <p className="mb-1 font-medium">{label}</p>
+      {payload.map((entry) => (
+        <p key={entry.name} style={{ color: entry.color }}>
+          {entry.name} : {entry.value}
+        </p>
+      ))}
+    </div>,
+    document.body,
+  )
+}
 
 interface TrajectoryPlotChartProps {
   chartData: Array<Record<string, number | boolean>>
@@ -57,8 +105,23 @@ export function TrajectoryPlotChart({
   onDismissContextMenu,
   selectionSurfaceRef,
 }: TrajectoryPlotChartProps) {
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+
+  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    setMousePos({ x: event.clientX, y: event.clientY })
+  }, [])
+
   return (
-    <div className="relative flex-1 min-h-0">
+    <div
+      ref={selectionSurfaceRef}
+      data-testid="trajectory-selection-surface"
+      className="relative flex-1 min-h-0 cursor-crosshair"
+      onContextMenu={onSelectionContextMenu}
+      onPointerDown={onSelectionPointerDown}
+      onPointerMove={onSelectionPointerMove}
+      onPointerUp={onSelectionPointerUp}
+      onMouseMove={handleMouseMove}
+    >
       <ResponsiveContainer
         width="100%"
         height="100%"
@@ -78,15 +141,9 @@ export function TrajectoryPlotChart({
             domain={showNormalized && !showVelocity ? [0, 1] : ['auto', 'auto']}
           />
           <Tooltip
-            allowEscapeViewBox={{ x: true, y: true }}
-            reverseDirection={{ x: false, y: true }}
-            offset={{ x: 16, y: 12 }}
             isAnimationActive={false}
-            contentStyle={{
-              backgroundColor: 'hsl(var(--popover))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '6px',
-            }}
+            content={<TrajectoryTooltipPortal mousePosition={mousePos} />}
+            wrapperStyle={{ display: 'none' }}
           />
 
           {Array.from(trajectoryAdjustments.keys()).map((frameIdx) => (
@@ -124,13 +181,8 @@ export function TrajectoryPlotChart({
         selectedRange={selectedRange}
         selectionHighlight={selectionHighlight}
         contextMenuPosition={contextMenuPosition}
-        onSelectionContextMenu={onSelectionContextMenu}
-        onSelectionPointerDown={onSelectionPointerDown}
-        onSelectionPointerMove={onSelectionPointerMove}
-        onSelectionPointerUp={onSelectionPointerUp}
         onCreateSubtaskFromRange={onCreateSubtaskFromRange}
         onDismissContextMenu={onDismissContextMenu}
-        selectionSurfaceRef={selectionSurfaceRef}
       />
     </div>
   )
