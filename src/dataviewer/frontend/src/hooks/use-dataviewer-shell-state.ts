@@ -17,6 +17,7 @@ export function useDataviewerShellState({
   const [datasetIdState, setDatasetIdState] = useState('');
   const [selectedEpisode, setSelectedEpisode] = useState<number>(0);
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(() => isDiagnosticsEnabled());
+  const [isWarmingCache, setIsWarmingCache] = useState(false);
   const setDatasets = useDatasetStore((state) => state.setDatasets);
   const selectDataset = useDatasetStore((state) => state.selectDataset);
   const warmedRef = useRef<string | null>(null);
@@ -39,7 +40,8 @@ export function useDataviewerShellState({
 
       if (autoId !== warmedRef.current) {
         warmedRef.current = autoId;
-        void warmCache(autoId, 5);
+        setIsWarmingCache(true);
+        void warmCache(autoId, 5).finally(() => setIsWarmingCache(false));
       }
     }
   }, [datasets, datasetIdState]);
@@ -71,7 +73,8 @@ export function useDataviewerShellState({
 
     if (nextDatasetId && nextDatasetId !== warmedRef.current) {
       warmedRef.current = nextDatasetId;
-      void warmCache(nextDatasetId, 5);
+      setIsWarmingCache(true);
+      void warmCache(nextDatasetId, 5).finally(() => setIsWarmingCache(false));
     }
   }, []);
 
@@ -112,5 +115,6 @@ export function useDataviewerShellState({
     handlePreviousEpisode,
     handleNextEpisode,
     toggleDiagnostics,
+    isWarmingCache,
   };
 }

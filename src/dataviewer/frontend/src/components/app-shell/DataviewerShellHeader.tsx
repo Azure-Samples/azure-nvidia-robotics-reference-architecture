@@ -1,4 +1,4 @@
-import { Activity,Check, ChevronsUpDown } from 'lucide-react';
+import { Activity, Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -133,6 +133,7 @@ interface DataviewerShellHeaderProps {
     isLerobotDataset?: boolean;
     hasHdf5Files?: boolean;
   };
+  isWarmingCache?: boolean;
 }
 
 export function DataviewerShellHeader({
@@ -142,6 +143,7 @@ export function DataviewerShellHeader({
   onSelectDataset,
   onToggleDiagnostics,
   capabilities,
+  isWarmingCache,
 }: DataviewerShellHeaderProps) {
   return (
     <header className="bg-card border-b px-4 py-2.5">
@@ -174,6 +176,12 @@ export function DataviewerShellHeader({
           )}
           {capabilities?.hasHdf5Files && !capabilities?.isLerobotDataset && (
             <Badge variant="outline">HDF5</Badge>
+          )}
+          {isWarmingCache && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground" title="Pre-loading episodes into cache">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Warming
+            </span>
           )}
         </div>
       </div>

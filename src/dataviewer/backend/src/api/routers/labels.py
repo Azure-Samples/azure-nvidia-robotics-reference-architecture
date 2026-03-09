@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from ..auth import require_auth
 from ..csrf import require_csrf_token
+from ..services.dataset_service import DatasetService, get_dataset_service
 from ..validation import validate_path_containment, validated_dataset_id
 
 logger = logging.getLogger(__name__)
@@ -172,6 +173,7 @@ async def set_episode_labels(
     dataset_id: str = Depends(validated_dataset_id),
     episode_idx: int = ...,
     body: BulkLabelUpdate = ...,
+    dataset_service: DatasetService = Depends(get_dataset_service),
 ) -> EpisodeLabels:
     """Set labels for a specific episode (replaces existing labels)."""
     labels_file = await _load_labels(dataset_id)
@@ -185,6 +187,7 @@ async def set_episode_labels(
 
     labels_file.episodes[key] = [normalized for label in body.labels if (normalized := _normalize_label(label))]
     await _save_labels(dataset_id, labels_file)
+    dataset_service.invalidate_episode_cache(dataset_id, episode_idx)
 
     return EpisodeLabels(
         episode_index=episode_idx,

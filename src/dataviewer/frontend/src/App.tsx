@@ -54,6 +54,7 @@ export function AppContent() {
         onSelectDataset={setDatasetId}
         onToggleDiagnostics={toggleDiagnostics}
         capabilities={capabilities}
+        isWarmingCache={shellState.isWarmingCache}
       />
 
       <div className="flex flex-1 min-h-0">
