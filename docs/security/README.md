@@ -18,6 +18,7 @@ Security documentation for the Azure NVIDIA Robotics Reference Architecture cove
 |---------------------------------------------------|------------------------------------------------------------------|
 | [Threat Model](threat-model.md)                   | STRIDE-based threat analysis and remediation roadmap             |
 | [Security Guide for Deployers](security-guide.md) | Security configuration inventory and deployment responsibilities |
+| [Release Verification](release-verification.md)   | Verify release artifact provenance and SBOM attestations         |
 | [SECURITY.md](../../SECURITY.md)                  | Vulnerability disclosure and reporting process                   |
 
 ## 🔒 Security Posture
