@@ -147,7 +147,7 @@ export function useAnnotationWorkspaceVideoSync({
 
   useEffect(() => {
     shouldAutoPlayOnMetadataLoadRef.current = autoPlay
-  }, [autoPlay])
+  }, [autoPlay, videoSrc])
 
   const syncVideoElementPlayback = useCallback((video: HTMLVideoElement) => {
     const action = computeSyncAction(

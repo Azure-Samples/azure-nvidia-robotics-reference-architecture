@@ -3,6 +3,7 @@ import type { SyntheticEvent } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAnnotationWorkspaceVideoSync } from '@/components/annotation-workspace/useAnnotationWorkspaceVideoSync'
+import type { FrameInsertion } from '@/types/episode-edit'
 
 describe('useAnnotationWorkspaceVideoSync', () => {
   beforeEach(() => {
@@ -41,6 +42,53 @@ describe('useAnnotationWorkspaceVideoSync', () => {
     })
 
     expect(togglePlayback).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-arms autoplay when videoSrc changes between episodes', () => {
+    const togglePlayback = vi.fn()
+    const baseProps = {
+      currentFrame: 0,
+      totalFrames: 12,
+      originalFrameIndex: 0,
+      activePlaybackRange: null as [number, number] | null,
+      playbackRangeStart: 0,
+      playbackRangeEnd: 11,
+      isPlaying: false,
+      playbackSpeed: 1,
+      autoPlay: true,
+      autoLoop: false,
+      shouldLoopPlaybackRange: false,
+      datasetFps: 24,
+      insertedFrames: new Map<number, FrameInsertion>(),
+      removedFrames: new Set<number>(),
+      videoSrc: '/videos/episode-0.mp4',
+      onSetCurrentFrame: vi.fn(),
+      onTogglePlayback: togglePlayback,
+      onSetFrameWithinPlaybackRange: vi.fn(),
+      onRecordEvent: vi.fn(),
+    }
+
+    const { result, rerender } = renderHook(
+      (props) => useAnnotationWorkspaceVideoSync(props),
+      { initialProps: baseProps },
+    )
+
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'duration', { configurable: true, value: 8.4 })
+
+    act(() => {
+      result.current.handleLoadedMetadata({ currentTarget: video } as SyntheticEvent<HTMLVideoElement>)
+    })
+
+    expect(togglePlayback).toHaveBeenCalledTimes(1)
+
+    rerender({ ...baseProps, videoSrc: '/videos/episode-1.mp4' })
+
+    act(() => {
+      result.current.handleLoadedMetadata({ currentTarget: video } as SyntheticEvent<HTMLVideoElement>)
+    })
+
+    expect(togglePlayback).toHaveBeenCalledTimes(2)
   })
 
   it('jumps to the playback range start when the video ends in loop mode', () => {
