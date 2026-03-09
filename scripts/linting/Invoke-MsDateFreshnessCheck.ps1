@@ -21,9 +21,6 @@
 
 .PARAMETER BaseBranch
     Base branch for changed-file detection. Defaults to 'origin/main'.
-
-.PARAMETER SoftFail
-    Emit warnings without failing the CI step on stale documentation.
 #>
 
 #Requires -Version 7.0
@@ -41,10 +38,7 @@ param(
     [switch]$ChangedFilesOnly,
 
     [Parameter()]
-    [string]$BaseBranch = 'origin/main',
-
-    [Parameter()]
-    [switch]$SoftFail
+    [string]$BaseBranch = 'origin/main'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -302,13 +296,9 @@ if (Test-Path $report.MarkdownPath) {
     }
 }
 
-if ($report.StaleCount -gt 0 -and -not $SoftFail) {
+if ($report.StaleCount -gt 0) {
     Write-Host "`n❌ Found $($report.StaleCount) stale documentation file(s)"
     exit 1
-}
-elseif ($report.StaleCount -gt 0 -and $SoftFail) {
-    Write-Host "`n⚠️  Found $($report.StaleCount) stale documentation file(s) (soft-fail enabled)"
-    exit 0
 }
 else {
     Write-Host "`n✅ All files are fresh"

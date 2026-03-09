@@ -1,15 +1,3 @@
-# ms.date Freshness Check - Reusable workflow for detecting stale documentation frontmatter
-#
-# Execution Contexts:
-# - Weekly: weekly-validation.yml (Monday 9 AM UTC, soft-fail: false, all files)
-# - PR: pr-validation.yml (on pull request, soft-fail: true, changed files only)
-# - Manual: GitHub Actions UI via workflow_dispatch on calling orchestrators
-#
-# Configuration:
-# - staleness-threshold-days: Days before ms.date considered stale (default: 90)
-# - soft-fail: Continue on stale files (true) or fail workflow (false)
-# - changed-files-only: Check only files changed in PR (true) or all files (false)
-
 name: ms.date Freshness Check
 
 on:
@@ -20,11 +8,6 @@ on:
         required: false
         type: number
         default: 90
-      soft-fail:
-        description: 'Whether to continue on stale documentation found'
-        required: false
-        type: boolean
-        default: true
       changed-files-only:
         description: 'Only check changed markdown files'
         required: false
@@ -66,9 +49,6 @@ jobs:
           }
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
             $args['ChangedFilesOnly'] = $true
-          }
-          if ('${{ inputs.soft-fail }}' -eq 'true') {
-            $args['SoftFail'] = $true
           }
           & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 @args
 
