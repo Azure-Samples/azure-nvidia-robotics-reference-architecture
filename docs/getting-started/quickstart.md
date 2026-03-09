@@ -178,7 +178,7 @@ See [Cost Considerations](../contributing/cost-considerations.md) for detailed p
 
 | Resource                                        | Description                               |
 |-------------------------------------------------|-------------------------------------------|
-| [LeRobot Inference](../lerobot-inference.md)    | Run inference with trained LeRobot models |
-| [MLflow Integration](../mlflow-integration.md)  | Track experiments with MLflow             |
+| [LeRobot Inference](../inference/lerobot-inference.md)    | Run inference with trained LeRobot models |
+| [MLflow Integration](../training/mlflow-integration.md)  | Track experiments with MLflow             |
 | [Deployment Guide](../../deploy/README.md)      | Full deployment reference and options     |
 | [Contributing Guide](../contributing/README.md) | Development workflow and code standards   |
