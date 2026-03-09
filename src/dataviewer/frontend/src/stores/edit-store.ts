@@ -25,10 +25,13 @@ import type {
   SubtaskSegment,
   TrajectoryAdjustment,
 } from '@/types/episode-edit';
+import { validateSegments } from '@/types/episode-edit';
+
 import {
-  createDefaultSubtask,
-  validateSegments,
-} from '@/types/episode-edit';
+  createEditStoreFrameActions,
+  createEditStoreSubtaskActions,
+  createEditStoreTransformActions,
+} from './edit-store-action-factories';
 
 export {
   getEffectiveFrameCount,
@@ -214,6 +217,10 @@ export const useEditStore = create<EditStore>()(
         persistCurrentDraft()
       }
 
+      const transformActions = createEditStoreTransformActions<EditStore>(updateState)
+      const frameActions = createEditStoreFrameActions<EditStore>(updateState)
+      const subtaskActions = createEditStoreSubtaskActions<EditStore>(updateState, get)
+
       return {
         ...initialState,
 
@@ -323,161 +330,14 @@ export const useEditStore = create<EditStore>()(
           });
         },
 
-        setGlobalTransform: (transform) => {
-          updateState('setGlobalTransform', () => ({ globalTransform: transform }))
-        },
+        ...transformActions,
 
-        setCameraTransform: (camera, transform) => {
-          updateState('setCameraTransform', (state) => {
-            const nextCameraTransforms = { ...state.cameraTransforms }
-            if (transform) {
-              nextCameraTransforms[camera] = transform
-            } else {
-              delete nextCameraTransforms[camera]
-            }
+        ...frameActions,
 
-            return { cameraTransforms: nextCameraTransforms }
-          })
-        },
-
-        clearTransforms: () => {
-          updateState('clearTransforms', () => ({ globalTransform: null, cameraTransforms: {} }))
-        },
-
-        toggleFrameRemoval: (frameIndex) => {
-          updateState('toggleFrameRemoval', (state) => {
-            const nextRemovedFrames = new Set(state.removedFrames)
-            if (nextRemovedFrames.has(frameIndex)) {
-              nextRemovedFrames.delete(frameIndex)
-            } else {
-              nextRemovedFrames.add(frameIndex)
-            }
-            return { removedFrames: nextRemovedFrames }
-          })
-        },
-
-        addFrameRange: (start, end) => {
-          updateState('addFrameRange', (state) => {
-            const nextRemovedFrames = new Set(state.removedFrames)
-            for (let frameIndex = start; frameIndex <= end; frameIndex++) {
-              nextRemovedFrames.add(frameIndex)
-            }
-            return { removedFrames: nextRemovedFrames }
-          })
-        },
-
-        addFramesByFrequency: (start, end, frequency) => {
-          updateState('addFramesByFrequency', (state) => {
-            const nextRemovedFrames = new Set(state.removedFrames)
-            for (let frameIndex = start; frameIndex <= end; frameIndex += frequency) {
-              nextRemovedFrames.add(frameIndex)
-            }
-            return { removedFrames: nextRemovedFrames }
-          })
-        },
-
-        removeFrameRange: (start, end) => {
-          updateState('removeFrameRange', (state) => {
-            const nextRemovedFrames = new Set(state.removedFrames)
-            for (let frameIndex = start; frameIndex <= end; frameIndex++) {
-              nextRemovedFrames.delete(frameIndex)
-            }
-            return { removedFrames: nextRemovedFrames }
-          })
-        },
-
-        clearRemovedFrames: () => {
-          updateState('clearRemovedFrames', () => ({ removedFrames: new Set<number>() }))
-        },
-
-        insertFrame: (afterFrameIndex, factor = 0.5) => {
-          updateState('insertFrame', (state) => {
-            const nextInsertedFrames = new Map(state.insertedFrames)
-            nextInsertedFrames.set(afterFrameIndex, {
-              afterFrameIndex,
-              interpolationFactor: factor,
-            })
-            return { insertedFrames: nextInsertedFrames }
-          })
-        },
-
-        removeInsertedFrame: (afterFrameIndex) => {
-          updateState('removeInsertedFrame', (state) => {
-            const nextInsertedFrames = new Map(state.insertedFrames)
-            nextInsertedFrames.delete(afterFrameIndex)
-            return { insertedFrames: nextInsertedFrames }
-          })
-        },
-
-        clearInsertedFrames: () => {
-          updateState('clearInsertedFrames', () => ({ insertedFrames: new Map<number, FrameInsertion>() }))
-        },
-
-        addSubtask: (segment) => {
-          updateState(
-            'addSubtask',
-            (state) => ({ subtasks: [...state.subtasks, segment] }),
-            { validationErrors: (nextState) => validateSegments(nextState.subtasks) },
-          )
-        },
-
-        addSubtaskFromRange: (start, end) => {
-          const { subtasks } = get();
-          const segment = createDefaultSubtask([start, end], subtasks);
-          get().addSubtask(segment);
-        },
-
-        updateSubtask: (id, update) => {
-          updateState(
-            'updateSubtask',
-            (state) => ({
-              subtasks: state.subtasks.map((segment) =>
-                segment.id === id ? { ...segment, ...update } : segment,
-              ),
-            }),
-            { validationErrors: (nextState) => validateSegments(nextState.subtasks) },
-          )
-        },
-
-        removeSubtask: (id) => {
-          updateState(
-            'removeSubtask',
-            (state) => ({ subtasks: state.subtasks.filter((segment) => segment.id !== id) }),
-            { validationErrors: (nextState) => validateSegments(nextState.subtasks) },
-          )
-        },
-
-        reorderSubtasks: (fromIndex, toIndex) => {
-          updateState('reorderSubtasks', (state) => {
-            const nextSubtasks = [...state.subtasks]
-            const [removed] = nextSubtasks.splice(fromIndex, 1)
-            nextSubtasks.splice(toIndex, 0, removed)
-            return { subtasks: nextSubtasks }
-          })
-        },
-
-        setTrajectoryAdjustment: (frameIndex, adjustment) => {
-          updateState('setTrajectoryAdjustment', (state) => {
-            const nextTrajectoryAdjustments = new Map(state.trajectoryAdjustments)
-            nextTrajectoryAdjustments.set(frameIndex, { ...adjustment, frameIndex })
-            return { trajectoryAdjustments: nextTrajectoryAdjustments }
-          })
-        },
-
-        removeTrajectoryAdjustment: (frameIndex) => {
-          updateState('removeTrajectoryAdjustment', (state) => {
-            const nextTrajectoryAdjustments = new Map(state.trajectoryAdjustments)
-            nextTrajectoryAdjustments.delete(frameIndex)
-            return { trajectoryAdjustments: nextTrajectoryAdjustments }
-          })
-        },
+        ...subtaskActions,
 
         getTrajectoryAdjustment: (frameIndex) => {
           return get().trajectoryAdjustments.get(frameIndex);
-        },
-
-        clearTrajectoryAdjustments: () => {
-          updateState('clearTrajectoryAdjustments', () => ({ trajectoryAdjustments: new Map<number, TrajectoryAdjustment>() }))
         },
 
         getEditOperations: () => {
