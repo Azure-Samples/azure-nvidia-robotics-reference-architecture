@@ -526,6 +526,7 @@ Describe 'Invoke-Validation' -Tag 'Unit' {
         $script:SoftFail = $false
         $script:WarningsAsErrors = $false
         $script:FooterExcludePaths = @('dependency-pinning-artifacts/**')
+        $script:FrontmatterExcludePaths = @('README.md')
         $script:SkipFooterValidation = $true
         $script:scriptRoot = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
     }
