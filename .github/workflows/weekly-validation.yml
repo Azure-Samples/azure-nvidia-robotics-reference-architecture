@@ -5,6 +5,12 @@ on:
     # Weekly scan: Mondays at 09:00 UTC
     - cron: "0 9 * * 1"
   workflow_dispatch:
+  # TEMPORARY: Test trigger for PR validation (remove before merge)
+  pull_request:
+    paths:
+      - '.github/workflows/weekly-validation.yml'
+      - '.github/workflows/create-stale-docs-issues.yml'
+      - 'scripts/linting/Invoke-MsDateFreshnessCheck.ps1'
 
 permissions:
   contents: read
@@ -29,7 +35,10 @@ jobs:
   create-stale-docs-issues:
     name: Create or Update Issues for Stale Documentation
     needs: [msdate-freshness]
-    if: failure() && needs.msdate-freshness.result == 'failure'
+    # TEMPORARY: Always run on PR trigger for testing, otherwise only on failure
+    if: |
+      github.event_name == 'pull_request' || 
+      (failure() && needs.msdate-freshness.result == 'failure')
     uses: ./.github/workflows/create-stale-docs-issues.yml
     with:
       threshold-days: 90
