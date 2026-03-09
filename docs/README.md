@@ -35,6 +35,7 @@ Documentation spans the full lifecycle — from provisioning Azure infrastructur
 | Workflows                              | AzureML and OSMO job templates, pipeline configuration, and submission scripts     | Coming soon |
 | Operations                             | Monitoring, scaling, troubleshooting, and cost management for running clusters     | Coming soon |
 | Security                               | Identity, networking, compliance, and hardening for production deployments         | Coming soon |
+| [Reference](reference/README.md)      | CLI parameter tables, script usage, workflow templates, and configuration reference | Available   |
 | [Contributing](contributing/README.md) | Contribution guidelines, PR process, deployment validation, and coding conventions | Available   |
 
 ## 📄 Current Guides

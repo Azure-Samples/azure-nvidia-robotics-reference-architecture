@@ -147,7 +147,7 @@ cd scripts
 bash submit-osmo-training.sh
 ```
 
-Scripts auto-detect configuration from Terraform outputs. Override values with CLI arguments or environment variables as needed. See [Scripts](../../scripts/README.md) for all submission options.
+Scripts auto-detect configuration from Terraform outputs. Override values with CLI arguments or environment variables as needed. See [Scripts Reference](../reference/scripts.md) for all submission options.
 
 ## Step 8: Verify Results
 
