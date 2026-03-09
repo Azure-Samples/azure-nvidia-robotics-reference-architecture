@@ -294,6 +294,8 @@ export interface CacheStats {
   hits: number;
   misses: number;
   hitRate: number;
+  totalBytes: number;
+  maxMemoryBytes: number;
 }
 
 /**

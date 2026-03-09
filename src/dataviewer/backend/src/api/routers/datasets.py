@@ -294,6 +294,8 @@ class EpisodeCacheStats(BaseModel):
     hits: int
     misses: int
     hit_rate: float
+    total_bytes: int
+    max_memory_bytes: int
 
 
 @router.get("/cache/stats", response_model=EpisodeCacheStats)
@@ -308,6 +310,8 @@ async def get_cache_stats(
         hits=stats.hits,
         misses=stats.misses,
         hit_rate=stats.hit_rate,
+        total_bytes=stats.total_bytes,
+        max_memory_bytes=stats.max_memory_bytes,
     )
 
 

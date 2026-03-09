@@ -48,6 +48,7 @@ class DatasetService:
         storage_adapter: StorageAdapter | None = None,
         blob_provider: "BlobDatasetProvider | None" = None,
         episode_cache_capacity: int = 32,
+        episode_cache_max_mb: int = 100,
     ):
         if base_path is None:
             base_path = os.environ.get("HMI_DATA_PATH", "./data")
@@ -68,7 +69,10 @@ class DatasetService:
         self._hdf5_handler = HDF5FormatHandler()
         self._handlers = [self._lerobot_handler, self._hdf5_handler]
 
-        self._episode_cache = EpisodeCache(capacity=episode_cache_capacity)
+        self._episode_cache = EpisodeCache(
+            capacity=episode_cache_capacity,
+            max_memory_bytes=episode_cache_max_mb * 1024 * 1024 if episode_cache_max_mb > 0 else 0,
+        )
         self._prefetch_radius = 2
         self._prefetch_tasks: set[asyncio.Task[None]] = set()
 
@@ -598,5 +602,6 @@ def get_dataset_service() -> DatasetService:
             storage_adapter=storage,
             blob_provider=blob_provider,
             episode_cache_capacity=config.episode_cache_capacity,
+            episode_cache_max_mb=config.episode_cache_max_mb,
         )
     return _dataset_service

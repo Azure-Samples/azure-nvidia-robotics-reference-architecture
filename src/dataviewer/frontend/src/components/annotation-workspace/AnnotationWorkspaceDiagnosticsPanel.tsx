@@ -72,6 +72,7 @@ export function AnnotationWorkspaceDiagnosticsPanel({
                 {[
                   { label: 'Capacity', value: String(cacheStats.capacity) },
                   { label: 'Cached Episodes', value: String(cacheStats.size) },
+                  { label: 'Memory', value: `${(cacheStats.totalBytes / 1024).toFixed(0)} KB / ${cacheStats.maxMemoryBytes > 0 ? `${(cacheStats.maxMemoryBytes / (1024 * 1024)).toFixed(0)} MB` : '∞'}` },
                   { label: 'Hits / Misses', value: `${cacheStats.hits} / ${cacheStats.misses}` },
                   { label: 'Hit Rate', value: `${(cacheStats.hitRate * 100).toFixed(1)}%` },
                 ].map((entry) => (

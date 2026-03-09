@@ -54,6 +54,9 @@ class AppConfig:
     episode_cache_capacity: int = 32
     """Max episodes held in the LRU cache. 0 disables caching."""
 
+    episode_cache_max_mb: int = 100
+    """Max memory budget for the LRU cache in megabytes. 0 means count-only."""
+
 
 def load_config(env_path: Path | None = None) -> AppConfig:
     """
@@ -85,6 +88,7 @@ def load_config(env_path: Path | None = None) -> AppConfig:
     cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
 
     episode_cache_capacity = int(os.environ.get("EPISODE_CACHE_CAPACITY", "32"))
+    episode_cache_max_mb = int(os.environ.get("EPISODE_CACHE_MAX_MB", "100"))
 
     return AppConfig(
         storage_backend=storage_backend,
@@ -97,6 +101,7 @@ def load_config(env_path: Path | None = None) -> AppConfig:
         backend_port=backend_port,
         cors_origins=cors_origins,
         episode_cache_capacity=episode_cache_capacity,
+        episode_cache_max_mb=episode_cache_max_mb,
     )
 
 
