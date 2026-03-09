@@ -65,17 +65,19 @@ jobs:
 
             Write-Host "Processing: $filePath (age: $ageDays days)"
 
-            # Create URL-safe label from file path
-            $fileLabel = "stale-docs:$($filePath -replace '[/.]', '-')"
-
             # Issue title includes file path
             $issueTitle = "docs: Update stale documentation - $filePath"
 
-            # Check for existing open issue for this specific file
+            # Automation identifier for duplicate detection
+            $automationMarker = "<!-- automation:stale-docs:$filePath -->"
+
+            # Check for existing open issue for this specific file using search
+            # Search by automation marker in issue body
+            $searchQuery = "repo:${{ github.repository }} is:issue is:open in:body `"automation:stale-docs:$filePath`""
             $existingIssueJson = gh issue list `
               --repo "${{ github.repository }}" `
-              --label "$fileLabel" `
-              --state "open" `
+              --search "$searchQuery" `
+              --limit 1 `
               --json number `
               --jq '.[0].number // empty'
 
@@ -99,7 +101,7 @@ jobs:
           - [ ] Verify technical accuracy of content
           - [ ] Close this issue manually after fixes are merged
 
-          <!-- automation:stale-docs:$filePath -->
+          $automationMarker
           "@
 
             if ($existingIssue) {
@@ -118,7 +120,7 @@ jobs:
                 --repo "${{ github.repository }}" `
                 --title $issueTitle `
                 --body $issueBody `
-                --label "documentation,$fileLabel,automated,needs-triage"
+                --label "documentation,stale-docs,automated,needs-triage"
             }
           }
 

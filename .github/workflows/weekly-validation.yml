@@ -37,7 +37,7 @@ jobs:
     needs: [msdate-freshness]
     # TEMPORARY: Always run on PR trigger for testing, otherwise only on failure
     if: |
-      github.event_name == 'pull_request' || 
+      github.event_name == 'pull_request' ||
       (failure() && needs.msdate-freshness.result == 'failure')
     uses: ./.github/workflows/create-stale-docs-issues.yml
     with:
