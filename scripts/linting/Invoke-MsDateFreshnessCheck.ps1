@@ -32,7 +32,10 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string[]]$Paths,
+    [int]$ThresholdDays = 90,
+
+    [Parameter()]
+    [string[]]$Paths = @('.'),
 
     [Parameter()]
     [switch]$ChangedFilesOnly,
@@ -46,12 +49,6 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-
-# Hardcoded values for workflow invocations
-$ThresholdDays = 90
-if (-not $Paths) {
-    $Paths = '.'
-}
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
 Import-Module (Join-Path $scriptRoot 'Modules' 'LintingHelpers.psm1') -Force
@@ -74,7 +71,7 @@ function Get-MarkdownFiles {
 
     if ($ChangedOnly) {
         Write-Verbose "Getting changed markdown files relative to $Base"
-        $files = Get-ChangedFilesFromGit -BaseBranch $Base -FileExtensions @('*.md')
+        $files = @(Get-ChangedFilesFromGit -BaseBranch $Base -FileExtensions @('*.md'))
         return @($files | Where-Object { Test-Path $_ -PathType Leaf })
     }
 
@@ -87,9 +84,9 @@ function Get-MarkdownFiles {
             continue
         }
 
-        $isExplicitPath = $SearchPaths.Count -eq 1 -and $SearchPaths[0] -ne '.'
+        $isExplicitPath = @($SearchPaths).Count -eq 1 -and $SearchPaths[0] -ne '.'
 
-        $files = Get-ChildItem -Path $path -Recurse -Include '*.md' -File -ErrorAction SilentlyContinue
+        $files = @(Get-ChildItem -Path $path -Recurse -Include '*.md' -File -ErrorAction SilentlyContinue)
 
         $allFiles += @($files | Where-Object {
             $file = $_
@@ -112,7 +109,7 @@ function Get-MarkdownFiles {
         })
     }
 
-    Write-Verbose "Found $($allFiles.Count) markdown files"
+    Write-Verbose "Found $(@($allFiles).Count) markdown files"
     return $allFiles
 }
 
@@ -190,17 +187,17 @@ function New-MsDateReport {
     Write-Verbose "JSON report written to $jsonPath"
 
     $staleFiles = @($Results | Where-Object { $_.IsStale })
-    $totalFiles = $Results.Count
+    $totalFiles = @($Results).Count
 
     $markdown = @"
 # ms.date Freshness Check Results
 
 **Threshold**: $Threshold days
 **Files Checked**: $totalFiles
-**Stale Files**: $($staleFiles.Count)
+**Stale Files**: $(@($staleFiles).Count)
 "@
 
-    if ($staleFiles.Count -gt 0) {
+    if (@($staleFiles).Count -gt 0) {
         $markdown += @"
 
 ## 🚨 Stale Documentation Files
@@ -230,7 +227,7 @@ All documentation files with ms.date frontmatter are within the $Threshold-day f
     return @{
         JsonPath     = $jsonPath
         MarkdownPath = $mdPath
-        StaleCount   = $staleFiles.Count
+        StaleCount   = @($staleFiles).Count
     }
 }
 
@@ -240,14 +237,14 @@ All documentation files with ms.date frontmatter are within the $Threshold-day f
 
 Write-Verbose "Starting ms.date freshness check with $ThresholdDays-day threshold"
 
-$markdownFiles = Get-MarkdownFiles -SearchPaths $Paths -ChangedOnly:$ChangedFilesOnly -Base $BaseBranch
+$markdownFiles = @(Get-MarkdownFiles -SearchPaths $Paths -ChangedOnly:$ChangedFilesOnly -Base $BaseBranch)
 
-if ($markdownFiles.Count -eq 0) {
+if (@($markdownFiles).Count -eq 0) {
     Write-Warning "No markdown files found to check"
     exit 0
 }
 
-Write-Verbose "Checking $($markdownFiles.Count) markdown files"
+Write-Verbose "Checking $(@($markdownFiles).Count) markdown files"
 
 $results = @()
 $currentDate = Get-Date
@@ -287,15 +284,15 @@ foreach ($file in $markdownFiles) {
     }
 }
 
-if ($results.Count -eq 0) {
+if (@($results).Count -eq 0) {
     Write-Warning "No files with ms.date frontmatter found"
     exit 0
 }
 
 $report = New-MsDateReport -Results $results -Threshold $ThresholdDays
 
-Write-Host "`nms.date Freshness Check Summary:"
-Write-Host "  Files Checked: $($results.Count)"
+Write-Host "\nms.date Freshness Check Summary:"
+Write-Host "  Files Checked: $(@($results).Count)"
 Write-Host "  Stale Files: $($report.StaleCount)"
 Write-Host "  Threshold: $ThresholdDays days"
 
