@@ -1,4 +1,4 @@
-import { Activity, Download, RotateCcw, Scan, SkipBack, SkipForward, Video } from 'lucide-react'
+import { Activity, Download, RotateCcw, Scan, SkipBack, SkipForward } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -72,10 +72,6 @@ export function AnnotationWorkspaceTopBar({
         </div>
       </div>
       <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto md:flex-wrap xl:overflow-visible">
-        <TabsTrigger value="episode" className="gap-2">
-          <Video className="h-4 w-4" />
-          Episode Viewer
-        </TabsTrigger>
         <TabsTrigger value="trajectory" className="gap-2">
           <Activity className="h-4 w-4" />
           Trajectory Viewer

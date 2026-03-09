@@ -112,9 +112,15 @@ describe('AnnotationWorkspace status and header actions', () => {
   it('adds a dedicated trajectory viewer tab alongside the existing workspace tabs', () => {
     render(<AnnotationWorkspace />)
 
-    expect(screen.getByRole('tab', { name: /episode viewer/i })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /episode viewer/i })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /trajectory viewer/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /object detection/i })).toBeInTheDocument()
+  })
+
+  it('selects the trajectory viewer tab by default', () => {
+    render(<AnnotationWorkspace />)
+
+    expect(screen.getByRole('tab', { name: /trajectory viewer/i })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('renders a Previous Episode action in the workspace header when navigation is available', () => {

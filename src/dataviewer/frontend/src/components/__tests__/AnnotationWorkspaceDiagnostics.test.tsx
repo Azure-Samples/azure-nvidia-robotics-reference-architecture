@@ -102,7 +102,7 @@ describe('AnnotationWorkspace diagnostics', () => {
     mockDiagnosticsState.enabled = true
     mockDiagnosticsState.channels = ['all', 'export']
     mockDiagnosticsState.events = [
-      { channel: 'export', type: 'dialog-open', data: { activeTab: 'episode' }, timestamp: '2026-03-08T00:00:00.000Z' },
+      { channel: 'export', type: 'dialog-open', data: { activeTab: 'trajectory' }, timestamp: '2026-03-08T00:00:00.000Z' },
     ]
 
     render(<AnnotationWorkspace />)
@@ -140,7 +140,7 @@ describe('AnnotationWorkspace diagnostics', () => {
 
     expect(mockRecordDiagnosticEvent.mock.calls).toEqual(expect.arrayContaining([
       ['labels', 'draft-change', expect.objectContaining({ episodeIndex: 0, labelCount: 1 })],
-      ['export', 'dialog-open', expect.objectContaining({ activeTab: 'episode' })],
+      ['export', 'dialog-open', expect.objectContaining({ activeTab: 'trajectory' })],
       ['subtasks', 'create', expect.objectContaining({ rangeStart: 2, rangeEnd: 6 })],
       ['detection', 'tab-viewed', expect.objectContaining({ previousTab: 'trajectory' })],
       ['persistence', 'draft-saved', expect.objectContaining({ episodeIndex: 0 })],

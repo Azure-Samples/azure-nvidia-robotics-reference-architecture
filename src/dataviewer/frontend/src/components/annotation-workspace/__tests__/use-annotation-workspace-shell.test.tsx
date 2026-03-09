@@ -14,6 +14,12 @@ describe('useAnnotationWorkspaceShell', () => {
   beforeEach(setupAnnotationWorkspaceTestCase)
   afterEach(teardownAnnotationWorkspaceTestCase)
 
+  it('defaults the workspace shell to the trajectory tab', () => {
+    const { result } = renderHook(() => useAnnotationWorkspaceShell({}))
+
+    expect(result.current.activeTab).toBe('trajectory')
+  })
+
   it('records workspace and detection diagnostics when switching to the detection tab', () => {
     const { result } = renderHook(() => useAnnotationWorkspaceShell({}))
 
@@ -23,11 +29,11 @@ describe('useAnnotationWorkspaceShell', () => {
 
     expect(result.current.activeTab).toBe('detection')
     expect(mockRecordDiagnosticEvent).toHaveBeenCalledWith('workspace', 'tab-change', {
-      previousTab: 'episode',
+      previousTab: 'trajectory',
       nextTab: 'detection',
     })
     expect(mockRecordDiagnosticEvent).toHaveBeenCalledWith('detection', 'tab-viewed', {
-      previousTab: 'episode',
+      previousTab: 'trajectory',
       episodeIndex: 0,
     })
   })
@@ -41,7 +47,7 @@ describe('useAnnotationWorkspaceShell', () => {
 
     expect(result.current.exportDialogOpen).toBe(true)
     expect(mockRecordDiagnosticEvent).toHaveBeenCalledWith('export', 'dialog-open', {
-      activeTab: 'episode',
+      activeTab: 'trajectory',
       episodeIndex: 0,
     })
   })

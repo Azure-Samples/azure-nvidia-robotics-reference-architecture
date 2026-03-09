@@ -19,31 +19,33 @@ describe('AnnotationWorkspace playback and trajectory tab flows', () => {
   beforeEach(setupAnnotationWorkspaceTestCase)
   afterEach(teardownAnnotationWorkspaceTestCase)
 
-  it('keeps the trajectory plot out of the default episode viewer tab', () => {
+  it('defaults the workspace to the trajectory viewer without an episode tab', () => {
     render(<AnnotationWorkspace />)
 
-    expect(screen.queryByText('Trajectory Plot')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /episode viewer/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /trajectory viewer/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Trajectory Graph')).toBeInTheDocument()
   })
 
-  it('keeps subtask controls out of the default episode viewer tab', () => {
+  it('shows subtask controls in the default trajectory viewer', () => {
     render(<AnnotationWorkspace />)
 
-    expect(screen.queryByText('Subtask Toolbar')).not.toBeInTheDocument()
-    expect(screen.queryByText('Subtask Timeline Track')).not.toBeInTheDocument()
+    expect(screen.getByText('Subtask Toolbar')).toBeInTheDocument()
+    expect(screen.getByText('Subtask Timeline Track')).toBeInTheDocument()
   })
 
-  it('renders the shared subtask list in the default episode viewer', () => {
+  it('renders the shared subtask list in the default trajectory viewer', () => {
     render(<AnnotationWorkspace />)
 
     expect(screen.getByText('Subtask List')).toBeInTheDocument()
   })
 
-  it('keeps the default episode viewer focused on playback and subtasks without the edit tools sidebar', () => {
+  it('keeps the default trajectory viewer playback group focused on playback and subtasks without edit tools', () => {
     render(<AnnotationWorkspace />)
 
-    const episodePanel = screen.getByRole('tabpanel', { name: /episode viewer/i })
+    const playbackGroup = screen.getByTestId('trajectory-playback-group-panel')
 
-    expect(within(episodePanel).queryByText('Edit Tools')).not.toBeInTheDocument()
+    expect(within(playbackGroup).queryByText('Edit Tools')).not.toBeInTheDocument()
   })
 
   it('renders the trajectory plot after switching to the trajectory viewer tab', () => {
@@ -70,10 +72,6 @@ describe('AnnotationWorkspace playback and trajectory tab flows', () => {
 
   it('moves episode labels into the trajectory playback grouping instead of the default edit tools column', () => {
     render(<AnnotationWorkspace />)
-
-    expect(screen.queryByText('Toggle Label Draft')).not.toBeInTheDocument()
-
-    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
 
     expect(screen.getByTestId('trajectory-labels-panel')).toContainElement(screen.getByText('Toggle Label Draft'))
   })

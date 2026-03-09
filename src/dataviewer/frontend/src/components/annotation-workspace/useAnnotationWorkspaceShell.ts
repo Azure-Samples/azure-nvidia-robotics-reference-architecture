@@ -41,7 +41,7 @@ export function useAnnotationWorkspaceShell({
   onSaveAndNextEpisode,
 }: UseAnnotationWorkspaceShellOptions) {
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('episode')
+  const [activeTab, setActiveTab] = useState('trajectory')
   const seekVideoFrameRef = useRef(
     (frame: number, _range: [number, number] | null, _constrainToRange = true) => frame,
   )

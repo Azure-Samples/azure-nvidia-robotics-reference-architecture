@@ -23,37 +23,6 @@ export function AnnotationWorkspaceContent({ shell }: AnnotationWorkspaceContent
     return null
   }
 
-  const episodePlaybackCard = (
-    <AnnotationWorkspacePlaybackCard
-      canvasRef={shell.canvasRef}
-      videoRef={shell.videoRef}
-      videoSrc={shell.videoSrc}
-      onVideoEnded={shell.handleVideoEnded}
-      onLoadedMetadata={shell.handleLoadedMetadata}
-      displayFilter={shell.displayFilter}
-      isInsertedFrame={shell.isInsertedFrame}
-      interpolatedImageUrl={shell.interpolatedImageUrl}
-      currentFrame={shell.currentFrame}
-      totalFrames={shell.totalFrames}
-      resizeOutput={shell.globalTransform?.resize ?? null}
-      frameImageUrl={shell.frameImageUrl}
-      isPlaying={shell.isPlaying}
-      onTogglePlayback={shell.togglePlayback}
-      onStepFrame={shell.playback.stepFrame}
-      playbackSpeed={shell.playbackSpeed}
-      onSetPlaybackSpeed={shell.setPlaybackSpeed}
-      autoPlay={shell.autoPlay}
-      onSetAutoPlay={shell.setAutoPlay}
-      autoLoop={shell.autoLoop}
-      onSetAutoLoop={shell.setAutoLoop}
-      playbackRangeStart={shell.playback.playbackRangeStart}
-      playbackRangeEnd={shell.playback.playbackRangeEnd}
-      onSetFrameWithinPlaybackRange={shell.playback.setFrameWithinPlaybackRange}
-      playbackRangeHighlight={shell.playback.playbackRangeHighlight}
-      playbackRangeLabel={shell.playback.playbackRangeLabel}
-    />
-  )
-
   const trajectoryPlaybackCard = (
     <AnnotationWorkspacePlaybackCard
       compact
@@ -83,17 +52,6 @@ export function AnnotationWorkspaceContent({ shell }: AnnotationWorkspaceContent
       onSetFrameWithinPlaybackRange={shell.playback.setFrameWithinPlaybackRange}
       playbackRangeHighlight={shell.playback.playbackRangeHighlight}
       playbackRangeLabel={shell.playback.playbackRangeLabel}
-    />
-  )
-
-  const episodeSubtaskListCard = (
-    <AnnotationWorkspaceSubtaskListCard
-      selectedSubtaskId={shell.playback.selectedSubtaskId}
-      onSelectionChange={shell.playback.handleSubtaskSelectionChange}
-      draftRange={shell.playback.selectedRange}
-      maxFrame={Math.max(shell.totalFrames - 1, 0)}
-      onDraftRangeChange={shell.playback.handleDraftRangeChange}
-      onCreateSubtaskFromRange={shell.handleCreateSubtaskFromSelection}
     />
   )
 
@@ -132,15 +90,6 @@ export function AnnotationWorkspaceContent({ shell }: AnnotationWorkspaceContent
           onSaveAndNextEpisode={() => void shell.handleSaveAndNextEpisode()}
           saveStatusMessage={shell.saveStatusMessage}
         />
-
-        <TabsContent value="episode" className="mt-2.5 flex-1 min-h-0">
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="min-h-0 overflow-y-auto">
-              {episodePlaybackCard}
-              {episodeSubtaskListCard}
-            </div>
-          </div>
-        </TabsContent>
 
         <AnnotationWorkspaceTrajectoryTab
           playbackCard={trajectoryPlaybackCard}
