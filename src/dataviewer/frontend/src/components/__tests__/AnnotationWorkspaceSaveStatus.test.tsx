@@ -68,6 +68,7 @@ let mockHasEdits = false
 let mockIsPlaying = false
 let mockAutoPlay = false
 let mockAutoLoop = false
+let mockSubtasks = [{ id: 'subtask-1', frameRange: [2, 6] as [number, number] }]
 let playSpy: ReturnType<typeof vi.spyOn>
 let pauseSpy: ReturnType<typeof vi.spyOn>
 const mockInitializeEdit = vi.fn()
@@ -163,7 +164,14 @@ vi.mock('@/components/playback/PlaybackControlStrip', () => ({
 }))
 
 vi.mock('@/components/subtask-timeline', () => ({
-  SubtaskList: () => <div>Subtask List</div>,
+  SubtaskList: ({ onSelectionChange }: { onSelectionChange?: (id: string | null) => void }) => (
+    <div>
+      <div>Subtask List</div>
+      <button type="button" onClick={() => onSelectionChange?.('subtask-1')}>
+        Select Saved Subtask
+      </button>
+    </div>
+  ),
   SubtaskTimelineTrack: () => <div>Subtask Timeline Track</div>,
   SubtaskToolbar: () => <div>Subtask Toolbar</div>,
 }))
@@ -202,7 +210,7 @@ vi.mock('@/lib/playback-utils', () => ({
   computeSyncAction: mockComputeSyncAction,
   resolvePlaybackRange: (totalFrames: number) => [0, totalFrames - 1],
   resolvePlaybackTick: (frame: number) => ({ frame, shouldStop: false }),
-  shouldLoopActivePlaybackRange: (range: [number, number] | null, autoLoop: boolean) => autoLoop || !!range,
+  shouldLoopActivePlaybackRange: (range: [number, number] | null, autoLoop: boolean) => autoLoop && !!range || (range === null && autoLoop),
 }))
 
 vi.mock('@/hooks/use-labels', () => ({
@@ -241,7 +249,7 @@ vi.mock('@/stores', () => ({
   }),
   useEditStore: (selector: (state: unknown) => unknown) =>
     selector({
-      subtasks: [],
+      subtasks: mockSubtasks,
       addSubtask: vi.fn(),
       removedFrames: new Set<number>(),
       initializeEdit: mockInitializeEdit,
@@ -299,6 +307,7 @@ describe('AnnotationWorkspace save status', () => {
     mockIsPlaying = false
     mockAutoPlay = false
     mockAutoLoop = false
+    mockSubtasks = [{ id: 'subtask-1', frameRange: [2, 6] }]
     mockSaveEpisodeLabels.mockReset()
     mockSetCurrentFrame.mockReset()
     mockTogglePlayback.mockReset()
@@ -478,6 +487,23 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.getByText(/workspace state/i)).toBeInTheDocument()
     expect(within(diagnosticsPanel).getByText(/sync-action/i)).toBeInTheDocument()
     expect(screen.queryByTestId('playback-diagnostics-panel')).not.toBeInTheDocument()
+  })
+
+  it('updates subgroup loop intent when the auto-loop toggle changes', () => {
+    mockDiagnosticsState.enabled = true
+    mockDiagnosticsState.channels = ['all']
+    mockAutoLoop = true
+
+    const { rerender } = render(<AnnotationWorkspace diagnosticsVisible />)
+
+    fireEvent.click(screen.getByRole('button', { name: /select saved subtask/i }))
+
+    expect(screen.getByText(/loop intent: enabled/i)).toBeInTheDocument()
+
+    mockAutoLoop = false
+    rerender(<AnnotationWorkspace diagnosticsVisible />)
+
+    expect(screen.getByText(/loop intent: disabled/i)).toBeInTheDocument()
   })
 
   it('filters diagnostics events by channel and clears only the visible channel history', () => {

@@ -72,10 +72,10 @@ export function shouldRestartPlaybackAfterLoop(
 }
 
 export function shouldLoopActivePlaybackRange(
-  range: PlaybackRange | null,
+  _range: PlaybackRange | null,
   autoLoop: boolean,
 ): boolean {
-  return autoLoop || !!range
+  return autoLoop
 }
 
 export function shouldRecoverPlaybackAfterDesync(

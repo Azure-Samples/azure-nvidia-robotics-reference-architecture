@@ -229,8 +229,12 @@ describe('shouldLoopActivePlaybackRange', () => {
     expect(shouldLoopActivePlaybackRange(null, true)).toBe(true)
   })
 
-  it('loops when an active playback range exists even if autoLoop is disabled', () => {
-    expect(shouldLoopActivePlaybackRange([10, 20], false)).toBe(true)
+  it('does not loop a selected subgroup when autoLoop is disabled', () => {
+    expect(shouldLoopActivePlaybackRange([10, 20], false)).toBe(false)
+  })
+
+  it('loops a selected subgroup when autoLoop is enabled', () => {
+    expect(shouldLoopActivePlaybackRange([10, 20], true)).toBe(true)
   })
 
   it('does not loop full-episode playback when autoLoop is disabled', () => {
