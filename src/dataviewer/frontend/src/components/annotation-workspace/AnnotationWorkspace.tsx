@@ -10,6 +10,7 @@ import { AnnotationWorkspaceSubtaskListCard } from '@/components/annotation-work
 import { AnnotationWorkspaceTopBar } from '@/components/annotation-workspace/AnnotationWorkspaceTopBar';
 import { AnnotationWorkspaceTrajectoryTab } from '@/components/annotation-workspace/AnnotationWorkspaceTrajectoryTab';
 import { useAnnotationWorkspaceDiagnostics } from '@/components/annotation-workspace/useAnnotationWorkspaceDiagnostics';
+import { useAnnotationWorkspaceEpisodeActions } from '@/components/annotation-workspace/useAnnotationWorkspaceEpisodeActions';
 import { useAnnotationWorkspacePlayback } from '@/components/annotation-workspace/useAnnotationWorkspacePlayback';
 import { ExportDialog } from '@/components/export';
 import { DetectionPanel } from '@/components/object-detection';
@@ -72,12 +73,10 @@ export function AnnotationWorkspace({
   onSaveAndNextEpisode,
 }: AnnotationWorkspaceProps) {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [showSavedStatus, setShowSavedStatus] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentFrameRef = useRef(0);
   const originalFrameIndexRef = useRef<number | null>(null);
-  const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldAutoPlayOnMetadataLoadRef = useRef(false);
   const skipNextPlaybackSyncRef = useRef(false);
   const playbackRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -85,8 +84,6 @@ export function AnnotationWorkspace({
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
   const [activeTab, setActiveTab] = useState('episode');
-  const lastLabelSignatureRef = useRef<string | null>(null);
-  const lastEpisodeContextRef = useRef<string | null>(null);
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
@@ -124,30 +121,9 @@ export function AnnotationWorkspace({
 
     return savedEpisodeLabels[currentEpisode.meta.index] ?? EMPTY_LABELS;
   }, [currentEpisode, savedEpisodeLabels]);
-  const labelSignature = useMemo(
-    () => JSON.stringify([...currentEpisodeLabels].sort()),
-    [currentEpisodeLabels],
-  );
-
-  const announceSave = useCallback(() => {
-    setShowSavedStatus(true);
-
-    if (saveStatusTimeoutRef.current) {
-      clearTimeout(saveStatusTimeoutRef.current);
-    }
-
-    saveStatusTimeoutRef.current = setTimeout(() => {
-      setShowSavedStatus(false);
-      saveStatusTimeoutRef.current = null;
-    }, 2400);
-  }, []);
 
   useEffect(() => {
     return () => {
-      if (saveStatusTimeoutRef.current) {
-        clearTimeout(saveStatusTimeoutRef.current);
-      }
-
       if (playbackRetryTimeoutRef.current) {
         clearTimeout(playbackRetryTimeoutRef.current);
       }
@@ -156,133 +132,28 @@ export function AnnotationWorkspace({
 
   const diagnosticsEnabled = diagnosticsVisible && isDiagnosticsEnabled();
 
-  const hasLabelChanges = useMemo(() => {
-    if (!currentEpisode || !labelDataLoaded) {
-      return false;
-    }
-
-    const current = [...currentEpisodeLabels].sort();
-    const initial = [...savedLabelsForCurrentEpisode].sort();
-
-    if (current.length !== initial.length) {
-      return true;
-    }
-
-    return current.some((label, index) => label !== initial[index]);
-  }, [currentEpisode, currentEpisodeLabels, labelDataLoaded, savedLabelsForCurrentEpisode]);
-
-  const hasPendingEpisodeChanges = hasLabelChanges || hasEdits;
-  const saveStatusMessage = hasPendingEpisodeChanges
-    ? 'Unsaved episode changes.'
-    : showSavedStatus
-      ? 'Episode changes saved.'
-      : null;
-
-  useEffect(() => {
-    if (!currentEpisode) {
-      lastLabelSignatureRef.current = null;
-      return;
-    }
-
-    if (
-      diagnosticsEnabled
-      && lastLabelSignatureRef.current !== null
-      && lastLabelSignatureRef.current !== labelSignature
-    ) {
-      recordDiagnosticEvent('labels', 'draft-change', {
-        episodeIndex: currentEpisode.meta.index,
-        labelCount: currentEpisodeLabels.length,
-        labels: [...currentEpisodeLabels],
-        hasLabelChanges,
-      });
-    }
-
-    lastLabelSignatureRef.current = labelSignature;
-  }, [currentEpisode, currentEpisodeLabels, diagnosticsEnabled, hasLabelChanges, labelSignature]);
-
-  useEffect(() => {
-    const nextContext = currentDataset && currentEpisode
-      ? `${currentDataset.id}:${currentEpisode.meta.index}`
-      : null;
-
-    if (!nextContext) {
-      lastEpisodeContextRef.current = null;
-      return;
-    }
-
-    if (
-      diagnosticsEnabled
-      && lastEpisodeContextRef.current !== null
-      && lastEpisodeContextRef.current !== nextContext
-    ) {
-      const [previousDatasetId, previousEpisodeIndex] = lastEpisodeContextRef.current.split(':');
-
-      recordDiagnosticEvent('navigation', 'episode-context-change', {
-        previousDatasetId,
-        previousEpisodeIndex: Number(previousEpisodeIndex),
-        datasetId: currentDataset?.id ?? null,
-        episodeIndex: currentEpisode?.meta.index ?? null,
-      });
-    }
-
-    lastEpisodeContextRef.current = nextContext;
-  }, [currentDataset, currentEpisode, diagnosticsEnabled]);
-
-  const handleResetAll = useCallback(async () => {
-    resetEdits();
-
-    if (!currentEpisode || !hasLabelChanges) {
-      return;
-    }
-
-    const nextLabels = savedLabelsForCurrentEpisode.filter((label) =>
-      availableLabels.includes(label),
-    );
-
-    setEpisodeLabelsInStore(currentEpisode.meta.index, nextLabels);
-  }, [availableLabels, currentEpisode, hasLabelChanges, resetEdits, savedLabelsForCurrentEpisode, setEpisodeLabelsInStore]);
-
-  const handleSaveAndNextEpisode = useCallback(async () => {
-    const advanceToNextEpisode = onSaveAndNextEpisode ?? onNextEpisode;
-
-    if (!canGoNextEpisode || !advanceToNextEpisode) {
-      return;
-    }
-
-    if (currentEpisode && currentDataset && hasLabelChanges) {
-      await saveEpisodeLabels.mutateAsync({
-        episodeIdx: currentEpisode.meta.index,
-        labels: currentEpisodeLabels,
-      });
-
-      recordDiagnosticEvent('labels', 'saved', {
-        datasetId: currentDataset.id,
-        episodeIndex: currentEpisode.meta.index,
-        labelCount: currentEpisodeLabels.length,
-      });
-    }
-
-    if (hasEdits) {
-      saveEpisodeDraft();
-      recordDiagnosticEvent('persistence', 'draft-saved', {
-        datasetId: currentDataset?.id ?? null,
-        episodeIndex: currentEpisode?.meta.index ?? null,
-      });
-    }
-
-    if (hasPendingEpisodeChanges) {
-      announceSave();
-    }
-
-    recordDiagnosticEvent('workspace', 'save-next-episode', {
-      episodeIndex: currentEpisode?.meta.index ?? null,
-      hasPendingEpisodeChanges,
-      hasEdits,
-      hasLabelChanges,
-    });
-
-    advanceToNextEpisode();
-  }, [announceSave, canGoNextEpisode, currentDataset, currentEpisode, currentEpisodeLabels, hasEdits, hasLabelChanges, hasPendingEpisodeChanges, onNextEpisode, onSaveAndNextEpisode, saveEpisodeDraft, saveEpisodeLabels]);
+  const {
+    hasPendingEpisodeChanges,
+    saveStatusMessage,
+    handleResetAll,
+    handleSaveAndNextEpisode,
+  } = useAnnotationWorkspaceEpisodeActions({
+    diagnosticsEnabled,
+    currentDatasetId: currentDataset?.id ?? null,
+    currentEpisodeIndex: currentEpisode?.meta.index ?? null,
+    currentEpisodeLabels,
+    savedLabelsForCurrentEpisode,
+    availableLabels,
+    labelDataLoaded,
+    hasEdits,
+    onResetEdits: resetEdits,
+    onSetEpisodeLabels: setEpisodeLabelsInStore,
+    onSaveEpisodeDraft: saveEpisodeDraft,
+    onSaveEpisodeLabels: saveEpisodeLabels.mutateAsync,
+    onRecordEvent: recordDiagnosticEvent,
+    canGoNextEpisode,
+    onAdvanceToNextEpisode: onSaveAndNextEpisode ?? onNextEpisode,
+  });
 
   const displayFilter = useMemo(
     () => combineCssFilters(
