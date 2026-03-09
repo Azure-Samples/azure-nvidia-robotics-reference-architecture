@@ -9,19 +9,54 @@ interface SubtaskListProps {
   selectedSubtaskId?: string | null;
   onSelectionChange?: (id: string | null) => void;
   className?: string;
+  draftRange?: [number, number] | null;
+  maxFrame?: number;
+  onDraftRangeChange?: (range: [number, number] | null) => void;
+  onCreateSubtaskFromRange?: (range: [number, number]) => void;
 }
 
 export function SubtaskList({
   selectedSubtaskId,
   onSelectionChange,
   className,
+  draftRange = null,
+  maxFrame = 0,
+  onDraftRangeChange,
+  onCreateSubtaskFromRange,
 }: SubtaskListProps) {
   const { subtasks, updateSubtask, removeSubtask, reorderSubtasks } = useSubtaskState();
   const { setCurrentFrame } = usePlaybackControls();
 
-  if (subtasks.length === 0) {
+  const updateDraftRange = (nextStart: number, nextEnd: number) => {
+    if (!Number.isFinite(nextStart) || !Number.isFinite(nextEnd)) {
+      return
+    }
+
+    const boundedStart = Math.max(0, Math.min(nextStart, maxFrame))
+    const boundedEnd = Math.max(0, Math.min(nextEnd, maxFrame))
+
+    onDraftRangeChange?.([
+      Math.min(boundedStart, boundedEnd),
+      Math.max(boundedStart, boundedEnd),
+    ])
+  }
+
+  const nudgeDraftBoundary = (boundary: 'start' | 'end', delta: number) => {
+    if (!draftRange) {
+      return
+    }
+
+    if (boundary === 'start') {
+      updateDraftRange(draftRange[0] + delta, draftRange[1])
+      return
+    }
+
+    updateDraftRange(draftRange[0], draftRange[1] + delta)
+  }
+
+  if (subtasks.length === 0 && !draftRange) {
     return (
-      <div className={cn('rounded-lg border border-dashed p-4 text-sm text-muted-foreground', className)}>
+      <div className={cn('rounded-lg border border-dashed p-4 text-sm text-muted-foreground', className)} data-keep-playback-selection="true">
         <div className="flex items-center gap-2 font-medium text-foreground">
           <ListChecks className="h-4 w-4" />
           Subtasks
@@ -34,18 +69,93 @@ export function SubtaskList({
   }
 
   return (
-    <div className={cn('rounded-lg border p-3', className)}>
+    <div className={cn('rounded-lg border p-3', className)} data-keep-playback-selection="true">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <ListChecks className="h-4 w-4" />
           <h4 className="text-sm font-medium">Subtasks</h4>
         </div>
-        {selectedSubtaskId && (
-          <Button size="sm" variant="ghost" onClick={() => onSelectionChange?.(null)}>
+        {(selectedSubtaskId || draftRange) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (selectedSubtaskId) {
+                onSelectionChange?.(null)
+                return
+              }
+
+              onDraftRangeChange?.(null)
+            }}
+          >
             Clear
           </Button>
         )}
       </div>
+      {draftRange && (
+        <div className="mb-3 rounded-md border border-primary/40 bg-primary/5 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-medium text-primary">Draft Selection</div>
+              <p className="text-xs text-muted-foreground">
+                Frames {draftRange[0]} to {draftRange[1]}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onCreateSubtaskFromRange?.(draftRange)}
+              >
+                Create Subtask
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onDraftRangeChange?.(null)}>
+                Clear
+              </Button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            <div className="rounded border bg-background p-2">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Start</div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => nudgeDraftBoundary('start', -1)}>
+                  -1
+                </Button>
+                <Input
+                  type="number"
+                  min={0}
+                  max={maxFrame}
+                  value={draftRange[0]}
+                  onChange={(event) => updateDraftRange(Number(event.target.value), draftRange[1])}
+                  aria-label="Draft selection start frame"
+                />
+                <Button size="sm" variant="outline" onClick={() => nudgeDraftBoundary('start', 1)}>
+                  +1
+                </Button>
+              </div>
+            </div>
+            <div className="rounded border bg-background p-2">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">End</div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => nudgeDraftBoundary('end', -1)}>
+                  -1
+                </Button>
+                <Input
+                  type="number"
+                  min={0}
+                  max={maxFrame}
+                  value={draftRange[1]}
+                  onChange={(event) => updateDraftRange(draftRange[0], Number(event.target.value))}
+                  aria-label="Draft selection end frame"
+                />
+                <Button size="sm" variant="outline" onClick={() => nudgeDraftBoundary('end', 1)}>
+                  +1
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         {subtasks.map((segment, index) => {
           const isSelected = segment.id === selectedSubtaskId;

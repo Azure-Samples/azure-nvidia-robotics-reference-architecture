@@ -274,6 +274,14 @@ export async function getMetadata<T = unknown>(
 }
 
 /**
+ * Delete metadata value.
+ */
+export async function deleteMetadata(key: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('metadata', key);
+}
+
+/**
  * Clear all local data.
  */
 export async function clearAllLocalData(): Promise<void> {

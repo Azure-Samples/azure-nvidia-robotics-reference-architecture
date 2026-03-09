@@ -60,6 +60,10 @@ interface TrajectoryPlotProps {
   onSelectedRangeChange?: (range: [number, number] | null) => void;
   /** Called when the user creates a subtask from the selected range */
   onCreateSubtaskFromRange?: (range: [number, number]) => void;
+  /** Called when the user begins dragging a graph selection */
+  onSelectionStart?: () => void;
+  /** Called after a graph drag selection is committed */
+  onSelectionComplete?: (range: [number, number]) => void;
 }
 
 function applyTrajectoryAdjustment(
@@ -122,6 +126,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   selectedRange = null,
   onSelectedRangeChange,
   onCreateSubtaskFromRange,
+  onSelectionStart,
+  onSelectionComplete,
 }: TrajectoryPlotProps) {
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
   const setCurrentFrame = useEpisodeStore((state) => state.setCurrentFrame);
@@ -144,6 +150,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   const [selectionAnchorX, setSelectionAnchorX] = useState<number | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const selectionSurfaceRef = useRef<HTMLDivElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const withSave = useCallback(
     <T extends unknown[]>(fn: (...args: T) => void) =>
@@ -236,6 +243,48 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
     }
   }, [selectedRange])
 
+  useEffect(() => {
+    if (!selectedRange) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return
+      }
+
+      setContextMenuPosition(null)
+      onSelectedRangeChange?.(null)
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+
+      if (!(target instanceof Element)) {
+        return
+      }
+
+      if (selectionSurfaceRef.current?.contains(target) || contextMenuRef.current?.contains(target)) {
+        return
+      }
+
+      if (target.closest('[data-keep-playback-selection="true"]')) {
+        return
+      }
+
+      setContextMenuPosition(null)
+      onSelectedRangeChange?.(null)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('pointerdown', handlePointerDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [onSelectedRangeChange, selectedRange])
+
   const frameFromClientX = useCallback((clientX: number) => {
     const bounds = selectionSurfaceRef.current?.getBoundingClientRect()
 
@@ -261,10 +310,14 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       return
     }
 
+    if ('setPointerCapture' in event.currentTarget) {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    }
     setContextMenuPosition(null)
     setSelectionAnchorX(event.clientX)
     setSelectionAnchorFrame(frameFromClientX(event.clientX))
-  }, [frameFromClientX])
+    onSelectionStart?.()
+  }, [frameFromClientX, onSelectionStart])
 
   const handleSelectionPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (selectionAnchorFrame === null || selectionAnchorX === null) {
@@ -283,18 +336,28 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       return
     }
 
+    if ('hasPointerCapture' in event.currentTarget && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+
     const pointerFrame = frameFromClientX(event.clientX)
     const pointerDistance = selectionAnchorX === null ? 0 : Math.abs(event.clientX - selectionAnchorX)
 
     if (pointerDistance < 4) {
       setCurrentFrame(pointerFrame)
     } else {
-      updateSelectedRange(selectionAnchorFrame, pointerFrame)
+      const nextRange: [number, number] = [
+        Math.min(selectionAnchorFrame, pointerFrame),
+        Math.max(selectionAnchorFrame, pointerFrame),
+      ]
+
+      updateSelectedRange(nextRange[0], nextRange[1])
+      onSelectionComplete?.(nextRange)
     }
 
     setSelectionAnchorFrame(null)
     setSelectionAnchorX(null)
-  }, [frameFromClientX, selectionAnchorFrame, selectionAnchorX, setCurrentFrame, updateSelectedRange])
+  }, [frameFromClientX, onSelectionComplete, selectionAnchorFrame, selectionAnchorX, setCurrentFrame, updateSelectedRange])
 
   const handleSelectionContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!selectedRange || !selectionSurfaceRef.current) {
@@ -513,6 +576,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
         <div
           ref={selectionSurfaceRef}
           data-testid="trajectory-selection-surface"
+          data-keep-playback-selection="true"
           className="absolute inset-0 z-10 cursor-crosshair"
           onContextMenu={handleSelectionContextMenu}
           onPointerDown={handleSelectionPointerDown}
@@ -527,6 +591,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
           )}
           {contextMenuPosition && selectedRange && (
             <div
+              ref={contextMenuRef}
+              data-keep-playback-selection="true"
               className="absolute z-20 rounded-md border bg-popover p-1 shadow-md"
               style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
               onContextMenu={(event) => event.preventDefault()}

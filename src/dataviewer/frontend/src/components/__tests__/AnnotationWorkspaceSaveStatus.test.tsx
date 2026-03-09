@@ -9,6 +9,7 @@ let mockAvailableLabels = ['SUCCESS', 'FAILURE', 'PARTIAL']
 let mockLabelsLoaded = true
 let mockEpisodeIndex = 0
 let mockHasEdits = false
+let mockIsPlaying = false
 const mockInitializeEdit = vi.fn()
 const mockResetEdits = vi.fn()
 const mockSaveEpisodeDraft = vi.fn()
@@ -33,7 +34,43 @@ vi.mock('@/components/annotation-panel', () => ({
 }))
 
 vi.mock('@/components/episode-viewer', () => ({
-  TrajectoryPlot: () => <div>Trajectory Plot</div>,
+  TrajectoryPlot: (props: Record<string, unknown>) => {
+    const plotProps = props as {
+      selectedRange?: [number, number] | null
+      onSelectedRangeChange?: (range: [number, number] | null) => void
+      onSelectionStart?: () => void
+      onSelectionComplete?: (range: [number, number]) => void
+    }
+
+    return (
+      <div>
+        <div>Trajectory Plot</div>
+        <div>
+          {plotProps.selectedRange
+            ? `Selected range ${plotProps.selectedRange[0]}-${plotProps.selectedRange[1]}`
+            : 'No selected range'}
+        </div>
+        <button type="button" onClick={() => plotProps.onSelectedRangeChange?.([2, 6])}>
+          Select Range Draft
+        </button>
+        <button type="button" onClick={() => plotProps.onSelectionStart?.()}>
+          Start Range Drag
+        </button>
+        <button type="button" onClick={() => plotProps.onSelectionComplete?.([2, 6])}>
+          Finish Range Drag
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            plotProps.onSelectedRangeChange?.([2, 6])
+            plotProps.onSelectionComplete?.([2, 6])
+          }}
+        >
+          Finish Range Drag
+        </button>
+      </div>
+    )
+  },
 }))
 
 vi.mock('@/components/export', () => ({
@@ -139,7 +176,7 @@ vi.mock('@/stores', () => ({
     }),
   usePlaybackControls: () => ({
     currentFrame: 0,
-    isPlaying: false,
+    isPlaying: mockIsPlaying,
     playbackSpeed: 1,
     setCurrentFrame: mockSetCurrentFrame,
     togglePlayback: mockTogglePlayback,
@@ -172,7 +209,13 @@ describe('AnnotationWorkspace save status', () => {
     mockLabelsLoaded = true
     mockEpisodeIndex = 0
     mockHasEdits = false
+    mockIsPlaying = false
     mockSaveEpisodeLabels.mockReset()
+    mockSetCurrentFrame.mockReset()
+    mockTogglePlayback.mockReset()
+    mockSetPlaybackSpeed.mockReset()
+    mockSetAutoPlay.mockReset()
+    mockSetAutoLoop.mockReset()
     mockSaveEpisodeLabels.mockImplementation(async ({ episodeIdx, labels }: { episodeIdx: number; labels: string[] }) => {
       mockEpisodeLabels = { ...mockEpisodeLabels, [episodeIdx]: labels }
       mockSavedEpisodeLabels = { ...mockSavedEpisodeLabels, [episodeIdx]: labels }
@@ -341,6 +384,45 @@ describe('AnnotationWorkspace save status', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
 
     expect(screen.getByText('Subtask List')).toBeInTheDocument()
+  })
+
+  it('clears a draft graph selection when Escape is pressed', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: /select range draft/i }))
+
+    expect(screen.getByRole('button', { name: /clear selection/i })).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.queryByRole('button', { name: /clear selection/i })).not.toBeInTheDocument()
+  })
+
+  it('pauses during graph range selection and resumes from the selection start when playback was already running', () => {
+    mockIsPlaying = true
+
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: /start range drag/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /finish range drag/i })[1])
+
+    expect(mockTogglePlayback).toHaveBeenCalledTimes(2)
+    expect(mockSetCurrentFrame).toHaveBeenLastCalledWith(2)
+  })
+
+  it('keeps playback paused after a graph range selection when playback was already paused', () => {
+    mockIsPlaying = false
+
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: /start range drag/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /finish range drag/i })[1])
+
+    expect(mockTogglePlayback).not.toHaveBeenCalled()
+    expect(mockSetCurrentFrame).toHaveBeenLastCalledWith(2)
   })
 
   it('uses compact playback controls in the trajectory viewer tab', () => {

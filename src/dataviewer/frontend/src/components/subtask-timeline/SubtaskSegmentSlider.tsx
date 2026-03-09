@@ -21,6 +21,8 @@ interface SubtaskSegmentSliderProps {
   onClick?: () => void;
   /** Additional CSS classes */
   className?: string;
+  /** Whether the segment is the active selection */
+  isActive?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export function SubtaskSegmentSlider({
   onRangeChange,
   onClick,
   className,
+  isActive = false,
 }: SubtaskSegmentSliderProps) {
   const handleValueChange = useCallback(
     (values: number[]) => {
@@ -70,7 +73,10 @@ export function SubtaskSegmentSlider({
     >
       <SliderTrack className="h-full w-full rounded-sm bg-transparent">
         <SliderRange
-          className="absolute h-full rounded-sm cursor-pointer transition-opacity hover:opacity-90"
+          className={cn(
+            'absolute h-full rounded-sm cursor-pointer transition-opacity hover:opacity-90',
+            isActive && 'ring-2 ring-primary ring-offset-1 ring-offset-background',
+          )}
           style={{ backgroundColor: segment.color }}
           onClick={onClick}
         />

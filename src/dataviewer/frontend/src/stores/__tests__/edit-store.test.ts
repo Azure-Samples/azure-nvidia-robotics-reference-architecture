@@ -1,5 +1,7 @@
+import { waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { clearPersistedEditDraftsForTests } from '@/lib/edit-draft-storage'
 import type { FrameInsertion } from '@/types/episode-edit'
 
 import {
@@ -99,7 +101,8 @@ describe('edit-store pure functions', () => {
 })
 
 describe('useEditStore', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearPersistedEditDraftsForTests()
     useEditStore.getState().clear()
   })
 
@@ -297,6 +300,34 @@ describe('useEditStore', () => {
       useEditStore.getState().initializeEdit('ds-1', 0)
       expect(useEditStore.getState().removedFrames.has(5)).toBe(true)
       expect(useEditStore.getState().isDirty).toBe(false)
+    })
+
+    it('restores a saved draft after the in-memory store is cleared', async () => {
+      useEditStore.getState().initializeEdit('ds-1', 0)
+      useEditStore.getState().toggleFrameRemoval(5)
+      useEditStore.getState().addSubtaskFromRange(10, 20)
+      useEditStore.getState().saveEpisodeDraft()
+
+      useEditStore.getState().clear()
+      useEditStore.getState().initializeEdit('ds-1', 0)
+
+      await waitFor(() => {
+        expect(useEditStore.getState().removedFrames.has(5)).toBe(true)
+        expect(useEditStore.getState().subtasks).toHaveLength(1)
+      })
+    })
+
+    it('restores in-progress edits after the in-memory store is cleared without an explicit save', async () => {
+      useEditStore.getState().initializeEdit('ds-1', 2)
+      useEditStore.getState().addSubtaskFromRange(15, 30)
+
+      useEditStore.getState().clear()
+      useEditStore.getState().initializeEdit('ds-1', 2)
+
+      await waitFor(() => {
+        expect(useEditStore.getState().subtasks).toHaveLength(1)
+        expect(useEditStore.getState().subtasks[0]?.frameRange).toEqual([15, 30])
+      })
     })
 
     it('resetEdits clears subtasks, transforms, and trajectory adjustments', () => {

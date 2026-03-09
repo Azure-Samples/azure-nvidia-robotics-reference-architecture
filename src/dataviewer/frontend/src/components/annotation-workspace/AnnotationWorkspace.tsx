@@ -69,10 +69,13 @@ export function AnnotationWorkspace({
   const currentFrameRef = useRef(0);
   const originalFrameIndexRef = useRef<number | null>(null);
   const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldResumeAfterSelectionRef = useRef(false);
+  const shouldAutoPlayOnMetadataLoadRef = useRef(false);
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
+  const [activeTab, setActiveTab] = useState('episode');
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
@@ -287,20 +290,38 @@ export function AnnotationWorkspace({
   );
   const playbackRangeStart = playbackRange[0];
   const playbackRangeEnd = playbackRange[1];
+  const playbackRangeLabel = selectedSubtaskId ? 'Active subtask range' : selectedRange ? 'Draft selection range' : null;
+  const playbackRangeHighlight = useMemo(() => {
+    if (!activePlaybackRange || totalFrames <= 1) {
+      return null;
+    }
+
+    const total = Math.max(totalFrames - 1, 1);
+    const left = (playbackRangeStart / total) * 100;
+    const width = ((Math.max(playbackRangeEnd - playbackRangeStart, 0) + 1) / (total + 1)) * 100;
+
+    return {
+      left: `${left}%`,
+      width: `${Math.max(width, 0.5)}%`,
+    };
+  }, [activePlaybackRange, playbackRangeEnd, playbackRangeStart, totalFrames]);
 
   const setFrameWithinPlaybackRange = useCallback((frame: number) => {
     setCurrentFrame(clampFrameToPlaybackRange(frame, totalFrames, activePlaybackRange));
   }, [activePlaybackRange, setCurrentFrame, totalFrames]);
 
   const clearPlaybackSelection = useCallback(() => {
+    shouldResumeAfterSelectionRef.current = false;
     setSelectedSubtaskId(null);
     setSelectedRange(null);
   }, []);
 
   const handleSubtaskSelectionChange = useCallback((id: string | null) => {
     setSelectedSubtaskId(id);
+    shouldResumeAfterSelectionRef.current = false;
 
     if (!id) {
+      setSelectedRange(null);
       return;
     }
 
@@ -315,10 +336,41 @@ export function AnnotationWorkspace({
   const handleCreateSubtaskFromRange = useCallback((range: [number, number]) => {
     const nextSegment = createDefaultSubtask(range, subtasks);
     addSubtask(nextSegment);
+    shouldResumeAfterSelectionRef.current = false;
     setSelectedRange(null);
     setSelectedSubtaskId(nextSegment.id);
     setCurrentFrame(nextSegment.frameRange[0]);
   }, [addSubtask, setCurrentFrame, subtasks]);
+
+  const handleDraftRangeChange = useCallback((range: [number, number] | null) => {
+    if (!range) {
+      shouldResumeAfterSelectionRef.current = false;
+    }
+
+    setSelectedSubtaskId(null);
+    setSelectedRange(range);
+  }, []);
+
+  const handleSelectionStart = useCallback(() => {
+    shouldResumeAfterSelectionRef.current = isPlaying;
+
+    if (isPlaying) {
+      togglePlayback();
+    }
+  }, [isPlaying, togglePlayback]);
+
+  const handleSelectionComplete = useCallback((range: [number, number]) => {
+    const shouldResume = shouldResumeAfterSelectionRef.current;
+
+    setSelectedSubtaskId(null);
+    setSelectedRange(range);
+    setCurrentFrame(range[0]);
+    shouldResumeAfterSelectionRef.current = false;
+
+    if (shouldResume) {
+      togglePlayback();
+    }
+  }, [setCurrentFrame, togglePlayback]);
 
   // Resolve the first available camera from episode video URLs
   const cameraName = useMemo(() => {
@@ -336,7 +388,12 @@ export function AnnotationWorkspace({
   useEffect(() => {
     setSelectedSubtaskId(null);
     setSelectedRange(null);
+    shouldResumeAfterSelectionRef.current = false;
   }, [currentDataset?.id, currentEpisode?.meta.index]);
+
+  useEffect(() => {
+    shouldAutoPlayOnMetadataLoadRef.current = autoPlay;
+  }, [autoPlay, currentDataset?.id, currentEpisode?.meta.index]);
 
   useEffect(() => {
     if (selectedSubtaskId && !activeSubtask) {
@@ -355,6 +412,26 @@ export function AnnotationWorkspace({
       setCurrentFrame(clampedFrame);
     }
   }, [activePlaybackRange, currentFrame, setCurrentFrame, totalFrames]);
+
+  useEffect(() => {
+    if (!selectedRange) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      clearPlaybackSelection();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [clearPlaybackSelection, selectedRange]);
 
   // Build frame image URL (only used when paused for frame-accurate view)
   const frameImageUrl = useMemo(() => {
@@ -417,11 +494,15 @@ export function AnnotationWorkspace({
   // Track video duration for accurate frame↔time mapping
   const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLVideoElement>) => {
     setVideoDuration(e.currentTarget.duration);
-    // Auto-play when video loads and autoPlay is enabled
-    if (autoPlay && !isPlaying) {
+    if (isPlaying) {
+      return;
+    }
+
+    if (shouldAutoPlayOnMetadataLoadRef.current) {
+      shouldAutoPlayOnMetadataLoadRef.current = false;
       togglePlayback();
     }
-  }, [autoPlay, isPlaying, togglePlayback]);
+  }, [isPlaying, togglePlayback]);
 
   // Sync play/pause and playback speed to native video element.
   // Reads currentFrame/originalFrameIndex from refs to avoid re-triggering
@@ -468,7 +549,7 @@ export function AnnotationWorkspace({
     const tick = () => {
       const video = videoRef.current;
       if (video) {
-        const nextFrame = Math.round(video.currentTime * fps);
+        const nextFrame = Math.floor(video.currentTime * fps);
         const resolved = resolvePlaybackTick(nextFrame, totalFrames, activePlaybackRange, autoLoop);
 
         if (resolved.frame !== lastFrame) {
@@ -480,6 +561,7 @@ export function AnnotationWorkspace({
           if (isPlaying) {
             togglePlayback();
           }
+          video.currentTime = resolved.frame / fps;
           video.pause();
           return;
         }
@@ -535,10 +617,14 @@ export function AnnotationWorkspace({
         <SubtaskList
           selectedSubtaskId={selectedSubtaskId}
           onSelectionChange={handleSubtaskSelectionChange}
+          draftRange={selectedRange}
+          maxFrame={Math.max(totalFrames - 1, 0)}
+          onDraftRangeChange={handleDraftRangeChange}
+          onCreateSubtaskFromRange={handleCreateSubtaskFromRange}
         />
       </CardContent>
     </Card>
-  ), [handleSubtaskSelectionChange, selectedSubtaskId]);
+  ), [handleCreateSubtaskFromRange, handleDraftRangeChange, handleSubtaskSelectionChange, selectedRange, selectedSubtaskId, totalFrames]);
 
   const renderPlaybackCard = useCallback((compact = false) => (
     <Card className={compact ? 'h-full min-h-0' : 'flex-shrink-0'}>
@@ -754,14 +840,31 @@ export function AnnotationWorkspace({
             )
           }
           slider={
-            <input
-              type="range"
-              min={playbackRangeStart}
-              max={playbackRangeEnd}
-              value={currentFrame}
-              onChange={(e) => setFrameWithinPlaybackRange(parseInt(e.target.value, 10))}
-              className="w-full"
-            />
+            <div className="space-y-1">
+              <div className="relative">
+                {playbackRangeHighlight && (
+                  <div className="pointer-events-none absolute inset-y-1 left-0 right-0 rounded bg-muted/60">
+                    <div
+                      className="absolute inset-y-0 rounded bg-primary/20"
+                      style={playbackRangeHighlight}
+                    />
+                  </div>
+                )}
+                <input
+                  type="range"
+                  min={playbackRangeStart}
+                  max={playbackRangeEnd}
+                  value={currentFrame}
+                  onChange={(e) => setFrameWithinPlaybackRange(parseInt(e.target.value, 10))}
+                  className="relative z-10 w-full"
+                />
+              </div>
+              {playbackRangeLabel && (
+                <p className="text-xs text-muted-foreground">
+                  {playbackRangeLabel}: frames {playbackRangeStart} to {playbackRangeEnd}
+                </p>
+              )}
+            </div>
           }
         />
       </CardContent>
@@ -782,6 +885,8 @@ export function AnnotationWorkspace({
     setAutoLoop,
     setAutoPlay,
     playbackRangeEnd,
+    playbackRangeHighlight,
+    playbackRangeLabel,
     playbackRangeStart,
     setPlaybackSpeed,
     setFrameWithinPlaybackRange,
@@ -811,7 +916,7 @@ export function AnnotationWorkspace({
   return (
     <div className="flex h-full flex-col gap-2.5 px-3 py-2">
       {/* Main tabbed content area */}
-      <Tabs defaultValue="episode" className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between gap-3" data-testid="workspace-top-bar">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex min-w-0 items-center gap-2">
@@ -971,15 +1076,10 @@ export function AnnotationWorkspace({
                 <TrajectoryPlot
                   className="flex-1 min-h-[280px]"
                   selectedRange={selectedRange}
-                  onSelectedRangeChange={(range) => {
-                    setSelectedSubtaskId(null);
-                    setSelectedRange(range);
-
-                    if (range) {
-                      setCurrentFrame(range[0]);
-                    }
-                  }}
+                  onSelectedRangeChange={handleDraftRangeChange}
                   onCreateSubtaskFromRange={handleCreateSubtaskFromRange}
+                  onSelectionStart={handleSelectionStart}
+                  onSelectionComplete={handleSelectionComplete}
                 />
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
@@ -999,6 +1099,8 @@ export function AnnotationWorkspace({
                   <SubtaskTimelineTrack
                     totalFrames={totalFrames}
                     editable
+                    selectedSegmentId={selectedSubtaskId}
+                    draftRange={selectedRange}
                     onSegmentClick={(segment) => handleSubtaskSelectionChange(segment.id)}
                   />
                 </div>

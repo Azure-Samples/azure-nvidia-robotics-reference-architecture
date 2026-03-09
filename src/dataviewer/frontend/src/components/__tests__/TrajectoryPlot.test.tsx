@@ -307,6 +307,45 @@ describe('TrajectoryPlot', () => {
     expect(handleCreateSubtask).toHaveBeenCalledWith([2, 6])
   })
 
+  it('clears the current graph selection when Escape is pressed', () => {
+    const handleRangeSelectionChange = vi.fn()
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot
+          className="h-full"
+          selectedRange={[2, 6]}
+          onSelectedRangeChange={handleRangeSelectionChange}
+        />
+      </div>,
+    )
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(handleRangeSelectionChange).toHaveBeenCalledWith(null)
+  })
+
+  it('clears a draft graph selection when the user clicks outside the graph', () => {
+    const handleRangeSelectionChange = vi.fn()
+
+    render(
+      <div>
+        <button type="button">Outside</button>
+        <div style={{ width: 600, height: 300 }}>
+          <TrajectoryPlot
+            className="h-full"
+            selectedRange={[2, 6]}
+            onSelectedRangeChange={handleRangeSelectionChange}
+          />
+        </div>
+      </div>,
+    )
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Outside' }))
+
+    expect(handleRangeSelectionChange).toHaveBeenCalledWith(null)
+  })
+
   it('keeps graph pointer handlers from swallowing a context-menu create click', () => {
     const handleCreateSubtask = vi.fn()
 

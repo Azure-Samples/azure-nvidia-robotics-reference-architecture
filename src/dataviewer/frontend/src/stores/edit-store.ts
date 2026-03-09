@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 
+import { loadPersistedEditDraft, persistEditDraft } from '@/lib/edit-draft-storage';
 import type {
   EpisodeEditOperations,
   FrameInsertion,
@@ -388,8 +389,11 @@ export const useEditStore = create<EditStore>()(
     (set, get) => ({
       ...initialState,
 
+
+
       initializeEdit: (datasetId, episodeIndex) => {
-        const savedDraft = get().savedEpisodeDrafts[getEpisodeDraftKey(datasetId, episodeIndex)];
+        const draftKey = getEpisodeDraftKey(datasetId, episodeIndex);
+        const savedDraft = get().savedEpisodeDrafts[draftKey];
 
         if (savedDraft) {
           get().loadEditOperations(savedDraft);
@@ -417,6 +421,31 @@ export const useEditStore = create<EditStore>()(
           false,
           'initializeEdit'
         );
+
+        void loadPersistedEditDraft(datasetId, episodeIndex).then((persistedDraft) => {
+          if (!persistedDraft) {
+            return;
+          }
+
+          const currentState = get();
+
+          if (currentState.datasetId !== datasetId || currentState.episodeIndex !== episodeIndex) {
+            return;
+          }
+
+          set(
+            (state) => ({
+              savedEpisodeDrafts: {
+                ...state.savedEpisodeDrafts,
+                [draftKey]: persistedDraft,
+              },
+            }),
+            false,
+            'hydratePersistedEpisodeDraft'
+          );
+
+          get().loadEditOperations(persistedDraft);
+        });
       },
 
       loadEditOperations: (ops) => {
@@ -455,6 +484,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'loadEditOperations'
         );
+
+        void persistEditDraft(
+          ops.datasetId,
+          ops.episodeIndex,
+          hasEditContent(ops) ? ops : null,
+        );
       },
 
       setGlobalTransform: (transform) => {
@@ -466,6 +501,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'setGlobalTransform'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       setCameraTransform: (camera, transform) => {
@@ -483,6 +524,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'setCameraTransform'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       clearTransforms: () => {
@@ -498,6 +545,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'clearTransforms'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       toggleFrameRemoval: (frameIndex) => {
@@ -515,6 +568,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'toggleFrameRemoval'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       addFrameRange: (start, end) => {
@@ -530,6 +589,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'addFrameRange'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       addFramesByFrequency: (start, end, frequency) => {
@@ -545,6 +610,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'addFramesByFrequency'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       removeFrameRange: (start, end) => {
@@ -560,6 +631,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'removeFrameRange'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       clearRemovedFrames: () => {
@@ -571,6 +648,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'clearRemovedFrames'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       insertFrame: (afterFrameIndex, factor = 0.5) => {
@@ -587,6 +670,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'insertFrame'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       removeInsertedFrame: (afterFrameIndex) => {
@@ -600,6 +689,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'removeInsertedFrame'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       clearInsertedFrames: () => {
@@ -611,6 +706,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'clearInsertedFrames'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       addSubtask: (segment) => {
@@ -627,6 +728,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'addSubtask'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       addSubtaskFromRange: (start, end) => {
@@ -651,6 +758,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'updateSubtask'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       removeSubtask: (id) => {
@@ -667,6 +780,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'removeSubtask'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       reorderSubtasks: (fromIndex, toIndex) => {
@@ -681,6 +800,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'reorderSubtasks'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       setTrajectoryAdjustment: (frameIndex, adjustment) => {
@@ -694,6 +819,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'setTrajectoryAdjustment'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       removeTrajectoryAdjustment: (frameIndex) => {
@@ -707,6 +838,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'removeTrajectoryAdjustment'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       getTrajectoryAdjustment: (frameIndex) => {
@@ -722,6 +859,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'clearTrajectoryAdjustments'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       getEditOperations: () => {
@@ -729,18 +872,23 @@ export const useEditStore = create<EditStore>()(
       },
 
       saveEpisodeDraft: () => {
+        const currentState = get();
+        const operations = buildEditOperations(currentState);
+        const datasetId = currentState.datasetId;
+        const episodeIndex = currentState.episodeIndex;
+
+        if (!operations || !datasetId || episodeIndex === null) {
+          return;
+        }
+
+        const shouldPersistDraft = hasEditContent(operations) ? operations : null;
+
         set(
           (state) => {
-            const operations = buildEditOperations(state);
-
-            if (!operations || !state.datasetId || state.episodeIndex === null) {
-              return state;
-            }
-
-            const draftKey = getEpisodeDraftKey(state.datasetId, state.episodeIndex);
+            const draftKey = getEpisodeDraftKey(datasetId, episodeIndex);
             const nextSavedEpisodeDrafts = { ...state.savedEpisodeDrafts };
 
-            if (hasEditContent(operations)) {
+            if (shouldPersistDraft) {
               nextSavedEpisodeDrafts[draftKey] = operations;
             } else {
               delete nextSavedEpisodeDrafts[draftKey];
@@ -755,6 +903,8 @@ export const useEditStore = create<EditStore>()(
           false,
           'saveEpisodeDraft'
         );
+
+        void persistEditDraft(datasetId, episodeIndex, shouldPersistDraft);
       },
 
       markSaved: () => {
@@ -766,6 +916,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'markSaved'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       resetEdits: () => {
@@ -787,6 +943,12 @@ export const useEditStore = create<EditStore>()(
           false,
           'resetEdits'
         );
+
+        const nextState = get();
+        const operations = buildEditOperations(nextState);
+        if (nextState.datasetId && nextState.episodeIndex !== null) {
+          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
+        }
       },
 
       clear: () => {
