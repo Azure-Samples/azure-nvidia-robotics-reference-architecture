@@ -7,6 +7,7 @@ import {
   computeSyncAction,
   needsSeekBeforePlay,
   resolvePlaybackTick,
+  shouldLoopActivePlaybackRange,
 } from '../playback-utils'
 
 describe('computeEffectiveFps', () => {
@@ -218,6 +219,20 @@ describe('computeSyncAction', () => {
     if (action.kind === 'seek-and-play') {
       expect(action.seekTo).toBeCloseTo(150 / fps, 5)
     }
+  })
+})
+
+describe('shouldLoopActivePlaybackRange', () => {
+  it('loops when autoLoop is enabled', () => {
+    expect(shouldLoopActivePlaybackRange(null, true)).toBe(true)
+  })
+
+  it('loops when an active playback range exists even if autoLoop is disabled', () => {
+    expect(shouldLoopActivePlaybackRange([10, 20], false)).toBe(true)
+  })
+
+  it('does not loop full-episode playback when autoLoop is disabled', () => {
+    expect(shouldLoopActivePlaybackRange(null, false)).toBe(false)
   })
 })
 

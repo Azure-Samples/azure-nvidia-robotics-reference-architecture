@@ -56,6 +56,13 @@ export function resolvePlaybackTick(
   return { frame: end, shouldStop: true }
 }
 
+export function shouldLoopActivePlaybackRange(
+  range: PlaybackRange | null,
+  autoLoop: boolean,
+): boolean {
+  return autoLoop || !!range
+}
+
 /**
  * Derive effective fps from the video element's actual duration.
  *

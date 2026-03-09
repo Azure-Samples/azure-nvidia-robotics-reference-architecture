@@ -21,6 +21,7 @@ import {
   computeSyncAction,
   resolvePlaybackRange,
   resolvePlaybackTick,
+  shouldLoopActivePlaybackRange,
 } from '@/lib/playback-utils';
 import {
   useDatasetStore,
@@ -196,7 +197,6 @@ export function AnnotationWorkspace({
     advanceToNextEpisode();
   }, [announceSave, canGoNextEpisode, currentDataset, currentEpisode, currentEpisodeLabels, hasEdits, hasLabelChanges, hasPendingEpisodeChanges, onNextEpisode, onSaveAndNextEpisode, saveEpisodeDraft, saveEpisodeLabels]);
 
-  // Combined CSS filter: viewer display adjustments + edit color transforms
   const displayFilter = useMemo(
     () => combineCssFilters(
       displayAdjustment, displayActive,
@@ -284,6 +284,10 @@ export function AnnotationWorkspace({
     [selectedSubtaskId, subtasks],
   );
   const activePlaybackRange = activeSubtask?.frameRange ?? selectedRange;
+  const shouldLoopPlaybackRange = useMemo(
+    () => shouldLoopActivePlaybackRange(activePlaybackRange, autoLoop),
+    [activePlaybackRange, autoLoop],
+  );
   const playbackRange = useMemo(
     () => resolvePlaybackRange(totalFrames, activePlaybackRange),
     [activePlaybackRange, totalFrames],
@@ -360,7 +364,7 @@ export function AnnotationWorkspace({
   }, [isPlaying, togglePlayback]);
 
   const handleSelectionComplete = useCallback((range: [number, number]) => {
-    const shouldResume = shouldResumeAfterSelectionRef.current;
+    const shouldResume = true;
 
     setSelectedSubtaskId(null);
     setSelectedRange(range);
@@ -491,30 +495,15 @@ export function AnnotationWorkspace({
 
   // --- Video element synchronisation ---
 
-  // Track video duration for accurate frame↔time mapping
-  const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLVideoElement>) => {
-    setVideoDuration(e.currentTarget.duration);
-    if (isPlaying) {
-      return;
-    }
-
-    if (shouldAutoPlayOnMetadataLoadRef.current) {
-      shouldAutoPlayOnMetadataLoadRef.current = false;
-      togglePlayback();
-    }
-  }, [isPlaying, togglePlayback]);
-
-  // Sync play/pause and playback speed to native video element.
-  // Reads currentFrame/originalFrameIndex from refs to avoid re-triggering
-  // on every rAF frame update, which would fight the native playbackRate.
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !videoSrc) return;
-
+  const syncVideoElementPlayback = useCallback((video: HTMLVideoElement) => {
     const action = computeSyncAction(
-      isPlaying, playbackSpeed,
-      currentFrameRef.current, totalFrames, originalFrameIndexRef.current,
-      fps, video.currentTime,
+      isPlaying,
+      playbackSpeed,
+      currentFrameRef.current,
+      totalFrames,
+      originalFrameIndexRef.current,
+      fps,
+      video.currentTime,
       playbackRangeStart,
       playbackRangeEnd,
     );
@@ -539,7 +528,33 @@ export function AnnotationWorkspace({
         video.pause();
         break;
     }
-  }, [fps, isPlaying, playbackRangeEnd, playbackRangeStart, playbackSpeed, setFrameWithinPlaybackRange, totalFrames, videoSrc]);
+  }, [fps, isPlaying, playbackRangeEnd, playbackRangeStart, playbackSpeed, setFrameWithinPlaybackRange, totalFrames]);
+
+  // Track video duration for accurate frame↔time mapping
+  const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+
+    setVideoDuration(video.duration);
+    if (isPlaying) {
+      syncVideoElementPlayback(video);
+      return;
+    }
+
+    if (shouldAutoPlayOnMetadataLoadRef.current) {
+      shouldAutoPlayOnMetadataLoadRef.current = false;
+      togglePlayback();
+    }
+  }, [isPlaying, syncVideoElementPlayback, togglePlayback]);
+
+  // Sync play/pause and playback speed to native video element.
+  // Reads currentFrame/originalFrameIndex from refs to avoid re-triggering
+  // on every rAF frame update, which would fight the native playbackRate.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoSrc) return;
+
+    syncVideoElementPlayback(video);
+  }, [syncVideoElementPlayback, videoSrc]);
 
   // During playback, drive frame counter from video.currentTime via rAF
   useEffect(() => {
@@ -550,7 +565,7 @@ export function AnnotationWorkspace({
       const video = videoRef.current;
       if (video) {
         const nextFrame = Math.floor(video.currentTime * fps);
-        const resolved = resolvePlaybackTick(nextFrame, totalFrames, activePlaybackRange, autoLoop);
+        const resolved = resolvePlaybackTick(nextFrame, totalFrames, activePlaybackRange, shouldLoopPlaybackRange);
 
         if (resolved.frame !== lastFrame) {
           lastFrame = resolved.frame;
@@ -574,7 +589,7 @@ export function AnnotationWorkspace({
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [activePlaybackRange, autoLoop, fps, isPlaying, setCurrentFrame, togglePlayback, totalFrames]);
+  }, [activePlaybackRange, fps, isPlaying, setCurrentFrame, shouldLoopPlaybackRange, togglePlayback, totalFrames]);
 
   // When paused, seek video to match store frame (slider scrub / step buttons)
   useEffect(() => {
@@ -588,7 +603,7 @@ export function AnnotationWorkspace({
 
   // When the video ends, loop or stop based on autoLoop setting
   const handleVideoEnded = useCallback(() => {
-    if (autoLoop) {
+    if (shouldLoopPlaybackRange) {
       // Restart directly — the sync effect won't re-trigger since isPlaying
       // hasn't changed, so we must seek and play the video element ourselves.
       const video = videoRef.current;
@@ -601,7 +616,7 @@ export function AnnotationWorkspace({
       if (isPlaying) togglePlayback();
       setFrameWithinPlaybackRange(playbackRangeEnd);
     }
-  }, [autoLoop, fps, isPlaying, playbackRangeEnd, playbackRangeStart, setFrameWithinPlaybackRange, togglePlayback]);
+  }, [fps, isPlaying, playbackRangeEnd, playbackRangeStart, setFrameWithinPlaybackRange, shouldLoopPlaybackRange, togglePlayback]);
 
   // Step forward / backward one frame (when paused)
   const stepFrame = useCallback(
@@ -680,11 +695,12 @@ export function AnnotationWorkspace({
           )}
         </div>
 
-        <PlaybackControlStrip
-          currentFrame={currentFrame}
-          totalFrames={totalFrames}
-          className={compact ? 'mt-2' : 'mt-3'}
-          controls={
+        <div data-keep-playback-selection="true">
+          <PlaybackControlStrip
+            currentFrame={currentFrame}
+            totalFrames={totalFrames}
+            className={compact ? 'mt-2' : 'mt-3'}
+            controls={
             compact ? (
               <div data-testid="trajectory-compact-controls" className="flex w-full items-center justify-between gap-2">
                 <div className="flex shrink-0 items-center gap-1">
@@ -838,35 +854,36 @@ export function AnnotationWorkspace({
                 </div>
               </>
             )
-          }
-          slider={
-            <div className="space-y-1">
-              <div className="relative">
-                {playbackRangeHighlight && (
-                  <div className="pointer-events-none absolute inset-y-1 left-0 right-0 rounded bg-muted/60">
-                    <div
-                      className="absolute inset-y-0 rounded bg-primary/20"
-                      style={playbackRangeHighlight}
-                    />
-                  </div>
+            }
+            slider={
+              <div className="space-y-1">
+                <div className="relative">
+                  {playbackRangeHighlight && (
+                    <div className="pointer-events-none absolute inset-y-1 left-0 right-0 rounded bg-muted/60">
+                      <div
+                        className="absolute inset-y-0 rounded bg-primary/20"
+                        style={playbackRangeHighlight}
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="range"
+                    min={playbackRangeStart}
+                    max={playbackRangeEnd}
+                    value={currentFrame}
+                    onChange={(e) => setFrameWithinPlaybackRange(parseInt(e.target.value, 10))}
+                    className="relative z-10 w-full"
+                  />
+                </div>
+                {playbackRangeLabel && (
+                  <p className="text-xs text-muted-foreground">
+                    {playbackRangeLabel}: frames {playbackRangeStart} to {playbackRangeEnd}
+                  </p>
                 )}
-                <input
-                  type="range"
-                  min={playbackRangeStart}
-                  max={playbackRangeEnd}
-                  value={currentFrame}
-                  onChange={(e) => setFrameWithinPlaybackRange(parseInt(e.target.value, 10))}
-                  className="relative z-10 w-full"
-                />
               </div>
-              {playbackRangeLabel && (
-                <p className="text-xs text-muted-foreground">
-                  {playbackRangeLabel}: frames {playbackRangeStart} to {playbackRangeEnd}
-                </p>
-              )}
-            </div>
-          }
-        />
+            }
+          />
+        </div>
       </CardContent>
     </Card>
   ), [

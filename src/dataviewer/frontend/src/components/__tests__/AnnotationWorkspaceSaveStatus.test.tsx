@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace'
 
+const { mockComputeSyncAction } = vi.hoisted(() => ({
+  mockComputeSyncAction: vi.fn<() => { kind: string; playbackRate?: number }>(() => ({ kind: 'pause' })),
+}))
+
 let mockEpisodeLabels: Record<number, string[]> = { 0: ['SUCCESS'] }
 let mockSavedEpisodeLabels: Record<number, string[]> = { 0: ['SUCCESS'] }
 let mockAvailableLabels = ['SUCCESS', 'FAILURE', 'PARTIAL']
@@ -10,6 +14,10 @@ let mockLabelsLoaded = true
 let mockEpisodeIndex = 0
 let mockHasEdits = false
 let mockIsPlaying = false
+let mockAutoPlay = false
+let mockAutoLoop = false
+let playSpy: ReturnType<typeof vi.spyOn>
+let pauseSpy: ReturnType<typeof vi.spyOn>
 const mockInitializeEdit = vi.fn()
 const mockResetEdits = vi.fn()
 const mockSaveEpisodeDraft = vi.fn()
@@ -115,9 +123,10 @@ vi.mock('@/lib/css-filters', () => ({
 vi.mock('@/lib/playback-utils', () => ({
   clampFrameToPlaybackRange: (frame: number) => frame,
   computeEffectiveFps: () => 30,
-  computeSyncAction: () => ({ kind: 'pause' }),
+  computeSyncAction: mockComputeSyncAction,
   resolvePlaybackRange: (totalFrames: number) => [0, totalFrames - 1],
   resolvePlaybackTick: (frame: number) => ({ frame, shouldStop: false }),
+  shouldLoopActivePlaybackRange: (range: [number, number] | null, autoLoop: boolean) => autoLoop || !!range,
 }))
 
 vi.mock('@/hooks/use-labels', () => ({
@@ -170,7 +179,7 @@ vi.mock('@/stores', () => ({
     selector({
       currentEpisode: {
         meta: { index: mockEpisodeIndex, length: 12 },
-        videoUrls: undefined,
+        videoUrls: { main: '/video.mp4' },
         trajectoryData: undefined,
       },
     }),
@@ -183,8 +192,8 @@ vi.mock('@/stores', () => ({
     setPlaybackSpeed: mockSetPlaybackSpeed,
   }),
   usePlaybackSettings: () => ({
-    autoPlay: false,
-    autoLoop: false,
+    autoPlay: mockAutoPlay,
+    autoLoop: mockAutoLoop,
     setAutoPlay: mockSetAutoPlay,
     setAutoLoop: mockSetAutoLoop,
   }),
@@ -203,6 +212,8 @@ vi.mock('@/stores/edit-store', () => ({
 describe('AnnotationWorkspace save status', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
+    pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined)
     mockEpisodeLabels = { 0: ['SUCCESS'] }
     mockSavedEpisodeLabels = { 0: ['SUCCESS'] }
     mockAvailableLabels = ['SUCCESS', 'FAILURE', 'PARTIAL']
@@ -210,12 +221,16 @@ describe('AnnotationWorkspace save status', () => {
     mockEpisodeIndex = 0
     mockHasEdits = false
     mockIsPlaying = false
+    mockAutoPlay = false
+    mockAutoLoop = false
     mockSaveEpisodeLabels.mockReset()
     mockSetCurrentFrame.mockReset()
     mockTogglePlayback.mockReset()
     mockSetPlaybackSpeed.mockReset()
     mockSetAutoPlay.mockReset()
     mockSetAutoLoop.mockReset()
+    mockComputeSyncAction.mockReset()
+    mockComputeSyncAction.mockReturnValue({ kind: 'pause' })
     mockSaveEpisodeLabels.mockImplementation(async ({ episodeIdx, labels }: { episodeIdx: number; labels: string[] }) => {
       mockEpisodeLabels = { ...mockEpisodeLabels, [episodeIdx]: labels }
       mockSavedEpisodeLabels = { ...mockSavedEpisodeLabels, [episodeIdx]: labels }
@@ -230,6 +245,8 @@ describe('AnnotationWorkspace save status', () => {
 
   afterEach(() => {
     cleanup()
+    playSpy.mockRestore()
+    pauseSpy.mockRestore()
     vi.runOnlyPendingTimers()
     vi.useRealTimers()
   })
@@ -412,7 +429,7 @@ describe('AnnotationWorkspace save status', () => {
     expect(mockSetCurrentFrame).toHaveBeenLastCalledWith(2)
   })
 
-  it('keeps playback paused after a graph range selection when playback was already paused', () => {
+  it('auto-plays a graph range selection when playback was paused', () => {
     mockIsPlaying = false
 
     render(<AnnotationWorkspace />)
@@ -421,8 +438,38 @@ describe('AnnotationWorkspace save status', () => {
     fireEvent.click(screen.getByRole('button', { name: /start range drag/i }))
     fireEvent.click(screen.getAllByRole('button', { name: /finish range drag/i })[1])
 
-    expect(mockTogglePlayback).not.toHaveBeenCalled()
+    expect(mockTogglePlayback).toHaveBeenCalledTimes(1)
     expect(mockSetCurrentFrame).toHaveBeenLastCalledWith(2)
+  })
+
+  it('restarts playback when a remounted video finishes loading while the store is already playing', () => {
+    mockIsPlaying = true
+    mockComputeSyncAction.mockReturnValue({ kind: 'play', playbackRate: 1 })
+
+    const { container } = render(<AnnotationWorkspace />)
+    const video = container.querySelector('video')
+
+    expect(video).not.toBeNull()
+
+    Object.defineProperty(video!, 'duration', {
+      configurable: true,
+      value: 12.8,
+    })
+
+    playSpy.mockClear()
+
+    fireEvent.loadedMetadata(video!)
+
+    expect(playSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks the trajectory playback controls as keep-selection controls for draft ranges', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: /select range draft/i }))
+
+    expect(screen.getByRole('button', { name: /play playback/i }).closest('[data-keep-playback-selection="true"]')).not.toBeNull()
   })
 
   it('uses compact playback controls in the trajectory viewer tab', () => {
