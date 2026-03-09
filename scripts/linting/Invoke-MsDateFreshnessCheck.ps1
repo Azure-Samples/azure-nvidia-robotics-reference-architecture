@@ -280,7 +280,7 @@ foreach ($file in $markdownFiles) {
 
     if ($isStale) {
         Write-Verbose "Stale file detected: $relativePath ($ageDays days old)"
-        Write-CIAnnotation -Message "ms.date is $ageDays days old (threshold: $ThresholdDays days)" -Level 'Warning' -File $relativePath
+        Write-CIAnnotation -Message "${relativePath}: ms.date is $ageDays days old (threshold: $ThresholdDays days)" -Level 'Warning' -File $relativePath
     }
 }
 
@@ -291,7 +291,7 @@ if (@($results).Count -eq 0) {
 
 $report = New-MsDateReport -Results $results -Threshold $ThresholdDays
 
-Write-Host "\nms.date Freshness Check Summary:"
+Write-Host "`nms.date Freshness Check Summary:"
 Write-Host "  Files Checked: $(@($results).Count)"
 Write-Host "  Stale Files: $($report.StaleCount)"
 Write-Host "  Threshold: $ThresholdDays days"
