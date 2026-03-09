@@ -32,7 +32,7 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string[]]$Paths = @('.'),
+    [string[]]$Paths,
 
     [Parameter()]
     [switch]$ChangedFilesOnly,
@@ -47,8 +47,11 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# Hardcoded value for workflow invocations
+# Hardcoded values for workflow invocations
 $ThresholdDays = 90
+if (-not $Paths) {
+    $Paths = '.'
+}
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
 Import-Module (Join-Path $scriptRoot 'Modules' 'LintingHelpers.psm1') -Force
