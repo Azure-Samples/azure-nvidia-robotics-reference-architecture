@@ -186,6 +186,8 @@ jobs:
           use_oidc: true
           files: logs/coverage.xml
           flags: pester
+          name: pester-coverage
+          verbose: true
           fail_ci_if_error: false
 
       - name: Coverage Threshold Check
