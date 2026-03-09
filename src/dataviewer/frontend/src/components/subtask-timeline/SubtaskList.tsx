@@ -75,22 +75,6 @@ export function SubtaskList({
           <ListChecks className="h-4 w-4" />
           <h4 className="text-sm font-medium">Subtasks</h4>
         </div>
-        {(selectedSubtaskId || draftRange) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              if (selectedSubtaskId) {
-                onSelectionChange?.(null)
-                return
-              }
-
-              onDraftRangeChange?.(null)
-            }}
-          >
-            Clear
-          </Button>
-        )}
       </div>
       {draftRange && (
         <div className="mb-3 rounded-md border border-primary/40 bg-primary/5 p-3">
@@ -108,9 +92,6 @@ export function SubtaskList({
                 onClick={() => onCreateSubtaskFromRange?.(draftRange)}
               >
                 Create Subtask
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => onDraftRangeChange?.(null)}>
-                Clear
               </Button>
             </div>
           </div>

@@ -65,6 +65,8 @@ interface TrajectoryPlotProps {
   onSelectionStart?: () => void;
   /** Called after a graph drag selection is committed */
   onSelectionComplete?: (range: [number, number]) => void;
+  /** Called when the graph explicitly seeks to a frame */
+  onSeekFrame?: (frame: number) => void;
 }
 
 function applyTrajectoryAdjustment(
@@ -129,6 +131,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   onCreateSubtaskFromRange,
   onSelectionStart,
   onSelectionComplete,
+  onSeekFrame,
 }: TrajectoryPlotProps) {
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
   const setCurrentFrame = useEpisodeStore((state) => state.setCurrentFrame);
@@ -293,31 +296,10 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       onSelectedRangeChange?.(null)
     }
 
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target
-
-      if (!(target instanceof Element)) {
-        return
-      }
-
-      if (selectionSurfaceRef.current?.contains(target) || contextMenuRef.current?.contains(target)) {
-        return
-      }
-
-      if (target.closest('[data-keep-playback-selection="true"]')) {
-        return
-      }
-
-      setContextMenuPosition(null)
-      onSelectedRangeChange?.(null)
-    }
-
     window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('pointerdown', handlePointerDown)
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('pointerdown', handlePointerDown)
     }
   }, [onSelectedRangeChange, selectedRange])
 
@@ -357,7 +339,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
     setSelectionAnchorX(event.clientX)
     setSelectionAnchorFrame(anchorFrame)
     setCurrentFrame(anchorFrame)
-  }, [frameFromClientX, setCurrentFrame])
+    onSeekFrame?.(anchorFrame)
+  }, [frameFromClientX, onSeekFrame, setCurrentFrame])
 
   const handleSelectionPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (selectionAnchorFrame === null || selectionAnchorX === null) {
@@ -447,9 +430,12 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   const handleChartClick = useCallback((data: unknown) => {
     const chartData = data as { activePayload?: { payload?: { frame: number } }[] };
     if (chartData?.activePayload?.[0]?.payload?.frame !== undefined) {
-      setCurrentFrame(chartData.activePayload[0].payload.frame);
+      const frame = chartData.activePayload[0].payload.frame
+
+      setCurrentFrame(frame);
+      onSeekFrame?.(frame)
     }
-  }, [setCurrentFrame]);
+  }, [onSeekFrame, setCurrentFrame]);
 
   if (!currentEpisode) {
     return (
@@ -502,16 +488,6 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
           />
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-start">
-          {selectedRange && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onSelectedRangeChange?.(null)}
-            >
-              Clear Selection
-            </Button>
-          )}
           <button
             onClick={() => setShowVelocity(false)}
             className={cn(

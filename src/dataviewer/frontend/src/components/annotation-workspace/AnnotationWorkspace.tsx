@@ -72,6 +72,8 @@ export function AnnotationWorkspace({
   const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldResumeAfterSelectionRef = useRef(false);
   const shouldAutoPlayOnMetadataLoadRef = useRef(false);
+  const skipNextPlaybackSyncRef = useRef(false);
+  const playbackRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
@@ -132,6 +134,10 @@ export function AnnotationWorkspace({
     return () => {
       if (saveStatusTimeoutRef.current) {
         clearTimeout(saveStatusTimeoutRef.current);
+      }
+
+      if (playbackRetryTimeoutRef.current) {
+        clearTimeout(playbackRetryTimeoutRef.current);
       }
     };
   }, []);
@@ -310,9 +316,67 @@ export function AnnotationWorkspace({
     };
   }, [activePlaybackRange, playbackRangeEnd, playbackRangeStart, totalFrames]);
 
-  const setFrameWithinPlaybackRange = useCallback((frame: number) => {
-    setCurrentFrame(clampFrameToPlaybackRange(frame, totalFrames, activePlaybackRange));
-  }, [activePlaybackRange, setCurrentFrame, totalFrames]);
+  const ensureVideoPlaybackAtTime = useCallback((video: HTMLVideoElement, targetTime: number) => {
+    const playbackStartTime = Number.isFinite(video.duration)
+      ? Math.max(0, Math.min(targetTime + 0.001, Math.max(video.duration - 0.001, 0)))
+      : Math.max(0, targetTime + 0.001);
+
+    if (playbackRetryTimeoutRef.current) {
+      clearTimeout(playbackRetryTimeoutRef.current);
+      playbackRetryTimeoutRef.current = null;
+    }
+
+    video.pause();
+    video.currentTime = playbackStartTime;
+    video.playbackRate = playbackSpeed;
+    video.play().catch(() => { /* autoplay may be blocked */ });
+
+    playbackRetryTimeoutRef.current = setTimeout(() => {
+      playbackRetryTimeoutRef.current = null;
+
+      if (Math.abs(video.currentTime - playbackStartTime) <= 0.5 / fps) {
+        video.pause();
+        video.currentTime = playbackStartTime;
+        video.playbackRate = playbackSpeed;
+        video.play().catch(() => { /* autoplay may be blocked */ });
+      }
+    }, 180);
+  }, [fps, playbackSpeed]);
+
+  const seekVideoFrame = useCallback((frame: number, range: [number, number] | null, constrainToRange = true) => {
+    const nextFrame = constrainToRange
+      ? clampFrameToPlaybackRange(frame, totalFrames, range)
+      : Math.max(0, Math.min(frame, Math.max(totalFrames - 1, 0)));
+
+    setCurrentFrame(nextFrame);
+
+    const video = videoRef.current;
+
+    if (!video) {
+      return nextFrame;
+    }
+
+    const targetOriginalFrame = getOriginalIndex(nextFrame, insertedFrames, removedFrames);
+    const targetTime = (targetOriginalFrame ?? nextFrame) / fps;
+
+    if (Math.abs(video.currentTime - targetTime) > 0.5 / fps) {
+      video.currentTime = targetTime;
+    }
+
+    if (isPlaying) {
+      ensureVideoPlaybackAtTime(video, targetTime);
+    }
+
+    return nextFrame;
+  }, [ensureVideoPlaybackAtTime, fps, insertedFrames, isPlaying, removedFrames, setCurrentFrame, totalFrames]);
+
+  const setFrameWithinPlaybackRange = useCallback((frame: number, rangeOverride?: [number, number] | null) => {
+    return seekVideoFrame(frame, rangeOverride ?? activePlaybackRange, true);
+  }, [activePlaybackRange, seekVideoFrame]);
+
+  const handleGraphSeek = useCallback((frame: number) => {
+    seekVideoFrame(frame, null, false);
+  }, [seekVideoFrame]);
 
   const clearPlaybackSelection = useCallback(() => {
     shouldResumeAfterSelectionRef.current = false;
@@ -333,9 +397,9 @@ export function AnnotationWorkspace({
     const nextSegment = subtasks.find((segment) => segment.id === id);
 
     if (nextSegment) {
-      setCurrentFrame(nextSegment.frameRange[0]);
+      setFrameWithinPlaybackRange(nextSegment.frameRange[0], nextSegment.frameRange);
     }
-  }, [setCurrentFrame, subtasks]);
+  }, [setFrameWithinPlaybackRange, subtasks]);
 
   const handleCreateSubtaskFromRange = useCallback((range: [number, number]) => {
     const nextSegment = createDefaultSubtask(range, subtasks);
@@ -343,8 +407,8 @@ export function AnnotationWorkspace({
     shouldResumeAfterSelectionRef.current = false;
     setSelectedRange(null);
     setSelectedSubtaskId(nextSegment.id);
-    setCurrentFrame(nextSegment.frameRange[0]);
-  }, [addSubtask, setCurrentFrame, subtasks]);
+    setFrameWithinPlaybackRange(nextSegment.frameRange[0], nextSegment.frameRange);
+  }, [addSubtask, setFrameWithinPlaybackRange, subtasks]);
 
   const handleDraftRangeChange = useCallback((range: [number, number] | null) => {
     if (!range) {
@@ -365,16 +429,29 @@ export function AnnotationWorkspace({
 
   const handleSelectionComplete = useCallback((range: [number, number]) => {
     const shouldResume = shouldResumeAfterSelectionRef.current;
+    const nextFrame = setFrameWithinPlaybackRange(range[0], range);
 
     setSelectedSubtaskId(null);
     setSelectedRange(range);
-    setCurrentFrame(range[0]);
     shouldResumeAfterSelectionRef.current = false;
 
     if (shouldResume) {
       togglePlayback();
+
+      requestAnimationFrame(() => {
+        const video = videoRef.current;
+
+        if (!video) {
+          return;
+        }
+
+        const targetOriginalFrame = getOriginalIndex(nextFrame, insertedFrames, removedFrames);
+        const targetTime = (targetOriginalFrame ?? nextFrame) / fps;
+
+        ensureVideoPlaybackAtTime(video, targetTime);
+      });
     }
-  }, [setCurrentFrame, togglePlayback]);
+  }, [ensureVideoPlaybackAtTime, fps, insertedFrames, removedFrames, setFrameWithinPlaybackRange, togglePlayback]);
 
   // Resolve the first available camera from episode video URLs
   const cameraName = useMemo(() => {
@@ -510,25 +587,20 @@ export function AnnotationWorkspace({
 
     switch (action.kind) {
       case 'restart':
-        video.playbackRate = action.playbackRate;
         setFrameWithinPlaybackRange(playbackRangeStart);
-        video.currentTime = playbackRangeStart / fps;
-        video.play().catch(() => { /* autoplay may be blocked */ });
+        ensureVideoPlaybackAtTime(video, playbackRangeStart / fps);
         break;
       case 'seek-and-play':
-        video.playbackRate = action.playbackRate;
-        video.currentTime = action.seekTo;
-        video.play().catch(() => { /* autoplay may be blocked */ });
+        ensureVideoPlaybackAtTime(video, action.seekTo);
         break;
       case 'play':
-        video.playbackRate = action.playbackRate;
-        video.play().catch(() => { /* autoplay may be blocked */ });
+        ensureVideoPlaybackAtTime(video, video.currentTime);
         break;
       case 'pause':
         video.pause();
         break;
     }
-  }, [fps, isPlaying, playbackRangeEnd, playbackRangeStart, playbackSpeed, setFrameWithinPlaybackRange, totalFrames]);
+  }, [ensureVideoPlaybackAtTime, fps, isPlaying, playbackRangeEnd, playbackRangeStart, playbackSpeed, setFrameWithinPlaybackRange, totalFrames]);
 
   // Track video duration for accurate frame↔time mapping
   const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLVideoElement>) => {
@@ -536,6 +608,7 @@ export function AnnotationWorkspace({
 
     setVideoDuration(video.duration);
     if (isPlaying) {
+      skipNextPlaybackSyncRef.current = true;
       syncVideoElementPlayback(video);
       return;
     }
@@ -552,6 +625,11 @@ export function AnnotationWorkspace({
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
+
+    if (skipNextPlaybackSyncRef.current) {
+      skipNextPlaybackSyncRef.current = false;
+      return;
+    }
 
     syncVideoElementPlayback(video);
   }, [syncVideoElementPlayback, videoSrc]);
@@ -609,14 +687,13 @@ export function AnnotationWorkspace({
       const video = videoRef.current;
       setFrameWithinPlaybackRange(playbackRangeStart);
       if (video) {
-        video.currentTime = playbackRangeStart / fps;
-        video.play().catch(() => { /* autoplay may be blocked */ });
+        ensureVideoPlaybackAtTime(video, playbackRangeStart / fps);
       }
     } else {
       if (isPlaying) togglePlayback();
       setFrameWithinPlaybackRange(playbackRangeEnd);
     }
-  }, [fps, isPlaying, playbackRangeEnd, playbackRangeStart, setFrameWithinPlaybackRange, shouldLoopPlaybackRange, togglePlayback]);
+  }, [ensureVideoPlaybackAtTime, fps, isPlaying, playbackRangeEnd, playbackRangeStart, setFrameWithinPlaybackRange, shouldLoopPlaybackRange, togglePlayback]);
 
   // Step forward / backward one frame (when paused)
   const stepFrame = useCallback(
@@ -1095,6 +1172,7 @@ export function AnnotationWorkspace({
                   selectedRange={selectedRange}
                   onSelectedRangeChange={handleDraftRangeChange}
                   onCreateSubtaskFromRange={handleCreateSubtaskFromRange}
+                  onSeekFrame={handleGraphSeek}
                   onSelectionStart={handleSelectionStart}
                   onSelectionComplete={handleSelectionComplete}
                 />

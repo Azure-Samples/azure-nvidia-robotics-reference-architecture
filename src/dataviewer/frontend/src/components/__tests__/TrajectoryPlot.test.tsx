@@ -282,6 +282,7 @@ describe('TrajectoryPlot', () => {
     const handleRangeSelectionChange = vi.fn()
     const handleSelectionStart = vi.fn()
     const handleSelectionComplete = vi.fn()
+    const handleSeekFrame = vi.fn()
 
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
@@ -302,6 +303,7 @@ describe('TrajectoryPlot', () => {
           className="h-full"
           selectedRange={null}
           onSelectedRangeChange={handleRangeSelectionChange}
+          onSeekFrame={handleSeekFrame}
           onSelectionStart={handleSelectionStart}
           onSelectionComplete={handleSelectionComplete}
         />
@@ -318,6 +320,7 @@ describe('TrajectoryPlot', () => {
     fireEvent.pointerDown(selectionSurface, { button: 0, clientX: 150, clientY: 20 })
     fireEvent.pointerUp(selectionSurface, { clientX: 150, clientY: 20 })
 
+    expect(handleSeekFrame).toHaveBeenCalledWith(5)
     expect(useEpisodeStore.getState().currentFrame).toBe(5)
     expect(handleSelectionStart).not.toHaveBeenCalled()
     expect(handleSelectionComplete).not.toHaveBeenCalled()
@@ -382,7 +385,7 @@ describe('TrajectoryPlot', () => {
     expect(handleRangeSelectionChange).toHaveBeenCalledWith(null)
   })
 
-  it('clears a draft graph selection when the user clicks outside the graph', () => {
+  it('does not clear a draft graph selection when the user clicks outside the graph', () => {
     const handleRangeSelectionChange = vi.fn()
 
     render(
@@ -400,7 +403,7 @@ describe('TrajectoryPlot', () => {
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Outside' }))
 
-    expect(handleRangeSelectionChange).toHaveBeenCalledWith(null)
+    expect(handleRangeSelectionChange).not.toHaveBeenCalled()
   })
 
   it('keeps graph pointer handlers from swallowing a context-menu create click', () => {
