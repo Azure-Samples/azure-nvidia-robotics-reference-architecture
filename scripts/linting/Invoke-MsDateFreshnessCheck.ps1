@@ -32,9 +32,6 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [int]$ThresholdDays = 90,
-
-    [Parameter()]
     [AllowNull()]
     [AllowEmptyCollection()]
     [string[]]$Paths,
@@ -46,7 +43,10 @@ param(
     [string]$BaseBranch = 'origin/main',
 
     [Parameter()]
-    [switch]$SoftFail
+    [switch]$SoftFail,
+
+    [Parameter()]
+    [int]$ThresholdDays = 90
 )
 
 $ErrorActionPreference = 'Stop'
