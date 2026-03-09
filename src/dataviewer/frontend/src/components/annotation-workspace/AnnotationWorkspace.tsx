@@ -1,12 +1,6 @@
 import { type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  buildDiagnosticsStateSummary,
-  getAvailableDiagnosticsChannels,
-  getRecentDiagnosticEvents,
-  getVisibleDiagnosticEvents,
-} from '@/components/annotation-workspace/annotation-workspace-diagnostics';
-import {
   AnnotationWorkspaceDiagnosticsPanel,
 } from '@/components/annotation-workspace/AnnotationWorkspaceDiagnosticsPanel';
 import { AnnotationWorkspaceEditToolsPanel } from '@/components/annotation-workspace/AnnotationWorkspaceEditToolsPanel';
@@ -15,6 +9,7 @@ import { AnnotationWorkspacePlaybackCard } from '@/components/annotation-workspa
 import { AnnotationWorkspaceSubtaskListCard } from '@/components/annotation-workspace/AnnotationWorkspaceSubtaskListCard';
 import { AnnotationWorkspaceTopBar } from '@/components/annotation-workspace/AnnotationWorkspaceTopBar';
 import { AnnotationWorkspaceTrajectoryTab } from '@/components/annotation-workspace/AnnotationWorkspaceTrajectoryTab';
+import { useAnnotationWorkspaceDiagnostics } from '@/components/annotation-workspace/useAnnotationWorkspaceDiagnostics';
 import { useAnnotationWorkspacePlayback } from '@/components/annotation-workspace/useAnnotationWorkspacePlayback';
 import { ExportDialog } from '@/components/export';
 import { DetectionPanel } from '@/components/object-detection';
@@ -22,13 +17,8 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { useSaveEpisodeLabels } from '@/hooks/use-labels';
 import { combineCssFilters } from '@/lib/css-filters';
 import {
-  clearDiagnosticEvents,
-  DIAGNOSTICS_EVENT_NAME,
-  getEnabledDiagnosticsChannels,
   isDiagnosticsEnabled,
-  readDiagnosticEvents,
   recordDiagnosticEvent,
-  stringifyDiagnosticEvents,
 } from '@/lib/playback-diagnostics';
 import {
   clampFrameToPlaybackRange,
@@ -95,14 +85,8 @@ export function AnnotationWorkspace({
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
   const [activeTab, setActiveTab] = useState('episode');
-  const [diagnosticEvents, setDiagnosticEvents] = useState(() =>
-    diagnosticsVisible && isDiagnosticsEnabled() ? readDiagnosticEvents() : [],
-  );
-  const [selectedDiagnosticsChannel, setSelectedDiagnosticsChannel] = useState('all');
-  const [diagnosticsClipboardStatus, setDiagnosticsClipboardStatus] = useState<string | null>(null);
   const lastLabelSignatureRef = useRef<string | null>(null);
   const lastEpisodeContextRef = useRef<string | null>(null);
-  const wasDiagnosticsEnabledRef = useRef(diagnosticsVisible && isDiagnosticsEnabled());
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
@@ -170,50 +154,7 @@ export function AnnotationWorkspace({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isDiagnosticsEnabled() || typeof window === 'undefined') {
-      return;
-    }
-
-    const syncDiagnostics = () => {
-      setDiagnosticEvents(readDiagnosticEvents());
-    };
-
-    syncDiagnostics();
-    window.addEventListener(DIAGNOSTICS_EVENT_NAME, syncDiagnostics);
-
-    return () => {
-      window.removeEventListener(DIAGNOSTICS_EVENT_NAME, syncDiagnostics);
-    };
-  }, [diagnosticsVisible]);
-
   const diagnosticsEnabled = diagnosticsVisible && isDiagnosticsEnabled();
-  const diagnosticsChannels = getEnabledDiagnosticsChannels();
-
-  useEffect(() => {
-    if (diagnosticsEnabled && !wasDiagnosticsEnabledRef.current) {
-      recordDiagnosticEvent('workspace', 'diagnostics-enabled', {
-        activeTab,
-        episodeIndex: currentEpisode?.meta.index ?? null,
-      });
-      setDiagnosticEvents(readDiagnosticEvents());
-    }
-
-    if (!diagnosticsEnabled && wasDiagnosticsEnabledRef.current) {
-      setDiagnosticEvents([]);
-    }
-
-    wasDiagnosticsEnabledRef.current = diagnosticsEnabled;
-  }, [activeTab, currentEpisode?.meta.index, diagnosticsEnabled]);
-
-  useEffect(() => {
-    if (diagnosticsEnabled) {
-      return;
-    }
-
-    setSelectedDiagnosticsChannel('all');
-    setDiagnosticsClipboardStatus(null);
-  }, [diagnosticsEnabled]);
 
   const hasLabelChanges = useMemo(() => {
     if (!currentEpisode || !labelDataLoaded) {
@@ -542,6 +483,28 @@ export function AnnotationWorkspace({
     onRecordEvent: recordDiagnosticEvent,
   });
 
+  const {
+    diagnosticsStateSummary,
+    availableDiagnosticsChannels,
+    diagnosticsClipboardStatus,
+    handleClearVisibleDiagnostics,
+    handleCopyDiagnostics,
+    handleDownloadDiagnostics,
+    recentDiagnosticEvents,
+    selectedDiagnosticsChannel,
+    setSelectedDiagnosticsChannel,
+  } = useAnnotationWorkspaceDiagnostics({
+    diagnosticsVisible,
+    activeTab,
+    currentDatasetId: currentDataset?.id ?? null,
+    currentEpisodeIndex: currentEpisode?.meta.index ?? null,
+    currentFrame,
+    totalFrames,
+    isPlaying,
+    selectedRange,
+    selectedSubtaskId,
+  });
+
   const handleCreateSubtaskFromSelection = useCallback((range: [number, number]) => {
     const nextSegment = createDefaultSubtask(range, subtasks);
 
@@ -847,73 +810,6 @@ export function AnnotationWorkspace({
     });
     void handleResetAll();
   }, [activeTab, currentEpisode?.meta.index, handleResetAll, hasPendingEpisodeChanges]);
-
-  const diagnosticsStateSummary = useMemo(() => buildDiagnosticsStateSummary({
-    activeTab,
-    currentDatasetId: currentDataset?.id ?? null,
-    currentEpisodeIndex: currentEpisode?.meta.index ?? null,
-    currentFrame,
-    totalFrames,
-    diagnosticsChannels,
-    isPlaying,
-    selectedRange,
-    selectedSubtaskId,
-  }), [activeTab, currentDataset?.id, currentEpisode?.meta.index, currentFrame, diagnosticsChannels, isPlaying, selectedRange, selectedSubtaskId, totalFrames]);
-
-  const availableDiagnosticsChannels = useMemo(
-    () => getAvailableDiagnosticsChannels(diagnosticsChannels, diagnosticEvents),
-    [diagnosticEvents, diagnosticsChannels],
-  );
-
-  const visibleDiagnosticEvents = useMemo(
-    () => getVisibleDiagnosticEvents(diagnosticEvents, selectedDiagnosticsChannel),
-    [diagnosticEvents, selectedDiagnosticsChannel],
-  );
-  const recentDiagnosticEvents = useMemo(() => {
-    return getRecentDiagnosticEvents(visibleDiagnosticEvents);
-  }, [visibleDiagnosticEvents]);
-
-  const serializedDiagnosticEvents = useMemo(
-    () => stringifyDiagnosticEvents(visibleDiagnosticEvents),
-    [visibleDiagnosticEvents],
-  );
-
-  const handleClearVisibleDiagnostics = useCallback(() => {
-    if (selectedDiagnosticsChannel === 'all') {
-      clearDiagnosticEvents();
-    } else {
-      clearDiagnosticEvents(selectedDiagnosticsChannel);
-    }
-
-    setDiagnosticEvents(readDiagnosticEvents());
-  }, [selectedDiagnosticsChannel]);
-
-  const handleCopyDiagnostics = useCallback(async () => {
-    if (!navigator.clipboard?.writeText) {
-      setDiagnosticsClipboardStatus('Clipboard access is unavailable.');
-      return;
-    }
-
-    await navigator.clipboard.writeText(serializedDiagnosticEvents);
-    setDiagnosticsClipboardStatus('Copied diagnostics JSON.');
-  }, [serializedDiagnosticEvents]);
-
-  const handleDownloadDiagnostics = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const blob = new Blob([serializedDiagnosticEvents], { type: 'application/json' });
-    const objectUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const channelLabel = selectedDiagnosticsChannel === 'all' ? 'all' : selectedDiagnosticsChannel;
-
-    link.href = objectUrl;
-    link.download = `dataviewer-diagnostics-${channelLabel}.json`;
-    link.click();
-    window.URL.revokeObjectURL(objectUrl);
-    setDiagnosticsClipboardStatus('Downloaded diagnostics JSON.');
-  }, [selectedDiagnosticsChannel, serializedDiagnosticEvents]);
 
   if (!currentDataset || !currentEpisode) {
     return <AnnotationWorkspaceEmptyState />;

@@ -11,7 +11,14 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 
-import { loadPersistedEditDraft, persistEditDraft } from '@/lib/edit-draft-storage';
+import { loadPersistedEditDraft } from '@/lib/edit-draft-storage';
+import {
+  buildDraftPersistencePayload,
+  buildEditOperations,
+  buildEditStateUpdate,
+  buildOriginalEditState,
+  persistEditStateDraft,
+} from '@/stores/edit-store-helpers';
 import type {
   EpisodeEditOperations,
   FrameInsertion,
@@ -150,113 +157,6 @@ function getEpisodeDraftKey(datasetId: string, episodeIndex: number) {
   return `${datasetId}:${episodeIndex}`;
 }
 
-function buildOriginalState(state: Pick<EditState, 'globalTransform' | 'cameraTransforms' | 'removedFrames' | 'insertedFrames' | 'subtasks' | 'trajectoryAdjustments'>) {
-  return {
-    globalTransform: state.globalTransform,
-    cameraTransforms: structuredClone(state.cameraTransforms),
-    removedFrames: new Set(state.removedFrames),
-    insertedFrames: new Map(state.insertedFrames),
-    subtasks: structuredClone(state.subtasks),
-    trajectoryAdjustments: new Map(state.trajectoryAdjustments),
-  };
-}
-
-function buildEditOperations(state: EditState): EpisodeEditOperations | null {
-  if (!state.datasetId || state.episodeIndex === null) {
-    return null;
-  }
-
-  return {
-    datasetId: state.datasetId,
-    episodeIndex: state.episodeIndex,
-    globalTransform: state.globalTransform ?? undefined,
-    cameraTransforms:
-      Object.keys(state.cameraTransforms).length > 0
-        ? state.cameraTransforms
-        : undefined,
-    removedFrames:
-      state.removedFrames.size > 0
-        ? Array.from(state.removedFrames).sort((a, b) => a - b)
-        : undefined,
-    insertedFrames:
-      state.insertedFrames.size > 0
-        ? Array.from(state.insertedFrames.values())
-            .sort((a, b) => a.afterFrameIndex - b.afterFrameIndex)
-        : undefined,
-    subtasks: state.subtasks.length > 0 ? state.subtasks : undefined,
-    trajectoryAdjustments:
-      state.trajectoryAdjustments.size > 0
-        ? Array.from(state.trajectoryAdjustments.values())
-        : undefined,
-  };
-}
-
-function hasEditContent(operations: EpisodeEditOperations) {
-  return !!(
-    operations.globalTransform ||
-    operations.cameraTransforms ||
-    operations.removedFrames ||
-    operations.insertedFrames ||
-    operations.subtasks ||
-    operations.trajectoryAdjustments
-  );
-}
-
-/** Check if state has changed from original */
-function computeDirty(state: EditState): boolean {
-  if (!state.originalState) return false;
-
-  // Check global transform
-  if (JSON.stringify(state.globalTransform) !== JSON.stringify(state.originalState.globalTransform)) {
-    return true;
-  }
-
-  // Check camera transforms
-  if (JSON.stringify(state.cameraTransforms) !== JSON.stringify(state.originalState.cameraTransforms)) {
-    return true;
-  }
-
-  // Check removed frames
-  if (state.removedFrames.size !== state.originalState.removedFrames.size) {
-    return true;
-  }
-  for (const frame of state.removedFrames) {
-    if (!state.originalState.removedFrames.has(frame)) {
-      return true;
-    }
-  }
-
-  // Check inserted frames
-  if (state.insertedFrames.size !== state.originalState.insertedFrames.size) {
-    return true;
-  }
-  for (const [afterIdx, insertion] of state.insertedFrames) {
-    const origInsertion = state.originalState.insertedFrames.get(afterIdx);
-    if (!origInsertion ||
-        insertion.interpolationFactor !== origInsertion.interpolationFactor) {
-      return true;
-    }
-  }
-
-  // Check subtasks
-  if (JSON.stringify(state.subtasks) !== JSON.stringify(state.originalState.subtasks)) {
-    return true;
-  }
-
-  // Check trajectory adjustments
-  if (state.trajectoryAdjustments.size !== state.originalState.trajectoryAdjustments.size) {
-    return true;
-  }
-  for (const [frame, adj] of state.trajectoryAdjustments) {
-    const origAdj = state.originalState.trajectoryAdjustments.get(frame);
-    if (!origAdj || JSON.stringify(adj) !== JSON.stringify(origAdj)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /**
  * Compute effective index accounting for insertions and removals.
  *
@@ -386,82 +286,130 @@ export function getEffectiveFrameCount(
  */
 export const useEditStore = create<EditStore>()(
   devtools(
-    (set, get) => ({
-      ...initialState,
+    (set, get) => {
+      const persistCurrentDraft = () => {
+        void persistEditStateDraft(get())
+      }
 
-
-
-      initializeEdit: (datasetId, episodeIndex) => {
-        const draftKey = getEpisodeDraftKey(datasetId, episodeIndex);
-        const savedDraft = get().savedEpisodeDrafts[draftKey];
-
-        if (savedDraft) {
-          get().loadEditOperations(savedDraft);
-          return;
-        }
-
-        const newState = {
-          datasetId,
-          episodeIndex,
-          globalTransform: null,
-          cameraTransforms: {},
-          removedFrames: new Set<number>(),
-          insertedFrames: new Map<number, FrameInsertion>(),
-          subtasks: [],
-          trajectoryAdjustments: new Map<number, TrajectoryAdjustment>(),
-        };
-
+      const updateState = (
+        actionName: string,
+        recipe: (state: EditStore) => Partial<EditStore>,
+        options?: { validationErrors?: (nextState: EditStore) => string[] },
+      ) => {
         set(
-          {
-            ...newState,
-            originalState: buildOriginalState(newState),
-            isDirty: false,
-            validationErrors: [],
+          (state) => {
+            const updates = recipe(state)
+            const nextState = { ...state, ...updates } as EditStore
+
+            return buildEditStateUpdate(state, updates, {
+              validationErrors: options?.validationErrors?.(nextState),
+            })
           },
           false,
-          'initializeEdit'
-        );
+          actionName,
+        )
 
-        void loadPersistedEditDraft(datasetId, episodeIndex).then((persistedDraft) => {
-          if (!persistedDraft) {
+        persistCurrentDraft()
+      }
+
+      return {
+        ...initialState,
+
+        initializeEdit: (datasetId, episodeIndex) => {
+          const draftKey = getEpisodeDraftKey(datasetId, episodeIndex);
+          const savedDraft = get().savedEpisodeDrafts[draftKey];
+
+          if (savedDraft) {
+            get().loadEditOperations(savedDraft);
             return;
           }
 
-          const currentState = get();
+          const newState = {
+            datasetId,
+            episodeIndex,
+            globalTransform: null,
+            cameraTransforms: {},
+            removedFrames: new Set<number>(),
+            insertedFrames: new Map<number, FrameInsertion>(),
+            subtasks: [],
+            trajectoryAdjustments: new Map<number, TrajectoryAdjustment>(),
+          };
 
-          if (currentState.datasetId !== datasetId || currentState.episodeIndex !== episodeIndex) {
-            return;
+          set(
+            {
+              ...newState,
+              originalState: buildOriginalEditState(newState),
+              isDirty: false,
+              validationErrors: [],
+            },
+            false,
+            'initializeEdit'
+          );
+
+          void loadPersistedEditDraft(datasetId, episodeIndex).then((persistedDraft) => {
+            if (!persistedDraft) {
+              return;
+            }
+
+            const currentState = get();
+
+            if (currentState.datasetId !== datasetId || currentState.episodeIndex !== episodeIndex) {
+              return;
+            }
+
+            set(
+              (state) => ({
+                savedEpisodeDrafts: {
+                  ...state.savedEpisodeDrafts,
+                  [draftKey]: persistedDraft,
+                },
+              }),
+              false,
+              'hydratePersistedEpisodeDraft'
+            );
+
+            get().loadEditOperations(persistedDraft);
+          });
+        },
+
+        loadEditOperations: (ops) => {
+          const removedSet = new Set(ops.removedFrames ?? []);
+          const insertedMap = new Map<number, FrameInsertion>();
+          for (const ins of ops.insertedFrames ?? []) {
+            insertedMap.set(ins.afterFrameIndex, ins);
+          }
+          const subtasks = ops.subtasks ?? [];
+          const trajectoryAdjustments = new Map<number, TrajectoryAdjustment>();
+          for (const adj of ops.trajectoryAdjustments ?? []) {
+            trajectoryAdjustments.set(adj.frameIndex, adj);
           }
 
           set(
-            (state) => ({
-              savedEpisodeDrafts: {
-                ...state.savedEpisodeDrafts,
-                [draftKey]: persistedDraft,
-              },
-            }),
+            {
+              datasetId: ops.datasetId,
+              episodeIndex: ops.episodeIndex,
+              globalTransform: ops.globalTransform ?? null,
+              cameraTransforms: ops.cameraTransforms ?? {},
+              removedFrames: removedSet,
+              insertedFrames: insertedMap,
+              subtasks,
+              trajectoryAdjustments,
+              originalState: buildOriginalEditState({
+                globalTransform: ops.globalTransform ?? null,
+                cameraTransforms: ops.cameraTransforms ?? {},
+                removedFrames: removedSet,
+                insertedFrames: insertedMap,
+                subtasks,
+                trajectoryAdjustments,
+              }),
+              isDirty: false,
+              validationErrors: validateSegments(subtasks),
+            },
             false,
-            'hydratePersistedEpisodeDraft'
+            'loadEditOperations'
           );
 
-          get().loadEditOperations(persistedDraft);
-        });
-      },
-
-      loadEditOperations: (ops) => {
-        const removedSet = new Set(ops.removedFrames ?? []);
-        const insertedMap = new Map<number, FrameInsertion>();
-        for (const ins of ops.insertedFrames ?? []) {
-          insertedMap.set(ins.afterFrameIndex, ins);
-        }
-        const subtasks = ops.subtasks ?? [];
-        const trajectoryAdjustments = new Map<number, TrajectoryAdjustment>();
-        for (const adj of ops.trajectoryAdjustments ?? []) {
-          trajectoryAdjustments.set(adj.frameIndex, adj);
-        }
-
-        set(
-          {
+          void persistEditStateDraft({
             datasetId: ops.datasetId,
             episodeIndex: ops.episodeIndex,
             globalTransform: ops.globalTransform ?? null,
@@ -470,491 +418,246 @@ export const useEditStore = create<EditStore>()(
             insertedFrames: insertedMap,
             subtasks,
             trajectoryAdjustments,
-            originalState: buildOriginalState({
-              globalTransform: ops.globalTransform ?? null,
-              cameraTransforms: ops.cameraTransforms ?? {},
-              removedFrames: removedSet,
-              insertedFrames: insertedMap,
-              subtasks,
-              trajectoryAdjustments,
-            }),
-            isDirty: false,
-            validationErrors: validateSegments(subtasks),
-          },
-          false,
-          'loadEditOperations'
-        );
+          });
+        },
 
-        void persistEditDraft(
-          ops.datasetId,
-          ops.episodeIndex,
-          hasEditContent(ops) ? ops : null,
-        );
-      },
+        setGlobalTransform: (transform) => {
+          updateState('setGlobalTransform', () => ({ globalTransform: transform }))
+        },
 
-      setGlobalTransform: (transform) => {
-        set(
-          (state) => {
-            const newState = { ...state, globalTransform: transform };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'setGlobalTransform'
-        );
-
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      setCameraTransform: (camera, transform) => {
-        set(
-          (state) => {
-            const newCameraTransforms = { ...state.cameraTransforms };
+        setCameraTransform: (camera, transform) => {
+          updateState('setCameraTransform', (state) => {
+            const nextCameraTransforms = { ...state.cameraTransforms }
             if (transform) {
-              newCameraTransforms[camera] = transform;
+              nextCameraTransforms[camera] = transform
             } else {
-              delete newCameraTransforms[camera];
+              delete nextCameraTransforms[camera]
             }
-            const newState = { ...state, cameraTransforms: newCameraTransforms };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'setCameraTransform'
-        );
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+            return { cameraTransforms: nextCameraTransforms }
+          })
+        },
 
-      clearTransforms: () => {
-        set(
-          (state) => {
-            const newState = {
-              ...state,
-              globalTransform: null,
-              cameraTransforms: {},
-            };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'clearTransforms'
-        );
+        clearTransforms: () => {
+          updateState('clearTransforms', () => ({ globalTransform: null, cameraTransforms: {} }))
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      toggleFrameRemoval: (frameIndex) => {
-        set(
-          (state) => {
-            const newRemoved = new Set(state.removedFrames);
-            if (newRemoved.has(frameIndex)) {
-              newRemoved.delete(frameIndex);
+        toggleFrameRemoval: (frameIndex) => {
+          updateState('toggleFrameRemoval', (state) => {
+            const nextRemovedFrames = new Set(state.removedFrames)
+            if (nextRemovedFrames.has(frameIndex)) {
+              nextRemovedFrames.delete(frameIndex)
             } else {
-              newRemoved.add(frameIndex);
+              nextRemovedFrames.add(frameIndex)
             }
-            const newState = { ...state, removedFrames: newRemoved };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'toggleFrameRemoval'
-        );
+            return { removedFrames: nextRemovedFrames }
+          })
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      addFrameRange: (start, end) => {
-        set(
-          (state) => {
-            const newRemoved = new Set(state.removedFrames);
-            for (let i = start; i <= end; i++) {
-              newRemoved.add(i);
+        addFrameRange: (start, end) => {
+          updateState('addFrameRange', (state) => {
+            const nextRemovedFrames = new Set(state.removedFrames)
+            for (let frameIndex = start; frameIndex <= end; frameIndex++) {
+              nextRemovedFrames.add(frameIndex)
             }
-            const newState = { ...state, removedFrames: newRemoved };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'addFrameRange'
-        );
+            return { removedFrames: nextRemovedFrames }
+          })
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      addFramesByFrequency: (start, end, frequency) => {
-        set(
-          (state) => {
-            const newRemoved = new Set(state.removedFrames);
-            for (let i = start; i <= end; i += frequency) {
-              newRemoved.add(i);
+        addFramesByFrequency: (start, end, frequency) => {
+          updateState('addFramesByFrequency', (state) => {
+            const nextRemovedFrames = new Set(state.removedFrames)
+            for (let frameIndex = start; frameIndex <= end; frameIndex += frequency) {
+              nextRemovedFrames.add(frameIndex)
             }
-            const newState = { ...state, removedFrames: newRemoved };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'addFramesByFrequency'
-        );
+            return { removedFrames: nextRemovedFrames }
+          })
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      removeFrameRange: (start, end) => {
-        set(
-          (state) => {
-            const newRemoved = new Set(state.removedFrames);
-            for (let i = start; i <= end; i++) {
-              newRemoved.delete(i);
+        removeFrameRange: (start, end) => {
+          updateState('removeFrameRange', (state) => {
+            const nextRemovedFrames = new Set(state.removedFrames)
+            for (let frameIndex = start; frameIndex <= end; frameIndex++) {
+              nextRemovedFrames.delete(frameIndex)
             }
-            const newState = { ...state, removedFrames: newRemoved };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'removeFrameRange'
-        );
+            return { removedFrames: nextRemovedFrames }
+          })
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+        clearRemovedFrames: () => {
+          updateState('clearRemovedFrames', () => ({ removedFrames: new Set<number>() }))
+        },
 
-      clearRemovedFrames: () => {
-        set(
-          (state) => {
-            const newState = { ...state, removedFrames: new Set<number>() };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'clearRemovedFrames'
-        );
-
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      insertFrame: (afterFrameIndex, factor = 0.5) => {
-        set(
-          (state) => {
-            const newInserted = new Map(state.insertedFrames);
-            newInserted.set(afterFrameIndex, {
+        insertFrame: (afterFrameIndex, factor = 0.5) => {
+          updateState('insertFrame', (state) => {
+            const nextInsertedFrames = new Map(state.insertedFrames)
+            nextInsertedFrames.set(afterFrameIndex, {
               afterFrameIndex,
               interpolationFactor: factor,
-            });
-            const newState = { ...state, insertedFrames: newInserted };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'insertFrame'
-        );
+            })
+            return { insertedFrames: nextInsertedFrames }
+          })
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+        removeInsertedFrame: (afterFrameIndex) => {
+          updateState('removeInsertedFrame', (state) => {
+            const nextInsertedFrames = new Map(state.insertedFrames)
+            nextInsertedFrames.delete(afterFrameIndex)
+            return { insertedFrames: nextInsertedFrames }
+          })
+        },
 
-      removeInsertedFrame: (afterFrameIndex) => {
-        set(
-          (state) => {
-            const newInserted = new Map(state.insertedFrames);
-            newInserted.delete(afterFrameIndex);
-            const newState = { ...state, insertedFrames: newInserted };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'removeInsertedFrame'
-        );
+        clearInsertedFrames: () => {
+          updateState('clearInsertedFrames', () => ({ insertedFrames: new Map<number, FrameInsertion>() }))
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+        addSubtask: (segment) => {
+          updateState(
+            'addSubtask',
+            (state) => ({ subtasks: [...state.subtasks, segment] }),
+            { validationErrors: (nextState) => validateSegments(nextState.subtasks) },
+          )
+        },
 
-      clearInsertedFrames: () => {
-        set(
-          (state) => {
-            const newState = { ...state, insertedFrames: new Map<number, FrameInsertion>() };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'clearInsertedFrames'
-        );
+        addSubtaskFromRange: (start, end) => {
+          const { subtasks } = get();
+          const segment = createDefaultSubtask([start, end], subtasks);
+          get().addSubtask(segment);
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+        updateSubtask: (id, update) => {
+          updateState(
+            'updateSubtask',
+            (state) => ({
+              subtasks: state.subtasks.map((segment) =>
+                segment.id === id ? { ...segment, ...update } : segment,
+              ),
+            }),
+            { validationErrors: (nextState) => validateSegments(nextState.subtasks) },
+          )
+        },
 
-      addSubtask: (segment) => {
-        set(
-          (state) => {
-            const newSubtasks = [...state.subtasks, segment];
-            const newState = { ...state, subtasks: newSubtasks };
-            return {
-              ...newState,
-              isDirty: computeDirty(newState),
-              validationErrors: validateSegments(newSubtasks),
-            };
-          },
-          false,
-          'addSubtask'
-        );
+        removeSubtask: (id) => {
+          updateState(
+            'removeSubtask',
+            (state) => ({ subtasks: state.subtasks.filter((segment) => segment.id !== id) }),
+            { validationErrors: (nextState) => validateSegments(nextState.subtasks) },
+          )
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+        reorderSubtasks: (fromIndex, toIndex) => {
+          updateState('reorderSubtasks', (state) => {
+            const nextSubtasks = [...state.subtasks]
+            const [removed] = nextSubtasks.splice(fromIndex, 1)
+            nextSubtasks.splice(toIndex, 0, removed)
+            return { subtasks: nextSubtasks }
+          })
+        },
 
-      addSubtaskFromRange: (start, end) => {
-        const { subtasks } = get();
-        const segment = createDefaultSubtask([start, end], subtasks);
-        get().addSubtask(segment);
-      },
+        setTrajectoryAdjustment: (frameIndex, adjustment) => {
+          updateState('setTrajectoryAdjustment', (state) => {
+            const nextTrajectoryAdjustments = new Map(state.trajectoryAdjustments)
+            nextTrajectoryAdjustments.set(frameIndex, { ...adjustment, frameIndex })
+            return { trajectoryAdjustments: nextTrajectoryAdjustments }
+          })
+        },
 
-      updateSubtask: (id, update) => {
-        set(
-          (state) => {
-            const newSubtasks = state.subtasks.map((s) =>
-              s.id === id ? { ...s, ...update } : s
-            );
-            const newState = { ...state, subtasks: newSubtasks };
-            return {
-              ...newState,
-              isDirty: computeDirty(newState),
-              validationErrors: validateSegments(newSubtasks),
-            };
-          },
-          false,
-          'updateSubtask'
-        );
+        removeTrajectoryAdjustment: (frameIndex) => {
+          updateState('removeTrajectoryAdjustment', (state) => {
+            const nextTrajectoryAdjustments = new Map(state.trajectoryAdjustments)
+            nextTrajectoryAdjustments.delete(frameIndex)
+            return { trajectoryAdjustments: nextTrajectoryAdjustments }
+          })
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+        getTrajectoryAdjustment: (frameIndex) => {
+          return get().trajectoryAdjustments.get(frameIndex);
+        },
 
-      removeSubtask: (id) => {
-        set(
-          (state) => {
-            const newSubtasks = state.subtasks.filter((s) => s.id !== id);
-            const newState = { ...state, subtasks: newSubtasks };
-            return {
-              ...newState,
-              isDirty: computeDirty(newState),
-              validationErrors: validateSegments(newSubtasks),
-            };
-          },
-          false,
-          'removeSubtask'
-        );
+        clearTrajectoryAdjustments: () => {
+          updateState('clearTrajectoryAdjustments', () => ({ trajectoryAdjustments: new Map<number, TrajectoryAdjustment>() }))
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+        getEditOperations: () => {
+          return buildEditOperations(get());
+        },
 
-      reorderSubtasks: (fromIndex, toIndex) => {
-        set(
-          (state) => {
-            const newSubtasks = [...state.subtasks];
-            const [removed] = newSubtasks.splice(fromIndex, 1);
-            newSubtasks.splice(toIndex, 0, removed);
-            const newState = { ...state, subtasks: newSubtasks };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'reorderSubtasks'
-        );
+        saveEpisodeDraft: () => {
+          const currentState = get();
+          const { datasetId, episodeIndex, operations, persistedDraft } = buildDraftPersistencePayload(currentState);
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+          if (!operations || !datasetId || episodeIndex === null) {
+            return;
+          }
 
-      setTrajectoryAdjustment: (frameIndex, adjustment) => {
-        set(
-          (state) => {
-            const newAdjustments = new Map(state.trajectoryAdjustments);
-            newAdjustments.set(frameIndex, { ...adjustment, frameIndex });
-            const newState = { ...state, trajectoryAdjustments: newAdjustments };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'setTrajectoryAdjustment'
-        );
+          set(
+            (state) => {
+              const draftKey = getEpisodeDraftKey(datasetId, episodeIndex);
+              const nextSavedEpisodeDrafts = { ...state.savedEpisodeDrafts };
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+              if (persistedDraft) {
+                nextSavedEpisodeDrafts[draftKey] = operations;
+              } else {
+                delete nextSavedEpisodeDrafts[draftKey];
+              }
 
-      removeTrajectoryAdjustment: (frameIndex) => {
-        set(
-          (state) => {
-            const newAdjustments = new Map(state.trajectoryAdjustments);
-            newAdjustments.delete(frameIndex);
-            const newState = { ...state, trajectoryAdjustments: newAdjustments };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'removeTrajectoryAdjustment'
-        );
+              return {
+                savedEpisodeDrafts: nextSavedEpisodeDrafts,
+                originalState: buildOriginalEditState(state),
+                isDirty: false,
+              };
+            },
+            false,
+            'saveEpisodeDraft'
+          );
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+          void persistEditStateDraft(currentState);
+        },
 
-      getTrajectoryAdjustment: (frameIndex) => {
-        return get().trajectoryAdjustments.get(frameIndex);
-      },
-
-      clearTrajectoryAdjustments: () => {
-        set(
-          (state) => {
-            const newState = { ...state, trajectoryAdjustments: new Map<number, TrajectoryAdjustment>() };
-            return { ...newState, isDirty: computeDirty(newState) };
-          },
-          false,
-          'clearTrajectoryAdjustments'
-        );
-
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      getEditOperations: () => {
-        return buildEditOperations(get());
-      },
-
-      saveEpisodeDraft: () => {
-        const currentState = get();
-        const operations = buildEditOperations(currentState);
-        const datasetId = currentState.datasetId;
-        const episodeIndex = currentState.episodeIndex;
-
-        if (!operations || !datasetId || episodeIndex === null) {
-          return;
-        }
-
-        const shouldPersistDraft = hasEditContent(operations) ? operations : null;
-
-        set(
-          (state) => {
-            const draftKey = getEpisodeDraftKey(datasetId, episodeIndex);
-            const nextSavedEpisodeDrafts = { ...state.savedEpisodeDrafts };
-
-            if (shouldPersistDraft) {
-              nextSavedEpisodeDrafts[draftKey] = operations;
-            } else {
-              delete nextSavedEpisodeDrafts[draftKey];
-            }
-
-            return {
-              savedEpisodeDrafts: nextSavedEpisodeDrafts,
-              originalState: buildOriginalState(state),
+        markSaved: () => {
+          set(
+            (state) => ({
+              originalState: buildOriginalEditState(state),
               isDirty: false,
-            };
-          },
-          false,
-          'saveEpisodeDraft'
-        );
+            }),
+            false,
+            'markSaved'
+          );
 
-        void persistEditDraft(datasetId, episodeIndex, shouldPersistDraft);
-      },
+          persistCurrentDraft()
+        },
 
-      markSaved: () => {
-        set(
-          (state) => ({
-            originalState: buildOriginalState(state),
-            isDirty: false,
-          }),
-          false,
-          'markSaved'
-        );
+        resetEdits: () => {
+          set(
+            (state) => {
+              if (!state.originalState) {
+                return state
+              }
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
+              return {
+                ...state,
+                globalTransform: state.originalState.globalTransform,
+                cameraTransforms: structuredClone(state.originalState.cameraTransforms),
+                removedFrames: new Set(state.originalState.removedFrames),
+                insertedFrames: new Map(state.originalState.insertedFrames),
+                subtasks: structuredClone(state.originalState.subtasks),
+                trajectoryAdjustments: new Map(state.originalState.trajectoryAdjustments),
+                isDirty: false,
+                validationErrors: validateSegments(state.originalState.subtasks),
+              }
+            },
+            false,
+            'resetEdits'
+          );
 
-      resetEdits: () => {
-        set(
-          (state) => {
-            if (!state.originalState) return state;
-            return {
-              ...state,
-              globalTransform: state.originalState.globalTransform,
-              cameraTransforms: structuredClone(state.originalState.cameraTransforms),
-              removedFrames: new Set(state.originalState.removedFrames),
-              insertedFrames: new Map(state.originalState.insertedFrames),
-              subtasks: structuredClone(state.originalState.subtasks),
-              trajectoryAdjustments: new Map(state.originalState.trajectoryAdjustments),
-              isDirty: false,
-              validationErrors: validateSegments(state.originalState.subtasks),
-            };
-          },
-          false,
-          'resetEdits'
-        );
+          persistCurrentDraft()
+        },
 
-        const nextState = get();
-        const operations = buildEditOperations(nextState);
-        if (nextState.datasetId && nextState.episodeIndex !== null) {
-          void persistEditDraft(nextState.datasetId, nextState.episodeIndex, operations && hasEditContent(operations) ? operations : null);
-        }
-      },
-
-      clear: () => {
-        set(initialState, false, 'clear');
-      },
-    }),
+        clear: () => {
+          set(initialState, false, 'clear');
+        },
+      }
+    },
     { name: 'edit-store' }
   )
 );

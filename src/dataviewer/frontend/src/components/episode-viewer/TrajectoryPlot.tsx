@@ -19,7 +19,6 @@ import {
   YAxis,
 } from 'recharts';
 
-import { Button } from '@/components/ui/button'
 import { useJointConfigDefaults, useSaveJointConfig, useSaveJointConfigDefaults } from '@/hooks/use-joint-config'
 import { getAutoSelectedJointsForEpisode } from '@/lib/joint-significance'
 import { recordDiagnosticEvent } from '@/lib/playback-diagnostics'
@@ -32,10 +31,9 @@ import { useJointConfigStore } from '@/stores/joint-config-store'
 import { getJointLabel, JOINT_COLORS } from './joint-constants'
 import { JointConfigDefaultsEditor } from './JointConfigDefaultsEditor'
 import { JointSelector } from './JointSelector'
-import {
-  buildTrajectoryChartData,
-  resolveTrajectorySelectionRange,
-} from './trajectory-plot-utils'
+import { buildTrajectoryChartData } from './trajectory-plot-utils'
+import { TrajectoryPlotSelectionOverlay } from './TrajectoryPlotSelectionOverlay'
+import { useTrajectoryPlotSelection } from './useTrajectoryPlotSelection'
 
 /**
  * Isolated current frame marker component.
@@ -116,13 +114,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   const [showVelocity, setShowVelocity] = useState(false);
   const [showNormalized, setShowNormalized] = useState(true);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
-  const [selectionAnchorFrame, setSelectionAnchorFrame] = useState<number | null>(null);
-  const [selectionAnchorX, setSelectionAnchorX] = useState<number | null>(null);
-  const [selectionDragging, setSelectionDragging] = useState(false);
   const [plotArea, setPlotArea] = useState<TrajectoryPlotArea | null>(null);
-  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const selectionSurfaceRef = useRef<HTMLDivElement>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const withSave = useCallback(
     <T extends unknown[]>(fn: (...args: T) => void) =>
@@ -167,12 +160,6 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   }, [autoSelectedJoints])
 
   useEffect(() => {
-    if (!selectedRange) {
-      setContextMenuPosition(null)
-    }
-  }, [selectedRange])
-
-  useEffect(() => {
     const surface = selectionSurfaceRef.current
 
     if (!surface) {
@@ -205,28 +192,6 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
     }
   }, [chartData.length, currentEpisode?.meta.length, selectedJoints.length, showNormalized, showVelocity])
 
-  useEffect(() => {
-    if (!selectedRange) {
-      return
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') {
-        return
-      }
-
-      recordDiagnosticEvent('playback', 'selection-clear', { source: 'escape' })
-      setContextMenuPosition(null)
-      onSelectedRangeChange?.(null)
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [onSelectedRangeChange, selectedRange])
-
   const frameFromClientX = useCallback((clientX: number) => {
     const bounds = selectionSurfaceRef.current?.getBoundingClientRect()
 
@@ -241,102 +206,25 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
     )
   }, [currentEpisode?.meta.length, plotArea])
 
-  const updateSelectedRange = useCallback((startFrame: number, endFrame: number) => {
-    onSelectedRangeChange?.([
-      Math.min(startFrame, endFrame),
-      Math.max(startFrame, endFrame),
-    ])
-  }, [onSelectedRangeChange])
-
-  const handleSelectionPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
-      return
-    }
-
-    const anchorFrame = frameFromClientX(event.clientX)
-
-    if ('setPointerCapture' in event.currentTarget) {
-      event.currentTarget.setPointerCapture(event.pointerId)
-    }
-    setContextMenuPosition(null)
-    setSelectionDragging(false)
-    setSelectionAnchorX(event.clientX)
-    setSelectionAnchorFrame(anchorFrame)
-    setCurrentFrame(anchorFrame)
-    recordDiagnosticEvent('playback', 'selection-anchor', { anchorFrame })
-    onSeekFrame?.(anchorFrame)
-  }, [frameFromClientX, onSeekFrame, setCurrentFrame])
-
-  const handleSelectionPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (selectionAnchorFrame === null || selectionAnchorX === null) {
-      return
-    }
-
-    if (Math.abs(event.clientX - selectionAnchorX) < 4) {
-      return
-    }
-
-    if (!selectionDragging) {
-      setSelectionDragging(true)
-      recordDiagnosticEvent('playback', 'selection-drag-start', { anchorFrame: selectionAnchorFrame })
-      onSelectionStart?.()
-    }
-
-    const pointerFrame = frameFromClientX(event.clientX)
-
-    recordDiagnosticEvent('playback', 'selection-drag-update', {
-      anchorFrame: selectionAnchorFrame,
-      currentFrame: pointerFrame,
-    })
-    updateSelectedRange(selectionAnchorFrame, pointerFrame)
-  }, [frameFromClientX, onSelectionStart, selectionAnchorFrame, selectionAnchorX, selectionDragging, updateSelectedRange])
-
-  const handleSelectionPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (selectionAnchorFrame === null) {
-      return
-    }
-
-    if ('hasPointerCapture' in event.currentTarget && event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-
-    const pointerFrame = frameFromClientX(event.clientX)
-    const pointerDistance = selectionAnchorX === null ? 0 : Math.abs(event.clientX - selectionAnchorX)
-
-    if (pointerDistance >= 4 || selectionDragging) {
-      const nextRange = resolveTrajectorySelectionRange(selectionAnchorFrame, pointerFrame)
-
-      recordDiagnosticEvent('playback', 'selection-complete', {
-        rangeStart: nextRange[0],
-        rangeEnd: nextRange[1],
-      })
-      updateSelectedRange(nextRange[0], nextRange[1])
-      onSelectionComplete?.(nextRange)
-    }
-
-    setSelectionDragging(false)
-    setSelectionAnchorFrame(null)
-    setSelectionAnchorX(null)
-  }, [frameFromClientX, onSelectionComplete, selectionAnchorFrame, selectionAnchorX, selectionDragging, updateSelectedRange])
-
-  const handleSelectionContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!selectedRange || !selectionSurfaceRef.current) {
-      return
-    }
-
-    const frame = frameFromClientX(event.clientX)
-
-    if (frame < selectedRange[0] || frame > selectedRange[1]) {
-      return
-    }
-
-    const bounds = selectionSurfaceRef.current.getBoundingClientRect()
-    event.preventDefault()
-    setContextMenuPosition({
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top,
-    })
-  }, [frameFromClientX, selectedRange])
+  const {
+    contextMenuPosition,
+    dismissContextMenu,
+    handleSelectionContextMenu,
+    handleSelectionPointerDown,
+    handleSelectionPointerMove,
+    handleSelectionPointerUp,
+  } = useTrajectoryPlotSelection({
+    currentEpisodeLength: currentEpisode?.meta.length ?? 0,
+    frameFromClientX,
+    getSurfaceBounds: () => selectionSurfaceRef.current?.getBoundingClientRect() ?? null,
+    selectedRange,
+    onSelectedRangeChange,
+    onSelectionStart,
+    onSelectionComplete,
+    onSeekFrame,
+    onSetCurrentFrame: setCurrentFrame,
+    onRecordEvent: recordDiagnosticEvent,
+  })
 
   const selectionHighlight = useMemo(() => {
     if (!selectedRange || (currentEpisode?.meta.length ?? 0) <= 1) {
@@ -529,47 +417,18 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
             ))}
           </LineChart>
         </ResponsiveContainer>
-        <div
-          ref={selectionSurfaceRef}
-          data-testid="trajectory-selection-surface"
-          data-keep-playback-selection="true"
-          className="absolute inset-0 z-10 cursor-crosshair"
-          onContextMenu={handleSelectionContextMenu}
-          onPointerDown={handleSelectionPointerDown}
-          onPointerMove={handleSelectionPointerMove}
-          onPointerUp={handleSelectionPointerUp}
-        >
-          {selectionHighlight && (
-            <div
-              className="absolute bottom-2 top-2 rounded-md border border-primary/60 bg-primary/10"
-              style={selectionHighlight}
-            />
-          )}
-          {contextMenuPosition && selectedRange && (
-            <div
-              ref={contextMenuRef}
-              data-keep-playback-selection="true"
-              className="absolute z-20 rounded-md border bg-popover p-1 shadow-md"
-              style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
-              onContextMenu={(event) => event.preventDefault()}
-              onPointerDown={(event) => event.stopPropagation()}
-              onPointerUp={(event) => event.stopPropagation()}
-            >
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onCreateSubtaskFromRange?.(selectedRange)
-                  setContextMenuPosition(null)
-                }}
-              >
-                Create Subtask
-              </Button>
-            </div>
-          )}
-        </div>
+        <TrajectoryPlotSelectionOverlay
+          selectedRange={selectedRange}
+          selectionHighlight={selectionHighlight}
+          contextMenuPosition={contextMenuPosition}
+          onSelectionContextMenu={handleSelectionContextMenu}
+          onSelectionPointerDown={handleSelectionPointerDown}
+          onSelectionPointerMove={handleSelectionPointerMove}
+          onSelectionPointerUp={handleSelectionPointerUp}
+          onCreateSubtaskFromRange={onCreateSubtaskFromRange}
+          onDismissContextMenu={dismissContextMenu}
+          selectionSurfaceRef={selectionSurfaceRef}
+        />
       </div>
 
       <JointConfigDefaultsEditor
