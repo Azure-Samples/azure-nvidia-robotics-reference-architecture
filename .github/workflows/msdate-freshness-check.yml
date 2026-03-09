@@ -61,14 +61,14 @@ jobs:
 
       - name: Run ms.date Freshness Check
         run: |
-          $args = @()
+          $cmd = '& scripts/linting/Invoke-MsDateFreshnessCheck.ps1'
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $args += '-ChangedFilesOnly'
+            $cmd += ' -ChangedFilesOnly'
           }
           if ('${{ inputs.soft-fail }}' -eq 'true') {
-            $args += '-SoftFail'
+            $cmd += ' -SoftFail'
           }
-          & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 @args
+          Invoke-Expression $cmd
 
       - name: Upload freshness check results
         if: always()
