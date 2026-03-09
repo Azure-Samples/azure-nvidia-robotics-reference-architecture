@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useJointConfigDefaults, useSaveJointConfig, useSaveJointConfigDefaults } from '@/hooks/use-joint-config'
 import { getAutoSelectedJointsForEpisode } from '@/lib/joint-significance'
+import { recordDiagnosticEvent } from '@/lib/playback-diagnostics'
 import { resolveSelectionHighlightStyle, resolveSurfaceFrame, resolveTrajectoryPlotArea, type TrajectoryPlotArea } from '@/lib/trajectory-graph-geometry'
 import { cn } from '@/lib/utils'
 import { useEpisodeStore } from '@/stores'
@@ -292,6 +293,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
         return
       }
 
+      recordDiagnosticEvent('playback', 'selection-clear', { source: 'escape' })
       setContextMenuPosition(null)
       onSelectedRangeChange?.(null)
     }
@@ -339,6 +341,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
     setSelectionAnchorX(event.clientX)
     setSelectionAnchorFrame(anchorFrame)
     setCurrentFrame(anchorFrame)
+    recordDiagnosticEvent('playback', 'selection-anchor', { anchorFrame })
     onSeekFrame?.(anchorFrame)
   }, [frameFromClientX, onSeekFrame, setCurrentFrame])
 
@@ -353,10 +356,17 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
 
     if (!selectionDragging) {
       setSelectionDragging(true)
+      recordDiagnosticEvent('playback', 'selection-drag-start', { anchorFrame: selectionAnchorFrame })
       onSelectionStart?.()
     }
 
-    updateSelectedRange(selectionAnchorFrame, frameFromClientX(event.clientX))
+    const pointerFrame = frameFromClientX(event.clientX)
+
+    recordDiagnosticEvent('playback', 'selection-drag-update', {
+      anchorFrame: selectionAnchorFrame,
+      currentFrame: pointerFrame,
+    })
+    updateSelectedRange(selectionAnchorFrame, pointerFrame)
   }, [frameFromClientX, onSelectionStart, selectionAnchorFrame, selectionAnchorX, selectionDragging, updateSelectedRange])
 
   const handleSelectionPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -377,6 +387,10 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
         Math.max(selectionAnchorFrame, pointerFrame),
       ]
 
+      recordDiagnosticEvent('playback', 'selection-complete', {
+        rangeStart: nextRange[0],
+        rangeEnd: nextRange[1],
+      })
       updateSelectedRange(nextRange[0], nextRange[1])
       onSelectionComplete?.(nextRange)
     }

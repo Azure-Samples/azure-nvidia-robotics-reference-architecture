@@ -8,6 +8,7 @@ import {
   needsSeekBeforePlay,
   resolvePlaybackTick,
   shouldLoopActivePlaybackRange,
+  shouldRecoverPlaybackAfterDesync,
   shouldRestartPlaybackAfterLoop,
 } from '../playback-utils'
 
@@ -276,5 +277,23 @@ describe('shouldRestartPlaybackAfterLoop', () => {
 
   it('does not restart when playback stops at the range end instead of looping', () => {
     expect(shouldRestartPlaybackAfterLoop(75, 74, [43, 74], false)).toBe(false)
+  })
+})
+
+describe('shouldRecoverPlaybackAfterDesync', () => {
+  it('recovers when the store expects playback but the media element is paused', () => {
+    expect(shouldRecoverPlaybackAfterDesync(true, true, 0, 300)).toBe(true)
+  })
+
+  it('does not recover again while the cooldown window is active', () => {
+    expect(shouldRecoverPlaybackAfterDesync(true, true, 200, 300)).toBe(false)
+  })
+
+  it('does not recover when playback is intentionally paused', () => {
+    expect(shouldRecoverPlaybackAfterDesync(false, true, 0, 300)).toBe(false)
+  })
+
+  it('does not recover when the media element is already running', () => {
+    expect(shouldRecoverPlaybackAfterDesync(true, false, 0, 300)).toBe(false)
   })
 })

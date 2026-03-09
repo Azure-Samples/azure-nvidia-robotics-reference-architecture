@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ViewerDisplayControls } from '@/components/viewer-display';
 import { useSaveEpisodeLabels } from '@/hooks/use-labels';
 import { combineCssFilters } from '@/lib/css-filters';
+import { DIAGNOSTICS_EVENT_NAME, isDiagnosticsChannelEnabled, readDiagnosticEvents, recordDiagnosticEvent } from '@/lib/playback-diagnostics';
 import {
   clampFrameToPlaybackRange,
   computeEffectiveFps,
@@ -22,6 +23,7 @@ import {
   resolvePlaybackRange,
   resolvePlaybackTick,
   shouldLoopActivePlaybackRange,
+  shouldRecoverPlaybackAfterDesync,
   shouldRestartPlaybackAfterLoop,
 } from '@/lib/playback-utils';
 import {
@@ -42,6 +44,7 @@ import { useLabelStore } from '@/stores/label-store';
 import { createDefaultSubtask } from '@/types/episode-edit';
 
 const EMPTY_LABELS: string[] = [];
+const PLAYBACK_RECOVERY_COOLDOWN_MS = 300;
 
 interface AnnotationWorkspaceProps {
   canGoPreviousEpisode?: boolean;
@@ -75,11 +78,16 @@ export function AnnotationWorkspace({
   const shouldAutoPlayOnMetadataLoadRef = useRef(false);
   const skipNextPlaybackSyncRef = useRef(false);
   const playbackRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPlaybackRecoveryAtRef = useRef(0);
   const [interpolatedImageUrl, setInterpolatedImageUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState('episode');
+  const diagnosticsEnabled = useMemo(() => isDiagnosticsChannelEnabled('playback'), []);
+  const [playbackDiagnostics, setPlaybackDiagnostics] = useState(() =>
+    diagnosticsEnabled ? readDiagnosticEvents('playback') : [],
+  );
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
   const currentEpisode = useEpisodeStore((state) => state.currentEpisode);
@@ -142,6 +150,23 @@ export function AnnotationWorkspace({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!diagnosticsEnabled || typeof window === 'undefined') {
+      return;
+    }
+
+    const syncDiagnostics = () => {
+      setPlaybackDiagnostics(readDiagnosticEvents('playback'));
+    };
+
+    syncDiagnostics();
+    window.addEventListener(DIAGNOSTICS_EVENT_NAME, syncDiagnostics);
+
+    return () => {
+      window.removeEventListener(DIAGNOSTICS_EVENT_NAME, syncDiagnostics);
+    };
+  }, [diagnosticsEnabled]);
 
   const hasLabelChanges = useMemo(() => {
     if (!currentEpisode || !labelDataLoaded) {
@@ -376,6 +401,7 @@ export function AnnotationWorkspace({
   }, [activePlaybackRange, seekVideoFrame]);
 
   const handleGraphSeek = useCallback((frame: number) => {
+    recordDiagnosticEvent('playback', 'graph-seek', { frame });
     seekVideoFrame(frame, null, false);
   }, [seekVideoFrame]);
 
@@ -383,11 +409,13 @@ export function AnnotationWorkspace({
     shouldResumeAfterSelectionRef.current = false;
     setSelectedSubtaskId(null);
     setSelectedRange(null);
+    recordDiagnosticEvent('playback', 'selection-clear', { source: 'workspace-action' });
   }, []);
 
   const handleSubtaskSelectionChange = useCallback((id: string | null) => {
     setSelectedSubtaskId(id);
     shouldResumeAfterSelectionRef.current = false;
+    recordDiagnosticEvent('playback', 'subtask-select', { id });
 
     if (!id) {
       setSelectedRange(null);
@@ -409,6 +437,11 @@ export function AnnotationWorkspace({
     setSelectedRange(null);
     setSelectedSubtaskId(nextSegment.id);
     setFrameWithinPlaybackRange(nextSegment.frameRange[0], nextSegment.frameRange);
+    recordDiagnosticEvent('playback', 'subtask-create', {
+      id: nextSegment.id,
+      rangeStart: nextSegment.frameRange[0],
+      rangeEnd: nextSegment.frameRange[1],
+    });
   }, [addSubtask, setFrameWithinPlaybackRange, subtasks]);
 
   const handleDraftRangeChange = useCallback((range: [number, number] | null) => {
@@ -418,10 +451,15 @@ export function AnnotationWorkspace({
 
     setSelectedSubtaskId(null);
     setSelectedRange(range);
+    recordDiagnosticEvent('playback', 'draft-range-change', {
+      rangeStart: range?.[0] ?? null,
+      rangeEnd: range?.[1] ?? null,
+    });
   }, []);
 
   const handleSelectionStart = useCallback(() => {
     shouldResumeAfterSelectionRef.current = isPlaying;
+    recordDiagnosticEvent('playback', 'selection-start', { shouldResume: isPlaying });
 
     if (isPlaying) {
       togglePlayback();
@@ -435,6 +473,12 @@ export function AnnotationWorkspace({
     setSelectedSubtaskId(null);
     setSelectedRange(range);
     shouldResumeAfterSelectionRef.current = false;
+    recordDiagnosticEvent('playback', 'selection-finish', {
+      shouldResume,
+      rangeStart: range[0],
+      rangeEnd: range[1],
+      nextFrame,
+    });
 
     if (shouldResume) {
       togglePlayback();
@@ -586,6 +630,17 @@ export function AnnotationWorkspace({
       playbackRangeEnd,
     );
 
+    recordDiagnosticEvent('playback', 'sync-action', {
+      action: action.kind,
+      currentFrame: currentFrameRef.current,
+      playbackRangeStart,
+      playbackRangeEnd,
+      isPlaying,
+      autoLoop,
+      shouldLoopPlaybackRange,
+      videoCurrentTime: Number(video.currentTime.toFixed(3)),
+    });
+
     switch (action.kind) {
       case 'restart':
         setFrameWithinPlaybackRange(playbackRangeStart);
@@ -601,13 +656,18 @@ export function AnnotationWorkspace({
         video.pause();
         break;
     }
-  }, [ensureVideoPlaybackAtTime, fps, isPlaying, playbackRangeEnd, playbackRangeStart, playbackSpeed, setFrameWithinPlaybackRange, totalFrames]);
+  }, [autoLoop, ensureVideoPlaybackAtTime, fps, isPlaying, playbackRangeEnd, playbackRangeStart, playbackSpeed, setFrameWithinPlaybackRange, shouldLoopPlaybackRange, totalFrames]);
 
   // Track video duration for accurate frame↔time mapping
   const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
 
     setVideoDuration(video.duration);
+    recordDiagnosticEvent('playback', 'loaded-metadata', {
+      duration: Number(video.duration.toFixed(3)),
+      isPlaying,
+      shouldAutoPlayOnMetadataLoad: shouldAutoPlayOnMetadataLoadRef.current,
+    });
     if (isPlaying) {
       skipNextPlaybackSyncRef.current = true;
       syncVideoElementPlayback(video);
@@ -645,6 +705,26 @@ export function AnnotationWorkspace({
       if (video) {
         const nextFrame = Math.floor(video.currentTime * fps);
         const resolved = resolvePlaybackTick(nextFrame, totalFrames, activePlaybackRange, shouldLoopPlaybackRange);
+        const now = Date.now();
+
+        if (shouldRecoverPlaybackAfterDesync(
+          isPlaying,
+          video.paused,
+          now - lastPlaybackRecoveryAtRef.current,
+          PLAYBACK_RECOVERY_COOLDOWN_MS,
+        )) {
+          lastPlaybackRecoveryAtRef.current = now;
+          recordDiagnosticEvent('playback', 'desync-recover', {
+            currentFrame: resolved.frame,
+            nextFrame,
+            videoCurrentTime: Number(video.currentTime.toFixed(3)),
+            playbackRangeStart,
+            playbackRangeEnd,
+            autoLoop,
+            shouldLoopPlaybackRange,
+          });
+          ensureVideoPlaybackAtTime(video, resolved.frame / fps);
+        }
 
         if (resolved.frame !== lastFrame) {
           lastFrame = resolved.frame;
@@ -669,6 +749,17 @@ export function AnnotationWorkspace({
           );
 
           if (didLoop) {
+            recordDiagnosticEvent('playback', 'range-loop', {
+              rangeStart: playbackRangeStart,
+              rangeEnd: playbackRangeEnd,
+              reportedFrame: nextFrame,
+              resolvedFrame: resolved.frame,
+              autoLoop,
+              shouldLoopPlaybackRange,
+            });
+          }
+
+          if (didLoop) {
             ensureVideoPlaybackAtTime(video, resolved.frame / fps);
           } else {
             video.currentTime = resolved.frame / fps;
@@ -679,7 +770,7 @@ export function AnnotationWorkspace({
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [activePlaybackRange, ensureVideoPlaybackAtTime, fps, isPlaying, setCurrentFrame, shouldLoopPlaybackRange, togglePlayback, totalFrames]);
+  }, [activePlaybackRange, autoLoop, ensureVideoPlaybackAtTime, fps, isPlaying, playbackRangeEnd, playbackRangeStart, setCurrentFrame, shouldLoopPlaybackRange, togglePlayback, totalFrames]);
 
   // When paused, seek video to match store frame (slider scrub / step buttons)
   useEffect(() => {
@@ -693,6 +784,12 @@ export function AnnotationWorkspace({
 
   // When the video ends, loop or stop based on autoLoop setting
   const handleVideoEnded = useCallback(() => {
+    recordDiagnosticEvent('playback', 'video-ended', {
+      playbackRangeStart,
+      playbackRangeEnd,
+      autoLoop,
+      shouldLoopPlaybackRange,
+    });
     if (shouldLoopPlaybackRange) {
       // Restart directly — the sync effect won't re-trigger since isPlaying
       // hasn't changed, so we must seek and play the video element ourselves.
@@ -705,7 +802,7 @@ export function AnnotationWorkspace({
       if (isPlaying) togglePlayback();
       setFrameWithinPlaybackRange(playbackRangeEnd);
     }
-  }, [ensureVideoPlaybackAtTime, fps, isPlaying, playbackRangeEnd, playbackRangeStart, setFrameWithinPlaybackRange, shouldLoopPlaybackRange, togglePlayback]);
+  }, [autoLoop, ensureVideoPlaybackAtTime, fps, isPlaying, playbackRangeEnd, playbackRangeStart, setFrameWithinPlaybackRange, shouldLoopPlaybackRange, togglePlayback]);
 
   // Step forward / backward one frame (when paused)
   const stepFrame = useCallback(
@@ -1188,6 +1285,34 @@ export function AnnotationWorkspace({
                   onSelectionStart={handleSelectionStart}
                   onSelectionComplete={handleSelectionComplete}
                 />
+                {diagnosticsEnabled && (
+                  <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs" data-testid="playback-diagnostics-panel">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-sm font-medium">Playback Diagnostics</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Enable with `?diagnostics=playback` or local storage key `dataviewer:diagnostics`.
+                        </p>
+                      </div>
+                      <div className="text-right text-muted-foreground">
+                        <div>Range: {playbackRangeStart} to {playbackRangeEnd}</div>
+                        <div>Loop intent: {shouldLoopPlaybackRange ? 'enabled' : 'disabled'}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 max-h-40 overflow-y-auto rounded border bg-background/80 p-2 font-mono text-[11px]">
+                      {playbackDiagnostics.length === 0 ? (
+                        <div className="text-muted-foreground">No playback events recorded yet.</div>
+                      ) : (
+                        playbackDiagnostics.slice(-8).map((event) => (
+                          <div key={`${event.timestamp}-${event.type}-${JSON.stringify(event.data ?? {})}`} className="border-b border-border/50 py-1 last:border-b-0">
+                            <div>{event.type}</div>
+                            <div className="text-muted-foreground">{JSON.stringify(event.data ?? {})}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>

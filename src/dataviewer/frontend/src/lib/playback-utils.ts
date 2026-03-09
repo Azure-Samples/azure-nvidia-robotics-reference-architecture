@@ -78,6 +78,17 @@ export function shouldLoopActivePlaybackRange(
   return autoLoop || !!range
 }
 
+export function shouldRecoverPlaybackAfterDesync(
+  isPlaying: boolean,
+  videoPaused: boolean,
+  elapsedSinceLastRecoveryMs: number,
+  recoveryCooldownMs: number,
+): boolean {
+  return isPlaying && videoPaused && (
+    elapsedSinceLastRecoveryMs <= 0 || elapsedSinceLastRecoveryMs >= recoveryCooldownMs
+  )
+}
+
 /**
  * Derive effective fps from the video element's actual duration.
  *
