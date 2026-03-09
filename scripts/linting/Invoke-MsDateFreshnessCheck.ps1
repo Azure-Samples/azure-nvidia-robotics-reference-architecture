@@ -38,16 +38,14 @@ param(
     [string]$BaseBranch = 'origin/main',
 
     [Parameter()]
-    [switch]$SoftFail,
-
-    [Parameter()]
-    [int]$ThresholdDays = 90
+    [switch]$SoftFail
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# Paths is always repository root for workflow invocations
+# Hardcoded values for workflow invocations
+$ThresholdDays = 90
 $Paths = @('.')
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
