@@ -56,6 +56,21 @@ export function resolvePlaybackTick(
   return { frame: end, shouldStop: true }
 }
 
+export function shouldRestartPlaybackAfterLoop(
+  reportedFrame: number,
+  resolvedFrame: number,
+  range: PlaybackRange | null,
+  autoLoop: boolean,
+): boolean {
+  if (!range || !autoLoop) {
+    return false
+  }
+
+  const [start, end] = range[0] <= range[1] ? range : [range[1], range[0]]
+
+  return reportedFrame > end && resolvedFrame === start
+}
+
 export function shouldLoopActivePlaybackRange(
   range: PlaybackRange | null,
   autoLoop: boolean,

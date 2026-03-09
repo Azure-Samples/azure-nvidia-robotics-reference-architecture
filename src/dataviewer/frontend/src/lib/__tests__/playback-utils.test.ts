@@ -8,6 +8,7 @@ import {
   needsSeekBeforePlay,
   resolvePlaybackTick,
   shouldLoopActivePlaybackRange,
+  shouldRestartPlaybackAfterLoop,
 } from '../playback-utils'
 
 describe('computeEffectiveFps', () => {
@@ -261,5 +262,19 @@ describe('resolvePlaybackTick', () => {
       frame: 40,
       shouldStop: true,
     })
+  })
+})
+
+describe('shouldRestartPlaybackAfterLoop', () => {
+  it('restarts playback when an active subgroup wraps back to its start frame', () => {
+    expect(shouldRestartPlaybackAfterLoop(75, 43, [43, 74], true)).toBe(true)
+  })
+
+  it('does not restart when playback stays inside the active subgroup', () => {
+    expect(shouldRestartPlaybackAfterLoop(54, 54, [43, 74], true)).toBe(false)
+  })
+
+  it('does not restart when playback stops at the range end instead of looping', () => {
+    expect(shouldRestartPlaybackAfterLoop(75, 74, [43, 74], false)).toBe(false)
   })
 })

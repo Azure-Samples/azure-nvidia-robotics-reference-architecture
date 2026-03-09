@@ -1,10 +1,10 @@
 import { Activity, Download, Pause, Play, Repeat, RotateCcw, Scan, SkipBack, SkipForward, Video } from 'lucide-react';
-import { type SyntheticEvent,useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { LabelPanel } from '@/components/annotation-panel';
 import { TrajectoryPlot } from '@/components/episode-viewer';
 import { ExportDialog } from '@/components/export';
-import { ColorAdjustmentControls,FrameInsertionToolbar, FrameRemovalToolbar, TrajectoryEditor, TransformControls } from '@/components/frame-editor';
+import { ColorAdjustmentControls, FrameInsertionToolbar, FrameRemovalToolbar, TrajectoryEditor, TransformControls } from '@/components/frame-editor';
 import { DetectionPanel } from '@/components/object-detection';
 import { PlaybackControlStrip } from '@/components/playback/PlaybackControlStrip';
 import { SubtaskList, SubtaskTimelineTrack, SubtaskToolbar } from '@/components/subtask-timeline';
@@ -22,6 +22,7 @@ import {
   resolvePlaybackRange,
   resolvePlaybackTick,
   shouldLoopActivePlaybackRange,
+  shouldRestartPlaybackAfterLoop,
 } from '@/lib/playback-utils';
 import {
   useDatasetStore,
@@ -660,14 +661,25 @@ export function AnnotationWorkspace({
         }
 
         if (resolved.frame !== nextFrame) {
-          video.currentTime = resolved.frame / fps;
+          const didLoop = shouldRestartPlaybackAfterLoop(
+            nextFrame,
+            resolved.frame,
+            activePlaybackRange,
+            shouldLoopPlaybackRange,
+          );
+
+          if (didLoop) {
+            ensureVideoPlaybackAtTime(video, resolved.frame / fps);
+          } else {
+            video.currentTime = resolved.frame / fps;
+          }
         }
       }
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [activePlaybackRange, fps, isPlaying, setCurrentFrame, shouldLoopPlaybackRange, togglePlayback, totalFrames]);
+  }, [activePlaybackRange, ensureVideoPlaybackAtTime, fps, isPlaying, setCurrentFrame, shouldLoopPlaybackRange, togglePlayback, totalFrames]);
 
   // When paused, seek video to match store frame (slider scrub / step buttons)
   useEffect(() => {
