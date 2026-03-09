@@ -92,16 +92,15 @@ describe('AnnotationWorkspace status and header actions', () => {
     expect(screen.getByTestId('workspace-save-status-slot')).toBeInTheDocument()
   })
 
-  it('keeps the episode title, tabs, and top actions in a single compact toolbar', () => {
+  it('allows the workspace header to wrap so actions do not overlap the tab list', () => {
     render(<AnnotationWorkspace />)
 
     const topBar = screen.getByTestId('workspace-top-bar')
 
     expect(topBar).toContainElement(screen.getByRole('tablist'))
     expect(topBar).toContainElement(screen.getByTestId('workspace-header-actions'))
-    expect(topBar.className).toContain('items-center')
-    expect(topBar.className).toContain('justify-between')
-    expect(topBar.className).not.toContain('flex-wrap')
+    expect(topBar.className).toContain('flex-col')
+    expect(topBar.className).toContain('xl:flex-row')
   })
 
   it('adds a dedicated trajectory viewer tab alongside the existing workspace tabs', () => {
