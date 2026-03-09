@@ -114,7 +114,7 @@ contourpy==1.3.3
     # via matplotlib
 croniter==6.0.0
     # via pydocket
-cryptography==45.0.7
+cryptography==46.0.5
     # via
     #   authlib
     #   azure-identity
