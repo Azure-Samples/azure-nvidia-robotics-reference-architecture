@@ -16,7 +16,7 @@ dependencies = [
     "pynvml>=11.5.0",
     "pyperclip==1.11.0",
     "azureml-mlflow==1.62.0",
-    "rsl-rl-lib==5.0.0",
+    "rsl-rl-lib==5.0.1",
     "skrl>=1.4.3",
     "tensordict>=0.7.0",
 ]
