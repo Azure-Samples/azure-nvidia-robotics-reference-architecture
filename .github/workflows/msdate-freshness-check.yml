@@ -61,21 +61,22 @@ jobs:
 
       - name: Run ms.date Freshness Check
         run: |
-          $scriptParams = @{
-            ThresholdDays = ${{ inputs.staleness-threshold-days }}
+          $args = @()
+
+          # Only pass ThresholdDays if not default (90)
+          if (${{ inputs.staleness-threshold-days }} -ne 90) {
+            $args += '-ThresholdDays'
+            $args += '${{ inputs.staleness-threshold-days }}'
           }
 
-          if ('${{ inputs.changed-files-only }}' -eq 'true' -and '${{ inputs.soft-fail }}' -eq 'true') {
-            & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 -ChangedFilesOnly -SoftFail @scriptParams
-          } elseif ('${{ inputs.changed-files-only }}' -eq 'true') {
-            & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 -ChangedFilesOnly @scriptParams
-          } elseif ('${{ inputs.soft-fail }}' -eq 'true') {
-            & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 -SoftFail @scriptParams
-          } else {
-            & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 @scriptParams
+          if ('${{ inputs.changed-files-only }}' -eq 'true') {
+            $args += '-ChangedFilesOnly'
+          }
+          if ('${{ inputs.soft-fail }}' -eq 'true') {
+            $args += '-SoftFail'
           }
 
-      - name: Upload freshness check results
+          & scripts/linting/Invoke-MsDateFreshnessCheck.ps1 @args
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
