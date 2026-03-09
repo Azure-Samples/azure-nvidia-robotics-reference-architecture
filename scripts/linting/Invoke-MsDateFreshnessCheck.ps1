@@ -32,11 +32,6 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [AllowNull()]
-    [AllowEmptyCollection()]
-    [string[]]$Paths,
-
-    [Parameter()]
     [switch]$ChangedFilesOnly,
 
     [Parameter()]
@@ -52,10 +47,8 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# Set default for Paths if not provided or empty
-if (-not $Paths -or $Paths.Count -eq 0) {
-    $Paths = @('.')
-}
+# Paths is always repository root for workflow invocations
+$Paths = @('.')
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
 Import-Module (Join-Path $scriptRoot 'Modules' 'LintingHelpers.psm1') -Force
