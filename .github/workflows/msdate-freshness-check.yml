@@ -65,7 +65,7 @@ jobs:
             ThresholdDays = ${{ inputs.staleness-threshold-days }}
           }
           if ('${{ inputs.changed-files-only }}' -eq 'true') {
-            $args['ChangedFilesOnly'] = $false
+            $args['ChangedFilesOnly'] = $true
           }
           if ('${{ inputs.soft-fail }}' -eq 'true') {
             $args['SoftFail'] = $true
