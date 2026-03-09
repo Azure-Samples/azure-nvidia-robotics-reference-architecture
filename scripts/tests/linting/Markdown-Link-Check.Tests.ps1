@@ -244,7 +244,7 @@ Describe 'Invoke-MarkdownLinkCheckCore' -Tag 'Unit' {
             try {
                 Invoke-MarkdownLinkCheckCore -Path @('.') -ConfigPath $script:FixtureConfig
             }
-            catch { }
+            catch { $null = $_ }
 
             Should -Invoke Resolve-Path -ParameterFilter { $LiteralPath -eq 'first.md' } -Times 1
             Should -Invoke Resolve-Path -ParameterFilter { $LiteralPath -eq 'second.md' } -Times 1

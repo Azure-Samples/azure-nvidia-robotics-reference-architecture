@@ -3,6 +3,9 @@
 
 using module ..\..\..\scripts\linting\Modules\FrontmatterValidation.psm1
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '')]
+param()
+
 BeforeDiscovery {
     $lintingDir = Join-Path $PSScriptRoot '..' '..' '..' 'scripts' 'linting'
     $schemaDir = Join-Path $lintingDir 'schemas' 'frontmatter'

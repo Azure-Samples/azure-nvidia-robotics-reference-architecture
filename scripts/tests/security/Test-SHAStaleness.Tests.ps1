@@ -12,6 +12,9 @@
     Uses dot-source guard pattern for function isolation.
 #>
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '')]
+param()
+
 BeforeAll {
     $scriptPath = Join-Path $PSScriptRoot '../../security/Test-SHAStaleness.ps1'
     . $scriptPath
