@@ -1,6 +1,6 @@
 import './support/annotationWorkspaceTestSupport'
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AnnotationWorkspace } from '@/components/annotation-workspace/AnnotationWorkspace'
@@ -38,6 +38,14 @@ describe('AnnotationWorkspace playback and trajectory tab flows', () => {
     expect(screen.getByText('Subtask List')).toBeInTheDocument()
   })
 
+  it('keeps the default episode viewer focused on playback and subtasks without the edit tools sidebar', () => {
+    render(<AnnotationWorkspace />)
+
+    const episodePanel = screen.getByRole('tabpanel', { name: /episode viewer/i })
+
+    expect(within(episodePanel).queryByText('Edit Tools')).not.toBeInTheDocument()
+  })
+
   it('renders the trajectory plot after switching to the trajectory viewer tab', () => {
     render(<AnnotationWorkspace />)
 
@@ -58,6 +66,90 @@ describe('AnnotationWorkspace playback and trajectory tab flows', () => {
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
     expect(screen.getByText('Subtask List')).toBeInTheDocument()
+  })
+
+  it('moves episode labels into the trajectory playback grouping instead of the default edit tools column', () => {
+    render(<AnnotationWorkspace />)
+
+    expect(screen.queryByText('Toggle Label Draft')).not.toBeInTheDocument()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    expect(screen.getByTestId('trajectory-labels-panel')).toContainElement(screen.getByText('Toggle Label Draft'))
+  })
+
+  it('renders episode labels in their own trajectory panel beside the stacked playback and graph panels on large layouts', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    const trajectoryLayout = screen.getByTestId('trajectory-layout-grid')
+    const labelsPanel = screen.getByTestId('trajectory-labels-panel')
+
+    expect(trajectoryLayout.className).toContain('lg:grid-cols-3')
+    expect(labelsPanel.className).toContain('lg:row-span-2')
+    expect(labelsPanel).not.toContainElement(screen.getByTestId('trajectory-compact-media-frame'))
+    expect(labelsPanel).not.toContainElement(screen.getByText('Subtask List'))
+  })
+
+  it('renders the remaining edit tools under the labels inside the trajectory side panel', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    const labelsPanel = screen.getByTestId('trajectory-labels-panel')
+
+    expect(labelsPanel).toContainElement(screen.getByText('Episode Labels'))
+    expect(labelsPanel).toContainElement(screen.getByText('Edit Tools'))
+    expect(labelsPanel).toContainElement(screen.getByText('Frame Removal'))
+    expect(labelsPanel).toContainElement(screen.getByText('Trajectory Adjustment'))
+  })
+
+  it('constrains the compact trajectory playback media frame so it does not dominate the viewer', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    expect(screen.getByTestId('trajectory-compact-media-frame').className).toContain('max-w-[40rem]')
+  })
+
+  it('groups the trajectory playback and subtask list into their own scrollable panel', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    const playbackGroupPanel = screen.getByTestId('trajectory-playback-group-panel')
+
+    expect(playbackGroupPanel.className).toContain('overflow-y-auto')
+    expect(playbackGroupPanel).toContainElement(screen.getByText('Subtask List'))
+  })
+
+  it('keeps the trajectory graph grouping below the playback and subtask grouping', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    expect(screen.getByTestId('trajectory-playback-group-panel').compareDocumentPosition(screen.getByTestId('trajectory-graph-panel')))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
+  it('keeps the outer trajectory tab panel free of its own vertical scrollbar', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    expect(screen.getByRole('tabpanel', { name: /trajectory viewer/i }).className).not.toContain('overflow-y-auto')
+  })
+
+  it('renders the trajectory graph inside its own scrollable panel', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+
+    const graphPanel = screen.getByTestId('trajectory-graph-panel')
+
+    expect(graphPanel.className).toContain('overflow-y-auto')
+    expect(graphPanel).toContainElement(screen.getByText('Trajectory Graph'))
   })
 
   it('clears a draft graph selection when Escape is pressed', () => {

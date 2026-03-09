@@ -40,10 +40,10 @@ export function TrajectoryPlotControls({
   onToggleNormalization,
 }: TrajectoryPlotControlsProps) {
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
       <div
         data-testid="trajectory-joint-selector-scroll"
-        className="flex-1 min-w-0 max-h-32 overflow-y-auto pr-2"
+        className="w-full flex-1 min-w-0 max-h-40 overflow-y-auto pr-2 lg:max-h-32"
       >
         <JointSelector
           jointCount={jointCount}
@@ -61,7 +61,7 @@ export function TrajectoryPlotControls({
           onOpenDefaults={onOpenDefaults}
         />
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-start">
+      <div className="flex w-full shrink-0 flex-wrap items-center gap-2 lg:w-auto lg:justify-end lg:self-start">
         <button
           onClick={() => onSetShowVelocity(false)}
           className={!showVelocity ? 'px-2 py-1 text-xs rounded bg-primary text-primary-foreground' : 'px-2 py-1 text-xs rounded bg-muted text-muted-foreground'}

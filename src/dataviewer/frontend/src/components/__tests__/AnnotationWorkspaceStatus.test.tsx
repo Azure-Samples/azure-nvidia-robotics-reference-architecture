@@ -26,6 +26,7 @@ describe('AnnotationWorkspace status and header actions', () => {
   it('shows pending episode changes instead of auto-save copy after labels change locally', () => {
     const { rerender } = render(<AnnotationWorkspace />)
 
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
     fireEvent.click(screen.getByRole('button', { name: /toggle label draft/i }))
     rerender(<AnnotationWorkspace />)
 
@@ -96,11 +97,16 @@ describe('AnnotationWorkspace status and header actions', () => {
     render(<AnnotationWorkspace />)
 
     const topBar = screen.getByTestId('workspace-top-bar')
+    const headerActions = screen.getByTestId('workspace-header-actions')
 
     expect(topBar).toContainElement(screen.getByRole('tablist'))
-    expect(topBar).toContainElement(screen.getByTestId('workspace-header-actions'))
+    expect(topBar).toContainElement(headerActions)
     expect(topBar.className).toContain('flex-col')
-    expect(topBar.className).toContain('xl:flex-row')
+    expect(headerActions.className).not.toContain('w-full')
+    expect(screen.getByRole('heading', { name: /episode 0/i }).compareDocumentPosition(headerActions))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(headerActions.compareDocumentPosition(screen.getByRole('tablist')))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
   it('adds a dedicated trajectory viewer tab alongside the existing workspace tabs', () => {

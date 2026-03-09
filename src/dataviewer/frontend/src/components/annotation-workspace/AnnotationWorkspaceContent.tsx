@@ -1,3 +1,4 @@
+import { LabelPanel } from '@/components/annotation-panel'
 import { AnnotationWorkspaceDiagnosticsPanel } from '@/components/annotation-workspace/AnnotationWorkspaceDiagnosticsPanel'
 import { AnnotationWorkspaceEditToolsPanel } from '@/components/annotation-workspace/AnnotationWorkspaceEditToolsPanel'
 import { AnnotationWorkspacePlaybackCard } from '@/components/annotation-workspace/AnnotationWorkspacePlaybackCard'
@@ -108,6 +109,14 @@ export function AnnotationWorkspaceContent({ shell }: AnnotationWorkspaceContent
     />
   )
 
+  const trajectoryLabelPanel = <LabelPanel episodeIndex={currentEpisode.meta.index} />
+  const trajectoryEditToolsPanel = (
+    <AnnotationWorkspaceEditToolsPanel
+      onClearTransforms={shell.clearTransforms}
+      canResetTransforms={Boolean(shell.globalTransform)}
+    />
+  )
+
   return (
     <div className="flex h-full flex-col gap-2.5 px-3 py-2">
       <Tabs value={shell.activeTab} onValueChange={shell.handleTabChange} className="flex min-h-0 flex-1 flex-col">
@@ -125,23 +134,19 @@ export function AnnotationWorkspaceContent({ shell }: AnnotationWorkspaceContent
         />
 
         <TabsContent value="episode" className="mt-2.5 flex-1 min-h-0">
-          <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="min-h-0 overflow-y-auto lg:col-span-2">
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="min-h-0 overflow-y-auto">
               {episodePlaybackCard}
               {episodeSubtaskListCard}
             </div>
-
-            <AnnotationWorkspaceEditToolsPanel
-              episodeIndex={currentEpisode.meta.index}
-              onClearTransforms={shell.clearTransforms}
-              canResetTransforms={Boolean(shell.globalTransform)}
-            />
           </div>
         </TabsContent>
 
         <AnnotationWorkspaceTrajectoryTab
           playbackCard={trajectoryPlaybackCard}
           subtaskListCard={trajectorySubtaskListCard}
+          labelPanel={trajectoryLabelPanel}
+          editToolsPanel={trajectoryEditToolsPanel}
           selectedRange={shell.playback.selectedRange}
           selectedSubtaskId={shell.playback.selectedSubtaskId}
           onClearPlaybackSelection={shell.playback.clearPlaybackSelection}

@@ -138,7 +138,7 @@ describe('TrajectoryPlot', () => {
 
     expect(scrollRegion).toBeInTheDocument()
     expect(scrollRegion).toHaveClass('overflow-y-auto')
-    expect(scrollRegion).toHaveClass('max-h-32')
+    expect(scrollRegion).toHaveClass('max-h-40')
     expect(screen.getByRole('button', { name: 'Position' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Velocity' })).toBeInTheDocument()
   })

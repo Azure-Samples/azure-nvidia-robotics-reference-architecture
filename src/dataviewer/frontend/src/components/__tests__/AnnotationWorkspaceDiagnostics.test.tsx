@@ -126,11 +126,10 @@ describe('AnnotationWorkspace diagnostics', () => {
 
     mockRecordDiagnosticEvent.mockClear()
 
-    fireEvent.click(screen.getByRole('button', { name: /toggle label draft/i }))
-    rerender(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
-
     fireEvent.click(screen.getByRole('button', { name: /export/i }))
     fireEvent.mouseDown(screen.getByRole('tab', { name: /trajectory viewer/i }), { button: 0, ctrlKey: false })
+    fireEvent.click(screen.getByRole('button', { name: /toggle label draft/i }))
+    rerender(<AnnotationWorkspace canGoNextEpisode onSaveAndNextEpisode={handleSaveAndNextEpisode} />)
     fireEvent.click(screen.getByRole('button', { name: /create subtask/i }))
     fireEvent.mouseDown(screen.getByRole('tab', { name: /object detection/i }), { button: 0, ctrlKey: false })
 

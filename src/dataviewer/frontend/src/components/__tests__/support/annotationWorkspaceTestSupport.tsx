@@ -96,14 +96,17 @@ export const mockSaveEpisodeLabels = hoisted.saveEpisodeLabels
 
 vi.mock('@/components/annotation-panel', () => ({
   LabelPanel: () => (
-    <button
-      type="button"
-      onClick={() => {
-        hoisted.state.episodeLabels = { 0: ['FAILURE'] }
-      }}
-    >
-      Toggle Label Draft
-    </button>
+    <div>
+      <h3>Episode Labels</h3>
+      <button
+        type="button"
+        onClick={() => {
+          hoisted.state.episodeLabels = { 0: ['FAILURE'] }
+        }}
+      >
+        Toggle Label Draft
+      </button>
+    </div>
   ),
 }))
 
@@ -156,7 +159,7 @@ vi.mock('@/components/export', () => ({ ExportDialog: () => null }))
 vi.mock('@/components/frame-editor', () => ({
   ColorAdjustmentControls: () => <div>Color Adjustment Controls</div>,
   FrameInsertionToolbar: () => <div>Frame Insertion Toolbar</div>,
-  FrameRemovalToolbar: () => <div>Frame Removal Toolbar</div>,
+  FrameRemovalToolbar: () => <div>Frame Removal</div>,
   TrajectoryEditor: () => <div>Trajectory Editor</div>,
   TransformControls: () => <div>Transform Controls</div>,
 }))

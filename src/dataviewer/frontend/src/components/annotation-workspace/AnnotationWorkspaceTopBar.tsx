@@ -29,28 +29,13 @@ export function AnnotationWorkspaceTopBar({
   saveStatusMessage,
 }: AnnotationWorkspaceTopBarProps) {
   return (
-    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between" data-testid="workspace-top-bar">
-      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
+    <div className="flex flex-col gap-2.5 xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-3" data-testid="workspace-top-bar">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 xl:contents">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-lg font-semibold leading-none">Episode {episodeIndex}</h2>
         </div>
-        <TabsList className="h-auto max-w-full shrink-0 flex-wrap justify-start">
-          <TabsTrigger value="episode" className="gap-2">
-            <Video className="h-4 w-4" />
-            Episode Viewer
-          </TabsTrigger>
-          <TabsTrigger value="trajectory" className="gap-2">
-            <Activity className="h-4 w-4" />
-            Trajectory Viewer
-          </TabsTrigger>
-          <TabsTrigger value="detection" className="gap-2">
-            <Scan className="h-4 w-4" />
-            Object Detection
-          </TabsTrigger>
-        </TabsList>
-      </div>
-      <div className="flex w-full shrink-0 flex-col gap-1 xl:w-auto xl:items-end" data-testid="workspace-header-actions">
-        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+        <div className="flex min-w-0 flex-col gap-1 xl:row-span-2 xl:justify-self-end xl:items-end" data-testid="workspace-header-actions">
+          <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             variant="outline"
             size="icon"
@@ -76,15 +61,30 @@ export function AnnotationWorkspaceTopBar({
             <SkipForward className="mr-2 h-4 w-4" />
             Save & Next Episode
           </Button>
-        </div>
-        <div className="min-h-[1rem]" data-testid="workspace-save-status-slot">
-          {saveStatusMessage && (
-            <p data-testid="workspace-save-status" className="text-xs text-muted-foreground">
-              {saveStatusMessage}
-            </p>
-          )}
+          </div>
+          <div className="min-h-[1rem] xl:text-right" data-testid="workspace-save-status-slot">
+            {saveStatusMessage && (
+              <p data-testid="workspace-save-status" className="text-xs text-muted-foreground">
+                {saveStatusMessage}
+              </p>
+            )}
+          </div>
         </div>
       </div>
+      <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto md:flex-wrap xl:overflow-visible">
+        <TabsTrigger value="episode" className="gap-2">
+          <Video className="h-4 w-4" />
+          Episode Viewer
+        </TabsTrigger>
+        <TabsTrigger value="trajectory" className="gap-2">
+          <Activity className="h-4 w-4" />
+          Trajectory Viewer
+        </TabsTrigger>
+        <TabsTrigger value="detection" className="gap-2">
+          <Scan className="h-4 w-4" />
+          Object Detection
+        </TabsTrigger>
+      </TabsList>
     </div>
   )
 }

@@ -68,12 +68,13 @@ export function AnnotationWorkspacePlaybackCard({
   playbackRangeLabel,
 }: AnnotationWorkspacePlaybackCardProps) {
   return (
-    <Card className={compact ? 'h-full min-h-0' : 'flex-shrink-0'}>
+    <Card className={compact ? 'mx-auto h-full min-h-0 w-full max-w-[44rem]' : 'flex-shrink-0'}>
       <CardContent className={compact ? 'flex h-full min-h-0 flex-col p-3' : 'p-4'}>
         <ViewerDisplayControls />
         <div
+          data-testid={compact ? 'trajectory-compact-media-frame' : undefined}
           className={compact
-            ? 'relative mt-2 flex min-h-0 aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-black'
+            ? 'relative mx-auto mt-2 flex min-h-0 w-full max-w-[40rem] aspect-video max-h-[18rem] items-center justify-center overflow-hidden rounded-lg bg-black'
             : 'relative mt-2 flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-black'}
         >
           <canvas ref={canvasRef} className="hidden" />
