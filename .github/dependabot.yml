@@ -118,3 +118,36 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+
+  # Docker base images for AzureML workflows
+  - package-ecosystem: "docker"
+    directory: "/workflows/azureml"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # Python dependencies for LeRobot inference
+  - package-ecosystem: "pip"
+    directory: "/workflows/azureml"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      lerobot-inference-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "python"
+      - "inference"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
