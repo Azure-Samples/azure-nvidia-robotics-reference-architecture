@@ -74,7 +74,7 @@ workflow:
 
             # Install UV package manager
             echo "Installing UV package manager..."
-            pip install --quiet uv
+            pip install --quiet uv==0.7.12
 
             # Unpack runtime payload and install dependencies from workflow manifest
             ARCHIVE_PATH="/tmp/lerobot_payload.zip"
