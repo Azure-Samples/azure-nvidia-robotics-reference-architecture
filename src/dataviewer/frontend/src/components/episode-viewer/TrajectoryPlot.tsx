@@ -28,11 +28,14 @@ import { cn } from '@/lib/utils'
 import { useEpisodeStore } from '@/stores'
 import { useTrajectoryAdjustmentState } from '@/stores/edit-store'
 import { useJointConfigStore } from '@/stores/joint-config-store'
-import type { TrajectoryAdjustment } from '@/types/episode-edit'
 
 import { getJointLabel, JOINT_COLORS } from './joint-constants'
 import { JointConfigDefaultsEditor } from './JointConfigDefaultsEditor'
 import { JointSelector } from './JointSelector'
+import {
+  buildTrajectoryChartData,
+  resolveTrajectorySelectionRange,
+} from './trajectory-plot-utils'
 
 /**
  * Isolated current frame marker component.
@@ -68,44 +71,6 @@ interface TrajectoryPlotProps {
   onSelectionComplete?: (range: [number, number]) => void;
   /** Called when the graph explicitly seeks to a frame */
   onSeekFrame?: (frame: number) => void;
-}
-
-function applyTrajectoryAdjustment(
-  value: number,
-  jointIndex: number,
-  adjustment: TrajectoryAdjustment | undefined,
-) {
-  let adjusted = value;
-
-  if (!adjustment) {
-    return adjusted;
-  }
-
-  if (adjustment.rightArmDelta && jointIndex >= 0 && jointIndex <= 2) {
-    adjusted += adjustment.rightArmDelta[jointIndex];
-  }
-
-  if (adjustment.leftArmDelta && jointIndex >= 8 && jointIndex <= 10) {
-    adjusted += adjustment.leftArmDelta[jointIndex - 8];
-  }
-
-  if (jointIndex === 7 && adjustment.rightGripperOverride !== undefined) {
-    adjusted = adjustment.rightGripperOverride;
-  }
-
-  if (jointIndex === 15 && adjustment.leftGripperOverride !== undefined) {
-    adjusted = adjustment.leftGripperOverride;
-  }
-
-  return adjusted;
-}
-
-function normalizeSeries(value: number, min: number, max: number) {
-  if (max === min) {
-    return 0;
-  }
-
-  return (value - min) / (max - min);
 }
 
 const TRAJECTORY_CHART_MIN_HEIGHT = 60
@@ -175,58 +140,15 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   );
 
   // Transform trajectory data for Recharts - memoized
-  // Apply trajectory adjustments to show modified values
   const chartData = useMemo(() => {
     if (!currentEpisode?.trajectoryData) return [];
 
-    const seriesValues = currentEpisode.trajectoryData.map((point) => {
-      const adjustment = trajectoryAdjustments.get(point.frame);
-
-      return showVelocity
-        ? point.jointVelocities
-        : point.jointPositions.map((position, jointIndex) =>
-            applyTrajectoryAdjustment(position, jointIndex, adjustment),
-          );
-    });
-
-    const shouldNormalizePositions = showNormalized && !showVelocity;
-    const normalizedRanges = shouldNormalizePositions
-      ? seriesValues[0]?.map((_, jointIndex) => {
-          const values = seriesValues.map((pointValues) => pointValues[jointIndex]);
-
-          return {
-            min: Math.min(...values),
-            max: Math.max(...values),
-          };
-        }) ?? []
-      : [];
-
-    return currentEpisode.trajectoryData.map((point, pointIndex) => {
-      const adjustment = trajectoryAdjustments.get(point.frame);
-      const data: Record<string, number | boolean> = {
-        frame: point.frame,
-        timestamp: point.timestamp,
-        hasAdjustment: !!adjustment,
-      };
-
-      // Add selected joint data with adjustments applied
-      const pointValues = seriesValues[pointIndex] ?? (showVelocity ? point.jointVelocities : point.jointPositions);
-
-      pointValues.forEach((value, jointIndex) => {
-        if (shouldNormalizePositions) {
-          const range = normalizedRanges[jointIndex];
-
-          data[`joint_${jointIndex}`] = range
-            ? normalizeSeries(value, range.min, range.max)
-            : value;
-          return;
-        }
-
-        data[`joint_${jointIndex}`] = value;
-      });
-
-      return data;
-    });
+    return buildTrajectoryChartData({
+      trajectoryData: currentEpisode.trajectoryData,
+      trajectoryAdjustments,
+      showVelocity,
+      showNormalized,
+    })
   }, [currentEpisode?.trajectoryData, showNormalized, showVelocity, trajectoryAdjustments]);
 
   // Get joint count - memoized
@@ -382,10 +304,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
     const pointerDistance = selectionAnchorX === null ? 0 : Math.abs(event.clientX - selectionAnchorX)
 
     if (pointerDistance >= 4 || selectionDragging) {
-      const nextRange: [number, number] = [
-        Math.min(selectionAnchorFrame, pointerFrame),
-        Math.max(selectionAnchorFrame, pointerFrame),
-      ]
+      const nextRange = resolveTrajectorySelectionRange(selectionAnchorFrame, pointerFrame)
 
       recordDiagnosticEvent('playback', 'selection-complete', {
         rangeStart: nextRange[0],
