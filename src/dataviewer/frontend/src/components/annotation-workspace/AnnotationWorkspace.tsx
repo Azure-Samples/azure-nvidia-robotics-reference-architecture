@@ -15,7 +15,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ViewerDisplayControls } from '@/components/viewer-display';
 import { useSaveEpisodeLabels } from '@/hooks/use-labels';
 import { combineCssFilters } from '@/lib/css-filters';
-import { DIAGNOSTICS_EVENT_NAME, isDiagnosticsChannelEnabled, readDiagnosticEvents, recordDiagnosticEvent } from '@/lib/playback-diagnostics';
+import {
+  DIAGNOSTICS_EVENT_NAME,
+  disableDiagnostics,
+  enableDiagnostics,
+  getEnabledDiagnosticsChannels,
+  isDiagnosticsEnabled,
+  readDiagnosticEvents,
+  recordDiagnosticEvent,
+} from '@/lib/playback-diagnostics';
 import {
   clampFrameToPlaybackRange,
   computeEffectiveFps,
@@ -84,9 +92,9 @@ export function AnnotationWorkspace({
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState('episode');
-  const diagnosticsEnabled = useMemo(() => isDiagnosticsChannelEnabled('playback'), []);
-  const [playbackDiagnostics, setPlaybackDiagnostics] = useState(() =>
-    diagnosticsEnabled ? readDiagnosticEvents('playback') : [],
+  const [diagnosticsVisible, setDiagnosticsVisible] = useState(() => isDiagnosticsEnabled());
+  const [diagnosticEvents, setDiagnosticEvents] = useState(() =>
+    isDiagnosticsEnabled() ? readDiagnosticEvents() : [],
   );
 
   const currentDataset = useDatasetStore((state) => state.currentDataset);
@@ -152,12 +160,12 @@ export function AnnotationWorkspace({
   }, []);
 
   useEffect(() => {
-    if (!diagnosticsEnabled || typeof window === 'undefined') {
+    if (!isDiagnosticsEnabled() || typeof window === 'undefined') {
       return;
     }
 
     const syncDiagnostics = () => {
-      setPlaybackDiagnostics(readDiagnosticEvents('playback'));
+      setDiagnosticEvents(readDiagnosticEvents());
     };
 
     syncDiagnostics();
@@ -166,7 +174,10 @@ export function AnnotationWorkspace({
     return () => {
       window.removeEventListener(DIAGNOSTICS_EVENT_NAME, syncDiagnostics);
     };
-  }, [diagnosticsEnabled]);
+  }, [diagnosticsVisible]);
+
+  const diagnosticsEnabled = diagnosticsVisible && isDiagnosticsEnabled();
+  const diagnosticsChannels = getEnabledDiagnosticsChannels();
 
   const hasLabelChanges = useMemo(() => {
     if (!currentEpisode || !labelDataLoaded) {
@@ -225,6 +236,13 @@ export function AnnotationWorkspace({
     if (hasPendingEpisodeChanges) {
       announceSave();
     }
+
+    recordDiagnosticEvent('workspace', 'save-next-episode', {
+      episodeIndex: currentEpisode?.meta.index ?? null,
+      hasPendingEpisodeChanges,
+      hasEdits,
+      hasLabelChanges,
+    });
 
     advanceToNextEpisode();
   }, [announceSave, canGoNextEpisode, currentDataset, currentEpisode, currentEpisodeLabels, hasEdits, hasLabelChanges, hasPendingEpisodeChanges, onNextEpisode, onSaveAndNextEpisode, saveEpisodeDraft, saveEpisodeLabels]);
@@ -404,6 +422,31 @@ export function AnnotationWorkspace({
     recordDiagnosticEvent('playback', 'graph-seek', { frame });
     seekVideoFrame(frame, null, false);
   }, [seekVideoFrame]);
+
+  const handleDiagnosticsToggle = useCallback(() => {
+    if (diagnosticsEnabled) {
+      disableDiagnostics();
+      setDiagnosticEvents([]);
+      setDiagnosticsVisible(false);
+      return;
+    }
+
+    enableDiagnostics();
+    setDiagnosticsVisible(true);
+    recordDiagnosticEvent('workspace', 'diagnostics-enabled', {
+      activeTab,
+      episodeIndex: currentEpisode?.meta.index ?? null,
+    });
+    setDiagnosticEvents(readDiagnosticEvents());
+  }, [activeTab, currentEpisode?.meta.index, diagnosticsEnabled]);
+
+  const handleTabChange = useCallback((nextTab: string) => {
+    setActiveTab(nextTab);
+    recordDiagnosticEvent('workspace', 'tab-change', {
+      previousTab: activeTab,
+      nextTab,
+    });
+  }, [activeTab]);
 
   const clearPlaybackSelection = useCallback(() => {
     shouldResumeAfterSelectionRef.current = false;
@@ -812,6 +855,33 @@ export function AnnotationWorkspace({
     [currentFrame, setFrameWithinPlaybackRange],
   );
 
+  const handleOpenExportDialog = useCallback(() => {
+    setExportDialogOpen(true);
+    recordDiagnosticEvent('workspace', 'export-open', {
+      activeTab,
+      episodeIndex: currentEpisode?.meta.index ?? null,
+    });
+  }, [activeTab, currentEpisode?.meta.index]);
+
+  const handleResetAllClick = useCallback(() => {
+    recordDiagnosticEvent('workspace', 'reset-all', {
+      activeTab,
+      episodeIndex: currentEpisode?.meta.index ?? null,
+      hasPendingEpisodeChanges,
+    });
+    void handleResetAll();
+  }, [activeTab, currentEpisode?.meta.index, handleResetAll, hasPendingEpisodeChanges]);
+
+  const diagnosticsStateSummary = useMemo(() => ([
+    { label: 'Dataset', value: currentDataset?.id ?? 'none' },
+    { label: 'Episode', value: currentEpisode ? String(currentEpisode.meta.index) : 'none' },
+    { label: 'Tab', value: activeTab },
+    { label: 'Frame', value: `${currentFrame} / ${Math.max(totalFrames - 1, 0)}` },
+    { label: 'Playback', value: isPlaying ? 'playing' : 'paused' },
+    { label: 'Selection', value: selectedSubtaskId ? `subtask:${selectedSubtaskId}` : selectedRange ? `${selectedRange[0]}-${selectedRange[1]}` : 'none' },
+    { label: 'Channels', value: diagnosticsChannels.length > 0 ? diagnosticsChannels.join(', ') : 'none' },
+  ]), [activeTab, currentDataset?.id, currentEpisode, currentFrame, diagnosticsChannels, isPlaying, selectedRange, selectedSubtaskId, totalFrames]);
+
   const renderSubtaskListCard = useCallback((compact = false) => (
     <Card className={compact ? 'min-h-[220px]' : 'mt-4'}>
       <CardContent className={compact ? 'p-3' : 'p-4'}>
@@ -1119,7 +1189,7 @@ export function AnnotationWorkspace({
   return (
     <div className="flex h-full flex-col gap-2.5 px-3 py-2">
       {/* Main tabbed content area */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between gap-3" data-testid="workspace-top-bar">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex min-w-0 items-center gap-2">
@@ -1156,15 +1226,24 @@ export function AnnotationWorkspace({
               </Button>
               <Button
                 variant="outline"
-                onClick={() => void handleResetAll()}
+                onClick={handleResetAllClick}
                 disabled={!hasPendingEpisodeChanges}
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset All
               </Button>
               <Button
+                variant={diagnosticsEnabled ? 'default' : 'outline'}
+                onClick={handleDiagnosticsToggle}
+                aria-label="Toggle Diagnostics"
+                title={diagnosticsEnabled ? 'Diagnostics on (click to hide)' : 'Diagnostics off (click to show)'}
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Diagnostics
+              </Button>
+              <Button
                 variant="outline"
-                onClick={() => setExportDialogOpen(true)}
+                onClick={handleOpenExportDialog}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export
@@ -1285,34 +1364,6 @@ export function AnnotationWorkspace({
                   onSelectionStart={handleSelectionStart}
                   onSelectionComplete={handleSelectionComplete}
                 />
-                {diagnosticsEnabled && (
-                  <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs" data-testid="playback-diagnostics-panel">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <h4 className="text-sm font-medium">Playback Diagnostics</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Enable with `?diagnostics=playback` or local storage key `dataviewer:diagnostics`.
-                        </p>
-                      </div>
-                      <div className="text-right text-muted-foreground">
-                        <div>Range: {playbackRangeStart} to {playbackRangeEnd}</div>
-                        <div>Loop intent: {shouldLoopPlaybackRange ? 'enabled' : 'disabled'}</div>
-                      </div>
-                    </div>
-                    <div className="mt-3 max-h-40 overflow-y-auto rounded border bg-background/80 p-2 font-mono text-[11px]">
-                      {playbackDiagnostics.length === 0 ? (
-                        <div className="text-muted-foreground">No playback events recorded yet.</div>
-                      ) : (
-                        playbackDiagnostics.slice(-8).map((event) => (
-                          <div key={`${event.timestamp}-${event.type}-${JSON.stringify(event.data ?? {})}`} className="border-b border-border/50 py-1 last:border-b-0">
-                            <div>{event.type}</div>
-                            <div className="text-muted-foreground">{JSON.stringify(event.data ?? {})}</div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
@@ -1346,6 +1397,54 @@ export function AnnotationWorkspace({
           <DetectionPanel />
         </TabsContent>
       </Tabs>
+
+      {diagnosticsEnabled && (
+        <Card className="shrink-0" data-testid="dataviewer-diagnostics-panel">
+          <CardHeader className="py-3 px-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm">Dataviewer Diagnostics</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Whole-workspace diagnostics are enabled. Use the header toggle to hide this panel.
+                </p>
+              </div>
+              <div className="text-right text-xs text-muted-foreground">
+                <div>Range: {playbackRangeStart} to {playbackRangeEnd}</div>
+                <div>Loop intent: {shouldLoopPlaybackRange ? 'enabled' : 'disabled'}</div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 border-t p-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <h4 className="text-sm font-medium">Workspace State</h4>
+              <div className="mt-2 grid gap-1 text-xs">
+                {diagnosticsStateSummary.map((entry) => (
+                  <div key={entry.label} className="flex items-center justify-between gap-3 border-b border-border/50 py-1 last:border-b-0">
+                    <span className="text-muted-foreground">{entry.label}</span>
+                    <span>{entry.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <h4 className="text-sm font-medium">Recent Events</h4>
+              <div className="mt-2 max-h-48 overflow-y-auto rounded border bg-background/80 p-2 font-mono text-[11px]">
+                {diagnosticEvents.length === 0 ? (
+                  <div className="text-muted-foreground">No diagnostics events recorded yet.</div>
+                ) : (
+                  diagnosticEvents.slice(-12).map((event) => (
+                    <div key={`${event.timestamp}-${event.channel}-${event.type}-${JSON.stringify(event.data ?? {})}`} className="border-b border-border/50 py-1 last:border-b-0">
+                      <div>{event.channel}</div>
+                      <div>{event.type}</div>
+                      <div className="text-muted-foreground">{JSON.stringify(event.data ?? {})}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Export Dialog */}
       <ExportDialog

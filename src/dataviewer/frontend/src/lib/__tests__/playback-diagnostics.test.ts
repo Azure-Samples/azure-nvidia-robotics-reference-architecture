@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   clearDiagnosticEvents,
   DIAGNOSTICS_STORAGE_KEY,
+  disableDiagnostics,
+  enableDiagnostics,
+  getEnabledDiagnosticsChannels,
   isDiagnosticsChannelEnabled,
+  isDiagnosticsEnabled,
   readDiagnosticEvents,
   recordDiagnosticEvent,
 } from '../playback-diagnostics'
@@ -34,10 +38,12 @@ describe('playback diagnostics', () => {
   })
 
   it('enables a channel from local storage without affecting default behavior', () => {
+    expect(isDiagnosticsEnabled()).toBe(false)
     expect(isDiagnosticsChannelEnabled('playback')).toBe(false)
 
     localStorage.setItem(DIAGNOSTICS_STORAGE_KEY, 'playback')
 
+    expect(isDiagnosticsEnabled()).toBe(true)
     expect(isDiagnosticsChannelEnabled('playback')).toBe(true)
   })
 
@@ -69,5 +75,26 @@ describe('playback diagnostics', () => {
     expect(events).toHaveLength(200)
     expect(events[0]?.data).toEqual({ index: 5 })
     expect(events[events.length - 1]?.data).toEqual({ index: 204 })
+  })
+
+  it('can enable and disable diagnostics from code for the whole dataviewer', () => {
+    enableDiagnostics()
+
+    expect(isDiagnosticsEnabled()).toBe(true)
+    expect(getEnabledDiagnosticsChannels()).toEqual(['all'])
+
+    disableDiagnostics()
+
+    expect(isDiagnosticsEnabled()).toBe(false)
+    expect(getEnabledDiagnosticsChannels()).toEqual([])
+  })
+
+  it('reads all diagnostics events when no channel filter is provided', () => {
+    enableDiagnostics(['all'])
+
+    recordDiagnosticEvent('workspace', 'tab-change', { nextTab: 'trajectory' })
+    recordDiagnosticEvent('playback', 'selection-complete', { range: [10, 20] })
+
+    expect(readDiagnosticEvents()).toHaveLength(2)
   })
 })

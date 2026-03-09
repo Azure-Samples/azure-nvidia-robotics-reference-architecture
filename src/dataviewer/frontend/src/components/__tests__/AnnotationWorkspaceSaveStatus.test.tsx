@@ -7,6 +7,40 @@ const { mockComputeSyncAction } = vi.hoisted(() => ({
   mockComputeSyncAction: vi.fn<() => { kind: string; playbackRate?: number }>(() => ({ kind: 'pause' })),
 }))
 
+const {
+  mockDiagnosticsState,
+  mockDisableDiagnostics,
+  mockEnableDiagnostics,
+  mockRecordDiagnosticEvent,
+} = vi.hoisted(() => {
+  const state = {
+    enabled: false,
+    events: [] as Array<{
+      channel: string
+      type: string
+      data?: Record<string, unknown>
+      timestamp: string
+    }>,
+  }
+
+  return {
+    mockDiagnosticsState: state,
+    mockDisableDiagnostics: vi.fn(() => {
+      state.enabled = false
+    }),
+    mockEnableDiagnostics: vi.fn(() => {
+      state.enabled = true
+    }),
+    mockRecordDiagnosticEvent: vi.fn((channel: string, type: string, data?: Record<string, unknown>) => {
+      if (!state.enabled) {
+        return
+      }
+
+      state.events.push({ channel, type, data, timestamp: new Date().toISOString() })
+    }),
+  }
+})
+
 let mockEpisodeLabels: Record<number, string[]> = { 0: ['SUCCESS'] }
 let mockSavedEpisodeLabels: Record<number, string[]> = { 0: ['SUCCESS'] }
 let mockAvailableLabels = ['SUCCESS', 'FAILURE', 'PARTIAL']
@@ -118,6 +152,23 @@ vi.mock('@/components/viewer-display', () => ({
 
 vi.mock('@/lib/css-filters', () => ({
   combineCssFilters: () => '',
+}))
+
+vi.mock('@/lib/playback-diagnostics', () => ({
+  DIAGNOSTICS_EVENT_NAME: 'dataviewer:diagnostics',
+  disableDiagnostics: mockDisableDiagnostics,
+  enableDiagnostics: mockEnableDiagnostics,
+  getEnabledDiagnosticsChannels: () => (mockDiagnosticsState.enabled ? ['all'] : []),
+  isDiagnosticsEnabled: () => mockDiagnosticsState.enabled,
+  isDiagnosticsChannelEnabled: () => mockDiagnosticsState.enabled,
+  readDiagnosticEvents: (channel?: string) => {
+    if (!channel) {
+      return mockDiagnosticsState.events
+    }
+
+    return mockDiagnosticsState.events.filter((event) => event.channel === channel)
+  },
+  recordDiagnosticEvent: mockRecordDiagnosticEvent,
 }))
 
 vi.mock('@/lib/playback-utils', () => ({
@@ -241,6 +292,11 @@ describe('AnnotationWorkspace save status', () => {
       mockHasEdits = false
     })
     mockResetEdits.mockReset()
+    mockDiagnosticsState.enabled = false
+    mockDiagnosticsState.events = []
+    mockEnableDiagnostics.mockClear()
+    mockDisableDiagnostics.mockClear()
+    mockRecordDiagnosticEvent.mockClear()
   })
 
   afterEach(() => {
@@ -355,6 +411,44 @@ describe('AnnotationWorkspace save status', () => {
     expect(screen.getByRole('tab', { name: /episode viewer/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /trajectory viewer/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /object detection/i })).toBeInTheDocument()
+  })
+
+  it('keeps the diagnostics panel hidden by default', () => {
+    render(<AnnotationWorkspace />)
+
+    expect(screen.queryByTestId('dataviewer-diagnostics-panel')).not.toBeInTheDocument()
+  })
+
+  it('toggles a whole-dataviewer diagnostics panel from the workspace header', () => {
+    render(<AnnotationWorkspace />)
+
+    fireEvent.click(screen.getByRole('button', { name: /toggle diagnostics/i }))
+
+    expect(mockEnableDiagnostics).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('dataviewer-diagnostics-panel')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /toggle diagnostics/i }))
+
+    expect(mockDisableDiagnostics).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('dataviewer-diagnostics-panel')).not.toBeInTheDocument()
+  })
+
+  it('renders diagnostics in a shared bottom panel outside the trajectory tab', () => {
+    mockDiagnosticsState.enabled = true
+    mockDiagnosticsState.events = [
+      { channel: 'workspace', type: 'tab-change', data: { nextTab: 'episode' }, timestamp: '2026-03-08T00:00:00.000Z' },
+      { channel: 'playback', type: 'sync-action', data: { action: 'play' }, timestamp: '2026-03-08T00:00:01.000Z' },
+    ]
+
+    render(<AnnotationWorkspace />)
+
+    const diagnosticsPanel = screen.getByTestId('dataviewer-diagnostics-panel')
+
+    expect(diagnosticsPanel).toBeInTheDocument()
+    expect(screen.getByText(/dataviewer diagnostics/i)).toBeInTheDocument()
+    expect(screen.getByText(/workspace state/i)).toBeInTheDocument()
+    expect(within(diagnosticsPanel).getByText(/sync-action/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('playback-diagnostics-panel')).not.toBeInTheDocument()
   })
 
   it('keeps the trajectory plot out of the default episode viewer tab', () => {
