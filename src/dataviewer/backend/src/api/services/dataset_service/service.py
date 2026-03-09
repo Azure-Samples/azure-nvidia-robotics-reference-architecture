@@ -5,6 +5,7 @@ Delegates format-specific operations to registered DatasetFormatHandler
 implementations (LeRobot, HDF5) and manages blob storage integration.
 """
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -20,6 +21,7 @@ from ...models.datasources import (
     TrajectoryPoint,
 )
 from ...storage import LocalStorageAdapter, StorageAdapter
+from ..episode_cache import EpisodeCache
 from .base import DatasetFormatHandler
 from .hdf5_handler import HDF5FormatHandler
 from .lerobot_handler import LEROBOT_AVAILABLE, LeRobotFormatHandler
@@ -45,6 +47,7 @@ class DatasetService:
         base_path: str | None = None,
         storage_adapter: StorageAdapter | None = None,
         blob_provider: "BlobDatasetProvider | None" = None,
+        episode_cache_capacity: int = 32,
     ):
         if base_path is None:
             base_path = os.environ.get("HMI_DATA_PATH", "./data")
@@ -64,6 +67,10 @@ class DatasetService:
         self._lerobot_handler = LeRobotFormatHandler()
         self._hdf5_handler = HDF5FormatHandler()
         self._handlers = [self._lerobot_handler, self._hdf5_handler]
+
+        self._episode_cache = EpisodeCache(capacity=episode_cache_capacity)
+        self._prefetch_radius = 2
+        self._prefetch_tasks: set[asyncio.Task[None]] = set()
 
     # ------------------------------------------------------------------
     # Handler resolution
@@ -237,6 +244,7 @@ class DatasetService:
         self._blob_dataset_ids.discard(dataset_id)
         self._blob_synced.pop(dataset_id, None)
         self._blob_meta_synced.pop(dataset_id, None)
+        self._episode_cache.invalidate(dataset_id)
         for handler in self._handlers:
             loaders = getattr(handler, "_loaders", None)
             if isinstance(loaders, dict):
@@ -381,6 +389,14 @@ class DatasetService:
     async def get_episode(self, dataset_id: str, episode_idx: int) -> EpisodeData | None:
         """Get complete data for a specific episode."""
         dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
+
+        # Check cache first
+        cached = self._episode_cache.get(dataset_id, episode_idx)
+        if cached is not None:
+            annotated_indices = set(await self._storage.list_annotated_episodes(dataset_id))
+            cached.meta.has_annotations = episode_idx in annotated_indices
+            return cached
+
         dataset = self._datasets.get(dataset_id)
         annotated_indices = set(await self._storage.list_annotated_episodes(dataset_id))
 
@@ -400,6 +416,8 @@ class DatasetService:
             episode = h.load_episode(dataset_id, episode_idx, dataset_info=dataset)
             if episode is not None:
                 episode.meta.has_annotations = episode_idx in annotated_indices
+                self._episode_cache.put(dataset_id, episode_idx, episode)
+                self._schedule_prefetch(dataset_id, episode_idx)
                 return episode
 
         # Validate episode index if we have dataset info
@@ -420,11 +438,68 @@ class DatasetService:
     async def get_episode_trajectory(self, dataset_id: str, episode_idx: int) -> list[TrajectoryPoint]:
         """Get only the trajectory data for an episode."""
         dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
+
+        cached = self._episode_cache.get(dataset_id, episode_idx)
+        if cached is not None:
+            return cached.trajectory_data
+
         return self._try_handlers(dataset_id, "get_trajectory", episode_idx) or []
+
+    # ------------------------------------------------------------------
+    # Background prefetch
+    # ------------------------------------------------------------------
+
+    def _schedule_prefetch(self, dataset_id: str, episode_idx: int) -> None:
+        """Schedule background loading of adjacent episodes into the cache."""
+        if not self._episode_cache.enabled:
+            return
+
+        dataset = self._datasets.get(dataset_id)
+        total = dataset.total_episodes if dataset else 0
+        if total <= 1:
+            return
+
+        indices = [
+            idx
+            for idx in range(
+                max(0, episode_idx - self._prefetch_radius),
+                min(total, episode_idx + self._prefetch_radius + 1),
+            )
+            if idx != episode_idx and self._episode_cache.get(dataset_id, idx) is None
+        ]
+
+        if not indices:
+            return
+
+        async def _prefetch() -> None:
+            for idx in indices:
+                if self._episode_cache.get(dataset_id, idx) is not None:
+                    continue
+                handler = self._resolve_handler(dataset_id)
+                if handler is None:
+                    break
+                episode = handler.load_episode(dataset_id, idx, dataset_info=dataset)
+                if episode is not None:
+                    self._episode_cache.put(dataset_id, idx, episode)
+                    logger.debug("Prefetched episode %s/%d", dataset_id, idx)
+
+        # Clean up completed tasks
+        self._prefetch_tasks = {t for t in self._prefetch_tasks if not t.done()}
+
+        try:
+            task = asyncio.create_task(_prefetch())
+            self._prefetch_tasks.add(task)
+            task.add_done_callback(self._prefetch_tasks.discard)
+        except RuntimeError:
+            pass
 
     # ------------------------------------------------------------------
     # Capability queries
     # ------------------------------------------------------------------
+
+    def invalidate_episode_cache(self, dataset_id: str, episode_index: int | None = None) -> int:
+        """Remove cached episode data after an external mutation (e.g. annotation save)."""
+        return self._episode_cache.invalidate(dataset_id, episode_index)
 
     def has_hdf5_support(self) -> bool:
         """Check if HDF5 support is available."""
@@ -515,5 +590,6 @@ def get_dataset_service() -> DatasetService:
             base_path=config.data_path,
             storage_adapter=storage,
             blob_provider=blob_provider,
+            episode_cache_capacity=config.episode_cache_capacity,
         )
     return _dataset_service

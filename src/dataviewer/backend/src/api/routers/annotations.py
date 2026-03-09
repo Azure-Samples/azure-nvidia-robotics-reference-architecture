@@ -87,7 +87,9 @@ async def save_annotations(
             detail=f"Episode {episode_idx} not found in dataset '{dataset_id}'",
         )
 
-    return await service.save_annotation(dataset_id, episode_idx, annotation)
+    result = await service.save_annotation(dataset_id, episode_idx, annotation)
+    dataset_service.invalidate_episode_cache(dataset_id, episode_idx)
+    return result
 
 
 @router.delete(
@@ -114,6 +116,7 @@ async def delete_annotations(
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
 
     deleted = await service.delete_annotation(dataset_id, episode_idx, annotator_id)
+    dataset_service.invalidate_episode_cache(dataset_id, episode_idx)
     return {"deleted": deleted, "episode_index": episode_idx}
 
 

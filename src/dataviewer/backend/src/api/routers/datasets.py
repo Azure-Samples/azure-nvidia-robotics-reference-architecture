@@ -125,6 +125,7 @@ async def list_episodes(
 @router.get("/{dataset_id}/episodes/{episode_idx}", response_model=EpisodeData)
 async def get_episode(
     episode_idx: int,
+    response: Response,
     dataset_id: str = Depends(validated_dataset_id),
     service: DatasetService = Depends(get_dataset_service),
 ) -> EpisodeData:
@@ -144,6 +145,7 @@ async def get_episode(
             status_code=404,
             detail=f"Episode {episode_idx} not found in dataset '{dataset_id}'",
         )
+    response.headers["Cache-Control"] = "private, max-age=60"
     return episode
 
 
@@ -153,6 +155,7 @@ async def get_episode(
 )
 async def get_episode_trajectory(
     episode_idx: int,
+    response: Response,
     dataset_id: str = Depends(validated_dataset_id),
     service: DatasetService = Depends(get_dataset_service),
 ) -> list[TrajectoryPoint]:
@@ -168,6 +171,7 @@ async def get_episode_trajectory(
             status_code=404,
             detail=f"No trajectory data for episode {episode_idx} in dataset '{dataset_id}'",
         )
+    response.headers["Cache-Control"] = "private, max-age=60"
     return trajectory
 
 
@@ -191,7 +195,11 @@ async def get_episode_frame(
                 status_code=404,
                 detail=f"Frame {frame_idx} not found for camera '{camera}'",
             )
-        return Response(content=image_bytes, media_type="image/jpeg")
+        return Response(
+            content=image_bytes,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -251,6 +259,7 @@ async def get_episode_video(
             path=str(video_file),
             media_type=media_type,
             filename=f"{dataset_id}_ep{episode_idx}_{camera.replace('.', '_')}{suffix}",
+            headers={"Cache-Control": "public, max-age=86400, immutable"},
         )
 
     # Fall back to blob streaming when local file is unavailable
@@ -274,4 +283,29 @@ async def get_episode_video(
     raise HTTPException(
         status_code=404,
         detail=f"Video not found for episode {episode_idx}, camera '{camera}'",
+    )
+
+
+class EpisodeCacheStats(BaseModel):
+    """Cache performance metrics."""
+
+    capacity: int
+    size: int
+    hits: int
+    misses: int
+    hit_rate: float
+
+
+@router.get("/cache/stats", response_model=EpisodeCacheStats)
+async def get_cache_stats(
+    service: DatasetService = Depends(get_dataset_service),
+) -> EpisodeCacheStats:
+    """Return episode cache performance metrics."""
+    stats = service._episode_cache.stats()
+    return EpisodeCacheStats(
+        capacity=stats.capacity,
+        size=stats.size,
+        hits=stats.hits,
+        misses=stats.misses,
+        hit_rate=stats.hit_rate,
     )

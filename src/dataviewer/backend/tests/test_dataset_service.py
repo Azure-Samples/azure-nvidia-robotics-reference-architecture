@@ -187,3 +187,51 @@ class TestVideoFilePath:
         service._discover_dataset(DATASET_ID)
         path = service.get_video_file_path(DATASET_ID, 0, "fake_camera")
         assert path is None
+
+
+class TestEpisodeCacheIntegration:
+    """Test LRU cache behavior within the real dataset service."""
+
+    @pytest.mark.asyncio
+    async def test_second_request_is_cache_hit(self, service):
+        await service.get_episode(DATASET_ID, 0)
+        stats_before = service._episode_cache.stats()
+
+        await service.get_episode(DATASET_ID, 0)
+        stats_after = service._episode_cache.stats()
+
+        assert stats_after.hits == stats_before.hits + 1
+
+    @pytest.mark.asyncio
+    async def test_invalidation_forces_reload(self, service):
+        await service.get_episode(DATASET_ID, 0)
+        assert service._episode_cache.get(DATASET_ID, 0) is not None
+
+        service.invalidate_episode_cache(DATASET_ID, 0)
+        assert service._episode_cache.get(DATASET_ID, 0) is None
+
+    @pytest.mark.asyncio
+    async def test_prefetch_populates_adjacent_episodes(self, service):
+        import asyncio
+
+        # Discover dataset metadata first so prefetch knows total_episodes
+        await service.get_dataset(DATASET_ID)
+        await service.get_episode(DATASET_ID, 3)
+        # Allow background prefetch task to complete
+        await asyncio.sleep(1.0)
+
+        # Episodes 1-5 should be prefetched (radius=2)
+        for idx in [1, 2, 4, 5]:
+            cached = service._episode_cache.get(DATASET_ID, idx)
+            assert cached is not None, f"Episode {idx} should be prefetched"
+
+    @pytest.mark.asyncio
+    async def test_trajectory_served_from_cache(self, service):
+        await service.get_episode(DATASET_ID, 0)
+        stats_before = service._episode_cache.stats()
+
+        traj = await service.get_episode_trajectory(DATASET_ID, 0)
+        stats_after = service._episode_cache.stats()
+
+        assert len(traj) > 0
+        assert stats_after.hits == stats_before.hits + 1

@@ -51,6 +51,9 @@ class AppConfig:
     cors_origins: list[str] = field(default_factory=list)
     """Allowed CORS origins for the frontend."""
 
+    episode_cache_capacity: int = 32
+    """Max episodes held in the LRU cache. 0 disables caching."""
+
 
 def load_config(env_path: Path | None = None) -> AppConfig:
     """
@@ -81,6 +84,8 @@ def load_config(env_path: Path | None = None) -> AppConfig:
     cors_raw = os.environ.get("CORS_ORIGINS", _DEFAULT_CORS)
     cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
 
+    episode_cache_capacity = int(os.environ.get("EPISODE_CACHE_CAPACITY", "32"))
+
     return AppConfig(
         storage_backend=storage_backend,
         data_path=data_path,
@@ -91,6 +96,7 @@ def load_config(env_path: Path | None = None) -> AppConfig:
         backend_host=backend_host,
         backend_port=backend_port,
         cors_origins=cors_origins,
+        episode_cache_capacity=episode_cache_capacity,
     )
 
 

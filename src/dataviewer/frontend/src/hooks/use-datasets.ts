@@ -119,6 +119,7 @@ export function useEpisodes(
     queryFn: () => fetchEpisodes(datasetId!, options),
     enabled: !!datasetId,
     staleTime: 1 * 60 * 1000, // 1 minute
+    gcTime: 30 * 60 * 1000, // 30 minutes
   });
 }
 
@@ -142,6 +143,7 @@ export function useEpisode(
     queryFn: () => fetchEpisode(datasetId!, episodeIndex!),
     enabled: !!datasetId && episodeIndex !== undefined && episodeIndex >= 0,
     staleTime: 30 * 1000, // 30 seconds
+    gcTime: 30 * 60 * 1000, // 30 minutes
   });
 }
 
