@@ -248,6 +248,7 @@ vi.mock('@/stores/label-store', () => ({
 vi.mock('@/stores', () => ({
   useDatasetStore: (selector: (state: unknown) => unknown) => selector({ currentDataset: { id: 'dataset-1', fps: 30 } }),
   useEditDirtyState: () => ({ isDirty: hoisted.state.hasEdits, resetEdits: hoisted.resetEdits }),
+  useFrameInsertionState: () => ({ insertedFrames: new Map<number, { interpolationFactor?: number }>() }),
   useEditStore: (selector: (state: unknown) => unknown) =>
     selector({
       subtasks: hoisted.state.subtasks,
@@ -288,7 +289,6 @@ vi.mock('@/stores', () => ({
 vi.mock('@/stores/edit-store', () => ({
   getEffectiveFrameCount: () => 12,
   getOriginalIndex: () => 0,
-  useFrameInsertionState: () => ({ insertedFrames: new Map<number, { interpolationFactor?: number }>() }),
 }))
 
 export const mediaSpies: {

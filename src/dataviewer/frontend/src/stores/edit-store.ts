@@ -9,7 +9,6 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { useShallow } from 'zustand/react/shallow';
 
 import { loadPersistedEditDraft } from '@/lib/edit-draft-storage';
 import {
@@ -30,6 +29,12 @@ import {
   createDefaultSubtask,
   validateSegments,
 } from '@/types/episode-edit';
+
+export {
+  getEffectiveFrameCount,
+  getEffectiveIndex,
+  getOriginalIndex,
+} from './edit-store-frame-utils';
 
 interface EditState {
   /** Current episode being edited */
@@ -155,109 +160,6 @@ const initialState: EditState = {
 
 function getEpisodeDraftKey(datasetId: string, episodeIndex: number) {
   return `${datasetId}:${episodeIndex}`;
-}
-
-/**
- * Compute effective index accounting for insertions and removals.
- *
- * @param originalIndex - Index in original frame space
- * @param insertedFrames - Map of inserted frames
- * @param removedFrames - Set of removed frames
- * @returns Effective index in the edited frame space
- */
-export function getEffectiveIndex(
-  originalIndex: number,
-  insertedFrames: Map<number, FrameInsertion>,
-  removedFrames: Set<number>,
-): number {
-  let offset = 0;
-
-  // Count insertions before this index
-  for (const afterIdx of insertedFrames.keys()) {
-    if (afterIdx < originalIndex && !removedFrames.has(afterIdx)) {
-      offset++;
-    }
-  }
-
-  // Count removals before this index
-  for (const removedIdx of removedFrames) {
-    if (removedIdx < originalIndex) {
-      offset--;
-    }
-  }
-
-  return originalIndex + offset;
-}
-
-/**
- * Convert effective index back to original frame index.
- *
- * @param effectiveIndex - Index in edited frame space
- * @param insertedFrames - Map of inserted frames
- * @param removedFrames - Set of removed frames
- * @returns Original frame index, or null if position is an inserted frame
- */
-export function getOriginalIndex(
-  effectiveIndex: number,
-  insertedFrames: Map<number, FrameInsertion>,
-  removedFrames: Set<number>,
-): number | null {
-  // Build sorted list of effective insertion positions
-  const insertionPositions: number[] = [];
-  for (const afterIdx of insertedFrames.keys()) {
-    if (!removedFrames.has(afterIdx)) {
-      const effectivePos = getEffectiveIndex(afterIdx, insertedFrames, removedFrames) + 1;
-      insertionPositions.push(effectivePos);
-    }
-  }
-  insertionPositions.sort((a, b) => a - b);
-
-  // Check if effectiveIndex is an inserted frame
-  if (insertionPositions.includes(effectiveIndex)) {
-    return null; // This is an inserted frame, no original index
-  }
-
-  // Count how many insertions are before this position
-  let insertionsBefore = 0;
-  for (const pos of insertionPositions) {
-    if (pos < effectiveIndex) insertionsBefore++;
-  }
-
-  // Count removals to adjust
-  const candidateOriginal = effectiveIndex - insertionsBefore;
-  let removedBefore = 0;
-  const sortedRemovals = Array.from(removedFrames).sort((a, b) => a - b);
-  for (const removedIdx of sortedRemovals) {
-    if (removedIdx <= candidateOriginal + removedBefore) {
-      removedBefore++;
-    }
-  }
-
-  return candidateOriginal + removedBefore;
-}
-
-/**
- * Get the total effective frame count after edits.
- *
- * @param originalCount - Original frame count
- * @param insertedFrames - Map of inserted frames
- * @param removedFrames - Set of removed frames
- * @returns Effective frame count
- */
-export function getEffectiveFrameCount(
-  originalCount: number,
-  insertedFrames: Map<number, FrameInsertion>,
-  removedFrames: Set<number>,
-): number {
-  // Valid insertions (not after removed frames)
-  let validInsertions = 0;
-  for (const afterIdx of insertedFrames.keys()) {
-    if (!removedFrames.has(afterIdx) && afterIdx < originalCount - 1) {
-      validInsertions++;
-    }
-  }
-
-  return originalCount - removedFrames.size + validInsertions;
 }
 
 /**
@@ -662,78 +564,3 @@ export const useEditStore = create<EditStore>()(
   )
 );
 
-// ============================================================================
-// Selector Hooks
-// ============================================================================
-
-/** Get transform state */
-export const useTransformState = () =>
-  useEditStore(
-    useShallow((state) => ({
-      globalTransform: state.globalTransform,
-      cameraTransforms: state.cameraTransforms,
-      setGlobalTransform: state.setGlobalTransform,
-      setCameraTransform: state.setCameraTransform,
-      clearTransforms: state.clearTransforms,
-    }))
-  );
-
-/** Get frame removal state */
-export const useFrameRemovalState = () =>
-  useEditStore(
-    useShallow((state) => ({
-      removedFrames: state.removedFrames,
-      toggleFrameRemoval: state.toggleFrameRemoval,
-      addFrameRange: state.addFrameRange,
-      addFramesByFrequency: state.addFramesByFrequency,
-      removeFrameRange: state.removeFrameRange,
-      clearRemovedFrames: state.clearRemovedFrames,
-    }))
-  );
-
-/** Get frame insertion state */
-export const useFrameInsertionState = () =>
-  useEditStore(
-    useShallow((state) => ({
-      insertedFrames: state.insertedFrames,
-      insertFrame: state.insertFrame,
-      removeInsertedFrame: state.removeInsertedFrame,
-      clearInsertedFrames: state.clearInsertedFrames,
-    }))
-  );
-
-/** Get subtask state */
-export const useSubtaskState = () =>
-  useEditStore(
-    useShallow((state) => ({
-      subtasks: state.subtasks,
-      validationErrors: state.validationErrors,
-      addSubtask: state.addSubtask,
-      addSubtaskFromRange: state.addSubtaskFromRange,
-      updateSubtask: state.updateSubtask,
-      removeSubtask: state.removeSubtask,
-      reorderSubtasks: state.reorderSubtasks,
-    }))
-  );
-
-/** Get edit dirty state */
-export const useEditDirtyState = () =>
-  useEditStore(
-    useShallow((state) => ({
-      isDirty: state.isDirty,
-      markSaved: state.markSaved,
-      resetEdits: state.resetEdits,
-    }))
-  );
-
-/** Get trajectory adjustment state */
-export const useTrajectoryAdjustmentState = () =>
-  useEditStore(
-    useShallow((state) => ({
-      trajectoryAdjustments: state.trajectoryAdjustments,
-      setTrajectoryAdjustment: state.setTrajectoryAdjustment,
-      removeTrajectoryAdjustment: state.removeTrajectoryAdjustment,
-      getTrajectoryAdjustment: state.getTrajectoryAdjustment,
-      clearTrajectoryAdjustments: state.clearTrajectoryAdjustments,
-    }))
-  );

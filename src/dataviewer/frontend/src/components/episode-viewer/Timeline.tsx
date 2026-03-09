@@ -10,8 +10,14 @@
 import { useCallback,useMemo, useRef } from 'react';
 
 import { cn } from '@/lib/utils';
-import { useAnnotationStore, useEditStore,useEpisodeStore, usePlaybackControls } from '@/stores';
-import { useFrameInsertionState, useTrajectoryAdjustmentState } from '@/stores/edit-store';
+import {
+  useAnnotationStore,
+  useEditStore,
+  useEpisodeStore,
+  useFrameInsertionState,
+  usePlaybackControls,
+  useTrajectoryAdjustmentState,
+} from '@/stores';
 import type { Anomaly } from '@/types';
 
 import { TimelineMarker } from './TimelineMarker';

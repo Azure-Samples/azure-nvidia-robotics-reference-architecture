@@ -13,13 +13,16 @@ export {
 export { useDatasetStore } from './dataset-store';
 export {
   getEffectiveFrameCount,
-  useEditDirtyState,
   useEditStore,
+} from './edit-store';
+export {
+  useEditDirtyState,
+  useFrameInsertionState,
   useFrameRemovalState,
   useSubtaskState,
   useTrajectoryAdjustmentState,
   useTransformState,
-} from './edit-store';
+} from './edit-store-selectors';
 export {
   useCurrentEpisodeIndex,
   useEpisodeNavigation,

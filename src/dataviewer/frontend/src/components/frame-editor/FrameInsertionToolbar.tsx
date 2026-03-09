@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useEpisodeStore } from '@/stores';
-import { useFrameInsertionState } from '@/stores/edit-store';
+import { useFrameInsertionState } from '@/stores';
 
 /**
  * Toolbar for frame insertion operations including single frame, range, and frequency-based insertion
