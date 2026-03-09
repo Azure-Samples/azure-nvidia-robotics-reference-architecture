@@ -229,6 +229,8 @@ describe('TrajectoryPlot', () => {
 
   it('supports dragging on the graph to select a frame range', () => {
     const handleRangeSelectionChange = vi.fn()
+    const handleSelectionStart = vi.fn()
+    const handleSelectionComplete = vi.fn()
 
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
@@ -249,6 +251,8 @@ describe('TrajectoryPlot', () => {
           className="h-full"
           selectedRange={null}
           onSelectedRangeChange={handleRangeSelectionChange}
+          onSelectionStart={handleSelectionStart}
+          onSelectionComplete={handleSelectionComplete}
         />
       </div>,
     )
@@ -261,10 +265,63 @@ describe('TrajectoryPlot', () => {
     })
 
     fireEvent.pointerDown(selectionSurface, { button: 0, clientX: 30, clientY: 20 })
+
+    expect(handleSelectionStart).not.toHaveBeenCalled()
+
     fireEvent.pointerMove(selectionSurface, { clientX: 210, clientY: 20 })
+
+    expect(handleSelectionStart).toHaveBeenCalledTimes(1)
+
     fireEvent.pointerUp(selectionSurface, { clientX: 210, clientY: 20 })
 
     expect(handleRangeSelectionChange).toHaveBeenLastCalledWith([1, 6])
+    expect(handleSelectionComplete).toHaveBeenCalledWith([1, 6])
+  })
+
+  it('seeks to the clicked frame without starting subgroup selection mode', () => {
+    const handleRangeSelectionChange = vi.fn()
+    const handleSelectionStart = vi.fn()
+    const handleSelectionComplete = vi.fn()
+
+    useEpisodeStore.getState().setCurrentEpisode({
+      meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
+      videoUrls: {},
+      trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
+        frame,
+        timestamp: frame / 10,
+        jointPositions: Array.from({ length: 17 }, (_, index) => index + frame),
+        jointVelocities: Array.from({ length: 17 }, (_, index) => (index + frame) / 10),
+        endEffectorPose: [],
+        gripperState: 0,
+      })),
+    })
+
+    render(
+      <div style={{ width: 600, height: 300 }}>
+        <TrajectoryPlot
+          className="h-full"
+          selectedRange={null}
+          onSelectedRangeChange={handleRangeSelectionChange}
+          onSelectionStart={handleSelectionStart}
+          onSelectionComplete={handleSelectionComplete}
+        />
+      </div>,
+    )
+
+    const selectionSurface = screen.getByTestId('trajectory-selection-surface')
+
+    Object.defineProperty(selectionSurface, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 0, width: 300, top: 0, height: 120, right: 300, bottom: 120 }),
+    })
+
+    fireEvent.pointerDown(selectionSurface, { button: 0, clientX: 150, clientY: 20 })
+    fireEvent.pointerUp(selectionSurface, { clientX: 150, clientY: 20 })
+
+    expect(useEpisodeStore.getState().currentFrame).toBe(5)
+    expect(handleSelectionStart).not.toHaveBeenCalled()
+    expect(handleSelectionComplete).not.toHaveBeenCalled()
+    expect(handleRangeSelectionChange).not.toHaveBeenCalled()
   })
 
   it('offers a create subtask action from the selected graph range context menu', () => {

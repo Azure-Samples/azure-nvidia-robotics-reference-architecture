@@ -364,7 +364,7 @@ export function AnnotationWorkspace({
   }, [isPlaying, togglePlayback]);
 
   const handleSelectionComplete = useCallback((range: [number, number]) => {
-    const shouldResume = true;
+    const shouldResume = shouldResumeAfterSelectionRef.current;
 
     setSelectedSubtaskId(null);
     setSelectedRange(range);

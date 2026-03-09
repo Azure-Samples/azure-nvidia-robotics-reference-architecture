@@ -429,7 +429,7 @@ describe('AnnotationWorkspace save status', () => {
     expect(mockSetCurrentFrame).toHaveBeenLastCalledWith(2)
   })
 
-  it('auto-plays a graph range selection when playback was paused', () => {
+  it('keeps a graph range selection paused when playback was already paused', () => {
     mockIsPlaying = false
 
     render(<AnnotationWorkspace />)
@@ -438,7 +438,7 @@ describe('AnnotationWorkspace save status', () => {
     fireEvent.click(screen.getByRole('button', { name: /start range drag/i }))
     fireEvent.click(screen.getAllByRole('button', { name: /finish range drag/i })[1])
 
-    expect(mockTogglePlayback).toHaveBeenCalledTimes(1)
+    expect(mockTogglePlayback).not.toHaveBeenCalled()
     expect(mockSetCurrentFrame).toHaveBeenLastCalledWith(2)
   })
 

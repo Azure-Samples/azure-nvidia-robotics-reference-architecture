@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useJointConfigDefaults, useSaveJointConfig, useSaveJointConfigDefaults } from '@/hooks/use-joint-config'
 import { getAutoSelectedJointsForEpisode } from '@/lib/joint-significance'
+import { resolveSelectionHighlightStyle, resolveSurfaceFrame, resolveTrajectoryPlotArea, type TrajectoryPlotArea } from '@/lib/trajectory-graph-geometry'
 import { cn } from '@/lib/utils'
 import { useEpisodeStore } from '@/stores'
 import { useTrajectoryAdjustmentState } from '@/stores/edit-store'
@@ -148,6 +149,8 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   const [defaultsOpen, setDefaultsOpen] = useState(false);
   const [selectionAnchorFrame, setSelectionAnchorFrame] = useState<number | null>(null);
   const [selectionAnchorX, setSelectionAnchorX] = useState<number | null>(null);
+  const [selectionDragging, setSelectionDragging] = useState(false);
+  const [plotArea, setPlotArea] = useState<TrajectoryPlotArea | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const selectionSurfaceRef = useRef<HTMLDivElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -244,6 +247,39 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
   }, [selectedRange])
 
   useEffect(() => {
+    const surface = selectionSurfaceRef.current
+
+    if (!surface) {
+      return
+    }
+
+    const measurePlotArea = () => {
+      setPlotArea(resolveTrajectoryPlotArea(surface))
+    }
+
+    measurePlotArea()
+
+    const observer = new ResizeObserver(() => {
+      measurePlotArea()
+    })
+
+    observer.observe(surface)
+
+    const svg = surface.parentElement?.querySelector('svg')
+
+    if (svg instanceof Element) {
+      observer.observe(svg)
+    }
+
+    window.addEventListener('resize', measurePlotArea)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measurePlotArea)
+    }
+  }, [chartData.length, currentEpisode?.meta.length, selectedJoints.length, showNormalized, showVelocity])
+
+  useEffect(() => {
     if (!selectedRange) {
       return
     }
@@ -292,11 +328,12 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       return 0
     }
 
-    const relativeX = Math.max(0, Math.min(clientX - bounds.left, bounds.width))
-    const ratio = bounds.width === 0 ? 0 : relativeX / bounds.width
-
-    return Math.round(ratio * Math.max((currentEpisode?.meta.length ?? 1) - 1, 0))
-  }, [currentEpisode?.meta.length])
+    return resolveSurfaceFrame(
+      clientX - bounds.left,
+      currentEpisode?.meta.length ?? 1,
+      plotArea ?? resolveTrajectoryPlotArea(selectionSurfaceRef.current),
+    )
+  }, [currentEpisode?.meta.length, plotArea])
 
   const updateSelectedRange = useCallback((startFrame: number, endFrame: number) => {
     onSelectedRangeChange?.([
@@ -310,14 +347,17 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       return
     }
 
+    const anchorFrame = frameFromClientX(event.clientX)
+
     if ('setPointerCapture' in event.currentTarget) {
       event.currentTarget.setPointerCapture(event.pointerId)
     }
     setContextMenuPosition(null)
+    setSelectionDragging(false)
     setSelectionAnchorX(event.clientX)
-    setSelectionAnchorFrame(frameFromClientX(event.clientX))
-    onSelectionStart?.()
-  }, [frameFromClientX, onSelectionStart])
+    setSelectionAnchorFrame(anchorFrame)
+    setCurrentFrame(anchorFrame)
+  }, [frameFromClientX, setCurrentFrame])
 
   const handleSelectionPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (selectionAnchorFrame === null || selectionAnchorX === null) {
@@ -328,8 +368,13 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       return
     }
 
+    if (!selectionDragging) {
+      setSelectionDragging(true)
+      onSelectionStart?.()
+    }
+
     updateSelectedRange(selectionAnchorFrame, frameFromClientX(event.clientX))
-  }, [frameFromClientX, selectionAnchorFrame, selectionAnchorX, updateSelectedRange])
+  }, [frameFromClientX, onSelectionStart, selectionAnchorFrame, selectionAnchorX, selectionDragging, updateSelectedRange])
 
   const handleSelectionPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (selectionAnchorFrame === null) {
@@ -343,9 +388,7 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
     const pointerFrame = frameFromClientX(event.clientX)
     const pointerDistance = selectionAnchorX === null ? 0 : Math.abs(event.clientX - selectionAnchorX)
 
-    if (pointerDistance < 4) {
-      setCurrentFrame(pointerFrame)
-    } else {
+    if (pointerDistance >= 4 || selectionDragging) {
       const nextRange: [number, number] = [
         Math.min(selectionAnchorFrame, pointerFrame),
         Math.max(selectionAnchorFrame, pointerFrame),
@@ -355,9 +398,10 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       onSelectionComplete?.(nextRange)
     }
 
+    setSelectionDragging(false)
     setSelectionAnchorFrame(null)
     setSelectionAnchorX(null)
-  }, [frameFromClientX, onSelectionComplete, selectionAnchorFrame, selectionAnchorX, setCurrentFrame, updateSelectedRange])
+  }, [frameFromClientX, onSelectionComplete, selectionAnchorFrame, selectionAnchorX, selectionDragging, updateSelectedRange])
 
   const handleSelectionContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!selectedRange || !selectionSurfaceRef.current) {
@@ -383,18 +427,21 @@ export const TrajectoryPlot = memo(function TrajectoryPlot({
       return null
     }
 
-    const [start, end] = selectedRange[0] <= selectedRange[1]
-      ? selectedRange
-      : [selectedRange[1], selectedRange[0]]
-    const total = Math.max((currentEpisode?.meta.length ?? 1) - 1, 1)
-    const left = (start / total) * 100
-    const width = ((Math.max(end - start, 0) + 1) / (total + 1)) * 100
+    const highlight = resolveSelectionHighlightStyle(
+      selectedRange,
+      currentEpisode?.meta.length ?? 0,
+      plotArea,
+    )
+
+    if (!highlight) {
+      return null
+    }
 
     return {
-      left: `${left}%`,
-      width: `${Math.max(width, 0.5)}%`,
+      left: `${highlight.left}px`,
+      width: `${highlight.width}px`,
     }
-  }, [currentEpisode?.meta.length, selectedRange])
+  }, [currentEpisode?.meta.length, plotArea, selectedRange])
 
   // Handle chart click to seek - memoized callback
   const handleChartClick = useCallback((data: unknown) => {
