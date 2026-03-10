@@ -44,6 +44,8 @@ export interface DatasetInfo {
   features: Record<string, FeatureSchema>;
   /** Available tasks in the dataset */
   tasks: TaskInfo[];
+  /** Parent folder group for nested datasets */
+  group?: string | null;
 }
 
 /** Capabilities available for a dataset */

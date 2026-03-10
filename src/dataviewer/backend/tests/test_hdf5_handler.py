@@ -1,15 +1,27 @@
 """
 Unit tests for HDF5FormatHandler.
 
-Tests handler detection and capability checks. Full episode loading
-tests are skipped when no HDF5 dataset is available since the test
-fixture datasets are LeRobot format.
+Tests handler detection, capability checks, and subdirectory episode
+discovery for datasets with recording session subdirectories.
 """
 
 import numpy as np
 import pytest
 
+h5py = pytest.importorskip("h5py")
+
 from src.api.services.dataset_service.hdf5_handler import HDF5FormatHandler
+from src.api.services.hdf5_loader import HDF5Loader
+
+
+def _create_minimal_hdf5(path, num_frames=10, num_joints=6):
+    """Create a minimal HDF5 episode file with required datasets."""
+    with h5py.File(path, "w") as f:
+        data = f.create_group("data")
+        data.create_dataset("qpos", data=np.zeros((num_frames, num_joints)))
+        data.create_dataset("action", data=np.zeros((num_frames, num_joints)))
+        f.attrs["fps"] = 30.0
+        f.attrs["task_index"] = 0
 
 
 class TestHandlerDetection:
@@ -158,3 +170,56 @@ class TestBuildTrajectory:
         assert points[0].joint_velocities == [0.0] * 6
         assert points[0].end_effector_pose == [0.0] * 6
         assert points[0].gripper_state == 0.0
+
+
+class TestSubdirectoryEpisodeDiscovery:
+    """
+    Test that HDF5Loader does NOT merge subdirectories into a single dataset.
+    Each recording session directory is its own dataset — nested discovery
+    is handled at the service layer, not the loader.
+    """
+
+    def test_loader_ignores_subdirectory_files(self, tmp_path):
+        """HDF5Loader should only find episodes in its base path, not subdirs."""
+        session = tmp_path / "session_a"
+        session.mkdir()
+        _create_minimal_hdf5(session / "episode_0.hdf5", num_frames=5)
+
+        loader = HDF5Loader(tmp_path)
+        episodes = loader.list_episodes()
+        assert episodes == []
+
+    def test_loader_finds_episodes_when_pointed_at_session(self, tmp_path):
+        """HDF5Loader pointed at a session directory finds its episodes."""
+        _create_minimal_hdf5(tmp_path / "episode_0.hdf5", num_frames=5)
+        _create_minimal_hdf5(tmp_path / "episode_1.hdf5", num_frames=8)
+
+        loader = HDF5Loader(tmp_path)
+        episodes = loader.list_episodes()
+        assert episodes == [0, 1]
+
+    def test_handler_can_handle_session_directory(self, tmp_path):
+        """HDF5FormatHandler.can_handle recognizes a direct session dir."""
+        _create_minimal_hdf5(tmp_path / "episode_0.hdf5")
+        handler = HDF5FormatHandler()
+        assert handler.can_handle(tmp_path) is True
+
+    def test_handler_cannot_handle_parent_of_sessions(self, tmp_path):
+        """Parent folder with only subdirectory HDF5 files should not match."""
+        session = tmp_path / "session_a"
+        session.mkdir()
+        _create_minimal_hdf5(session / "episode_0.hdf5")
+        handler = HDF5FormatHandler()
+        assert handler.can_handle(tmp_path) is False
+
+    def test_standard_layout_still_works(self, tmp_path):
+        """Standard flat layout episodes should still be discovered."""
+        _create_minimal_hdf5(tmp_path / "episode_0.hdf5", num_frames=10)
+        _create_minimal_hdf5(tmp_path / "episode_1.hdf5", num_frames=20)
+
+        loader = HDF5Loader(tmp_path)
+        episodes = loader.list_episodes()
+        assert episodes == [0, 1]
+
+        ep = loader.load_episode(0)
+        assert ep.length == 10

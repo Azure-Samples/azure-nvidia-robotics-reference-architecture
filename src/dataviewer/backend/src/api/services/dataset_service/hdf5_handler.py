@@ -42,7 +42,15 @@ class HDF5FormatHandler:
     def can_handle(self, dataset_path: Path) -> bool:
         if not HDF5_AVAILABLE:
             return False
-        return dataset_path.exists() and next(dataset_path.glob("**/*.hdf5"), None) is not None
+        if not dataset_path.exists():
+            return False
+        # Only match directories containing HDF5 files directly (or in
+        # data/episodes subdirs). Parent folders with only nested session
+        # directories are discovered at the service layer instead.
+        for search_dir in (dataset_path, dataset_path / "data", dataset_path / "episodes"):
+            if search_dir.is_dir() and next(search_dir.glob("*.hdf5"), None) is not None:
+                return True
+        return False
 
     def get_loader(self, dataset_id: str, dataset_path: Path) -> bool:
         """Get or create an HDF5 loader. Returns True if successful."""

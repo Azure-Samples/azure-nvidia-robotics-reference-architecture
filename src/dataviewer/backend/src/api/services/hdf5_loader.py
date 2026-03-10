@@ -147,12 +147,16 @@ class HDF5Loader:
         """
         List all available episode indices.
 
+        Searches for HDF5 files in the base path and well-known
+        subdirectories (data/, episodes/). Each recording session
+        directory should be loaded as its own dataset via the service
+        layer rather than merged here.
+
         Returns:
             Sorted list of episode indices.
         """
         episode_indices = set()
 
-        # Search for HDF5 files in common locations
         search_paths = [
             self.base_path,
             self.base_path / "data",
@@ -164,17 +168,24 @@ class HDF5Loader:
                 continue
 
             for file_path in search_path.glob("*.hdf5"):
-                # Extract episode index from filename
-                filename = file_path.stem
-                for prefix in ["episode_", "ep_"]:
-                    if filename.startswith(prefix):
-                        try:
-                            index_str = filename[len(prefix) :]
-                            episode_indices.add(int(index_str))
-                        except ValueError:
-                            continue
+                idx = self._parse_episode_index(file_path)
+                if idx is not None:
+                    episode_indices.add(idx)
+                    self._episode_cache[idx] = file_path
 
         return sorted(episode_indices)
+
+    @staticmethod
+    def _parse_episode_index(file_path: Path) -> int | None:
+        """Extract episode index from a filename like episode_0.hdf5."""
+        stem = file_path.stem
+        for prefix in ("episode_", "ep_"):
+            if stem.startswith(prefix):
+                try:
+                    return int(stem[len(prefix) :])
+                except ValueError:
+                    continue
+        return None
 
     def load_episode(
         self,

@@ -31,10 +31,22 @@ function DatasetSelector({
   const normalizedFilter = filterText.trim().toLowerCase();
   const filteredDatasets = normalizedFilter
     ? datasets.filter((dataset) => {
-      const searchableText = `${dataset.id} ${dataset.name}`.toLowerCase();
+      const searchableText = `${dataset.id} ${dataset.name} ${dataset.group ?? ''}`.toLowerCase();
       return searchableText.includes(normalizedFilter);
     })
     : datasets;
+
+  // Group datasets: ungrouped first, then by group name
+  const groupedDatasets = filteredDatasets.reduce<Record<string, DatasetInfo[]>>((acc, ds) => {
+    const key = ds.group ?? '';
+    (acc[key] ??= []).push(ds);
+    return acc;
+  }, {});
+  const groupKeys = Object.keys(groupedDatasets).sort((a, b) => {
+    if (a === '') return -1;
+    if (b === '') return 1;
+    return a.localeCompare(b);
+  });
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -83,39 +95,44 @@ function DatasetSelector({
             className="max-h-60"
           >
             <CommandEmpty>No datasets match the current filter.</CommandEmpty>
-            <CommandGroup>
-              {filteredDatasets.map((dataset) => {
-                const isSelected = dataset.id === datasetId;
+            {groupKeys.map((groupKey) => (
+              <CommandGroup key={groupKey} heading={groupKey || undefined}>
+                {groupedDatasets[groupKey].map((dataset) => {
+                  const isSelected = dataset.id === datasetId;
+                  const displayId = dataset.group
+                    ? dataset.id.slice(dataset.group.length + 2)
+                    : dataset.id;
 
-                return (
-                  <CommandItem
-                    key={dataset.id}
-                    value={dataset.id}
-                    keywords={[dataset.name]}
-                    role="option"
-                    aria-selected={isSelected}
-                    onSelect={() => {
-                      onSelectDataset(dataset.id);
-                      setIsOpen(false);
-                      setFilterText('');
-                    }}
-                    className="items-start justify-between gap-2 px-3 py-2 text-left"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{dataset.id}</span>
-                      {dataset.name !== dataset.id && (
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {dataset.name}
-                        </span>
-                      )}
-                    </span>
-                    <Check
-                      className={isSelected ? 'ml-2 mt-0.5 h-4 w-4 shrink-0 opacity-100' : 'ml-2 mt-0.5 h-4 w-4 shrink-0 opacity-0'}
-                    />
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
+                  return (
+                    <CommandItem
+                      key={dataset.id}
+                      value={dataset.id}
+                      keywords={[dataset.name, dataset.group ?? '']}
+                      role="option"
+                      aria-selected={isSelected}
+                      onSelect={() => {
+                        onSelectDataset(dataset.id);
+                        setIsOpen(false);
+                        setFilterText('');
+                      }}
+                      className="items-start justify-between gap-2 px-3 py-2 text-left"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{displayId}</span>
+                        {dataset.name !== dataset.id && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {dataset.name}
+                          </span>
+                        )}
+                      </span>
+                      <Check
+                        className={isSelected ? 'ml-2 mt-0.5 h-4 w-4 shrink-0 opacity-100' : 'ml-2 mt-0.5 h-4 w-4 shrink-0 opacity-0'}
+                      />
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
       </PopoverContent>

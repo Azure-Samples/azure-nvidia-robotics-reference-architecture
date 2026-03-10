@@ -63,20 +63,14 @@ export function AnnotationWorkspaceTrajectoryTab({
           </CardContent>
         </Card>
         <Card className="order-3 min-h-[360px] overflow-hidden lg:col-span-2">
-          <CardContent data-testid="trajectory-graph-panel" className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h3 className="text-sm font-medium">Trajectory Graph</h3>
-                <p className="text-xs text-muted-foreground">
-                  Review joint motion, filters, and subtask boundaries alongside a compact episode player.
-                </p>
-              </div>
-              {(selectedRange || selectedSubtaskId) && (
+          <CardContent data-testid="trajectory-graph-panel" className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-3">
+            {(selectedRange || selectedSubtaskId) && (
+              <div className="flex items-center justify-end">
                 <Button size="sm" variant="outline" onClick={onClearPlaybackSelection}>
                   Clear Selection
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
             <TrajectoryPlot
               className="flex-1 min-h-[280px]"
               selectedRange={selectedRange}

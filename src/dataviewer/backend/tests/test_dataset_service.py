@@ -7,13 +7,26 @@ episode data retrieval, trajectory extraction, and capability reporting.
 
 import os
 
+import numpy as np
 import pytest
+
+h5py = pytest.importorskip("h5py")
 
 from src.api.services.dataset_service import DatasetService
 
 from .conftest import TEST_DATASET_ID
 
 DATASET_ID = TEST_DATASET_ID
+
+
+def _create_minimal_hdf5(path, num_frames=10, num_joints=6):
+    """Create a minimal HDF5 episode file with required datasets."""
+    with h5py.File(path, "w") as f:
+        data = f.create_group("data")
+        data.create_dataset("qpos", data=np.zeros((num_frames, num_joints)))
+        data.create_dataset("action", data=np.zeros((num_frames, num_joints)))
+        f.attrs["fps"] = 30.0
+        f.attrs["task_index"] = 0
 
 
 @pytest.fixture
@@ -235,3 +248,65 @@ class TestEpisodeCacheIntegration:
 
         assert len(traj) > 0
         assert stats_after.hits == stats_before.hits + 1
+
+
+class TestNestedDatasetDiscovery:
+    """Test discovery of datasets nested under parent folders."""
+
+    @pytest.mark.asyncio
+    async def test_discovers_nested_hdf5_datasets(self, tmp_path):
+        """Subdirectories with HDF5 files under a parent folder are discovered."""
+        parent = tmp_path / "e2emanufacturing"
+        parent.mkdir()
+        session1 = parent / "session_a"
+        session1.mkdir()
+        _create_minimal_hdf5(session1 / "episode_0.hdf5")
+        session2 = parent / "session_b"
+        session2.mkdir()
+        _create_minimal_hdf5(session2 / "episode_0.hdf5")
+
+        service = DatasetService(base_path=str(tmp_path))
+        datasets = await service.list_datasets()
+        ids = {d.id for d in datasets}
+        assert "e2emanufacturing--session_a" in ids
+        assert "e2emanufacturing--session_b" in ids
+
+    @pytest.mark.asyncio
+    async def test_nested_datasets_have_group(self, tmp_path):
+        """Nested datasets should have their parent folder as the group."""
+        parent = tmp_path / "my_project"
+        parent.mkdir()
+        child = parent / "recording_1"
+        child.mkdir()
+        _create_minimal_hdf5(child / "episode_0.hdf5")
+
+        service = DatasetService(base_path=str(tmp_path))
+        datasets = await service.list_datasets()
+        ds = next(d for d in datasets if d.id == "my_project--recording_1")
+        assert ds.group == "my_project"
+
+    @pytest.mark.asyncio
+    async def test_nested_dataset_path_resolves(self, tmp_path):
+        """Nested dataset IDs resolve correctly to filesystem paths."""
+        parent = tmp_path / "group"
+        parent.mkdir()
+        child = parent / "ds1"
+        child.mkdir()
+        _create_minimal_hdf5(child / "episode_0.hdf5", num_frames=15)
+
+        service = DatasetService(base_path=str(tmp_path))
+        await service.list_datasets()
+        ds = await service.get_dataset("group--ds1")
+        assert ds is not None
+        assert ds.total_episodes == 1
+
+    @pytest.mark.asyncio
+    async def test_flat_datasets_have_no_group(self, tmp_path):
+        """Standard top-level datasets should have no group."""
+        (tmp_path / "flat_ds").mkdir()
+        _create_minimal_hdf5(tmp_path / "flat_ds" / "episode_0.hdf5")
+
+        service = DatasetService(base_path=str(tmp_path))
+        datasets = await service.list_datasets()
+        ds = next(d for d in datasets if d.id == "flat_ds")
+        assert ds.group is None

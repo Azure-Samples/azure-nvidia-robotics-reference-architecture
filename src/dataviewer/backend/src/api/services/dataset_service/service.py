@@ -237,6 +237,9 @@ class DatasetService:
 
         dataset_info = handler.discover(dataset_id, dataset_path)
         if dataset_info is not None:
+            # Set group for nested datasets (e.g. "parent--child" → group="parent")
+            if "--" in dataset_id:
+                dataset_info.group = dataset_id.split("--", 1)[0]
             self._datasets[dataset_id] = dataset_info
             self._local_dataset_ids.add(dataset_id)
         return dataset_info
@@ -276,15 +279,26 @@ class DatasetService:
         if not base.exists():
             return list(self._datasets.values())
 
-        # Scan local directory
+        # Scan local directory (two levels deep for nested datasets)
         discovered_ids: set[str] = set()
         try:
             for item in base.iterdir():
-                if item.is_dir():
-                    for handler in self._handlers:
-                        if handler.can_handle(item):
-                            discovered_ids.add(item.name)
-                            break
+                if not item.is_dir():
+                    continue
+                handled = False
+                for handler in self._handlers:
+                    if handler.can_handle(item):
+                        discovered_ids.add(item.name)
+                        handled = True
+                        break
+                if not handled:
+                    # Check children for nested datasets (e.g. e2emanufacturing/session_a/)
+                    for child in item.iterdir():
+                        if child.is_dir():
+                            for handler in self._handlers:
+                                if handler.can_handle(child):
+                                    discovered_ids.add(f"{item.name}--{child.name}")
+                                    break
         except OSError:
             return list(self._datasets.values())
 
@@ -536,23 +550,36 @@ class DatasetService:
         """
         Build and validate the filesystem path for a dataset.
 
-        Uses os.path.basename to strip directory components (a sanitizer
-        recognized by CodeQL) and filesystem enumeration to return a path
-        derived from the directory listing rather than from user input.
+        Supports both flat IDs (``my_dataset``) and nested IDs using
+        ``--`` separator (``parent--child``) for datasets in
+        subdirectories. Each path component is validated via
+        ``os.path.basename`` and resolved through directory enumeration.
 
         Raises:
-            ValueError: If dataset_id contains path separators or
+            ValueError: If any component contains path traversal or
                         the directory does not exist.
         """
-        safe_name = os.path.basename(dataset_id)
-        if not safe_name or safe_name != dataset_id:
+        parts = dataset_id.split("--") if "--" in dataset_id else [dataset_id]
+        if len(parts) > 2:
             raise ValueError(f"Invalid dataset path: {dataset_id}")
 
+        for part in parts:
+            safe = os.path.basename(part)
+            if not safe or safe != part:
+                raise ValueError(f"Invalid dataset path: {dataset_id}")
+
         base = Path(os.path.realpath(self.base_path))
-        for entry in base.iterdir():
-            if entry.name == safe_name and entry.is_dir():
-                return entry
-        raise ValueError(f"Dataset directory not found: {dataset_id}")
+        current = base
+        for part in parts:
+            found = False
+            for entry in current.iterdir():
+                if entry.name == part and entry.is_dir():
+                    current = entry
+                    found = True
+                    break
+            if not found:
+                raise ValueError(f"Dataset directory not found: {dataset_id}")
+        return current
 
     async def get_frame_image(self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str) -> bytes | None:
         """Get a single frame image from an episode."""

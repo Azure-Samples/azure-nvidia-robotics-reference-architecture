@@ -24,7 +24,7 @@ describe('AnnotationWorkspace playback and trajectory tab flows', () => {
 
     expect(screen.queryByRole('tab', { name: /episode viewer/i })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /trajectory viewer/i })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('Trajectory Graph')).toBeInTheDocument()
+    expect(screen.getByTestId('trajectory-graph-panel')).toBeInTheDocument()
   })
 
   it('shows subtask controls in the default trajectory viewer', () => {
@@ -147,7 +147,7 @@ describe('AnnotationWorkspace playback and trajectory tab flows', () => {
     const graphPanel = screen.getByTestId('trajectory-graph-panel')
 
     expect(graphPanel.className).toContain('overflow-y-auto')
-    expect(graphPanel).toContainElement(screen.getByText('Trajectory Graph'))
+    expect(graphPanel).toContainElement(screen.getByText('Trajectory Plot'))
   })
 
   it('clears a draft graph selection when Escape is pressed', () => {

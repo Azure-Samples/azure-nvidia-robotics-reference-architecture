@@ -71,6 +71,7 @@ class DatasetInfo(BaseModel):
 
     id: str = Field(description="Unique dataset identifier")
     name: str = Field(description="Human-readable dataset name")
+    group: str | None = Field(default=None, description="Parent folder group for nested datasets")
     total_episodes: int = Field(ge=0, description="Total number of episodes")
     fps: float = Field(gt=0, description="Frames per second")
     features: dict[str, FeatureSchema] = Field(default_factory=dict, description="Feature schemas by name")
