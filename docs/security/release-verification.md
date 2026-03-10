@@ -12,9 +12,9 @@ Verify the provenance and integrity of release artifacts published by this repos
 
 ## Prerequisites
 
-| Requirement     | Minimum Version | Purpose                                           |
-|-----------------|-----------------|---------------------------------------------------|
-| GitHub CLI      | 2.49.0+         | `gh attestation verify` subcommand for validation |
+| Requirement | Minimum Version | Purpose                                           |
+|-------------|-----------------|---------------------------------------------------|
+| GitHub CLI  | 2.49.0+         | `gh attestation verify` subcommand for validation |
 
 Install or update GitHub CLI: <https://cli.github.com/>
 

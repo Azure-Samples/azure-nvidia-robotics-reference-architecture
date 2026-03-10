@@ -1,14 +1,18 @@
 ---
-title: Security Guide for Deployers
+title: Deployment Security Guide
 description: Security configuration inventory, deployment responsibilities, and considerations for the Azure NVIDIA Robotics Reference Architecture
 author: Microsoft Robotics-AI Team
 ms.date: 2026-02-10
 ms.topic: concept
+keywords:
+  - security
+  - deployment
+  - network
+  - identity
+  - kubernetes
 ---
 
-<!-- cspell:words deployers -->
-
-Security configurations included in this reference architecture and responsibilities for deployers operating in production environments.
+Security configurations included in this reference architecture and responsibilities for teams operating in production environments.
 
 > [!IMPORTANT]
 > This document provides security guidance for informational purposes only. It does
