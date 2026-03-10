@@ -72,13 +72,15 @@ function Get-MarkdownFiles {
     $excludePatterns = @('node_modules', '.git', 'logs', '.copilot-tracking', 'CHANGELOG.md')
     $allFiles = @()
 
+    # Explicit paths bypass exclusion filtering (e.g., 'logs/specific.md')
+    # Only '.' or multiple paths receive standard exclusions
+    $isExplicitPath = @($SearchPaths).Count -eq 1 -and $SearchPaths[0] -ne '.'
+
     foreach ($path in $SearchPaths) {
         if (-not (Test-Path $path)) {
             Write-Warning "Path not found: $path"
             continue
         }
-
-        $isExplicitPath = @($SearchPaths).Count -eq 1 -and $SearchPaths[0] -ne '.'
 
         $files = @(Get-ChildItem -Path $path -Recurse -Include '*.md' -File -ErrorAction SilentlyContinue)
 
@@ -210,7 +212,6 @@ function New-MsDateReport {
         $markdown += @"
 
 ### ✅ All Files Fresh
- ✅ All Files Fresh
 
 All documentation files with ms.date frontmatter are within the $Threshold-day freshness threshold.
 "@
@@ -240,7 +241,7 @@ if (@($markdownFiles).Count -eq 0) {
 
 Write-Verbose "Checking $(@($markdownFiles).Count) markdown files"
 
-$results = @()
+$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 $currentDate = Get-Date
 
 foreach ($file in $markdownFiles) {
@@ -270,7 +271,7 @@ foreach ($file in $markdownFiles) {
         Threshold = $ThresholdDays
     }
 
-    $results += $result
+    $results.Add($result)
 
     if ($isStale) {
         Write-Verbose "Stale file detected: $relativePath ($ageDays days old)"

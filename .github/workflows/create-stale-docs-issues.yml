@@ -49,7 +49,7 @@ jobs:
       - name: Create or Update Issues (One Per File)
         run: |
           # Extract stale files from JSON
-          $results = Get-Content ${{ inputs.results-file }} | ConvertFrom-Json
+          $results = Get-Content '${{ inputs.results-file }}' | ConvertFrom-Json
           $staleFiles = $results | Where-Object { $_.IsStale -eq $true }
 
           if (-not $staleFiles) {

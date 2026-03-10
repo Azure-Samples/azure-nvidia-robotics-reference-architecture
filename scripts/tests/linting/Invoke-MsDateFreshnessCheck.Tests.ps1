@@ -1,5 +1,6 @@
 #Requires -Version 7.0
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
+#Requires -Modules powershell-yaml
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: MIT
 
@@ -12,17 +13,7 @@ BeforeAll {
     Import-Module $lintingHelpersPath -Force
     Import-Module $ciHelpersPath -Force
     Import-Module (Join-Path $PSScriptRoot '../Mocks/GitMocks.psm1') -Force
-
-    if (-not (Get-Module PowerShell-Yaml -ErrorAction SilentlyContinue)) {
-        try {
-            Import-Module PowerShell-Yaml -ErrorAction Stop
-        }
-        catch {
-            Write-Warning "PowerShell-Yaml module not available. Some tests will be skipped."
-        }
-    }
-
-    $script:YamlAvailable = $null -ne (Get-Module PowerShell-Yaml -ErrorAction SilentlyContinue)
+    Import-Module powershell-yaml -Force
 }
 
 #region Get-MarkdownFiles Tests
@@ -202,7 +193,7 @@ Describe 'Get-MsDateFromFrontmatter' -Tag 'Unit' {
         $script:TestFile = Join-Path $TestDrive 'test-frontmatter.md'
     }
 
-    Context 'Valid ms.date frontmatter' -Skip:(-not $script:YamlAvailable) {
+    Context 'Valid ms.date frontmatter' {
         It 'Parses valid ms.date' {
             $content = @'
 ---
@@ -238,7 +229,7 @@ Content
         }
     }
 
-    Context 'Invalid or missing ms.date' -Skip:(-not $script:YamlAvailable) {
+    Context 'Invalid or missing ms.date' {
         It 'Returns null when ms.date missing' {
             $content = @'
 ---
@@ -279,7 +270,7 @@ Content
         }
     }
 
-    Context 'No frontmatter' -Skip:(-not $script:YamlAvailable) {
+    Context 'No frontmatter' {
         It 'Returns null when no frontmatter present' {
             $content = @'
 # Regular Markdown
@@ -302,7 +293,7 @@ title: Incomplete
         }
     }
 
-    Context 'YAML parsing errors' -Skip:(-not $script:YamlAvailable) {
+    Context 'YAML parsing errors' {
         It 'Handles malformed YAML gracefully' {
             $content = @'
 ---
@@ -327,33 +318,6 @@ Content
         It 'Emits warning when file cannot be read' {
             $warnings = @(Get-MsDateFromFrontmatter -FilePath (Join-Path $TestDrive 'nonexistent.md') 3>&1)
             $warnings | Where-Object { $_ -like '*Error reading file*' } | Should -Not -BeNullOrEmpty
-        }
-    }
-
-    Context 'PowerShell-Yaml not available' {
-        BeforeAll {
-            $script:OriginalModule = Get-Module PowerShell-Yaml
-            if ($script:OriginalModule) {
-                Remove-Module PowerShell-Yaml -Force
-            }
-        }
-
-        AfterAll {
-            if ($script:OriginalModule) {
-                Import-Module PowerShell-Yaml -Force
-            }
-        }
-
-        It 'Warns when PowerShell-Yaml not installed' {
-            Mock Get-Command { return $null } -ParameterFilter { $Name -eq 'ConvertFrom-Yaml' }
-            $content = @'
----
-ms.date: 2025-01-01
----
-'@
-            Set-Content -Path $script:TestFile -Value $content
-            $result = Get-MsDateFromFrontmatter -FilePath $script:TestFile -WarningAction SilentlyContinue
-            $result | Should -BeNullOrEmpty
         }
     }
 }
@@ -494,7 +458,7 @@ Describe 'New-MsDateReport' -Tag 'Unit' {
 
 #region Main Script Integration Tests
 
-Describe 'Invoke-MsDateFreshnessCheck Integration' -Tag 'Integration' -Skip:(-not $script:YamlAvailable) {
+Describe 'Invoke-MsDateFreshnessCheck Integration' -Tag 'Integration' {
     BeforeAll {
         Save-CIEnvironment
     }
