@@ -96,13 +96,13 @@ This section defines versioning, release notes, deprecation notices, and breakin
 
 This project uses [release-please](https://github.com/googleapis/release-please) for automated semantic versioning. Version bumps follow conventional commit types:
 
-| Commit Type        | Version Bump | Example                                      |
-|--------------------|--------------|----------------------------------------------|
-| `feat:`            | Minor        | `feat(terraform): add GPU monitoring module` |
-| `fix:`             | Patch        | `fix(scripts): correct AKS credential path`  |
-| `BREAKING CHANGE:` | Major        | Footer in commit triggers major bump         |
+| Commit Type        | Version Bump | Example                                        |
+|--------------------|--------------|------------------------------------------------|
+| `feat:`            | Minor        | `feat(terraform): add GPU monitoring module`   |
+| `fix:`             | Patch        | `fix(scripts): correct AKS credential path`    |
+| `BREAKING CHANGE:` | Major        | Footer in commit triggers major bump           |
 | `security:`        | Patch        | `security: fix CVE-2024-XXXX input validation` |
-| `docs:`, `chore:`  | None         | Appears in changelog without version bump    |
+| `docs:`, `chore:`  | None         | Appears in changelog without version bump      |
 
 `CHANGELOG.md` is updated automatically by release-please when a release PR merges.
 

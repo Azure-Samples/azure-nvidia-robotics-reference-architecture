@@ -6,15 +6,13 @@ ms.date: 2026-03-07
 ms.topic: reference
 ---
 
-<!-- cspell:words attestations sigstore SBOM SPDX Rekor Deployers -->
-
 Verify the provenance and integrity of release artifacts published by this repository. Each release includes cryptographic attestations generated through GitHub Actions using Sigstore keyless signing, providing tamper-evident proof that artifacts were built from this repository's source code.
 
 ## Prerequisites
 
-| Requirement     | Minimum Version | Purpose                                           |
-|-----------------|-----------------|---------------------------------------------------|
-| GitHub CLI      | 2.49.0+         | `gh attestation verify` subcommand for validation |
+| Requirement | Minimum Version | Purpose                                           |
+|-------------|-----------------|---------------------------------------------------|
+| GitHub CLI  | 2.49.0+         | `gh attestation verify` subcommand for validation |
 
 Install or update GitHub CLI: <https://cli.github.com/>
 
@@ -60,7 +58,7 @@ The SBOM follows the SPDX 2.3 specification and lists all package dependencies i
 
 ## Related Documentation
 
-- [Security Guide for Deployers](security-guide.md): Security configuration inventory and deployment responsibilities
+- [Deployment Security Guide](../operations/security-guide.md): Security configuration inventory and deployment responsibilities
 - [Threat Model](threat-model.md): STRIDE-based threat analysis and remediation roadmap
 - [SECURITY.md](../../SECURITY.md): Vulnerability disclosure and reporting process
 - [GitHub attestation verification](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds): GitHub documentation on artifact attestations
