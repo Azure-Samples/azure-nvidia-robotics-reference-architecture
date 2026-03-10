@@ -32,12 +32,14 @@ variable "should_enable_internal" {
 
 variable "backend_image" {
   type        = string
-  description = "Full image reference for the backend container (e.g., acrosmorbt4dev001.azurecr.io/dataviewer-backend:latest)"
+  description = "Full image reference for the backend container (e.g., acr.azurecr.io/dataviewer-backend:latest). Leave empty to use a placeholder for initial IaC provisioning"
+  default     = ""
 }
 
 variable "frontend_image" {
   type        = string
-  description = "Full image reference for the frontend container (e.g., acrosmorbt4dev001.azurecr.io/dataviewer-frontend:latest)"
+  description = "Full image reference for the frontend container (e.g., acr.azurecr.io/dataviewer-frontend:latest). Leave empty to use a placeholder for initial IaC provisioning"
+  default     = ""
 }
 
 variable "backend_cpu" {

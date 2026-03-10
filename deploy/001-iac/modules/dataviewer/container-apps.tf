@@ -15,15 +15,19 @@ resource "azurerm_container_app" "backend" {
   container_app_environment_id = azurerm_container_app_environment.main.id
   resource_group_name          = var.resource_group.name
   revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
 
   identity {
     type         = "UserAssigned"
     identity_ids = [azurerm_user_assigned_identity.dataviewer.id]
   }
 
-  registry {
-    server   = var.container_registry.login_server
-    identity = azurerm_user_assigned_identity.dataviewer.id
+  dynamic "registry" {
+    for_each = local.use_acr_images ? [1] : []
+    content {
+      server   = var.container_registry.login_server
+      identity = azurerm_user_assigned_identity.dataviewer.id
+    }
   }
 
   ingress {
@@ -42,7 +46,7 @@ resource "azurerm_container_app" "backend" {
 
     container {
       name   = "backend"
-      image  = var.backend_image
+      image  = local.backend_image
       cpu    = var.backend_cpu
       memory = var.backend_memory
 
@@ -96,6 +100,12 @@ resource "azurerm_container_app" "backend" {
       }
     }
   }
+
+  // CI/CD manages the container image, env vars, and runtime config after IaC provisioning.
+  // Prevent Terraform from reverting deploy-time changes.
+  lifecycle {
+    ignore_changes = [template, registry]
+  }
 }
 
 // ============================================================
@@ -107,15 +117,19 @@ resource "azurerm_container_app" "frontend" {
   container_app_environment_id = azurerm_container_app_environment.main.id
   resource_group_name          = var.resource_group.name
   revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
 
   identity {
     type         = "UserAssigned"
     identity_ids = [azurerm_user_assigned_identity.dataviewer.id]
   }
 
-  registry {
-    server   = var.container_registry.login_server
-    identity = azurerm_user_assigned_identity.dataviewer.id
+  dynamic "registry" {
+    for_each = local.use_acr_images ? [1] : []
+    content {
+      server   = var.container_registry.login_server
+      identity = azurerm_user_assigned_identity.dataviewer.id
+    }
   }
 
   ingress {
@@ -134,7 +148,7 @@ resource "azurerm_container_app" "frontend" {
 
     container {
       name   = "frontend"
-      image  = var.frontend_image
+      image  = local.frontend_image
       cpu    = var.frontend_cpu
       memory = var.frontend_memory
 
@@ -143,5 +157,11 @@ resource "azurerm_container_app" "frontend" {
         value = azurerm_container_app.backend.ingress[0].fqdn
       }
     }
+  }
+
+  // CI/CD manages the container image, env vars, and runtime config after IaC provisioning.
+  // Prevent Terraform from reverting deploy-time changes.
+  lifecycle {
+    ignore_changes = [template, registry]
   }
 }
