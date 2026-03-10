@@ -53,6 +53,8 @@ export function AnnotationWorkspaceContent({ shell }: AnnotationWorkspaceContent
       onSetFrameWithinPlaybackRange={shell.playback.setFrameWithinPlaybackRange}
       playbackRangeHighlight={shell.playback.playbackRangeHighlight}
       playbackRangeLabel={shell.playback.playbackRangeLabel}
+      frameCacheProgress={shell.frameCacheProgress}
+      frameCacheReady={shell.frameCacheReady}
     />
   )
 

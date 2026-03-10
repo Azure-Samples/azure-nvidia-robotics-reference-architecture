@@ -1,5 +1,5 @@
-import { Pause, Play, Repeat, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
-import type { RefObject, SyntheticEvent } from 'react'
+import { Loader2, Pause, Play, Repeat, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
+import { type RefObject, type SyntheticEvent, useEffect, useMemo, useState } from 'react'
 
 import { PlaybackControlStrip } from '@/components/playback/PlaybackControlStrip'
 import { SpeedControl } from '@/components/playback/SpeedControl'
@@ -36,6 +36,8 @@ interface AnnotationWorkspacePlaybackCardProps {
   onSetFrameWithinPlaybackRange: (frame: number) => number
   playbackRangeHighlight: { left: string; width: string } | null
   playbackRangeLabel: string | null
+  frameCacheProgress?: number
+  frameCacheReady?: boolean
 }
 
 export function AnnotationWorkspacePlaybackCard({
@@ -67,7 +69,23 @@ export function AnnotationWorkspacePlaybackCard({
   onSetFrameWithinPlaybackRange,
   playbackRangeHighlight,
   playbackRangeLabel,
+  frameCacheProgress = 0,
+  frameCacheReady = true,
 }: AnnotationWorkspacePlaybackCardProps) {
+  // Extract episode base path from frameImageUrl to detect episode switches
+  const episodeBase = useMemo(() => {
+    if (!frameImageUrl) return null
+    const match = frameImageUrl.match(/^(.*\/frames\/)/)
+    return match ? match[1] : frameImageUrl
+  }, [frameImageUrl])
+
+  const [imageLoaded, setImageLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!videoSrc && frameImageUrl) {
+      setImageLoaded(false)
+    }
+  }, [episodeBase, videoSrc])
   return (
     <Card className={compact ? 'mx-auto h-full min-h-0 w-full max-w-[44rem]' : 'flex-shrink-0'}>
       <CardContent className={compact ? 'flex h-full min-h-0 flex-col p-3' : 'p-4'}>
@@ -111,6 +129,7 @@ export function AnnotationWorkspacePlaybackCard({
               alt={`Frame ${currentFrame}`}
               className="max-h-full max-w-full object-contain"
               style={displayFilter ? { filter: displayFilter } : undefined}
+              onLoad={() => setImageLoaded(true)}
             />
           ) : (
             <span className="text-white">Frame {currentFrame + 1} of {totalFrames}</span>
@@ -125,6 +144,26 @@ export function AnnotationWorkspacePlaybackCard({
           {resizeOutput && (
             <div className="absolute right-2 top-2 rounded bg-green-600/80 px-2 py-1 text-xs text-white">
               Output: {resizeOutput.width} × {resizeOutput.height}
+            </div>
+          )}
+
+          {videoSrc && !frameCacheReady && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/30">
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
+              <p className="mt-2 text-sm text-white">Preparing frames…</p>
+              <div className="mt-3 h-1.5 w-48 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-blue-400 transition-[width] duration-200"
+                  style={{ width: `${Math.round(frameCacheProgress * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {!videoSrc && frameImageUrl && !imageLoaded && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/30">
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
+              <p className="mt-2 text-sm text-white">Loading episode…</p>
             </div>
           )}
         </div>

@@ -1,8 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
 import type { SyntheticEvent } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAnnotationWorkspaceMediaController } from '@/components/annotation-workspace/useAnnotationWorkspaceMediaController'
+import { clearPersistentFrameCache } from '@/components/annotation-workspace/useVideoFrameCache'
 
 const dataset = {
   id: 'dataset-1',
@@ -16,6 +17,11 @@ const dataset = {
 describe('useAnnotationWorkspaceMediaController', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    clearPersistentFrameCache()
   })
 
   it('derives the primary camera video and frame URLs for the current episode frame', () => {
@@ -92,7 +98,6 @@ describe('useAnnotationWorkspaceMediaController', () => {
     act(() => {
       result.current.handleLoadedMetadata({ currentTarget: video } as SyntheticEvent<HTMLVideoElement>)
     })
-
     expect(togglePlayback).toHaveBeenCalledTimes(1)
   })
 

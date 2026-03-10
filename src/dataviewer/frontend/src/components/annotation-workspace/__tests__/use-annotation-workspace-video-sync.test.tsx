@@ -12,11 +12,11 @@ describe('useAnnotationWorkspaceVideoSync', () => {
 
   it('requests playback after metadata loads when autoplay is armed', () => {
     const togglePlayback = vi.fn()
-    const { result } = renderHook(() => useAnnotationWorkspaceVideoSync({
+    const baseProps = {
       currentFrame: 0,
       totalFrames: 12,
       originalFrameIndex: 0,
-      activePlaybackRange: null,
+      activePlaybackRange: null as [number, number] | null,
       playbackRangeStart: 0,
       playbackRangeEnd: 11,
       isPlaying: false,
@@ -25,14 +25,20 @@ describe('useAnnotationWorkspaceVideoSync', () => {
       autoLoop: false,
       shouldLoopPlaybackRange: false,
       datasetFps: 24,
-      insertedFrames: new Map(),
-      removedFrames: new Set(),
+      insertedFrames: new Map<number, FrameInsertion>(),
+      removedFrames: new Set<number>(),
       videoSrc: '/videos/wrist.mp4',
+      frameCacheReady: false,
       onSetCurrentFrame: vi.fn(),
       onTogglePlayback: togglePlayback,
       onSetFrameWithinPlaybackRange: vi.fn(),
       onRecordEvent: vi.fn(),
-    }))
+    }
+
+    const { result } = renderHook(
+      (props) => useAnnotationWorkspaceVideoSync(props),
+      { initialProps: baseProps },
+    )
 
     const video = document.createElement('video')
     Object.defineProperty(video, 'duration', { configurable: true, value: 8.4 })
@@ -40,7 +46,6 @@ describe('useAnnotationWorkspaceVideoSync', () => {
     act(() => {
       result.current.handleLoadedMetadata({ currentTarget: video } as SyntheticEvent<HTMLVideoElement>)
     })
-
     expect(togglePlayback).toHaveBeenCalledTimes(1)
   })
 
@@ -62,6 +67,7 @@ describe('useAnnotationWorkspaceVideoSync', () => {
       insertedFrames: new Map<number, FrameInsertion>(),
       removedFrames: new Set<number>(),
       videoSrc: '/videos/episode-0.mp4',
+      frameCacheReady: false,
       onSetCurrentFrame: vi.fn(),
       onTogglePlayback: togglePlayback,
       onSetFrameWithinPlaybackRange: vi.fn(),
@@ -76,18 +82,18 @@ describe('useAnnotationWorkspaceVideoSync', () => {
     const video = document.createElement('video')
     Object.defineProperty(video, 'duration', { configurable: true, value: 8.4 })
 
+    // Episode 0: metadata loads → autoplay fires immediately
     act(() => {
       result.current.handleLoadedMetadata({ currentTarget: video } as SyntheticEvent<HTMLVideoElement>)
     })
-
     expect(togglePlayback).toHaveBeenCalledTimes(1)
 
-    rerender({ ...baseProps, videoSrc: '/videos/episode-1.mp4' })
-
+    // Episode 1: switch episode, metadata loads → autoplay fires again
+    rerender({ ...baseProps, videoSrc: '/videos/episode-1.mp4', isPlaying: true })
+    rerender({ ...baseProps, videoSrc: '/videos/episode-1.mp4', isPlaying: false })
     act(() => {
       result.current.handleLoadedMetadata({ currentTarget: video } as SyntheticEvent<HTMLVideoElement>)
     })
-
     expect(togglePlayback).toHaveBeenCalledTimes(2)
   })
 
@@ -546,6 +552,67 @@ describe('useAnnotationWorkspaceVideoSync', () => {
     // The sync effect should NOT re-fire during normal playback just because a callback
     // dep changed identity. Only isPlaying or videoSrc changes should trigger re-sync.
     expect(pauseMock).not.toHaveBeenCalled()
+  })
+
+  it('draws from frame cache instead of video when cache is ready and paused', () => {
+    const drawImageSpy = vi.fn()
+    const canvas = document.createElement('canvas')
+    vi.spyOn(canvas, 'getContext').mockReturnValue({ drawImage: drawImageSpy } as unknown as CanvasRenderingContext2D)
+
+    const closeFn = vi.fn()
+    const mockBitmap = { close: closeFn, width: 640, height: 480 } as unknown as ImageBitmap
+    const frameCache = new Map<number, ImageBitmap>()
+    frameCache.set(10, mockBitmap)
+    frameCache.set(11, mockBitmap)
+
+    const video = document.createElement('video')
+    Object.defineProperty(video, 'duration', { configurable: true, value: 10 })
+    Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 0 })
+    Object.defineProperty(video, 'videoWidth', { configurable: true, value: 640 })
+    Object.defineProperty(video, 'videoHeight', { configurable: true, value: 480 })
+    video.pause = vi.fn()
+    video.play = vi.fn(() => Promise.resolve())
+
+    const baseProps = {
+      currentFrame: 10,
+      totalFrames: 100,
+      originalFrameIndex: 10,
+      activePlaybackRange: null as [number, number] | null,
+      playbackRangeStart: 0,
+      playbackRangeEnd: 99,
+      isPlaying: false,
+      playbackSpeed: 1,
+      autoPlay: false,
+      autoLoop: false,
+      shouldLoopPlaybackRange: false,
+      datasetFps: 30,
+      insertedFrames: new Map<number, FrameInsertion>(),
+      removedFrames: new Set<number>(),
+      videoSrc: '/videos/test.mp4',
+      frameCache,
+      frameCacheReady: true,
+      onSetCurrentFrame: vi.fn(),
+      onTogglePlayback: vi.fn(),
+      onSetFrameWithinPlaybackRange: vi.fn(),
+      onRecordEvent: vi.fn(),
+    }
+
+    const { result, rerender } = renderHook(
+      (props) => useAnnotationWorkspaceVideoSync(props),
+      { initialProps: baseProps },
+    )
+
+    act(() => {
+      Object.defineProperty(result.current.videoRef, 'current', { value: video, writable: true })
+      Object.defineProperty(result.current.displayCanvasRef, 'current', { value: canvas, writable: true })
+    })
+
+    drawImageSpy.mockClear()
+
+    // Change frame — should draw from cache, not seek the video
+    rerender({ ...baseProps, currentFrame: 11, originalFrameIndex: 11 })
+
+    expect(drawImageSpy).toHaveBeenCalledWith(mockBitmap, 0, 0)
   })
 
   it('draws to display canvas on seeked event when paused', () => {

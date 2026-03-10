@@ -4,6 +4,7 @@ import type { ColorAdjustment, FrameInsertion, ImageTransform } from '@/types/ep
 import { useAnnotationWorkspaceMediaSources } from './useAnnotationWorkspaceMediaSources'
 import { useAnnotationWorkspaceVideoSync } from './useAnnotationWorkspaceVideoSync'
 import { useFramePrefetch } from './useFramePrefetch'
+import { useVideoFrameCache } from './useVideoFrameCache'
 
 interface UseAnnotationWorkspaceMediaControllerOptions {
   currentDataset: DatasetInfo | null
@@ -78,6 +79,13 @@ export function useAnnotationWorkspaceMediaController({
     videoSrc: mediaSources.videoSrc,
   })
 
+  const frameCache = useVideoFrameCache({
+    videoSrc: mediaSources.videoSrc,
+    totalFrames,
+    fps: datasetFps,
+    onRecordEvent,
+  })
+
   const videoSync = useAnnotationWorkspaceVideoSync({
     currentFrame,
     totalFrames,
@@ -94,6 +102,8 @@ export function useAnnotationWorkspaceMediaController({
     insertedFrames,
     removedFrames,
     videoSrc: mediaSources.videoSrc,
+    frameCache: frameCache.frames,
+    frameCacheReady: frameCache.isReady,
     onSetCurrentFrame,
     onTogglePlayback,
     onSetFrameWithinPlaybackRange,
@@ -103,5 +113,7 @@ export function useAnnotationWorkspaceMediaController({
   return {
     ...mediaSources,
     ...videoSync,
+    frameCacheProgress: frameCache.progress,
+    frameCacheReady: frameCache.isReady,
   }
 }
