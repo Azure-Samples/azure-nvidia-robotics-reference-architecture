@@ -28,7 +28,8 @@ Validate changes using npm scripts from `src/dataviewer/`:
 
 Check existing terminals to see if the backend and frontend are already running:
 
-* If they're started in dev mode then you'll see logs in either terminal
+* If they're not started, use the VS Code task **Dataviewer: Start All** (Terminal > Run Task) to launch both the backend and frontend dev servers together.
+* If they're already started, check the VS Code Task output panels for issues, HTTP call logs, errors, and other diagnostic information before investigating problems externally.
 
 Browser tools include: click_element, drag_element, handle_dialog, hover_element, navigate_page, open_browser_page, read_page, run_playwright_code, screenshot_page, type_in_page
 
