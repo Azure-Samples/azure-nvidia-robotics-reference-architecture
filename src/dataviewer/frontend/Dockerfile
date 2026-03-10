@@ -35,7 +35,9 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 ENV NGINX_BACKEND_HOST=backend:8000
+ENV NGINX_BACKEND_SCHEME=http
+ENV NGINX_RESOLVER=127.0.0.11
 
 EXPOSE 80
 
-CMD ["/bin/sh", "-c", "envsubst '${NGINX_BACKEND_HOST}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", "envsubst '${NGINX_BACKEND_HOST} ${NGINX_BACKEND_SCHEME} ${NGINX_RESOLVER}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

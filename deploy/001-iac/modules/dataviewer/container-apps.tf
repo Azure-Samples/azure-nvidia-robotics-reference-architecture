@@ -31,8 +31,9 @@ resource "azurerm_container_app" "backend" {
   }
 
   ingress {
-    target_port      = 8000
-    external_enabled = false
+    target_port                = 8000
+    external_enabled           = false
+    allow_insecure_connections = true
 
     traffic_weight {
       latest_revision = true
@@ -155,6 +156,10 @@ resource "azurerm_container_app" "frontend" {
       env {
         name  = "NGINX_BACKEND_HOST"
         value = azurerm_container_app.backend.ingress[0].fqdn
+      }
+      env {
+        name  = "NGINX_BACKEND_SCHEME"
+        value = "https"
       }
     }
   }

@@ -22,7 +22,7 @@ locals {
   placeholder_image = "mcr.microsoft.com/k8se/quickstart:latest"
   backend_image     = coalesce(var.backend_image, local.placeholder_image)
   frontend_image    = coalesce(var.frontend_image, local.placeholder_image)
-  use_acr_images    = var.backend_image != "" && var.frontend_image != ""
+  use_acr_images    = var.container_registry.login_server != ""
 }
 
 // ============================================================
