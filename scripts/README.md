@@ -31,16 +31,16 @@ Submission scripts for training and inference workflows on Azure ML and OSMO pla
 
 ## 📜 Scripts
 
-| Script                               | Purpose                                             |
-|--------------------------------------|-----------------------------------------------------|
-| `submit-azureml-training.sh`         | Package code and submit Azure ML training job       |
-| `submit-azureml-validation.sh`       | Submit model validation job                         |
-| `submit-azureml-lerobot-training.sh` | Submit LeRobot training to Azure ML                 |
-| `submit-osmo-training.sh`            | Submit OSMO workflow (base64 payload)               |
-| `submit-osmo-dataset-training.sh`    | Submit OSMO workflow (dataset folder injection)     |
-| `submit-osmo-lerobot-training.sh`    | Submit LeRobot behavioral cloning training          |
-| `submit-osmo-lerobot-inference.sh`   | Submit LeRobot inference/evaluation                 |
-| `run-lerobot-pipeline.sh`            | End-to-end train → evaluate → register pipeline    |
+| Script                               | Purpose                                         |
+|--------------------------------------|-------------------------------------------------|
+| `submit-azureml-training.sh`         | Package code and submit Azure ML training job   |
+| `submit-azureml-validation.sh`       | Submit model validation job                     |
+| `submit-azureml-lerobot-training.sh` | Submit LeRobot training to Azure ML             |
+| `submit-osmo-training.sh`            | Submit OSMO workflow (base64 payload)           |
+| `submit-osmo-dataset-training.sh`    | Submit OSMO workflow (dataset folder injection) |
+| `submit-osmo-lerobot-training.sh`    | Submit LeRobot behavioral cloning training      |
+| `submit-osmo-lerobot-inference.sh`   | Submit LeRobot inference/evaluation             |
+| `run-lerobot-pipeline.sh`            | End-to-end train → evaluate → register pipeline |
 
 ## 📚 Related Documentation
 
