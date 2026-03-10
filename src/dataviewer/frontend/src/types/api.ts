@@ -108,6 +108,8 @@ export interface EpisodeData {
   meta: EpisodeMeta;
   /** Video URLs by camera name */
   videoUrls: Record<string, string>;
+  /** Available camera names */
+  cameras: string[];
   /** Trajectory data points */
   trajectoryData: TrajectoryPoint[];
 }

@@ -10,6 +10,7 @@ function seedEpisode() {
   useEpisodeStore.getState().setCurrentEpisode({
     meta: { index: 0, length: EPISODE_LENGTH, taskIndex: 0, hasAnnotations: false },
     videoUrls: {},
+    cameras: [],
     trajectoryData: [],
   })
 }

@@ -273,6 +273,7 @@ vi.mock('@/stores', () => ({
       currentEpisode: {
         meta: { index: hoisted.state.episodeIndex, length: 12 },
         videoUrls: { main: '/video.mp4' },
+        cameras: ['main'],
         trajectoryData: undefined,
       },
     }),

@@ -20,6 +20,7 @@ describe('useTrajectoryPlotState', () => {
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 3, taskIndex: 0, hasAnnotations: false },
       videoUrls: {},
+      cameras: [],
       trajectoryData: [
         {
           frame: 0,

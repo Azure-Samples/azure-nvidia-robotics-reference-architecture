@@ -24,6 +24,7 @@ describe('useAnnotationWorkspaceMediaController', () => {
       currentEpisode: {
         meta: { index: 3, length: 12, taskIndex: 0, hasAnnotations: false },
         videoUrls: { wrist: '/videos/wrist.mp4', overhead: '/videos/overhead.mp4' },
+        cameras: ['wrist', 'overhead'],
         trajectoryData: [],
       },
       currentFrame: 4,
@@ -60,6 +61,7 @@ describe('useAnnotationWorkspaceMediaController', () => {
       currentEpisode: {
         meta: { index: 3, length: 12, taskIndex: 0, hasAnnotations: false },
         videoUrls: { wrist: '/videos/wrist.mp4' },
+        cameras: ['wrist'],
         trajectoryData: [],
       },
       currentFrame: 0,
@@ -90,6 +92,41 @@ describe('useAnnotationWorkspaceMediaController', () => {
     act(() => {
       result.current.handleLoadedMetadata({ currentTarget: video } as SyntheticEvent<HTMLVideoElement>)
     })
+
+    expect(togglePlayback).toHaveBeenCalledTimes(1)
+  })
+
+  it('triggers autoplay immediately for frame-only episodes without video', () => {
+    const togglePlayback = vi.fn()
+    renderHook(() => useAnnotationWorkspaceMediaController({
+      currentDataset: dataset,
+      currentEpisode: {
+        meta: { index: 0, length: 100, taskIndex: 0, hasAnnotations: false },
+        videoUrls: {},
+        cameras: ['il-camera'],
+        trajectoryData: [],
+      },
+      currentFrame: 0,
+      totalFrames: 100,
+      originalFrameIndex: 0,
+      activePlaybackRange: null,
+      isPlaying: false,
+      playbackSpeed: 1,
+      autoPlay: true,
+      autoLoop: false,
+      playbackRangeStart: 0,
+      playbackRangeEnd: 99,
+      shouldLoopPlaybackRange: false,
+      displayAdjustment: null,
+      displayActive: false,
+      globalTransform: null,
+      insertedFrames: new Map(),
+      removedFrames: new Set(),
+      onSetCurrentFrame: vi.fn(),
+      onSetFrameWithinPlaybackRange: vi.fn(),
+      onTogglePlayback: togglePlayback,
+      onRecordEvent: vi.fn(),
+    }))
 
     expect(togglePlayback).toHaveBeenCalledTimes(1)
   })

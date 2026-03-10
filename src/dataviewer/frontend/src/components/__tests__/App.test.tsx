@@ -31,6 +31,7 @@ vi.mock('@/hooks/use-datasets', () => ({
     data: {
       meta: { index: episodeIndex, length: 12 },
       videoUrls: undefined,
+      cameras: [],
       trajectoryData: undefined,
     },
     isLoading: false,

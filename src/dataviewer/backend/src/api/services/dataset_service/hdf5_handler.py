@@ -155,8 +155,6 @@ class HDF5FormatHandler:
 
             video_urls: dict[str, str] = {}
             cameras = hdf5_data.metadata.get("cameras", [])
-            for camera in cameras:
-                video_urls[camera] = f"/api/datasets/{dataset_id}/episodes/{episode_idx}/video/{camera}"
 
             return EpisodeData(
                 meta=EpisodeMeta(
@@ -166,6 +164,7 @@ class HDF5FormatHandler:
                     has_annotations=False,  # Set by caller
                 ),
                 video_urls=video_urls,
+                cameras=cameras,
                 trajectory_data=trajectory_data,
             )
         except Exception as e:

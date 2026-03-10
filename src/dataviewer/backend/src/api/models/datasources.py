@@ -123,6 +123,7 @@ class EpisodeData(BaseModel):
 
     meta: EpisodeMeta
     video_urls: dict[str, str] = Field(default_factory=dict, description="Video URLs by camera name")
+    cameras: list[str] = Field(default_factory=list, description="Available camera names")
     trajectory_data: list[TrajectoryPoint] = Field(default_factory=list, description="Trajectory data points")
 
 

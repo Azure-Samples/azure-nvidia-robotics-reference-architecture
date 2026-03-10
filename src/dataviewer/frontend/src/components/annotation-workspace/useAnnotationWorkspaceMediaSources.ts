@@ -43,13 +43,14 @@ export function useAnnotationWorkspaceMediaSources({
   )
 
   const cameraName = useMemo(() => {
-    if (!currentEpisode?.videoUrls) {
-      return null
+    const cameras = currentEpisode?.cameras ?? []
+    if (cameras.length > 0) {
+      return cameras[0]
     }
 
-    const keys = Object.keys(currentEpisode.videoUrls)
-    return keys.length > 0 ? keys[0] : null
-  }, [currentEpisode?.videoUrls])
+    const videoKeys = Object.keys(currentEpisode?.videoUrls ?? {})
+    return videoKeys.length > 0 ? videoKeys[0] : null
+  }, [currentEpisode?.cameras, currentEpisode?.videoUrls])
 
   const videoSrc = useMemo(() => {
     if (!currentEpisode?.videoUrls || !cameraName) {

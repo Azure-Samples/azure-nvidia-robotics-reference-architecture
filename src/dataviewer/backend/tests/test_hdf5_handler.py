@@ -24,6 +24,20 @@ def _create_minimal_hdf5(path, num_frames=10, num_joints=6):
         f.attrs["task_index"] = 0
 
 
+def _create_hdf5_with_images(path, num_frames=10, num_joints=6, cameras=None):
+    """Create an HDF5 file with image data under observations/images/."""
+    cameras = cameras or ["il-camera"]
+    with h5py.File(path, "w") as f:
+        obs = f.create_group("observations")
+        obs.create_dataset("qpos", data=np.zeros((num_frames, num_joints)))
+        imgs = obs.create_group("images")
+        for cam in cameras:
+            imgs.create_dataset(cam, data=np.zeros((num_frames, 48, 64, 3), dtype=np.uint8))
+        f.create_dataset("action", data=np.zeros((num_frames, num_joints)))
+        f.attrs["fps"] = 30.0
+        f.attrs["task_index"] = 0
+
+
 class TestHandlerDetection:
     """Test format detection and capability."""
 
@@ -223,3 +237,27 @@ class TestSubdirectoryEpisodeDiscovery:
 
         ep = loader.load_episode(0)
         assert ep.length == 10
+
+
+class TestEpisodeCameraMetadata:
+    """Verify that load_episode includes camera names in metadata."""
+
+    def test_cameras_in_metadata(self, tmp_path):
+        """Episode metadata must include cameras discovered from image groups."""
+        _create_hdf5_with_images(tmp_path / "episode_0.hdf5", cameras=["il-camera", "wrist-camera"])
+
+        loader = HDF5Loader(tmp_path)
+        ep = loader.load_episode(0)
+        assert sorted(ep.metadata.get("cameras", [])) == ["il-camera", "wrist-camera"]
+
+    def test_cameras_populated_for_hdf5(self, tmp_path):
+        """HDF5FormatHandler.load_episode should return cameras, not video_urls."""
+        _create_hdf5_with_images(tmp_path / "episode_0.hdf5", cameras=["il-camera"])
+
+        handler = HDF5FormatHandler()
+        handler._loaders["test"] = HDF5Loader(tmp_path)
+
+        episode = handler.load_episode("test", 0)
+        assert episode is not None
+        assert "il-camera" in episode.cameras
+        assert episode.video_urls == {}

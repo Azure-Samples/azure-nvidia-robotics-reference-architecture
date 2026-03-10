@@ -183,6 +183,7 @@ class LeRobotFormatHandler:
                     has_annotations=False,  # Set by caller
                 ),
                 video_urls=video_urls,
+                cameras=list(video_urls.keys()),
                 trajectory_data=trajectory_data,
             )
         except Exception as e:

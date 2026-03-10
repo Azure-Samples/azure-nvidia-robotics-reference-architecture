@@ -55,6 +55,7 @@ beforeEach(() => {
   useEpisodeStore.getState().setCurrentEpisode({
     meta: { index: 0, length: 3, taskIndex: 0, hasAnnotations: false },
     videoUrls: {},
+    cameras: [],
     trajectoryData: [
       {
         frame: 0,
@@ -81,6 +82,7 @@ describe('TrajectoryPlot', () => {
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 4, taskIndex: 0, hasAnnotations: false },
       videoUrls: {},
+      cameras: [],
       trajectoryData: [
         {
           frame: 0,
@@ -236,6 +238,7 @@ describe('TrajectoryPlot', () => {
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
       videoUrls: {},
+      cameras: [],
       trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
         frame,
         timestamp: frame / 10,
@@ -288,6 +291,7 @@ describe('TrajectoryPlot', () => {
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
       videoUrls: {},
+      cameras: [],
       trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
         frame,
         timestamp: frame / 10,
@@ -334,6 +338,7 @@ describe('TrajectoryPlot', () => {
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
       videoUrls: {},
+      cameras: [],
       trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
         frame,
         timestamp: frame / 10,
@@ -413,6 +418,7 @@ describe('TrajectoryPlot', () => {
     useEpisodeStore.getState().setCurrentEpisode({
       meta: { index: 0, length: 10, taskIndex: 0, hasAnnotations: false },
       videoUrls: {},
+      cameras: [],
       trajectoryData: Array.from({ length: 10 }, (_, frame) => ({
         frame,
         timestamp: frame / 10,

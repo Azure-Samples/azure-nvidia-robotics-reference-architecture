@@ -91,6 +91,48 @@ describe('useAnnotationWorkspaceVideoSync', () => {
     expect(togglePlayback).toHaveBeenCalledTimes(2)
   })
 
+  it('re-arms autoplay when totalFrames changes between frame-only episodes', () => {
+    const togglePlayback = vi.fn()
+    const baseProps = {
+      currentFrame: 0,
+      totalFrames: 100,
+      originalFrameIndex: 0,
+      activePlaybackRange: null as [number, number] | null,
+      playbackRangeStart: 0,
+      playbackRangeEnd: 99,
+      isPlaying: false,
+      playbackSpeed: 1,
+      autoPlay: true,
+      autoLoop: false,
+      shouldLoopPlaybackRange: false,
+      datasetFps: 30,
+      insertedFrames: new Map<number, FrameInsertion>(),
+      removedFrames: new Set<number>(),
+      videoSrc: null,
+      onSetCurrentFrame: vi.fn(),
+      onTogglePlayback: togglePlayback,
+      onSetFrameWithinPlaybackRange: vi.fn(),
+      onRecordEvent: vi.fn(),
+    }
+
+    const { rerender } = renderHook(
+      (props) => useAnnotationWorkspaceVideoSync(props),
+      { initialProps: baseProps },
+    )
+
+    expect(togglePlayback).toHaveBeenCalledTimes(1)
+
+    rerender({ ...baseProps, isPlaying: true })
+    rerender({ ...baseProps, totalFrames: 185, playbackRangeEnd: 184, isPlaying: false })
+
+    expect(togglePlayback).toHaveBeenCalledTimes(2)
+
+    rerender({ ...baseProps, totalFrames: 185, playbackRangeEnd: 184, isPlaying: true })
+    rerender({ ...baseProps, totalFrames: 118, playbackRangeEnd: 117, isPlaying: false })
+
+    expect(togglePlayback).toHaveBeenCalledTimes(3)
+  })
+
   it('jumps to the playback range start when the video ends in loop mode', () => {
     const setFrameWithinPlaybackRange = vi.fn()
     const { result } = renderHook(() => useAnnotationWorkspaceVideoSync({
