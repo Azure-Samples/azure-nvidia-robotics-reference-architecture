@@ -438,7 +438,7 @@ variable "dataviewer_config" {
     storage_dataset_container    = optional(string, "datasets")
     storage_annotation_container = optional(string, "annotations")
     should_deploy_auth           = optional(bool, false)
-    redirect_uris                = optional(list(string), ["http://localhost:5173", "http://localhost:5174"])
+    redirect_uris                = optional(list(string), ["http://localhost:5173/", "http://localhost:5174/"])
   })
   description = "Dataviewer Container Apps configuration including subnet, access mode, container images, and auth. Leave image fields empty to provision with a placeholder for initial IaC deployment"
   default = {
@@ -449,6 +449,6 @@ variable "dataviewer_config" {
     storage_dataset_container    = "datasets"
     storage_annotation_container = "annotations"
     should_deploy_auth           = false
-    redirect_uris                = ["http://localhost:5173", "http://localhost:5174"]
+    redirect_uris                = ["http://localhost:5173/", "http://localhost:5174/"]
   }
 }

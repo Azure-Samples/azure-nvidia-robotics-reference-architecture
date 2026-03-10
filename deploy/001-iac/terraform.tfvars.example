@@ -140,7 +140,7 @@ should_enable_microsoft_defender        = true
 //   should_enable_internal = false
 //   should_deploy_auth     = true
 //   redirect_uris          = [
-//     "http://localhost:5173",
-//     "https://ca-frontend-nvidia-dev-001.westus2.azurecontainerapps.io",
+//     "http://localhost:5173/",
+//     "https://ca-frontend-nvidia-dev-001.westus2.azurecontainerapps.io/",
 //   ]
 // }
