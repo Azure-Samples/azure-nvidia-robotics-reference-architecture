@@ -17,12 +17,15 @@ Build and deploy the dataviewer application to Azure Container Apps.
 OPTIONS:
     -h, --help               Show this help message
     -t, --tf-dir DIR         Terraform directory (default: $DEFAULT_TF_DIR)
-    --tag TAG                Image tag (default: $DATAVIEWER_IMAGE_TAG)
+    --tag TAG                Image tag (default: auto-generated from git SHA)
     --skip-build             Skip container image builds (use existing images)
     --skip-update            Skip container app update (build images only)
     --skip-backend           Skip backend build/deploy
     --skip-frontend          Skip frontend build/deploy
     --config-preview         Print configuration and exit
+
+When building images, the tag defaults to 'sha-<git-short-hash>' for unique
+revisions. Use --tag to override, or --skip-build to reference existing images.
 
 EXAMPLES:
     $(basename "$0")
@@ -35,6 +38,7 @@ EOF
 # Defaults
 tf_dir="$SCRIPT_DIR/$DEFAULT_TF_DIR"
 image_tag="$DATAVIEWER_IMAGE_TAG"
+tag_explicit=false
 skip_build=false
 skip_update=false
 skip_backend=false
@@ -45,7 +49,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)           show_help; exit 0 ;;
     -t|--tf-dir)         tf_dir="$2"; shift 2 ;;
-    --tag)               image_tag="$2"; shift 2 ;;
+    --tag)               image_tag="$2"; tag_explicit=true; shift 2 ;;
     --skip-build)        skip_build=true; shift ;;
     --skip-update)       skip_update=true; shift ;;
     --skip-backend)      skip_backend=true; shift ;;
@@ -56,6 +60,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_tools az terraform jq
+
+# Auto-generate a unique image tag when building and no explicit --tag provided.
+# Uses git short SHA for traceability; falls back to timestamp outside a git repo.
+if [[ "$tag_explicit" == "false" && "$skip_build" == "false" ]]; then
+  if git_sha=$(git rev-parse --short HEAD 2>/dev/null); then
+    image_tag="sha-${git_sha}"
+  else
+    image_tag="build-$(date -u +%Y%m%d%H%M%S)"
+  fi
+fi
 
 #------------------------------------------------------------------------------
 # Gather Configuration
@@ -76,6 +90,8 @@ fi
 
 backend_app=$(tf_require "$tf_output" "dataviewer.value.backend.name" "Backend container app name")
 frontend_app=$(tf_require "$tf_output" "dataviewer.value.frontend.name" "Frontend container app name")
+identity_id=$(tf_require "$tf_output" "dataviewer.value.identity.id" "Managed identity resource ID")
+frontend_url=$(tf_get "$tf_output" "dataviewer.value.frontend.url" "")
 
 backend_image="${acr_login_server}/${DATAVIEWER_BACKEND_IMAGE}:${image_tag}"
 frontend_image="${acr_login_server}/${DATAVIEWER_FRONTEND_IMAGE}:${image_tag}"
@@ -88,16 +104,53 @@ section "Configuration"
 print_kv "Resource Group" "$rg"
 print_kv "ACR" "$acr_name"
 print_kv "Image Tag" "$image_tag"
+if [[ "$tag_explicit" == "true" ]]; then
+  tag_source="explicit (--tag)"
+elif [[ "$skip_build" == "true" ]]; then
+  tag_source="default (skip-build)"
+else
+  tag_source="auto-generated"
+fi
+print_kv "Tag Source" "$tag_source"
 print_kv "Backend Image" "$backend_image"
 print_kv "Frontend Image" "$frontend_image"
 print_kv "Backend App" "$backend_app"
 print_kv "Frontend App" "$frontend_app"
+print_kv "Identity" "${identity_id##*/}"
 print_kv "Skip Build" "$skip_build"
 print_kv "Skip Update" "$skip_update"
 
 if [[ "$config_preview" == "true" ]]; then
   info "Config preview mode — exiting without changes."
   exit 0
+fi
+
+#------------------------------------------------------------------------------
+# Configure ACR Registry
+#------------------------------------------------------------------------------
+
+if [[ "$skip_update" == "false" ]]; then
+  section "Configuring ACR Registry"
+
+  if [[ "$skip_backend" == "false" ]]; then
+    info "Ensuring ACR registry on $backend_app..."
+    az containerapp registry set \
+      --name "$backend_app" \
+      --resource-group "$rg" \
+      --server "$acr_login_server" \
+      --identity "$identity_id" \
+      --output none
+  fi
+
+  if [[ "$skip_frontend" == "false" ]]; then
+    info "Ensuring ACR registry on $frontend_app..."
+    az containerapp registry set \
+      --name "$frontend_app" \
+      --resource-group "$rg" \
+      --server "$acr_login_server" \
+      --identity "$identity_id" \
+      --output none
+  fi
 fi
 
 #------------------------------------------------------------------------------
@@ -175,6 +228,8 @@ print_kv "Backend Image" "$backend_image"
 print_kv "Frontend Image" "$frontend_image"
 print_kv "Backend App" "$backend_app"
 print_kv "Frontend App" "$frontend_app"
+print_kv "Image Tag" "$image_tag"
 print_kv "Build" "$([[ "$skip_build" == "true" ]] && echo 'Skipped' || echo 'Complete')"
 print_kv "Update" "$([[ "$skip_update" == "true" ]] && echo 'Skipped' || echo 'Complete')"
+[[ -n "$frontend_url" ]] && print_kv "Frontend URL" "$frontend_url"
 info "Deployment complete"
