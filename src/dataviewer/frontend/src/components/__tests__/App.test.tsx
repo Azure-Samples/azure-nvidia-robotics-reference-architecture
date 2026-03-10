@@ -53,6 +53,10 @@ vi.mock('@/lib/playback-diagnostics', () => ({
   isDiagnosticsEnabled: mockIsDiagnosticsEnabled,
 }))
 
+vi.mock('@/lib/api-client', () => ({
+  warmCache: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@/components/annotation-panel', () => ({
   LabelFilter: () => <div>Label Filter</div>,
 }))
