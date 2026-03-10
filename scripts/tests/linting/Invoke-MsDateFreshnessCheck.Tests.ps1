@@ -187,8 +187,8 @@ Describe 'Get-MarkdownFiles' -Tag 'Unit' {
 
     Context 'Non-existent path' {
         It 'Warns when path not found' {
-            $warnings = @(Get-MarkdownFiles -SearchPaths @(Join-Path $TestDrive 'nonexistent') -WarningVariable warnVar 3>&1)
-            # Should emit warning or handle gracefully
+            Get-MarkdownFiles -SearchPaths @(Join-Path $TestDrive 'nonexistent') -WarningAction SilentlyContinue
+            # Should handle gracefully and return empty or warn
         }
     }
 }
@@ -352,8 +352,7 @@ ms.date: 2025-01-01
 ---
 '@
             Set-Content -Path $script:TestFile -Value $content
-            $warnings = @(Get-MsDateFromFrontmatter -FilePath $script:TestFile -WarningVariable warnVar 3>&1)
-            $result = Get-MsDateFromFrontmatter -FilePath $script:TestFile
+            $result = Get-MsDateFromFrontmatter -FilePath $script:TestFile -WarningAction SilentlyContinue
             $result | Should -BeNullOrEmpty
         }
     }
@@ -416,7 +415,7 @@ Describe 'New-MsDateReport' -Tag 'Unit' {
         }
 
         It 'Creates logs directory if missing' {
-            $report = New-MsDateReport -Results $script:Results -Threshold 90
+            New-MsDateReport -Results $script:Results -Threshold 90 | Out-Null
             Test-Path (Join-Path $TestDrive 'logs') | Should -BeTrue
         }
     }
