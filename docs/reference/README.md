@@ -16,13 +16,13 @@ Technical reference documentation for submission scripts, workflow templates, en
 
 ## 📖 Reference Guides
 
-| Document                                   | Description                                                          | Status      |
-|--------------------------------------------|----------------------------------------------------------------------|-------------|
-| [Script Reference](scripts.md)             | Submission script inventory, CLI arguments, and configuration        | Available   |
-| [Script Examples](scripts-examples.md)     | Detailed examples for training, inference, and pipeline submission   | Available   |
-| Workflow Templates                         | AzureML and OSMO workflow YAML templates and configuration           | Coming soon |
-| Terraform Variables                        | Terraform input variables and outputs reference                      | Coming soon |
-| Environment Variables                      | Environment variables for training and deployment                    | Coming soon |
+| Document                               | Description                                                        | Status      |
+|----------------------------------------|--------------------------------------------------------------------|-------------|
+| [Script Reference](scripts.md)         | Submission script inventory, CLI arguments, and configuration      | Available   |
+| [Script Examples](scripts-examples.md) | Detailed examples for training, inference, and pipeline submission | Available   |
+| Workflow Templates                     | AzureML and OSMO workflow YAML templates and configuration         | Coming soon |
+| Terraform Variables                    | Terraform input variables and outputs reference                    | Coming soon |
+| Environment Variables                  | Environment variables for training and deployment                  | Coming soon |
 
 ## 📚 Related Documentation
 
