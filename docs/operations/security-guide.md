@@ -128,7 +128,7 @@ For team environments or production deployments, consider migrating to a remote 
 | [AKS baseline architecture](https://learn.microsoft.com/azure/architecture/reference-architectures/containers/aks/baseline-aks) | Production-ready AKS security and networking patterns |
 | [Azure compliance documentation](https://learn.microsoft.com/azure/compliance/)                                                 | Compliance offerings and certifications               |
 | [Terraform Azure backend](https://developer.hashicorp.com/terraform/language/backend/azurerm)                                   | Remote state backend configuration                    |
-| [Threat Model](threat-model.md)                                                                                                 | STRIDE-based threat analysis and remediation roadmap  |
+| [Threat Model](../security/threat-model.md)                                                                                     | STRIDE-based threat analysis and remediation roadmap  |
 | [Contributing security review](../contributing/security-review.md)                                                              | Contributor security checklist for pull requests      |
 
 ---
