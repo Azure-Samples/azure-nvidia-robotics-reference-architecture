@@ -63,7 +63,7 @@ AZURE_STORAGE_ANNOTATION_CONTAINER=annotations
 
 Expected blob structure:
 
-```
+```text
 {dataset_id}/meta/info.json
 {dataset_id}/meta/tasks.parquet
 {dataset_id}/data/chunk-000/file-000.parquet
@@ -85,6 +85,79 @@ Expected blob structure:
 | `BACKEND_PORT` | `8000` | API server port |
 | `FRONTEND_PORT` | `5173` | Dev server port |
 | `CORS_ORIGINS` | localhost ports | Comma-separated allowed CORS origins |
+
+## 🔒 Authentication with Entra ID
+
+The application supports Microsoft Entra ID (Azure AD) authentication for public-facing deployments. When auth is disabled (the default for local development), all requests bypass authentication. When enabled, the frontend uses MSAL.js to acquire tokens via PKCE, and the backend validates JWT tokens against the Entra ID JWKS endpoint.
+
+### Entra ID Prerequisites
+
+1. An [Azure AD app registration](https://learn.microsoft.com/entra/identity-platform/quickstart-register-app) with:
+   - **Single-page application** redirect URI set to your frontend URL (e.g., `http://localhost:5173` for local dev, `https://your-app.azurecontainerapps.io` for production)
+   - An **API scope** named `access_as_user` under "Expose an API" (`api://<client-id>/access_as_user`)
+   - Optional **App roles** defined for role-based access control (e.g., `Dataviewer.Viewer`, `Dataviewer.Annotator`, `Dataviewer.Admin`)
+
+2. Note the **Application (client) ID** and **Directory (tenant) ID** from the app registration.
+
+### Backend Configuration
+
+Set these environment variables in `backend/.env` (or as container environment variables):
+
+```env
+DATAVIEWER_AUTH_DISABLED=false
+DATAVIEWER_AUTH_PROVIDER=azure_ad
+DATAVIEWER_AZURE_TENANT_ID=<your-tenant-id>
+DATAVIEWER_AZURE_CLIENT_ID=<your-client-id>
+DATAVIEWER_SECURE_COOKIES=true   # Set to true when behind HTTPS
+```
+
+The backend validates incoming `Authorization: Bearer <token>` headers using RS256 and the Entra ID JWKS endpoint. When `DATAVIEWER_AUTH_DISABLED=true` (default), all authentication checks are bypassed.
+
+### Frontend Configuration
+
+The frontend uses build-time environment variables to configure MSAL.js. Set these before building:
+
+```env
+VITE_AZURE_CLIENT_ID=<your-client-id>
+VITE_AZURE_TENANT_ID=<your-tenant-id>
+```
+
+When `VITE_AZURE_CLIENT_ID` is set, the app wraps in an `MsalProvider` and attaches Bearer tokens to all API requests. When unset, MSAL is not initialized and the app runs without authentication (suitable for VPN-only access).
+
+### Docker Compose with Auth
+
+```bash
+export DATAVIEWER_AUTH_DISABLED=false
+export VITE_AZURE_CLIENT_ID=<your-client-id>
+export VITE_AZURE_TENANT_ID=<your-tenant-id>
+docker compose up --build
+```
+
+The frontend Dockerfile passes `VITE_AZURE_CLIENT_ID` and `VITE_AZURE_TENANT_ID` as build arguments. The backend receives `DATAVIEWER_AUTH_DISABLED` as a runtime environment variable.
+
+### Auth Environment Variable Reference
+
+| Variable | Location | Description |
+|---|---|---|
+| `DATAVIEWER_AUTH_DISABLED` | Backend | Set to `false` to enable auth (`true` disables all checks) |
+| `DATAVIEWER_AUTH_PROVIDER` | Backend | Auth provider: `apikey`, `azure_ad`, or `auth0` |
+| `DATAVIEWER_AZURE_TENANT_ID` | Backend | Entra ID tenant ID (GUID) |
+| `DATAVIEWER_AZURE_CLIENT_ID` | Backend | App registration client ID (GUID) |
+| `DATAVIEWER_SECURE_COOKIES` | Backend | Set to `true` for HTTPS deployments |
+| `VITE_AZURE_CLIENT_ID` | Frontend (build-time) | Same client ID — enables MSAL.js when set |
+| `VITE_AZURE_TENANT_ID` | Frontend (build-time) | Same tenant ID — used for authority URL |
+
+### Token Flow
+
+```text
+Browser → Entra ID (MSAL.js PKCE) → access_token
+   ↓
+   Bearer token → FastAPI backend (JWT validation)
+   ↓
+   Backend → Azure Storage (Managed Identity, not user token)
+```
+
+The backend accesses Azure Storage using managed identity, not the user's token. User authentication and storage authentication are independent.
 
 ## Running the Application
 

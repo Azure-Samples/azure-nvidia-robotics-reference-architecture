@@ -60,7 +60,7 @@ describe('fetchDatasets', () => {
 
     const result = await fetchDatasets()
     expect(result).toEqual(datasets)
-    expect(mockFetch).toHaveBeenCalledWith('/api/datasets')
+    expect(mockFetch).toHaveBeenCalledWith('/api/datasets', { headers: {} })
   })
 
   it('throws ApiClientError on failure', async () => {
@@ -77,7 +77,7 @@ describe('fetchDataset', () => {
 
     const result = await fetchDataset('ds-1')
     expect(result).toEqual(ds)
-    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1')
+    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1', { headers: {} })
   })
 })
 
@@ -121,7 +121,7 @@ describe('fetchEpisodes', () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([]))
 
     await fetchEpisodes('ds-1')
-    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1/episodes')
+    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1/episodes', { headers: {} })
   })
 })
 
@@ -149,7 +149,9 @@ describe('fetchAnnotations', () => {
 
     const result = await fetchAnnotations('ds-1', 0)
     expect(result).toEqual(data)
-    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1/episodes/0/annotations')
+    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1/episodes/0/annotations', {
+      headers: {},
+    })
   })
 })
 
@@ -208,7 +210,9 @@ describe('fetchAnnotationSummary', () => {
 
     const result = await fetchAnnotationSummary('ds-1')
     expect(result).toEqual(summary)
-    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1/annotations/summary')
+    expect(mockFetch).toHaveBeenCalledWith('/api/datasets/ds-1/annotations/summary', {
+      headers: {},
+    })
   })
 })
 

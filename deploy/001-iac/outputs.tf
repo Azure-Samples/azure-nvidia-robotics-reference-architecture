@@ -181,3 +181,12 @@ output "osmo_workload_identity" {
   description = "OSMO workload identity for deployment scripts"
   value       = module.platform.osmo_workload_identity
 }
+
+// ============================================================
+// Dataviewer Outputs (Optional)
+// ============================================================
+
+output "dataviewer" {
+  description = "Dataviewer container app configuration for deploy scripts."
+  value       = module.platform.dataviewer
+}

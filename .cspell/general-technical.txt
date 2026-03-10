@@ -1422,6 +1422,7 @@ virtualization
 visio
 visualisations
 visualstudio
+vite
 vlan
 vlans
 vm

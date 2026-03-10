@@ -12,7 +12,7 @@ COPY pyproject.toml uv.lock ./
 
 # Install production + azure dependencies
 # The 'azure' extra includes azure-storage-blob and azure-identity for MSI support.
-RUN uv sync --no-dev --extra azure --extra analysis --extra export
+RUN uv sync --no-dev --extra azure --extra analysis --extra export --extra auth
 
 # Copy application source
 COPY src/ ./src/

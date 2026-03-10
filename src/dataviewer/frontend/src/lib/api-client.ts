@@ -16,6 +16,8 @@ import type {
   EpisodeMeta,
 } from '@/types';
 
+import { getAuthHeaders } from './auth-headers';
+
 const API_BASE = '/api';
 
 /** Cached CSRF token fetched from the server. */
@@ -46,8 +48,12 @@ async function getCsrfToken(): Promise<string> {
   return _csrfTokenFetch;
 }
 
+export async function requestHeaders(): Promise<Record<string, string>> {
+  return { ...(await getAuthHeaders()) };
+}
+
 export async function mutationHeaders(): Promise<Record<string, string>> {
-  return { 'X-CSRF-Token': await getCsrfToken() };
+  return { 'X-CSRF-Token': await getCsrfToken(), ...(await getAuthHeaders()) };
 }
 
 /** Reset cached CSRF token (for testing). */
@@ -127,7 +133,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
  * Fetch all available datasets.
  */
 export async function fetchDatasets(): Promise<DatasetInfo[]> {
-  const response = await fetch(`${API_BASE}/datasets`);
+  const response = await fetch(`${API_BASE}/datasets`, {
+    headers: await requestHeaders(),
+  });
   return handleResponse<DatasetInfo[]>(response);
 }
 
@@ -135,7 +143,9 @@ export async function fetchDatasets(): Promise<DatasetInfo[]> {
  * Fetch a specific dataset by ID.
  */
 export async function fetchDataset(datasetId: string): Promise<DatasetInfo> {
-  const response = await fetch(`${API_BASE}/datasets/${datasetId}`);
+  const response = await fetch(`${API_BASE}/datasets/${datasetId}`, {
+    headers: await requestHeaders(),
+  });
   return handleResponse<DatasetInfo>(response);
 }
 
@@ -143,7 +153,9 @@ export async function fetchDataset(datasetId: string): Promise<DatasetInfo> {
  * Fetch capabilities for a dataset.
  */
 export async function fetchCapabilities(datasetId: string): Promise<DatasetCapabilities> {
-  const response = await fetch(`${API_BASE}/datasets/${datasetId}/capabilities`);
+  const response = await fetch(`${API_BASE}/datasets/${datasetId}/capabilities`, {
+    headers: await requestHeaders(),
+  });
   const data = await handleResponse<unknown>(response);
   return transformKeys<DatasetCapabilities>(data);
 }
@@ -178,7 +190,9 @@ export async function fetchEpisodes(
   const query = params.toString();
   const url = `${API_BASE}/datasets/${datasetId}/episodes${query ? `?${query}` : ''}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: await requestHeaders(),
+  });
   const data = await handleResponse<unknown>(response);
   return transformKeys<EpisodeMeta[]>(data);
 }
@@ -191,7 +205,8 @@ export async function fetchEpisode(
   episodeIndex: number
 ): Promise<EpisodeData> {
   const response = await fetch(
-    `${API_BASE}/datasets/${datasetId}/episodes/${episodeIndex}`
+    `${API_BASE}/datasets/${datasetId}/episodes/${episodeIndex}`,
+    { headers: await requestHeaders() }
   );
   const data = await handleResponse<unknown>(response);
   return transformKeys<EpisodeData>(data);
@@ -209,7 +224,8 @@ export async function fetchAnnotations(
   episodeIndex: number
 ): Promise<EpisodeAnnotationFile> {
   const response = await fetch(
-    `${API_BASE}/datasets/${datasetId}/episodes/${episodeIndex}/annotations`
+    `${API_BASE}/datasets/${datasetId}/episodes/${episodeIndex}/annotations`,
+    { headers: await requestHeaders() }
   );
   return handleResponse<EpisodeAnnotationFile>(response);
 }
@@ -279,7 +295,8 @@ export async function fetchAnnotationSummary(
   datasetId: string
 ): Promise<AnnotationSummary> {
   const response = await fetch(
-    `${API_BASE}/datasets/${datasetId}/annotations/summary`
+    `${API_BASE}/datasets/${datasetId}/annotations/summary`,
+    { headers: await requestHeaders() }
   );
   return handleResponse<AnnotationSummary>(response);
 }
@@ -302,7 +319,9 @@ export interface CacheStats {
  * Fetch episode cache performance metrics.
  */
 export async function fetchCacheStats(): Promise<CacheStats> {
-  const response = await fetch(`${API_BASE}/datasets/cache/stats`);
+  const response = await fetch(`${API_BASE}/datasets/cache/stats`, {
+    headers: await requestHeaders(),
+  });
   const data = await handleResponse<unknown>(response);
   return transformKeys<CacheStats>(data);
 }
@@ -313,5 +332,6 @@ export async function fetchCacheStats(): Promise<CacheStats> {
 export async function warmCache(datasetId: string, count = 5): Promise<void> {
   await fetch(`${API_BASE}/datasets/${datasetId}/cache/warm?count=${count}`, {
     method: 'POST',
+    headers: await mutationHeaders(),
   });
 }

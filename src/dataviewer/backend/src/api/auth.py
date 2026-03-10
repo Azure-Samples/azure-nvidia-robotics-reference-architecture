@@ -16,9 +16,10 @@ import logging
 import os
 import secrets
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 
 logger = logging.getLogger(__name__)
 
@@ -205,3 +206,27 @@ async def require_auth(request: Request) -> dict[str, Any] | None:
         )
 
     return user
+
+
+def require_role(required_role: str) -> Callable:
+    """FastAPI dependency that enforces an app role from JWT claims.
+
+    When auth is disabled (``DATAVIEWER_AUTH_DISABLED=true``), this dependency
+    passes through without checking roles.  When auth is enabled, the user's
+    JWT ``roles`` claim must contain *required_role* or HTTP 403 is raised.
+    """
+
+    async def _check_role(
+        user: dict[str, Any] | None = Depends(require_auth),
+    ) -> dict[str, Any] | None:
+        if user is None:
+            return user
+        roles: list[str] = user.get("roles", [])
+        if required_role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
+        return user
+
+    return _check_role

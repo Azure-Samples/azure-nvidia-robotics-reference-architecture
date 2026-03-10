@@ -24,6 +24,9 @@ services:
 
       # CORS: allow requests from the frontend container
       CORS_ORIGINS: "http://localhost:${FRONTEND_PORT:-5173},http://frontend"
+
+      # Authentication
+      DATAVIEWER_AUTH_DISABLED: "${DATAVIEWER_AUTH_DISABLED:-true}"
     volumes:
       # Mount local dataset directory when using local storage backend
       - "${HMI_LOCAL_DATA_PATH:-./datasets}:/data:ro"
@@ -38,8 +41,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_AZURE_CLIENT_ID: "${VITE_AZURE_CLIENT_ID:-}"
+        VITE_AZURE_TENANT_ID: "${VITE_AZURE_TENANT_ID:-}"
     ports:
       - "${FRONTEND_PORT:-5173}:80"
+    environment:
+      NGINX_BACKEND_HOST: "backend:8000"
     depends_on:
       backend:
         condition: service_healthy

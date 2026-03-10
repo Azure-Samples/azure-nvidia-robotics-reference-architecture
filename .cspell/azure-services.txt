@@ -38,6 +38,7 @@ azmon
 azuredevops
 azuremonitor
 azureml
+containerapp
 cosmosdb
 deviceregistry
 eastus
