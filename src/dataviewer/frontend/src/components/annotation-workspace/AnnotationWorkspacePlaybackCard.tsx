@@ -10,6 +10,7 @@ import { ViewerDisplayControls } from '@/components/viewer-display'
 interface AnnotationWorkspacePlaybackCardProps {
   compact?: boolean
   canvasRef: RefObject<HTMLCanvasElement>
+  displayCanvasRef: RefObject<HTMLCanvasElement>
   videoRef: RefObject<HTMLVideoElement>
   videoSrc: string | null
   onVideoEnded: () => void
@@ -40,6 +41,7 @@ interface AnnotationWorkspacePlaybackCardProps {
 export function AnnotationWorkspacePlaybackCard({
   compact = false,
   canvasRef,
+  displayCanvasRef,
   videoRef,
   videoSrc,
   onVideoEnded,
@@ -79,17 +81,23 @@ export function AnnotationWorkspacePlaybackCard({
           <canvas ref={canvasRef} className="hidden" />
 
           {videoSrc ? (
-            <video
-              ref={videoRef}
-              src={videoSrc}
-              onEnded={onVideoEnded}
-              onLoadedMetadata={onLoadedMetadata}
-              muted
-              playsInline
-              preload="auto"
-              className="max-h-full max-w-full object-contain"
-              style={displayFilter ? { filter: displayFilter } : undefined}
-            />
+            <>
+              <video
+                ref={videoRef}
+                src={videoSrc}
+                onEnded={onVideoEnded}
+                onLoadedMetadata={onLoadedMetadata}
+                muted
+                playsInline
+                preload="auto"
+                className="absolute opacity-0 pointer-events-none"
+              />
+              <canvas
+                ref={displayCanvasRef}
+                className="max-h-full max-w-full object-contain"
+                style={displayFilter ? { filter: displayFilter } : undefined}
+              />
+            </>
           ) : isInsertedFrame && interpolatedImageUrl ? (
             <img
               src={interpolatedImageUrl}

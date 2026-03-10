@@ -27,6 +27,7 @@ export function AnnotationWorkspaceContent({ shell }: AnnotationWorkspaceContent
     <AnnotationWorkspacePlaybackCard
       compact
       canvasRef={shell.canvasRef}
+      displayCanvasRef={shell.displayCanvasRef}
       videoRef={shell.videoRef}
       videoSrc={shell.videoSrc}
       onVideoEnded={shell.handleVideoEnded}

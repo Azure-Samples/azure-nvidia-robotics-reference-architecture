@@ -300,5 +300,6 @@ export function useAnnotationWorkspaceShell({
     videoRef: media.videoRef,
     videoSrc: media.videoSrc,
     canvasRef: media.canvasRef,
+    displayCanvasRef: media.displayCanvasRef,
   }
 }

@@ -89,6 +89,19 @@ export function shouldRecoverPlaybackAfterDesync(
   )
 }
 
+export function shouldRecoverStalledPlayback(
+  isPlaying: boolean,
+  videoPaused: boolean,
+  videoCurrentTime: number,
+  lastAdvancingTime: number,
+  elapsedSinceLastAdvanceMs: number,
+  stallThresholdMs: number,
+): boolean {
+  if (!isPlaying || videoPaused) return false
+  if (videoCurrentTime !== lastAdvancingTime) return false
+  return elapsedSinceLastAdvanceMs >= stallThresholdMs
+}
+
 /**
  * Derive effective fps from the video element's actual duration.
  *

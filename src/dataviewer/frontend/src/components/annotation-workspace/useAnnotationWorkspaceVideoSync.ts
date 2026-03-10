@@ -6,12 +6,25 @@ import {
   computeSyncAction,
   resolvePlaybackTick,
   shouldRecoverPlaybackAfterDesync,
+  shouldRecoverStalledPlayback,
   shouldRestartPlaybackAfterLoop,
 } from '@/lib/playback-utils'
 import { getOriginalIndex } from '@/stores/edit-store-frame-utils'
 import type { FrameInsertion } from '@/types/episode-edit'
 
 const PLAYBACK_RECOVERY_COOLDOWN_MS = 300
+
+function drawVideoToCanvas(video: HTMLVideoElement, canvas: HTMLCanvasElement): boolean {
+  if (!video.videoWidth || !video.videoHeight) return false
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return false
+  if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+  }
+  ctx.drawImage(video, 0, 0)
+  return true
+}
 
 interface UseAnnotationWorkspaceVideoSyncOptions {
   currentFrame: number
@@ -57,6 +70,7 @@ export function useAnnotationWorkspaceVideoSync({
   onRecordEvent,
 }: UseAnnotationWorkspaceVideoSyncOptions) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null)
   const currentFrameRef = useRef(0)
   const originalFrameIndexRef = useRef<number | null>(null)
   const playbackSpeedRef = useRef(playbackSpeed)
@@ -64,6 +78,7 @@ export function useAnnotationWorkspaceVideoSync({
   const skipNextPlaybackSyncRef = useRef(false)
   const playbackRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPlaybackRecoveryAtRef = useRef(0)
+  const rvfcActiveRef = useRef(false)
   const [videoDuration, setVideoDuration] = useState(0)
 
   useEffect(() => {
@@ -188,6 +203,9 @@ export function useAnnotationWorkspaceVideoSync({
     }
   }, [autoLoop, ensureVideoPlaybackAtTime, fps, isPlaying, onRecordEvent, onSetFrameWithinPlaybackRange, playbackRangeEnd, playbackRangeStart, shouldLoopPlaybackRange, totalFrames])
 
+  const syncVideoElementPlaybackRef = useRef(syncVideoElementPlayback)
+  syncVideoElementPlaybackRef.current = syncVideoElementPlayback
+
   const handleLoadedMetadata = useCallback((event: SyntheticEvent<HTMLVideoElement>) => {
     const video = event.currentTarget
 
@@ -200,7 +218,7 @@ export function useAnnotationWorkspaceVideoSync({
 
     if (isPlaying) {
       skipNextPlaybackSyncRef.current = true
-      syncVideoElementPlayback(video)
+      syncVideoElementPlaybackRef.current(video)
       return
     }
 
@@ -208,7 +226,7 @@ export function useAnnotationWorkspaceVideoSync({
       shouldAutoPlayOnMetadataLoadRef.current = false
       onTogglePlayback()
     }
-  }, [isPlaying, onRecordEvent, onTogglePlayback, syncVideoElementPlayback])
+  }, [isPlaying, onRecordEvent, onTogglePlayback])
 
   useEffect(() => {
     const video = videoRef.current
@@ -221,8 +239,8 @@ export function useAnnotationWorkspaceVideoSync({
       return
     }
 
-    syncVideoElementPlayback(video)
-  }, [syncVideoElementPlayback, videoSrc])
+    syncVideoElementPlaybackRef.current(video)
+  }, [isPlaying, videoSrc])
 
   useEffect(() => {
     if (!isPlaying) {
@@ -242,6 +260,8 @@ export function useAnnotationWorkspaceVideoSync({
     let lastFrame = -1
     let lastTimestamp: number | null = null
     let virtualTime = currentFrameRef.current / fps
+    let lastAdvancingVideoTime = -1
+    let lastAdvancingVideoTimeAt = Date.now()
 
     const tick = (timestamp: number) => {
       if (disposed) return
@@ -253,13 +273,27 @@ export function useAnnotationWorkspaceVideoSync({
         const resolved = resolvePlaybackTick(nextFrame, totalFrames, activePlaybackRange, shouldLoopPlaybackRange)
         const now = Date.now()
 
+        if (video.currentTime !== lastAdvancingVideoTime) {
+          lastAdvancingVideoTime = video.currentTime
+          lastAdvancingVideoTimeAt = now
+        }
+
         if (shouldRecoverPlaybackAfterDesync(
           isPlaying,
           video.paused,
           now - lastPlaybackRecoveryAtRef.current,
           PLAYBACK_RECOVERY_COOLDOWN_MS,
+        ) || shouldRecoverStalledPlayback(
+          isPlaying,
+          video.paused,
+          video.currentTime,
+          lastAdvancingVideoTime,
+          now - lastAdvancingVideoTimeAt,
+          PLAYBACK_RECOVERY_COOLDOWN_MS,
         )) {
           lastPlaybackRecoveryAtRef.current = now
+          lastAdvancingVideoTime = -1
+          lastAdvancingVideoTimeAt = now
           onRecordEvent('playback', 'desync-recover', {
             currentFrame: resolved.frame,
             nextFrame,
@@ -307,6 +341,11 @@ export function useAnnotationWorkspaceVideoSync({
           }
 
           video.currentTime = resolved.frame / fps
+        }
+
+        if (!rvfcActiveRef.current) {
+          const canvas = displayCanvasRef.current
+          if (canvas) drawVideoToCanvas(video, canvas)
         }
       } else if (!videoSrc) {
         if (lastTimestamp !== null) {
@@ -397,7 +436,66 @@ export function useAnnotationWorkspaceVideoSync({
     onSetFrameWithinPlaybackRange(playbackRangeEnd)
   }, [autoLoop, ensureVideoPlaybackAtTime, fps, isPlaying, onRecordEvent, onSetFrameWithinPlaybackRange, onTogglePlayback, playbackRangeEnd, playbackRangeStart, shouldLoopPlaybackRange])
 
+  // RVFC-based forward-only canvas rendering during playback
+  useEffect(() => {
+    const video = videoRef.current
+    const canvas = displayCanvasRef.current
+    if (!video || !canvas || !videoSrc || !isPlaying) {
+      rvfcActiveRef.current = false
+      return
+    }
+
+    if (!('requestVideoFrameCallback' in video)) {
+      rvfcActiveRef.current = false
+      return
+    }
+
+    rvfcActiveRef.current = true
+    let lastForwardTime = -1
+    let disposed = false
+
+    const handleSeeking = () => { lastForwardTime = -1 }
+    video.addEventListener('seeking', handleSeeking)
+
+    const onVideoFrame = (_now: number, metadata: { mediaTime: number }) => {
+      if (disposed) return
+      const c = displayCanvasRef.current
+      if (c && metadata.mediaTime > lastForwardTime) {
+        drawVideoToCanvas(video, c)
+        lastForwardTime = metadata.mediaTime
+      }
+      ;(video as HTMLVideoElement & { requestVideoFrameCallback: (cb: typeof onVideoFrame) => number }).requestVideoFrameCallback(onVideoFrame)
+    }
+
+    ;(video as HTMLVideoElement & { requestVideoFrameCallback: (cb: typeof onVideoFrame) => number }).requestVideoFrameCallback(onVideoFrame)
+
+    return () => {
+      disposed = true
+      rvfcActiveRef.current = false
+      video.removeEventListener('seeking', handleSeeking)
+    }
+  }, [isPlaying, videoSrc])
+
+  // Draw to canvas when paused (seeked/loadeddata events)
+  useEffect(() => {
+    const video = videoRef.current
+    const canvas = displayCanvasRef.current
+    if (!video || !canvas || !videoSrc || isPlaying) return
+
+    const draw = () => drawVideoToCanvas(video, canvas)
+
+    video.addEventListener('seeked', draw)
+    video.addEventListener('loadeddata', draw)
+    if (video.readyState >= 2) draw()
+
+    return () => {
+      video.removeEventListener('seeked', draw)
+      video.removeEventListener('loadeddata', draw)
+    }
+  }, [isPlaying, videoSrc])
+
   return {
+    displayCanvasRef,
     handleLoadedMetadata,
     handleResumePlayback,
     handleVideoEnded,

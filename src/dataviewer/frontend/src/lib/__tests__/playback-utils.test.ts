@@ -9,6 +9,7 @@ import {
   resolvePlaybackTick,
   shouldLoopActivePlaybackRange,
   shouldRecoverPlaybackAfterDesync,
+  shouldRecoverStalledPlayback,
   shouldRestartPlaybackAfterLoop,
 } from '../playback-utils'
 
@@ -299,5 +300,27 @@ describe('shouldRecoverPlaybackAfterDesync', () => {
 
   it('does not recover when the media element is already running', () => {
     expect(shouldRecoverPlaybackAfterDesync(true, false, 0, 300)).toBe(false)
+  })
+})
+
+describe('shouldRecoverStalledPlayback', () => {
+  it('recovers when playing, not paused, same time, and threshold exceeded', () => {
+    expect(shouldRecoverStalledPlayback(true, false, 1.5, 1.5, 400, 300)).toBe(true)
+  })
+
+  it('does not recover when time is still advancing', () => {
+    expect(shouldRecoverStalledPlayback(true, false, 1.6, 1.5, 400, 300)).toBe(false)
+  })
+
+  it('does not recover when threshold not reached', () => {
+    expect(shouldRecoverStalledPlayback(true, false, 1.5, 1.5, 100, 300)).toBe(false)
+  })
+
+  it('does not recover when not playing', () => {
+    expect(shouldRecoverStalledPlayback(false, false, 1.5, 1.5, 400, 300)).toBe(false)
+  })
+
+  it('does not recover when video is paused', () => {
+    expect(shouldRecoverStalledPlayback(true, true, 1.5, 1.5, 400, 300)).toBe(false)
   })
 })
