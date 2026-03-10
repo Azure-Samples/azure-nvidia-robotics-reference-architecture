@@ -3,6 +3,7 @@ import type { ColorAdjustment, FrameInsertion, ImageTransform } from '@/types/ep
 
 import { useAnnotationWorkspaceMediaSources } from './useAnnotationWorkspaceMediaSources'
 import { useAnnotationWorkspaceVideoSync } from './useAnnotationWorkspaceVideoSync'
+import { useFramePrefetch } from './useFramePrefetch'
 
 interface UseAnnotationWorkspaceMediaControllerOptions {
   currentDataset: DatasetInfo | null
@@ -65,6 +66,16 @@ export function useAnnotationWorkspaceMediaController({
     globalTransform,
     insertedFrames,
     removedFrames,
+  })
+
+  useFramePrefetch({
+    datasetId: currentDataset?.id ?? null,
+    episodeIndex: currentEpisode?.meta.index ?? null,
+    cameraName: mediaSources.cameraName,
+    currentFrame,
+    totalFrames,
+    isPlaying,
+    videoSrc: mediaSources.videoSrc,
   })
 
   const videoSync = useAnnotationWorkspaceVideoSync({

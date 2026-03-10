@@ -34,10 +34,9 @@ describe('PlaybackControls', () => {
     expect(screen.getByText(/0:03/)).toBeInTheDocument()
   })
 
-  it('renders speed options', () => {
+  it('renders speed control trigger', () => {
     render(<PlaybackControls {...defaultProps} />)
-    expect(screen.getByText('1x')).toBeInTheDocument()
-    expect(screen.getByText('2x')).toBeInTheDocument()
+    expect(screen.getByLabelText(/playback speed/i)).toBeInTheDocument()
   })
 
   it('play button uses icon-only variant with consistent size', () => {
@@ -49,35 +48,39 @@ describe('PlaybackControls', () => {
     expect(playButton.textContent).toBe('')
   })
 
-  it('clicking a speed button updates store playbackSpeed', () => {
+  it('clicking a speed preset updates store playbackSpeed', async () => {
     render(<PlaybackControls {...defaultProps} />)
+    // Open speed popover
+    fireEvent.click(screen.getByLabelText(/playback speed/i))
+    // Click 2x preset
     fireEvent.click(screen.getByText('2x'))
     expect(useEpisodeStore.getState().playbackSpeed).toBe(2)
   })
 
-  it('highlights the active speed button', () => {
+  it('displays the current speed on the trigger', () => {
     useEpisodeStore.getState().setPlaybackSpeed(2)
     render(<PlaybackControls {...defaultProps} />)
-    const btn2x = screen.getByText('2x')
-    const btn1x = screen.getByText('1x')
-    // Active button uses 'default' variant (solid bg), inactive uses 'ghost'
-    expect(btn2x.className).toContain('bg-primary')
-    expect(btn1x.className).not.toContain('bg-primary')
+    expect(screen.getByLabelText(/playback speed: 2x/i)).toBeInTheDocument()
   })
 
-  it('switching speeds updates the highlighted button', () => {
+  it('switching speeds updates the store', () => {
     render(<PlaybackControls {...defaultProps} />)
+    fireEvent.click(screen.getByLabelText(/playback speed/i))
     fireEvent.click(screen.getByText('2x'))
     expect(useEpisodeStore.getState().playbackSpeed).toBe(2)
 
+    fireEvent.click(screen.getByLabelText(/playback speed/i))
     fireEvent.click(screen.getByText('0.5x'))
     expect(useEpisodeStore.getState().playbackSpeed).toBe(0.5)
   })
 
-  it('renders all five speed options', () => {
+  it('renders speed presets in the popover', () => {
     render(<PlaybackControls {...defaultProps} />)
-    for (const label of ['0.25x', '0.5x', '1x', '1.5x', '2x']) {
+    fireEvent.click(screen.getByLabelText(/playback speed/i))
+    for (const label of ['0.25x', '0.5x', '0.75x', '1.5x', '2x', '3x', '5x']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
+    // '1x' appears on trigger and in popover
+    expect(screen.getAllByText('1x')).toHaveLength(2)
   })
 })

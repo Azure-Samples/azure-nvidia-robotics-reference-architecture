@@ -2,11 +2,10 @@ import { Pause, Play, Repeat, RotateCcw, SkipBack, SkipForward } from 'lucide-re
 import type { RefObject, SyntheticEvent } from 'react'
 
 import { PlaybackControlStrip } from '@/components/playback/PlaybackControlStrip'
+import { SpeedControl } from '@/components/playback/SpeedControl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ViewerDisplayControls } from '@/components/viewer-display'
-
-const PLAYBACK_SPEEDS = [0.5, 1, 2] as const
 
 interface AnnotationWorkspacePlaybackCardProps {
   compact?: boolean
@@ -261,18 +260,7 @@ function renderCompactControls({
         </Button>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        {PLAYBACK_SPEEDS.map((speed) => (
-          <Button
-            key={speed}
-            size="sm"
-            variant={playbackSpeed === speed ? 'default' : 'outline'}
-            onClick={() => onSetPlaybackSpeed(speed)}
-            aria-label={`Set playback speed to ${speed}x`}
-            className="h-8 min-w-[2.5rem] px-1.5 text-xs"
-          >
-            {speed}x
-          </Button>
-        ))}
+        <SpeedControl speed={playbackSpeed} onSpeedChange={onSetPlaybackSpeed} compact />
         <Button
           size="icon"
           variant={autoPlay ? 'default' : 'outline'}
@@ -327,18 +315,7 @@ function renderDefaultControls({
         <RotateCcw className="h-4 w-4" />
       </Button>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm">Speed:</span>
-        {PLAYBACK_SPEEDS.map((speed) => (
-          <Button
-            key={speed}
-            size="sm"
-            variant={playbackSpeed === speed ? 'default' : 'outline'}
-            onClick={() => onSetPlaybackSpeed(speed)}
-            className="px-2"
-          >
-            {speed}x
-          </Button>
-        ))}
+        <SpeedControl speed={playbackSpeed} onSpeedChange={onSetPlaybackSpeed} />
       </div>
       <div className="flex flex-wrap items-center gap-1">
         <Button
