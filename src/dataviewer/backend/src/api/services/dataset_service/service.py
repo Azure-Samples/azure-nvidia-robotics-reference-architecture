@@ -6,7 +6,6 @@ implementations (LeRobot, HDF5) and manages blob storage integration.
 """
 
 import asyncio
-import hashlib
 import logging
 import os
 import shutil
@@ -43,12 +42,6 @@ def _validate_dataset_id(dataset_id: str) -> str:
         if not safe or safe != part or part in {".", ".."}:
             raise ValueError(f"Invalid dataset identifier: {dataset_id!r}")
     return dataset_id
-
-
-def _safe_temp_dir_prefix(prefix: str, dataset_id: str) -> str:
-    """Build a filesystem-safe temp directory prefix from a dataset identifier hash."""
-    digest = hashlib.sha256(dataset_id.encode("utf-8")).hexdigest()[:16]
-    return f"{prefix}_{digest}_"
 
 
 class DatasetService:
@@ -154,7 +147,7 @@ class DatasetService:
         if dataset_id in self._blob_synced:
             return self._blob_synced[dataset_id]
 
-        tmp_dir = Path(tempfile.mkdtemp(prefix=_safe_temp_dir_prefix("dvw", dataset_id)))
+        tmp_dir = Path(tempfile.mkdtemp(prefix="dvw_"))
         success = await self._blob_provider.sync_dataset_to_local(dataset_id, tmp_dir)
         if success:
             self._blob_synced[dataset_id] = tmp_dir
@@ -174,7 +167,7 @@ class DatasetService:
         if dataset_id in self._blob_meta_synced:
             return self._blob_meta_synced[dataset_id]
 
-        tmp_dir = Path(tempfile.mkdtemp(prefix=_safe_temp_dir_prefix("dvwm", dataset_id)))
+        tmp_dir = Path(tempfile.mkdtemp(prefix="dvwm_"))
         success = await self._blob_provider.sync_meta_only_to_local(dataset_id, tmp_dir)
         if success:
             self._blob_meta_synced[dataset_id] = tmp_dir
@@ -541,7 +534,7 @@ class DatasetService:
             self._prefetch_tasks.add(task)
             task.add_done_callback(self._prefetch_tasks.discard)
         except RuntimeError as error:
-            logger.debug("Skipping episode prefetch for %r/%d: %s", dataset_id, episode_idx, error)
+            logger.debug("Skipping episode prefetch for episode %d: %s", episode_idx, error)
 
     # ------------------------------------------------------------------
     # Capability queries
