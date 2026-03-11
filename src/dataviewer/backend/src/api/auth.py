@@ -126,6 +126,52 @@ class JwtProvider(AuthProvider):
 
 
 # ============================================================================
+# Easy Auth provider (Azure Container Apps)
+# ============================================================================
+
+
+class EasyAuthProvider(AuthProvider):
+    """Reads identity from Azure Container Apps Easy Auth X-MS-CLIENT-PRINCIPAL header."""
+
+    async def authenticate(self, request: Request) -> dict[str, Any] | None:
+        principal = request.headers.get("X-MS-CLIENT-PRINCIPAL", "")
+        if not principal:
+            return None
+        import base64
+        import json
+
+        try:
+            claims_json = json.loads(base64.b64decode(principal))
+        except (ValueError, json.JSONDecodeError):
+            return None
+
+        claims = claims_json.get("claims", [])
+        name_id = ""
+        name = ""
+        roles: list[str] = []
+        for claim in claims:
+            typ = claim.get("typ", "")
+            val = claim.get("val", "")
+            if "nameidentifier" in typ:
+                name_id = val
+            elif typ == "name":
+                name = val
+            elif typ == "roles":
+                roles.append(val)
+
+        return {
+            "sub": name_id,
+            "name": name,
+            "roles": roles,
+            "auth_method": "easy_auth",
+        }
+
+    @property
+    def www_authenticate(self) -> str:
+        return 'EasyAuth realm="DataViewer API"'
+
+
+# ============================================================================
 # Provider factory
 # ============================================================================
 
@@ -152,6 +198,9 @@ def _build_provider() -> AuthProvider:
         jwks_uri = f"https://{domain}/.well-known/jwks.json"
         issuer = f"https://{domain}/"
         return JwtProvider(jwks_uri=jwks_uri, audience=audience, issuer=issuer)
+
+    if provider_name == "easy_auth":
+        return EasyAuthProvider()
 
     logger.error("Unknown DATAVIEWER_AUTH_PROVIDER value: %s; falling back to API-key", provider_name)
     return ApiKeyProvider(os.environ.get("DATAVIEWER_API_KEY", ""))

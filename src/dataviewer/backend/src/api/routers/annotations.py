@@ -7,7 +7,6 @@ annotation summaries.
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
-from ..auth import require_auth
 from ..csrf import require_csrf_token
 from ..models.annotations import (
     AnnotationSummary,
@@ -60,7 +59,7 @@ async def get_annotations(
 @router.put(
     "/datasets/{dataset_id}/episodes/{episode_idx}/annotations",
     response_model=EpisodeAnnotationFile,
-    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+    dependencies=[Depends(require_csrf_token)],
 )
 async def save_annotations(
     dataset_id: str,
@@ -95,7 +94,7 @@ async def save_annotations(
 @router.delete(
     "/datasets/{dataset_id}/episodes/{episode_idx}/annotations",
     response_model=dict,
-    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+    dependencies=[Depends(require_csrf_token)],
 )
 async def delete_annotations(
     dataset_id: str,
@@ -128,7 +127,7 @@ async def delete_annotations(
 @router.post(
     "/datasets/{dataset_id}/episodes/{episode_idx}/annotations/auto",
     response_model=AutoQualityAnalysis,
-    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+    dependencies=[Depends(require_csrf_token)],
 )
 async def trigger_auto_analysis(
     dataset_id: str,

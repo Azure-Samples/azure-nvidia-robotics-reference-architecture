@@ -14,7 +14,6 @@ import aiofiles.os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ..auth import require_auth
 from ..csrf import require_csrf_token
 from ..services.dataset_service import DatasetService, get_dataset_service
 from ..validation import validate_path_containment, validated_dataset_id
@@ -112,7 +111,7 @@ async def get_label_options(dataset_id: str = Depends(validated_dataset_id)) -> 
     return labels_file.available_labels
 
 
-@router.post("/{dataset_id}/labels/options", dependencies=[Depends(require_auth), Depends(require_csrf_token)])
+@router.post("/{dataset_id}/labels/options", dependencies=[Depends(require_csrf_token)])
 async def add_label_option(dataset_id: str = Depends(validated_dataset_id), body: AddLabelOption = ...) -> list[str]:
     """Add a new label option to the available set."""
     labels_file = await _load_labels(dataset_id)
@@ -127,7 +126,7 @@ async def add_label_option(dataset_id: str = Depends(validated_dataset_id), body
 
 @router.delete(
     "/{dataset_id}/labels/options/{label}",
-    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+    dependencies=[Depends(require_csrf_token)],
 )
 async def delete_label_option(
     dataset_id: str = Depends(validated_dataset_id),
@@ -167,7 +166,7 @@ async def get_episode_labels(dataset_id: str = Depends(validated_dataset_id), ep
 
 @router.put(
     "/{dataset_id}/episodes/{episode_idx}/labels",
-    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+    dependencies=[Depends(require_csrf_token)],
 )
 async def set_episode_labels(
     dataset_id: str = Depends(validated_dataset_id),
@@ -195,7 +194,7 @@ async def set_episode_labels(
     )
 
 
-@router.post("/{dataset_id}/labels/save", dependencies=[Depends(require_auth), Depends(require_csrf_token)])
+@router.post("/{dataset_id}/labels/save", dependencies=[Depends(require_csrf_token)])
 async def save_all_labels(dataset_id: str = Depends(validated_dataset_id)) -> DatasetLabelsFile:
     """Persist all labels to disk (already persisted on each write, but
     this endpoint lets the frontend trigger an explicit save/confirmation)."""

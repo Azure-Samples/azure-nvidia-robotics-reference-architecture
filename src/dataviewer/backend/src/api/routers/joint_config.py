@@ -14,7 +14,6 @@ import aiofiles.os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ..auth import require_auth
 from ..csrf import require_csrf_token
 from ..validation import validate_path_containment, validated_dataset_id
 
@@ -163,7 +162,7 @@ async def get_joint_config(dataset_id: str = Depends(validated_dataset_id)) -> J
 
 @router.put(
     "/{dataset_id}/joint-config",
-    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+    dependencies=[Depends(require_csrf_token)],
 )
 async def update_joint_config(
     dataset_id: str = Depends(validated_dataset_id),
@@ -187,7 +186,7 @@ async def get_joint_config_defaults() -> JointConfig:
 
 @defaults_router.put(
     "/joint-config/defaults",
-    dependencies=[Depends(require_auth), Depends(require_csrf_token)],
+    dependencies=[Depends(require_csrf_token)],
 )
 async def update_joint_config_defaults(body: JointConfigUpdate = ...) -> JointConfig:
     """Update global joint configuration defaults."""

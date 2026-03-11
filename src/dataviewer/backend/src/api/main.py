@@ -5,10 +5,11 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .auth import require_auth
 from .csrf import CSRF_COOKIE_NAME, generate_csrf_token
 from .routers import analysis, annotations, datasets, detection, export, joint_config, labels
 from .routes import ai_analysis
@@ -65,16 +66,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers - export must come before datasets to match longer paths first
-app.include_router(export.router, prefix="/api/datasets", tags=["export"])
-app.include_router(detection.router, prefix="/api/datasets", tags=["detection"])
-app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"])
-app.include_router(annotations.router, prefix="/api", tags=["annotations"])
-app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
-app.include_router(ai_analysis.router, prefix="/api", tags=["ai"])
-app.include_router(labels.router, prefix="/api/datasets", tags=["labels"])
-app.include_router(joint_config.router, prefix="/api/datasets", tags=["joint-config"])
-app.include_router(joint_config.defaults_router, prefix="/api", tags=["joint-config"])
+# All /api/* routes require authentication (health and csrf-token are on app directly)
+api_auth = [Depends(require_auth)]
+app.include_router(export.router, prefix="/api/datasets", tags=["export"], dependencies=api_auth)
+app.include_router(detection.router, prefix="/api/datasets", tags=["detection"], dependencies=api_auth)
+app.include_router(datasets.router, prefix="/api/datasets", tags=["datasets"], dependencies=api_auth)
+app.include_router(annotations.router, prefix="/api", tags=["annotations"], dependencies=api_auth)
+app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"], dependencies=api_auth)
+app.include_router(ai_analysis.router, prefix="/api", tags=["ai"], dependencies=api_auth)
+app.include_router(labels.router, prefix="/api/datasets", tags=["labels"], dependencies=api_auth)
+app.include_router(joint_config.router, prefix="/api/datasets", tags=["joint-config"], dependencies=api_auth)
+app.include_router(joint_config.defaults_router, prefix="/api", tags=["joint-config"], dependencies=api_auth)
 
 
 @app.get("/health")

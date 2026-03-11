@@ -93,6 +93,14 @@ frontend_app=$(tf_require "$tf_output" "dataviewer.value.frontend.name" "Fronten
 identity_id=$(tf_require "$tf_output" "dataviewer.value.identity.id" "Managed identity resource ID")
 frontend_url=$(tf_get "$tf_output" "dataviewer.value.frontend.url" "")
 
+# Entra ID auth configuration (empty when should_deploy_auth=false)
+entra_client_id=$(tf_get "$tf_output" "dataviewer.value.entra_id.client_id" "")
+entra_tenant_id=$(tf_get "$tf_output" "dataviewer.value.entra_id.tenant_id" "")
+auth_enabled=false
+if [[ -n "$entra_client_id" && "$entra_client_id" != "null" ]]; then
+  auth_enabled=true
+fi
+
 backend_image="${acr_login_server}/${DATAVIEWER_BACKEND_IMAGE}:${image_tag}"
 frontend_image="${acr_login_server}/${DATAVIEWER_FRONTEND_IMAGE}:${image_tag}"
 
@@ -119,6 +127,7 @@ print_kv "Frontend App" "$frontend_app"
 print_kv "Identity" "${identity_id##*/}"
 print_kv "Skip Build" "$skip_build"
 print_kv "Skip Update" "$skip_update"
+print_kv "Auth Enabled" "$auth_enabled"
 
 if [[ "$config_preview" == "true" ]]; then
   info "Config preview mode — exiting without changes."
@@ -176,10 +185,7 @@ if [[ "$skip_build" == "false" ]]; then
     info "Building $frontend_image..."
 
     build_args=()
-    # Inject MSAL build args when Entra ID auth is deployed
-    entra_client_id=$(tf_get "$tf_output" "dataviewer.value.entra_id.client_id" "")
-    entra_tenant_id=$(tf_get "$tf_output" "dataviewer.value.entra_id.tenant_id" "")
-    if [[ -n "$entra_client_id" && "$entra_client_id" != "null" ]]; then
+    if [[ "$auth_enabled" == "true" ]]; then
       build_args+=(--build-arg "VITE_AZURE_CLIENT_ID=${entra_client_id}")
       build_args+=(--build-arg "VITE_AZURE_TENANT_ID=${entra_tenant_id}")
       info "Entra ID auth enabled — injecting MSAL build args"
@@ -220,6 +226,74 @@ if [[ "$skip_update" == "false" ]]; then
 fi
 
 #------------------------------------------------------------------------------
+# Configure Authentication
+#------------------------------------------------------------------------------
+
+if [[ "$auth_enabled" == "true" && "$skip_update" == "false" ]]; then
+
+  section "Configuring Backend Authentication"
+  info "Setting auth env vars on $backend_app..."
+  az containerapp update \
+    --name "$backend_app" \
+    --resource-group "$rg" \
+    --set-env-vars \
+      "DATAVIEWER_AUTH_PROVIDER=easy_auth" \
+      "DATAVIEWER_AUTH_DISABLED=false" \
+      "DATAVIEWER_AZURE_TENANT_ID=${entra_tenant_id}" \
+      "DATAVIEWER_AZURE_CLIENT_ID=${entra_client_id}" \
+    --output none
+
+  section "Configuring Easy Auth on Frontend"
+
+  # Create client secret for server-directed OAuth flow
+  info "Creating client secret for Easy Auth..."
+  client_secret=$(az ad app credential reset \
+    --id "$entra_client_id" \
+    --display-name "easy-auth" \
+    --years 2 \
+    --query password -o tsv)
+
+  # Enable ID token issuance (required for Easy Auth)
+  info "Enabling ID token issuance..."
+  az ad app update --id "$entra_client_id" \
+    --enable-id-token-issuance true \
+    --output none
+
+  # Add web redirect URI for Easy Auth callback
+  frontend_fqdn=$(az containerapp show \
+    --name "$frontend_app" \
+    --resource-group "$rg" \
+    --query 'properties.configuration.ingress.fqdn' -o tsv)
+
+  info "Adding Easy Auth callback redirect URI..."
+  az ad app update --id "$entra_client_id" \
+    --web-redirect-uris "https://${frontend_fqdn}/.auth/login/aad/callback" \
+    --output none
+
+  # Configure Easy Auth identity provider
+  info "Configuring Easy Auth Microsoft provider..."
+  az containerapp auth microsoft update \
+    --name "$frontend_app" \
+    --resource-group "$rg" \
+    --client-id "$entra_client_id" \
+    --client-secret "$client_secret" \
+    --tenant-id "$entra_tenant_id" \
+    --issuer "https://login.microsoftonline.com/${entra_tenant_id}/v2.0" \
+    --yes \
+    --output none
+
+  # Require authentication for all requests
+  info "Setting unauthenticated client action to RedirectToLoginPage..."
+  az containerapp auth update \
+    --name "$frontend_app" \
+    --resource-group "$rg" \
+    --unauthenticated-client-action RedirectToLoginPage \
+    --redirect-provider azureactivedirectory \
+    --output none
+
+fi
+
+#------------------------------------------------------------------------------
 # Deployment Summary
 #------------------------------------------------------------------------------
 
@@ -231,5 +305,6 @@ print_kv "Frontend App" "$frontend_app"
 print_kv "Image Tag" "$image_tag"
 print_kv "Build" "$([[ "$skip_build" == "true" ]] && echo 'Skipped' || echo 'Complete')"
 print_kv "Update" "$([[ "$skip_update" == "true" ]] && echo 'Skipped' || echo 'Complete')"
+print_kv "Easy Auth" "$([[ "$auth_enabled" == "true" ]] && echo 'Configured' || echo 'Disabled')"
 [[ -n "$frontend_url" ]] && print_kv "Frontend URL" "$frontend_url"
 info "Deployment complete"

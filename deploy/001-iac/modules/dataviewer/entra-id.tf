@@ -43,6 +43,15 @@ resource "azuread_application" "dataviewer" {
     redirect_uris = var.dataviewer_redirect_uris
   }
 
+  // Easy Auth server-directed flow requires web redirect URIs and ID tokens
+  web {
+    redirect_uris = ["https://${azurerm_container_app.frontend.ingress[0].fqdn}/.auth/login/aad/callback"]
+
+    implicit_grant {
+      id_token_issuance_enabled = true
+    }
+  }
+
   api {
     requested_access_token_version = 2
 

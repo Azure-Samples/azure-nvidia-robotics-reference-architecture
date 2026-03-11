@@ -6,6 +6,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import App from './App'
+import { AuthGate } from './components/auth/AuthGate'
 import { isAuthEnabled, msalConfig } from './lib/auth-config'
 import { setMsalInstance } from './lib/auth-headers'
 
@@ -36,7 +37,9 @@ function Root() {
   if (isAuthEnabled && msalInstance) {
     return (
       <MsalProvider instance={msalInstance}>
-        <App />
+        <AuthGate>
+          <App />
+        </AuthGate>
       </MsalProvider>
     )
   }
