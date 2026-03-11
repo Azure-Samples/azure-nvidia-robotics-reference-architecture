@@ -102,8 +102,8 @@ describe('AppContent', () => {
         tasks: [],
       },
       {
-        id: 'hexagon_lerobot',
-        name: 'hexagon_lerobot (hexagarm)',
+        id: 'customer_lerobot',
+        name: 'customer_lerobot (hexagarm)',
         totalEpisodes: 64,
         fps: 30,
         features: {},
@@ -132,8 +132,8 @@ describe('AppContent', () => {
 
     mockDatasets = [
       {
-        id: 'hexagon_lerobot',
-        name: 'hexagon_lerobot (hexagarm)',
+        id: 'customer_lerobot',
+        name: 'customer_lerobot (hexagarm)',
         totalEpisodes: 64,
         fps: 30,
         features: {},
@@ -144,15 +144,15 @@ describe('AppContent', () => {
     rerender(<AppContent />)
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('hexagon_lerobot')
+      expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('customer_lerobot')
     })
   })
 
   it('renders a filterable dataset dropdown even when only one dataset is available', async () => {
     mockDatasets = [
       {
-        id: 'hexagon_lerobot',
-        name: 'hexagon_lerobot',
+        id: 'customer_lerobot',
+        name: 'customer_lerobot',
         totalEpisodes: 64,
         fps: 30,
         features: {},
@@ -165,13 +165,13 @@ describe('AppContent', () => {
     render(<AppContent />)
 
     const trigger = await screen.findByRole('combobox', { name: 'Dataset' })
-    expect(trigger).toHaveTextContent('hexagon_lerobot')
+    expect(trigger).toHaveTextContent('customer_lerobot')
     expect(screen.queryByPlaceholderText('Dataset ID')).not.toBeInTheDocument()
 
     await user.click(trigger)
 
     expect(screen.getByPlaceholderText('Filter datasets')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'hexagon_lerobot' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'customer_lerobot' })).toBeInTheDocument()
   })
 
   it('supports keyboard selection from the dataset dropdown results', async () => {
@@ -187,7 +187,7 @@ describe('AppContent', () => {
     await user.keyboard('{ArrowDown}{Enter}')
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('hexagon_lerobot')
+      expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveTextContent('customer_lerobot')
     })
   })
 

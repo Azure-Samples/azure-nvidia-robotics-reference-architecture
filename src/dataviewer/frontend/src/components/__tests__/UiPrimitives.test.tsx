@@ -35,7 +35,7 @@ describe('shared ui primitives', () => {
 
     function FilterableCommand() {
       const [query, setQuery] = useState('')
-      const items = ['houston_lerobot_fixed', 'hexagon_lerobot']
+      const items = ['houston_lerobot_fixed', 'customer_lerobot']
       const filteredItems = items.filter((item) => item.includes(query.toLowerCase()))
 
       return (
@@ -57,9 +57,9 @@ describe('shared ui primitives', () => {
 
     render(<FilterableCommand />)
 
-    await user.type(screen.getByPlaceholderText('Filter datasets'), 'hex')
+    await user.type(screen.getByPlaceholderText('Filter datasets'), 'customer')
 
-    expect(screen.getByText('hexagon_lerobot')).toBeInTheDocument()
+    expect(screen.getByText('customer_lerobot')).toBeInTheDocument()
     expect(screen.queryByText('houston_lerobot_fixed')).not.toBeInTheDocument()
   })
 
