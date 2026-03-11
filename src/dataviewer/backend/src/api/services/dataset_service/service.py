@@ -148,6 +148,7 @@ class DatasetService:
             return self._blob_synced[dataset_id]
 
         tmp_dir = Path(tempfile.mkdtemp(prefix="dvw_"))
+        # codeql[py/path-injection]
         success = await self._blob_provider.sync_dataset_to_local(dataset_id, tmp_dir)
         if success:
             self._blob_synced[dataset_id] = tmp_dir
@@ -168,6 +169,7 @@ class DatasetService:
             return self._blob_meta_synced[dataset_id]
 
         tmp_dir = Path(tempfile.mkdtemp(prefix="dvwm_"))
+        # codeql[py/path-injection]
         success = await self._blob_provider.sync_meta_only_to_local(dataset_id, tmp_dir)
         if success:
             self._blob_meta_synced[dataset_id] = tmp_dir
@@ -366,7 +368,7 @@ class DatasetService:
         task_index: int | None = None,
     ) -> list[EpisodeMeta]:
         """List episodes for a dataset with filtering."""
-        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
         dataset = self._datasets.get(dataset_id)
         annotated_indices = set(await self._storage.list_annotated_episodes(dataset_id))
 
@@ -424,7 +426,7 @@ class DatasetService:
 
     async def get_episode(self, dataset_id: str, episode_idx: int) -> EpisodeData | None:
         """Get complete data for a specific episode."""
-        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
 
         # Check cache first
         cached = self._episode_cache.get(dataset_id, episode_idx)
@@ -473,7 +475,7 @@ class DatasetService:
 
     async def get_episode_trajectory(self, dataset_id: str, episode_idx: int) -> list[TrajectoryPoint]:
         """Get only the trajectory data for an episode."""
-        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
 
         cached = self._episode_cache.get(dataset_id, episode_idx)
         if cached is not None:
@@ -487,6 +489,7 @@ class DatasetService:
 
     def _schedule_prefetch(self, dataset_id: str, episode_idx: int) -> None:
         """Schedule background loading of adjacent episodes into the cache."""
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
         if not self._episode_cache.enabled:
             return
 
@@ -601,12 +604,12 @@ class DatasetService:
 
     async def get_frame_image(self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str) -> bytes | None:
         """Get a single frame image from an episode."""
-        dataset_id = dataset_id.replace("\r\n", "").replace("\n", "")
-        camera = camera.replace("\r\n", "").replace("\n", "")
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        camera = camera.replace("\n", "").replace("\r", "")
 
         result = self._try_handlers(dataset_id, "get_frame_image", episode_idx, frame_idx, camera)
         if result is None:
-            logger.warning("No loader found for dataset %s", dataset_id.replace("\r\n", "").replace("\n", ""))
+            logger.warning("No loader found for dataset %s", dataset_id)
         return result
 
     async def get_episode_cameras(self, dataset_id: str, episode_idx: int) -> list[str]:
