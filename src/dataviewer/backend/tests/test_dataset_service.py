@@ -6,6 +6,7 @@ episode data retrieval, trajectory extraction, and capability reporting.
 """
 
 import os
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -310,3 +311,57 @@ class TestNestedDatasetDiscovery:
         datasets = await service.list_datasets()
         ds = next(d for d in datasets if d.id == "flat_ds")
         assert ds.group is None
+
+
+class TestBlobSyncTempPrefixes:
+    """Test temp-directory prefixes used for blob dataset sync."""
+
+    @pytest.mark.asyncio
+    async def test_blob_sync_prefix_excludes_path_separators(self, tmp_path, monkeypatch):
+        class FakeBlobProvider:
+            async def sync_dataset_to_local(self, dataset_id: str, local_dir: Path) -> bool:
+                return True
+
+        created_prefixes: list[str] = []
+        created_dir = tmp_path / "blob-sync"
+
+        def fake_mkdtemp(*, prefix: str) -> str:
+            created_prefixes.append(prefix)
+            created_dir.mkdir(parents=True, exist_ok=True)
+            return str(created_dir)
+
+        monkeypatch.setattr("src.api.services.dataset_service.service.tempfile.mkdtemp", fake_mkdtemp)
+
+        service = DatasetService(base_path=str(tmp_path), blob_provider=FakeBlobProvider())
+        result = await service._ensure_blob_synced("../escape")
+
+        assert result == created_dir
+        assert created_prefixes
+        assert "/" not in created_prefixes[0]
+        assert "\\" not in created_prefixes[0]
+        assert ".." not in created_prefixes[0]
+
+    @pytest.mark.asyncio
+    async def test_blob_meta_sync_prefix_excludes_path_separators(self, tmp_path, monkeypatch):
+        class FakeBlobProvider:
+            async def sync_meta_only_to_local(self, dataset_id: str, local_dir: Path) -> bool:
+                return True
+
+        created_prefixes: list[str] = []
+        created_dir = tmp_path / "blob-meta-sync"
+
+        def fake_mkdtemp(*, prefix: str) -> str:
+            created_prefixes.append(prefix)
+            created_dir.mkdir(parents=True, exist_ok=True)
+            return str(created_dir)
+
+        monkeypatch.setattr("src.api.services.dataset_service.service.tempfile.mkdtemp", fake_mkdtemp)
+
+        service = DatasetService(base_path=str(tmp_path), blob_provider=FakeBlobProvider())
+        result = await service._ensure_blob_meta_synced("..\\escape")
+
+        assert result == created_dir
+        assert created_prefixes
+        assert "/" not in created_prefixes[0]
+        assert "\\" not in created_prefixes[0]
+        assert ".." not in created_prefixes[0]

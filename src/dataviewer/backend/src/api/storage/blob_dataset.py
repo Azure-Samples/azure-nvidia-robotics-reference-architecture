@@ -40,7 +40,6 @@ except ImportError:
     AsyncDefaultAzureCredential = None  # type: ignore[assignment,misc]
     BlobServiceClient = None  # type: ignore[assignment]
 
-# Blobs to download when syncing a dataset for use by local loaders (excludes videos)
 _SYNC_META_BLOBS = [
     "meta/info.json",
     "meta/stats.json",
@@ -371,6 +370,9 @@ class BlobDatasetProvider:
 
             async for blob in container.list_blobs(name_starts_with=meta_prefix):
                 relative = blob.name[len(f"{dataset_id}/") :]
+                if relative not in _SYNC_META_BLOBS and not relative.startswith("meta/episodes/"):
+                    continue
+
                 local_path = local_dir / relative
                 local_path.parent.mkdir(parents=True, exist_ok=True)
 

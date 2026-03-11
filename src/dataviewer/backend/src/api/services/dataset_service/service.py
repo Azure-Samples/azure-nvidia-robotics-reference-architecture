@@ -6,8 +6,10 @@ implementations (LeRobot, HDF5) and manages blob storage integration.
 """
 
 import asyncio
+import hashlib
 import logging
 import os
+import shutil
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -30,6 +32,14 @@ if TYPE_CHECKING:
     from ...storage.blob_dataset import BlobDatasetProvider
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_temp_dir_prefix(prefix: str, dataset_id: str) -> str:
+    """Build a filesystem-safe temp directory prefix from an arbitrary dataset identifier."""
+    sanitized = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in dataset_id)
+    sanitized = sanitized.strip("_")[:32] or "dataset"
+    digest = hashlib.sha256(dataset_id.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}_{sanitized}_{digest}_"
 
 
 class DatasetService:
@@ -133,12 +143,13 @@ class DatasetService:
         if dataset_id in self._blob_synced:
             return self._blob_synced[dataset_id]
 
-        tmp_dir = Path(tempfile.mkdtemp(prefix=f"dvw_{dataset_id}_"))
+        tmp_dir = Path(tempfile.mkdtemp(prefix=_safe_temp_dir_prefix("dvw", dataset_id)))
         success = await self._blob_provider.sync_dataset_to_local(dataset_id, tmp_dir)
         if success:
             self._blob_synced[dataset_id] = tmp_dir
             return tmp_dir
 
+        shutil.rmtree(tmp_dir, ignore_errors=True)
         logger.warning("Blob sync failed for dataset '%s', tmp dir removed", dataset_id)
         return None
 
@@ -150,12 +161,13 @@ class DatasetService:
         if dataset_id in self._blob_meta_synced:
             return self._blob_meta_synced[dataset_id]
 
-        tmp_dir = Path(tempfile.mkdtemp(prefix=f"dvwm_{dataset_id}_"))
+        tmp_dir = Path(tempfile.mkdtemp(prefix=_safe_temp_dir_prefix("dvwm", dataset_id)))
         success = await self._blob_provider.sync_meta_only_to_local(dataset_id, tmp_dir)
         if success:
             self._blob_meta_synced[dataset_id] = tmp_dir
             return tmp_dir
 
+        shutil.rmtree(tmp_dir, ignore_errors=True)
         logger.warning("Blob meta sync failed for dataset '%s'", dataset_id)
         return None
 
@@ -515,8 +527,8 @@ class DatasetService:
             task = asyncio.create_task(_prefetch())
             self._prefetch_tasks.add(task)
             task.add_done_callback(self._prefetch_tasks.discard)
-        except RuntimeError:
-            pass
+        except RuntimeError as error:
+            logger.debug("Skipping episode prefetch for %s/%d: %s", dataset_id, episode_idx, error)
 
     # ------------------------------------------------------------------
     # Capability queries

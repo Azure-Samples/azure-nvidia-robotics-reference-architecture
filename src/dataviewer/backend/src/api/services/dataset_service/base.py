@@ -66,23 +66,23 @@ class DatasetFormatHandler(Protocol):
 
     def can_handle(self, dataset_path: Path) -> bool:
         """Return True if this handler supports the dataset at the given path."""
-        ...
+        pass
 
     def has_loader(self, dataset_id: str) -> bool:
         """Return True if a loader is already initialized for this dataset."""
-        ...
+        pass
 
     def discover(self, dataset_id: str, dataset_path: Path) -> DatasetInfo | None:
         """Build DatasetInfo from the dataset directory. Returns None on failure."""
-        ...
+        pass
 
     def get_loader(self, dataset_id: str, dataset_path: Path) -> bool:
         """Get or create the underlying loader for a dataset. Returns True if successful."""
-        ...
+        pass
 
     def list_episodes(self, dataset_id: str) -> tuple[list[int], dict[int, dict]]:
         """Return (sorted episode indices, {index: metadata dict})."""
-        ...
+        pass
 
     def load_episode(
         self,
@@ -91,11 +91,11 @@ class DatasetFormatHandler(Protocol):
         dataset_info: DatasetInfo | None = None,
     ) -> EpisodeData | None:
         """Load complete episode data. Returns None on failure."""
-        ...
+        pass
 
     def get_trajectory(self, dataset_id: str, episode_idx: int) -> list[TrajectoryPoint]:
         """Load trajectory data only. Returns empty list on failure."""
-        ...
+        pass
 
     def get_frame_image(
         self,
@@ -105,12 +105,12 @@ class DatasetFormatHandler(Protocol):
         camera: str,
     ) -> bytes | None:
         """Get a single JPEG frame image. Returns None if unavailable."""
-        ...
+        pass
 
     def get_cameras(self, dataset_id: str, episode_idx: int) -> list[str]:
         """List available camera names for an episode."""
-        ...
+        pass
 
     def get_video_path(self, dataset_id: str, episode_idx: int, camera: str) -> str | None:
         """Get filesystem path to a video file. Returns None if unavailable."""
-        ...
+        pass
