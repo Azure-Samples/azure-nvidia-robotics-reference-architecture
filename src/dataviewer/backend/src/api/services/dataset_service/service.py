@@ -34,6 +34,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _validate_dataset_id(dataset_id: str) -> str:
+    """Validate and return a safe dataset identifier. Raises ValueError on traversal attempts."""
+    if "\\" in dataset_id or "/" in dataset_id:
+        raise ValueError(f"Invalid dataset identifier: {dataset_id!r}")
+    for part in dataset_id.split("--"):
+        safe = os.path.basename(part)
+        if not safe or safe != part or part in {".", ".."}:
+            raise ValueError(f"Invalid dataset identifier: {dataset_id!r}")
+    return dataset_id
+
+
 def _safe_temp_dir_prefix(prefix: str, dataset_id: str) -> str:
     """Build a filesystem-safe temp directory prefix from an arbitrary dataset identifier."""
     sanitized = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in dataset_id)
@@ -140,6 +151,8 @@ class DatasetService:
         if self._blob_provider is None:
             return None
 
+        dataset_id = _validate_dataset_id(dataset_id)
+
         if dataset_id in self._blob_synced:
             return self._blob_synced[dataset_id]
 
@@ -157,6 +170,8 @@ class DatasetService:
         """Download only meta/ files from blob to a local temp dir."""
         if self._blob_provider is None:
             return None
+
+        dataset_id = _validate_dataset_id(dataset_id)
 
         if dataset_id in self._blob_meta_synced:
             return self._blob_meta_synced[dataset_id]
@@ -528,7 +543,8 @@ class DatasetService:
             self._prefetch_tasks.add(task)
             task.add_done_callback(self._prefetch_tasks.discard)
         except RuntimeError as error:
-            logger.debug("Skipping episode prefetch for %s/%d: %s", dataset_id, episode_idx, error)
+            safe_id = dataset_id.replace("\r\n", "").replace("\n", "")
+            logger.debug("Skipping episode prefetch for %s/%d: %s", safe_id, episode_idx, error)
 
     # ------------------------------------------------------------------
     # Capability queries

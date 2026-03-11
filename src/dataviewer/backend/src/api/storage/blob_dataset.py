@@ -40,11 +40,11 @@ except ImportError:
     AsyncDefaultAzureCredential = None  # type: ignore[assignment,misc]
     BlobServiceClient = None  # type: ignore[assignment]
 
-_SYNC_META_BLOBS = [
+_SYNC_META_BLOBS = {
     "meta/info.json",
     "meta/stats.json",
     "meta/tasks.parquet",
-]
+}
 
 
 class BlobDatasetProvider:

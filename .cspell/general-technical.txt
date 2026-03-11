@@ -1939,3 +1939,16 @@ ylim
 yticklabels
 yticks
 zorder
+
+# Dataviewer application terms
+allclose
+cmdk
+cooldown
+desync
+dvwm
+emanufacturing
+midtone
+nameidentifier
+persistable
+rvfc
+srcs

@@ -333,13 +333,8 @@ class TestBlobSyncTempPrefixes:
         monkeypatch.setattr("src.api.services.dataset_service.service.tempfile.mkdtemp", fake_mkdtemp)
 
         service = DatasetService(base_path=str(tmp_path), blob_provider=FakeBlobProvider())
-        result = await service._ensure_blob_synced("../escape")
-
-        assert result == created_dir
-        assert created_prefixes
-        assert "/" not in created_prefixes[0]
-        assert "\\" not in created_prefixes[0]
-        assert ".." not in created_prefixes[0]
+        with pytest.raises(ValueError, match="Invalid dataset identifier"):
+            await service._ensure_blob_synced("../escape")
 
     @pytest.mark.asyncio
     async def test_blob_meta_sync_prefix_excludes_path_separators(self, tmp_path, monkeypatch):
@@ -358,10 +353,5 @@ class TestBlobSyncTempPrefixes:
         monkeypatch.setattr("src.api.services.dataset_service.service.tempfile.mkdtemp", fake_mkdtemp)
 
         service = DatasetService(base_path=str(tmp_path), blob_provider=FakeBlobProvider())
-        result = await service._ensure_blob_meta_synced("..\\escape")
-
-        assert result == created_dir
-        assert created_prefixes
-        assert "/" not in created_prefixes[0]
-        assert "\\" not in created_prefixes[0]
-        assert ".." not in created_prefixes[0]
+        with pytest.raises(ValueError, match="Invalid dataset identifier"):
+            await service._ensure_blob_meta_synced("..\\escape")

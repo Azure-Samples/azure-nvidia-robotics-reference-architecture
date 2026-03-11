@@ -63,3 +63,4 @@ eastu
 AADSSH
 rtxprogpu
 RTXPRO
+azureactivedirectory
