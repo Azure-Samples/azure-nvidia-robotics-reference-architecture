@@ -46,11 +46,9 @@ def _validate_dataset_id(dataset_id: str) -> str:
 
 
 def _safe_temp_dir_prefix(prefix: str, dataset_id: str) -> str:
-    """Build a filesystem-safe temp directory prefix from an arbitrary dataset identifier."""
-    sanitized = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in dataset_id)
-    sanitized = sanitized.strip("_")[:32] or "dataset"
-    digest = hashlib.sha256(dataset_id.encode("utf-8")).hexdigest()[:12]
-    return f"{prefix}_{sanitized}_{digest}_"
+    """Build a filesystem-safe temp directory prefix from a dataset identifier hash."""
+    digest = hashlib.sha256(dataset_id.encode("utf-8")).hexdigest()[:16]
+    return f"{prefix}_{digest}_"
 
 
 class DatasetService:
@@ -543,8 +541,7 @@ class DatasetService:
             self._prefetch_tasks.add(task)
             task.add_done_callback(self._prefetch_tasks.discard)
         except RuntimeError as error:
-            safe_id = dataset_id.replace("\r\n", "").replace("\n", "")
-            logger.debug("Skipping episode prefetch for %s/%d: %s", safe_id, episode_idx, error)
+            logger.debug("Skipping episode prefetch for %r/%d: %s", dataset_id, episode_idx, error)
 
     # ------------------------------------------------------------------
     # Capability queries
