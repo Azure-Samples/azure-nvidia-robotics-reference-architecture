@@ -4,7 +4,7 @@
  * Handles background synchronization of local changes with the server.
  */
 
-import { apiClient } from '@/api/client';
+import { handleResponse, mutationHeaders } from '@/lib/api-client';
 
 import {
   getPendingSyncItems,
@@ -66,25 +66,36 @@ export function waitForOnline(): Promise<void> {
  */
 async function processSyncItem(item: SyncQueueItem): Promise<boolean> {
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(await mutationHeaders()),
+    };
+
+    let response: Response;
     switch (item.type) {
       case 'create':
-        await apiClient.post(
+        response = await fetch(
           `/api/datasets/${item.datasetId}/episodes/${item.episodeId}/annotations`,
-          item.payload
+          { method: 'POST', headers, body: JSON.stringify(item.payload) }
         );
         break;
 
       case 'update':
-        await apiClient.put(
+        response = await fetch(
           `/api/annotations/${item.annotationId}`,
-          item.payload
+          { method: 'PUT', headers, body: JSON.stringify(item.payload) }
         );
         break;
 
       case 'delete':
-        await apiClient.delete(`/api/annotations/${item.annotationId}`);
+        response = await fetch(
+          `/api/annotations/${item.annotationId}`,
+          { method: 'DELETE', headers: await mutationHeaders() }
+        );
         break;
     }
+
+    await handleResponse(response);
 
     // Mark annotation as synced
     await updateAnnotationSyncStatus(
@@ -105,8 +116,8 @@ async function processSyncItem(item: SyncQueueItem): Promise<boolean> {
     if (
       error &&
       typeof error === 'object' &&
-      'response' in error &&
-      (error as { response?: { status?: number } }).response?.status === 409
+      'status' in error &&
+      (error as { status?: number }).status === 409
     ) {
       await updateAnnotationSyncStatus(item.annotationId, 'conflict');
       await removeSyncItem(item.id);

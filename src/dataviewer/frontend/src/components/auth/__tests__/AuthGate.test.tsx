@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthGate } from '../AuthGate'
 
@@ -27,26 +27,60 @@ describe('AuthGate', () => {
     mockLoginRedirect.mockClear()
   })
 
-  it('renders children inside AuthenticatedTemplate', () => {
-    render(
-      <AuthGate>
-        <div>Protected Content</div>
-      </AuthGate>,
-    )
-
-    const authenticated = screen.getByTestId('authenticated')
-    expect(authenticated).toHaveTextContent('Protected Content')
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
-  it('triggers loginRedirect when unauthenticated and interaction is idle', () => {
+  it('renders children directly when Easy Auth is active', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve([{ userId: 'user-123' }]),
+    } as Response)
+
     render(
       <AuthGate>
         <div>Protected Content</div>
       </AuthGate>,
     )
 
+    await waitFor(() => {
+      expect(screen.getByText('Protected Content')).toBeInTheDocument()
+    })
+    expect(mockLoginRedirect).not.toHaveBeenCalled()
+  })
+
+  it('falls back to MSAL when Easy Auth is not available', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+    } as Response)
+
+    render(
+      <AuthGate>
+        <div>Protected Content</div>
+      </AuthGate>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toBeInTheDocument()
+    })
     expect(mockLoginRedirect).toHaveBeenCalledWith({
       scopes: ['api://test-client-id/access_as_user'],
     })
+  })
+
+  it('falls back to MSAL when Easy Auth fetch fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network error'))
+
+    render(
+      <AuthGate>
+        <div>Protected Content</div>
+      </AuthGate>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toBeInTheDocument()
+    })
+    expect(mockLoginRedirect).toHaveBeenCalled()
   })
 })

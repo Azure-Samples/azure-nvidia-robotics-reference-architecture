@@ -277,7 +277,6 @@ if [[ "$auth_enabled" == "true" && "$skip_update" == "false" ]]; then
     --resource-group "$rg" \
     --client-id "$entra_client_id" \
     --client-secret "$client_secret" \
-    --tenant-id "$entra_tenant_id" \
     --issuer "https://login.microsoftonline.com/${entra_tenant_id}/v2.0" \
     --yes \
     --output none

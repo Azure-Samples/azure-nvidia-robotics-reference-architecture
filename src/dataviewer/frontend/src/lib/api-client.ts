@@ -102,7 +102,7 @@ export class ApiClientError extends Error {
 /**
  * Handle API response, throwing on error.
  */
-async function handleResponse<T>(response: Response): Promise<T> {
+export async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let error: ApiError;
     try {
