@@ -209,6 +209,8 @@ class DatasetService:
 
     async def get_blob_video_path(self, dataset_id: str, episode_idx: int, camera: str) -> str | None:
         """Resolve the blob path for an episode video."""
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        episode_idx = int(episode_idx)
         if self._blob_provider is None:
             return None
         return await self._blob_provider.resolve_video_blob_path(dataset_id, episode_idx, camera)
@@ -427,6 +429,7 @@ class DatasetService:
     async def get_episode(self, dataset_id: str, episode_idx: int) -> EpisodeData | None:
         """Get complete data for a specific episode."""
         dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        episode_idx = int(episode_idx)
 
         # Check cache first
         cached = self._episode_cache.get(dataset_id, episode_idx)
@@ -476,6 +479,7 @@ class DatasetService:
     async def get_episode_trajectory(self, dataset_id: str, episode_idx: int) -> list[TrajectoryPoint]:
         """Get only the trajectory data for an episode."""
         dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        episode_idx = int(episode_idx)
 
         cached = self._episode_cache.get(dataset_id, episode_idx)
         if cached is not None:
@@ -490,6 +494,7 @@ class DatasetService:
     def _schedule_prefetch(self, dataset_id: str, episode_idx: int) -> None:
         """Schedule background loading of adjacent episodes into the cache."""
         dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        episode_idx = int(episode_idx)
         if not self._episode_cache.enabled:
             return
 
@@ -605,6 +610,8 @@ class DatasetService:
     async def get_frame_image(self, dataset_id: str, episode_idx: int, frame_idx: int, camera: str) -> bytes | None:
         """Get a single frame image from an episode."""
         dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        episode_idx = int(episode_idx)
+        frame_idx = int(frame_idx)
         camera = camera.replace("\n", "").replace("\r", "")
 
         result = self._try_handlers(dataset_id, "get_frame_image", episode_idx, frame_idx, camera)
@@ -614,10 +621,14 @@ class DatasetService:
 
     async def get_episode_cameras(self, dataset_id: str, episode_idx: int) -> list[str]:
         """Get list of available cameras for an episode."""
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        episode_idx = int(episode_idx)
         return self._try_handlers(dataset_id, "get_cameras", episode_idx) or []
 
     def get_video_file_path(self, dataset_id: str, episode_idx: int, camera: str) -> str | None:
         """Get the filesystem path to a video file."""
+        dataset_id = dataset_id.replace("\n", "").replace("\r", "")
+        episode_idx = int(episode_idx)
         handler = self._resolve_handler(dataset_id)
         if handler is not None:
             return handler.get_video_path(dataset_id, episode_idx, camera)
